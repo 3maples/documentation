@@ -1,0 +1,65 @@
+✅ 2. Fence Repair
+
+Generate JSON documents for all the necessary classes based on the description below. 
+Description: the following details are for an estimate named: Perimeter Fence Repair
+Details:
+	- Fence type: 6 ft wooden privacy fence
+	- Total length: 145 ft
+	- Scope: Fence repair, post replacement, painting
+	- equipment needed: fence repair kit - total cost: $50
+	- labour needed: 2 workers for 6 hours - total cost: $100
+	- materials needed: posts,wood planks, wood filler, paint - total cost: $200
+
+
+⸻
+
+✅ 3. Patio Power Washing
+
+Job Name: Patio Deep Cleaning & Pressure Wash
+Details:
+	•	Patio area: 22 ft × 18 ft (396 sq ft)
+	•	Material: Textured concrete
+	•	Condition: Algae buildup near edges, general dirt/stains
+	•	Obstacles: Outdoor furniture that needs temporary relocation
+	•	Water access: Outdoor spigot on the east wall
+
+⸻
+
+✅ 4. Gutter Cleaning
+
+Job Name: Two-Story Gutter Clearing
+Details:
+	•	Property: 2-story suburban home
+	•	Gutter length: Approximately 185 linear feet
+	•	Gutter type: Standard aluminum, 5-inch
+	•	Roof pitch: Moderate
+	•	Condition: Heavy leaf buildup, downspout on north side likely clogged
+	•	Safety note: Requires 24–28 ft ladder
+
+⸻
+
+✅ 5. Driveway Sealcoating
+
+Job Name: Asphalt Driveway Reseal
+Details:
+	•	Driveway size: 45 ft long × 11 ft wide (495 sq ft)
+	•	Material: Aged asphalt
+	•	Condition:
+	•	Minor cracks (⅛–¼ inch width)
+	•	Color faded
+	•	Preparation needed: Cleaning, crack filling, then sealcoating
+	•	Customer request: Quick-dry sealant preferred
+
+⸻
+
+✅ 6. Deck Staining
+
+Job Name: Backyard Deck Prep & Stain
+Details:
+	•	Deck size: 20 ft × 12 ft (240 sq ft)
+	•	Material: Pressure-treated wood
+	•	Condition: Slight discoloration, sun-faded, no major rot
+	•	Surface prep: Light sanding + cleaning
+	•	Desired stain: Semi-transparent cedar tone
+	•	Railing length: 32 ft total
+
