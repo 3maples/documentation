@@ -1,0 +1,33 @@
+
+
+Estimate
+- A proposal of work to be done for a client to sign off
+- Could consist of various types of work
+- one or more Work Items
+- Grand total rolled up from Work Items
+
+Work Item
+- Related set of tasks to be done
+- Has one or more Materials and/or People
+- recurring details (weekly, bi-weekly, monthly, etc)
+- Tax %
+- Subtotal rolled up from Materials and People
+
+Job
+- When a Work Item is assigned to a Crew and put into a Schedule
+- Breaks down a Work Items into Activities
+
+Crew
+- One or more Employees
+- Closely match the People role in Work Item
+
+Schedule
+- Block of times when Activities will be done
+- Might not be contiguous
+
+Activity
+- Each Job can have one or more activities
+- A Job is complete when all the activities are done
+
+Invoice
+- one or more completed Jobs
