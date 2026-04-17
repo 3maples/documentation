@@ -1,0 +1,6 @@
+{
+  "version": "0.7.0",
+  "date": { "$date": "2026-04-17T00:00:00Z" },
+  "content": "## New Features\n- **Recurring Work Items** — You can now set a recurring schedule on any Work Item. Toggle \"Recurring Work\" on and choose from three schedule types: a date range, a total number of occurrences, or specific months. A summary of the schedule is shown next to the toggle for easy reference.\n- **Recurring Cost Calculations** — Work Items with a recurring schedule automatically show the number of occurrences and the total cost across all recurring dates, both in the Work Item editor and on the Estimate detail page.\n- **Recurring Info in Generated Documents** — When generating estimate documents, recurring Work Items now include the schedule summary in the description and the total recurring cost in the amount.\n\n## Improvements\n- **Estimate Grand Total with Recurring** — The Estimate grand total now reflects the full recurring cost for all Work Items, giving you an accurate picture of the total contract value.\n\n## Bug Fixes\n- **Fixed Document Deletion** — Resolved an issue where previously generated estimate documents could not be deleted from Google Drive.",
+  "created_at": { "$date": "2026-04-17T23:00:00.000Z" }
+}
