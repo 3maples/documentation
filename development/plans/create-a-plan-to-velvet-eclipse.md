@@ -1,0 +1,263 @@
+# Plan: Maple CRUD Coverage Test Suite + Gap Report
+
+> **Status:** Most of this plan has shipped. The "What shipped" section is the source of truth for current behavior; the "What's open" section is the punch list.
+
+## Context
+
+Maple is the Orchestrator agent ([platform/agents/orchestrator/service.py](platform/agents/orchestrator/service.py)) — a hybrid rule-based + LLM intent classifier that routes user messages to specialized agents (Contact, Property, Material, Labour, Estimate). The user wants confidence that Maple correctly handles realistic CRUD-style user questions for four resources:
+
+- **Property** — job sites / addresses
+- **Contact** — *individuals* associated with a property
+- **Material** — catalog of physical products
+- **People / Labour** — catalog of *role definitions* (Landscaper, Foreman, etc.) — **distinct from Contact**
+
+**Equipment** is explicitly blocked (see policy below). **Estimate** coverage is out of scope (different ReAct architecture).
+
+**Goal**: a parametrized phrasing matrix exercised at two tiers (rule-only, live LLM) producing a dual-column gap report that shows, per phrasing, whether rules handle it AND/OR whether the LLM rescues it.
+
+## What shipped
+
+### Two-tier coverage matrix
+- **111 cases** = 9 categories × 4 CRUD resources × 3 phrasings + 3 equipment refusal phrasings
+- Tier 1 (`use_llm=False`) runs by default; Tier 2 (`@pytest.mark.llm_e2e`) opt-in via `-m "" / -m llm_e2e`
+- Dual-column markdown report at `platform/tests/reports/maple_crud_gap_report.md` (gitignored)
+- Files: [tests/_maple_coverage_data.py](platform/tests/_maple_coverage_data.py), [tests/test_maple_crud_coverage.py](platform/tests/test_maple_crud_coverage.py), [tests/conftest.py](platform/tests/conftest.py) (terminal-summary hook + `llm_e2e` marker), [pytest.ini](platform/pytest.ini)
+
+### Safety policies (rules + agent defenses)
+- **Bulk delete forbidden via Maple**: `is_bulk_delete_request()` + `BULK_DELETE_REFUSAL_MESSAGE` in [agents/text_utils.py](platform/agents/text_utils.py); guards wired into orchestrator `_classify_with_rules` AND `process()`, plus belt-and-braces refusals at top of every domain agent's `process()`. HTTP routers untouched (UI-driven bulk delete still possible).
+- **Equipment requests refused**: `is_equipment_request()` + `EQUIPMENT_REFUSAL_MESSAGE`; same wiring pattern as bulk delete.
+
+### Cheap rule wins (closed real coverage gaps)
+- `ACTION_HINTS["list"]` extended with `count`, `total`, `how many`
+- `ACTION_HINTS["get"]` extended with `search`
+- New `PLURAL_DOMAIN_TOKENS` mapping powers a plural-aware flip: when action is `get` but the message contains a plural domain form (incl. colloquial "people"/"workers"/"labour roles"), action flips to `list` so "find contacts named Smith" routes to `list_contacts`, not `get_contact`
+- `is_help_query` smarter: when CRUD intent is firm and action is `list`, prefers CRUD over help even with enum keywords ("how many labour roles" no longer misroutes to help via "roles")
+
+### People / Labour (the user's "People" UI label = the `labour` code domain)
+- Bulk-delete defensive refusal in [agents/labour/service.py](platform/agents/labour/service.py)
+- Field-extraction `of` separator in `_extract_fields_from_message`
+- `_match_bare_field_name()` + `awaiting_value_for` multi-turn flow in `update_labour` branch
+- Matrix uses `labour role` / `labour roles` + role-titles (Landscaper / Foreman) as `{NAME}` to avoid implying individual people
+- Disambiguation regression tests prove "Update John Doe's role to Manager" never misroutes to `update_labour`
+
+### Property / Contact / Material parity
+Same fixes applied across all three:
+- Bulk-delete defensive refusal in each agent's `process()`
+- `of` separator in `_extract_fields_from_message`
+- `_match_bare_field_name()` helper + `awaiting_value_for` multi-turn flow in each agent's `update_*` branch
+- Reuses the `humanize_field_name` helper for clarification messages
+
+### UX: count + tone
+- `is_count_query(text)` + `format_count_response(count, singular, plural)` helpers
+- All four CRUD agents: count queries return a count summary ("You have 7 contacts right now."), not a list dump. Name-based filtering is skipped for count queries so the count operates on the full catalog.
+- All response strings rewritten to first-person friendly tone:
+  - Create / Update / Delete / Get: "I've ___ for you. Here are the details: …"
+  - List: "Here are your ___: …"
+  - Empty list: "I couldn't find any matching ___."
+  - Count: "You have N ___ right now." / "You have 1 ___ right now." / "You don't have any ___ yet."
+- Labour agent uses "labour role" terminology in responses (not "person") to honor the People-vs-Contact disambiguation
+
+### Test coverage
+- 439 Maple-layer tests passing, zero regressions
+- Per-agent regression tests for: tone (create/update/delete/list), count queries (N>1), empty-list, alt count phrasings ("count my", "total number"), singular grammar (N=1), multi-turn field-then-value flow, "with X of Y" extraction
+- Helper unit tests for `is_bulk_delete_request`, `is_equipment_request`, `is_count_query`, `format_count_response`, refusal-message content invariants — all parameterized for edge cases
+
+### Documentation
+- Maple section added to [CLAUDE.md](CLAUDE.md) covering: supported resources, People-vs-Contact distinction, equipment block, bulk-delete policy, shared text-utility helpers, friendly-tone template, multi-turn flow, coverage matrix invocation
+
+## What's open
+
+| Item | Effort | Value | Notes |
+|---|---|---|---|
+| **Materials drilldown** (see section below) | small fix + medium coverage | **high — live bugs** | List + get-by-name return generic error in production |
+| Architectural gaps in matrix (`verbless` 0/12, `implicit_relationship` 3/12, `possessive` 2/12 rules-only) | hours / design | high | Need a name resolver + cross-resource query model — not regex tweaks. **Next conversation, not next commit.** |
+| Labour `_extract_name_from_message` over-eagerness | small | low | Patched the symptom (skip name extraction for count queries) but the underlying regex still over-matches phrases like "labour roles do I have". Tighten the regex to require role-title shapes. |
+| Field-extraction parity for Labour and Equipment if they ever come back into scope | medium | low | Equipment is currently blocked; replicating fixes would only matter if it's unblocked |
+
+## Materials drilldown — live bugs + coverage gaps
+
+### Reported symptoms
+
+- "How many materials do I have?" → **"I could not complete the material request."** (expected: count summary like "You have N materials right now.")
+- "Show me the details for the material Screened Topsoil" → **same generic error** (expected: get_material with details)
+
+### Root cause (single underlying bug — both symptoms share it)
+
+The Material agent is the **only CRUD agent** that calls a FastAPI router function for its list query, while every other agent queries Beanie directly:
+
+| Agent | List implementation |
+|---|---|
+| Property | `await Property.find(Property.company == PydanticObjectId(company_id)).to_list()` ([property/service.py:837](platform/agents/property/service.py#L837)) |
+| Contact | `await Contact.find(Contact.company == ...).to_list()` ([contact/service.py:960](platform/agents/contact/service.py#L960)) |
+| Labour | `await Labour.find(Labour.company == ...).to_list()` ([labour/service.py:674](platform/agents/labour/service.py#L674)) |
+| **Material** | **`return await materials_api_get_materials(company=company_id)`** ([material/service.py:969-970](platform/agents/material/service.py#L969-L970)) ← the router function |
+
+`materials_api_get_materials` in [routers/materials.py:159](platform/routers/materials.py#L159) requires `decoded_token: dict = Depends(verify_verified_firebase_token)`. When the agent calls this function directly (outside a FastAPI route handler), the `Depends` machinery has no request context to inject the token from, so the call raises an exception. The exception is swallowed by the broad `try/except` at [material/service.py:1947-1964](platform/agents/material/service.py#L1947-L1964), which returns the generic `"I could not complete the material request."` message and stashes the real exception in the response's `error` field.
+
+This breaks **both** symptoms because:
+- Count query path: `process()` → list_materials branch → `_list_materials_via_api()` → router → auth failure
+- Get-by-name path: `process()` → get_material branch → `_resolve_target_material()` → `_find_materials_by_name()` → `_list_materials_via_api()` → router → auth failure
+
+### Why tests didn't catch it
+
+Every existing Material test mocks `_list_materials_via_api` (e.g. [test_material_agent.py:700](platform/tests/test_material_agent.py#L700), [726](platform/tests/test_material_agent.py#L726)), so the auth failure never surfaces in the test suite. The mocks return fake `FakeMaterialDoc` objects directly, masking the real router-call indirection.
+
+### Fix (minimal, matches the other 3 agents)
+
+Rewrite [material/service.py:969-970](platform/agents/material/service.py#L969-L970) to query Beanie directly:
+
+```python
+async def _list_materials_via_api(self, company_id: str) -> List[Material]:
+    return await Material.find(Material.company == PydanticObjectId(company_id)).to_list()
+```
+
+That single change resolves both symptoms (count query + get-by-name). No router/auth changes needed.
+
+### Coverage gaps to close (CRUD on name, description, category, sizes)
+
+Material's domain is richer than the others — `sizes` is a list of `MaterialSizeCost` objects (each with `size`, `unit`, `cost`, `price`). Plus `category` is a `PydanticObjectId` reference to `MaterialCategory`. Existing tests only exercise simple `cost`/`size` scalar updates. Add coverage for:
+
+1. **Anti-regression for the bug above** — one integration test that calls `_list_materials_via_api` *unmocked* through a stubbed Beanie layer, proving the agent doesn't depend on FastAPI's `Depends`. Pin the contract at [test_material_agent.py](platform/tests/test_material_agent.py).
+2. **Get-by-name with multi-word names** — e.g. "Screened Topsoil", "Premium Concrete Mix". Verify `_find_materials_by_name` matches via case-insensitive substring and the response uses the friendly tone.
+3. **Field-level update coverage** — separate test per field:
+   - `name` update (rename material)
+   - `description` update (set / replace / clear)
+   - `category` update (resolve category by name → ObjectId, or via existing category ID)
+   - `sizes`: update cost on a specific size, update price, add a new size, remove a size, rename a size
+4. **Count query through the orchestrator-context path** — exercise with `orchestrator_intent="list_materials"` in context (the path the live app uses), not just isolated agent invocation. We added this for Contact in the empty-list test; replicate for Material.
+5. **Get-by-name confirmation flow** — when multiple materials match a fuzzy name, the agent should ask the user to disambiguate.
+
+### Implementation order
+
+1. Ship the Beanie fix in `_list_materials_via_api` first (single line; closes both live bugs immediately) ✅
+2. Add an integration test that fails without the fix (would have caught the bug) ✅
+3. Add the field-level + multi-size coverage (separate commits per concern if desired) ✅
+4. Re-run Tier 1 + Tier 2 — Material's score should hold or improve ✅
+
+## Materials drilldown phase 2 — categories + nested sizes CRUD
+
+The previous drilldown closed the live bugs and added field-level coverage. Phase 2 expands Maple's Material vocabulary to handle category-aware queries and richer size operations.
+
+**Status:** Categories shipped ✅ (intent + refusal + filter + 22 + 7 + 5 tests, no regressions across 481 Maple-layer tests). Sizes CRUD is the next commit.
+
+### Category support (new) ✅ shipped
+
+`MaterialCategory` is a separate `Document` model ([models/material_category.py](platform/models/material_category.py)) with just `name` and `company`. The Material agent already auto-creates categories on demand via `_find_or_create_category` ([material/service.py:932-944](platform/agents/material/service.py#L932-L944)) — but there's no Maple surface for **listing**, **filtering by**, or **inspecting** a category, and no policy preventing a user from asking Maple to manage categories directly.
+
+**Phrasings to support:**
+| Phrasing | Behavior |
+|---|---|
+| "List available material categories" / "what categories do I have?" / "show me categories" | New intent: `list_material_categories` (read-only) — returns the company's categories |
+| "Find materials in the Hardscape category" / "show me materials in Masonry" | `list_materials` filtered by category name |
+| "What category is Concrete Mix in?" / "what's the category of X?" | `get_material` (existing) — response surfaces the category prominently |
+| "Change Concrete Mix category to Masonry" | `update_material` with `category` field (already partially covered — extend tests to cover category-by-name resolution) |
+| "Create a new category called Hardscape" / "delete the Hardscape category" / "rename Masonry" | **Refused** with policy message: *"Material categories are managed in the catalog UI — I can't create, rename, or delete them from chat. I can list categories, find materials in a category, or change which category a material belongs to."* |
+
+**Implementation (all ✅ shipped):**
+1. ✅ `list_material_categories` registered in `SUPPORTED_INTENTS_BY_AGENT["Material Agent"]` and `MATERIAL_SUPPORTED_INTENTS`.
+2. ✅ `is_material_category_management_request()` + `MATERIAL_CATEGORY_REFUSAL_MESSAGE` in [agents/text_utils.py](platform/agents/text_utils.py). Verbs disjoint from "change"/"set" so material-update phrasings ("change Concrete Mix category to Masonry") do NOT trip the refusal.
+3. ✅ Refusal guard wired into both `_classify_with_rules` and `process()`.
+4. ✅ `_LIST_CATEGORIES_PATTERN` + `_LIST_CATEGORIES_QUESTION_PATTERN` short-circuit BOTH in `_classify_with_rules` AND ahead of `is_help_query` in `process()` (otherwise the "categories" enum keyword would route to help).
+5. ✅ `list_material_categories` branch in [agents/material/service.py](platform/agents/material/service.py) — queries `MaterialCategory.find(MaterialCategory.company == ...).to_list()` (Beanie direct, same pattern as the bug fix), friendly tone, count form via `format_count_response`.
+6. ✅ `_resolve_category_filter()` helper + category-filter branch in `list_materials`. Runs *before* `name_hint` lookup because phrases like "find materials in the Hardscape category" cause the name extractor to grab "Hardscape" — the category lookup disambiguates and wins when it matches.
+
+### Sizes CRUD (extend) — pending
+
+We already test:
+- ✅ Update cost on a specific size
+- ✅ Add a new size (merges with existing)
+
+Add coverage for:
+- **Update price on a specific size** — separate from cost (cost = what you pay, price = what you charge; both can move independently)
+- **Update unit on a specific size** — e.g. switch a size from "sq ft" to "sq yd"
+- **Remove a size from a material** — when the material has multiple sizes
+- **Rename a size label** — e.g. rename "1 sq ft" to "1 square foot"
+- **Refuse to remove the last size** — `MaterialSizeCost` requires `min 1 item` per the model; attempting to delete the only size must clarify, not silently accept
+
+**Implementation:**
+1. Identify each size operation by its size label (the `size: str` field in `MaterialSizeCost`). When the user says "remove the 1 sq ft size from Concrete Mix", extract the label and operate on that entry.
+2. New helper methods on the Material agent: `_update_size_in_material`, `_remove_size_from_material`. Both operate on the `sizes` list and produce the merged payload that `_update_material_via_api` consumes.
+3. Add validation: removing the only remaining size must return clarification with the refusal message above.
+4. Add the recognized phrasings to `_extract_fields_from_message` so the agent can parse "remove the X size" / "rename the X size to Y" / "set the price for X to $Y" etc.
+
+### Test coverage
+
+| Test | Status |
+|---|---|
+| `test_list_material_categories_returns_friendly_list` | ✅ |
+| `test_list_material_categories_count_query` | ✅ |
+| `test_list_material_categories_empty_uses_friendly_form` | ✅ (added) |
+| `test_orchestrator_routes_list_material_categories` | ✅ |
+| `test_orchestrator_routes_what_categories_do_i_have` | ✅ (added — short-circuits the help handler) |
+| `test_orchestrator_routes_count_material_categories` | ✅ (added) |
+| `test_orchestrator_refuses_create/delete/rename_material_category` | ✅ (3 cases) |
+| `test_orchestrator_change_material_category_value_is_not_refused` | ✅ (added — proves "change Concrete Mix category to Masonry" still routes as a material update) |
+| `test_list_materials_filters_by_category_name` | ✅ |
+| `test_list_materials_no_category_match_falls_back_to_unfiltered` | ✅ (added) |
+| `is_material_category_management_request` parametrized helper tests | ✅ (10 positive + 10 negative) |
+| `test_material_category_refusal_message_names_what_maple_can_do` | ✅ |
+| **Sizes CRUD coverage** (next commit) | |
+| `test_material_size_update_price` | ⏳ |
+| `test_material_size_update_unit` | ⏳ |
+| `test_material_size_remove_one_of_many` | ⏳ |
+| `test_material_size_rename_label` | ⏳ |
+| `test_material_size_remove_last_size_refuses` | ⏳ |
+
+Deferred from the original spec (low value relative to current coverage; revisit if needed):
+- `test_get_material_response_surfaces_category` — already covered indirectly by existing get_material tests + the response template
+- `test_update_material_category_by_name` — partial coverage exists in `test_material_update_category_field`; add an end-to-end variant alongside sizes work if it matters
+
+### Implementation order — categories phase complete
+
+1. ✅ Helper + refusal message in `agents/text_utils.py`
+2. ✅ Intent registration + orchestrator rule + orchestrator-level tests
+3. ✅ Material agent: `list_material_categories` branch + Beanie call + friendly response
+4. ✅ Material agent: category-filter branch in `list_materials`
+5. ⏳ Material agent: size update/remove/rename helpers + extraction patterns (next commit)
+6. Tests at each step (TDD)
+7. Re-run Tier 1 + Tier 2 after sizes ship
+
+### Out of scope for this phase
+
+- A standalone Category agent (premature; the Material agent owns the surface)
+- Multi-category filters ("materials in Hardscape OR Masonry") — single-category filter only
+- Estimate/Equipment alignment — those resources are out of the broader plan
+
+## Out of scope (decided)
+
+- **Equipment agent CRUD** — explicitly blocked by policy. See "Equipment requests are refused" section (kept below for reference). Not tested as a CRUD surface.
+- **Estimate agent CRUD** — different (ReAct + tool-use) architecture; not part of this matrix.
+- **Test grouping under `tests/maple/`** — considered, **declined**. The current per-file structure (`test_<agent>.py` + `test_orchestrator_intents.py` + `test_maple_crud_coverage.py` + `test_text_utils.py`) is already thematic; the grouping suggested earlier would be pure file moves (no behavior change) with import-path churn that affects every existing test. The cost (touching ~10 imports across the codebase) outweighs the benefit (slightly tidier discovery). Revisit if/when the test directory grows past ~50 files.
+- **Multi-turn / contextual follow-ups beyond field-then-value** — out of the current matrix scope. The implemented multi-turn flow handles "Update X" → "phone" → "555-1234" (a 3-turn pending-intent fulfillment). Anything richer ("...and its email?" anaphora, multi-resource cross-references) is deferred to the architectural-gaps conversation above.
+
+---
+
+## Reference: detailed policy texts (kept for posterity)
+
+### Policy: bulk delete is forbidden (Maple only)
+
+**Scope**: Maple (the AI agent) only. The HTTP API layer (`routers/*.py`) remains free to expose bulk-delete endpoints for UI-driven workflows. The concern is that Maple must never execute a bulk delete from a natural-language message; a single misclassification of "delete all contacts" could destroy all of a tenant's data.
+
+Required behavior for any phrasing matching the bulk-delete pattern (delete verb + `all`/`every`/`wipe`/`my` + plural domain):
+1. Classifier refuses to return `delete_{singular}` as a confident intent.
+2. Response sets `needs_clarification=True` with `BULK_DELETE_REFUSAL_MESSAGE`.
+3. Downstream agents reject bulk payloads defensively (belt-and-braces).
+
+The `bulk` test category in [_maple_coverage_data.py](platform/tests/_maple_coverage_data.py) asserts the refusal — any phrasing that returns `delete_{singular}` is a **failing test** (safety violation).
+
+### Policy: equipment requests are refused (not yet supported)
+
+Equipment management isn't exposed through Maple at this time. Phrasings whose domain is equipment return an explicit refusal naming the four supported resources (`EQUIPMENT_REFUSAL_MESSAGE`) — not a generic "I didn't understand". The `equipment_blocked` test category asserts the refusal across both tiers.
+
+### Vocabulary: People (Labour) vs Contact
+
+- **Contact** = an individual associated with a property (e.g. "John Doe"). Has fields `first_name`, `last_name`, `phone`, `email`, `role` (HOME_OWNER / MANAGER / ADMINISTRATOR), address.
+- **People** (a.k.a. **Labour** in code) = a catalog of role definitions (e.g. "Landscaper @ $50/hr"). Has fields `name` (the role title), `description`, `unit`, `cost`. Labour entries are templates, not individuals.
+
+`DOMAIN_HINTS` for `contact` and `labour` are disjoint at the rule level (no shared keywords). The Contact `role` field is unrelated to the Labour resource — phrasings like "Update John Doe's role to Manager" must route to `update_contact` (or fall through to LLM rescue), and must **never** classify as `update_labour`. Regression tests in [tests/test_orchestrator_intents.py](platform/tests/test_orchestrator_intents.py) enforce this.
+
+### Verification
+
+1. **Tier 1 only (default, no API key needed)**: `cd platform && ./run_tests.sh tests/test_maple_crud_coverage.py -v` → green session with XFAIL markers on the architectural-gap categories.
+2. **Full two-tier (requires `OPENAI_API_KEY`)**: `cd platform && ./run_tests.sh tests/test_maple_crud_coverage.py -m "" -v` → adds 111 real OpenAI calls, takes ~2-3 min. Both columns populate in the report.
+3. **Read the report**: `platform/tests/reports/maple_crud_gap_report.md` shows per-category and per-resource counts, plus a per-case verdict (covered / LLM rescues / real gap).
