@@ -12,9 +12,12 @@ touching the affected area. Items are ordered by impact within each severity.
 
 ## HIGH
 
-### 0. Bare `except Exception` in material-agent category filter
-**File**: `agents/material/service.py`
-**Lines**: ~980 and ~987 (inside `_resolve_category_filter`)
+### 0. Bare `except Exception` in material-agent category filter + estimate CRUD handlers
+**Files**: `agents/material/service.py`, `agents/estimate/service.py`
+**Lines**: material ~980 and ~987 (inside `_resolve_category_filter`); estimate
+~2949 and ~3024 (inside `_handle_list_estimates` / `_handle_get_estimate`,
+around the `PydanticObjectId(company_id)` coercion).
+
 **Why it matters**: same class of defect as the ones narrowed in the
 2026-04-19 critical sweep. The first except catches the `PydanticObjectId`
 cast failure (should be `(InvalidId, TypeError)`). The second catches
@@ -22,6 +25,12 @@ cast failure (should be `(InvalidId, TypeError)`). The second catches
 caller interprets as "no category filter" — so a MongoDB outage would degrade
 a filtered list request into an *unfiltered* one with no log. User sees every
 material in the catalog instead of the filtered subset they asked for.
+
+The estimate variant (added 2026-04-20 in the Estimates drilldown) re-uses the
+same broad `except Exception` pattern for the `PydanticObjectId(company_id)`
+coercion. The Beanie query failures in those handlers were fixed in the same
+review (they now return an error envelope), so only the coercion except
+remains.
 
 Fix:
 - Narrow the first except to `except (InvalidId, TypeError)` (import from
@@ -32,6 +41,7 @@ Fix:
 - Same review also flagged an unchecked `PydanticObjectId(company_id)` in the
   `list_material_categories` branch at ~line 1944 — validate once at the top
   of `process()` rather than letting `InvalidId` bubble into a 500.
+- Apply the same narrow-except treatment to the new estimate handlers.
 
 ### 1. Async hygiene in route handlers
 **Why it matters**: blocking calls inside `async def` freeze the event loop —
@@ -88,8 +98,12 @@ Files over the 800-line HIGH threshold:
   ([service.py:1942](../../platform/agents/material/service.py:1942)) → a
   `_handle_list_material_categories()` method. Apply the same pattern to the
   other branches over time.
-- `agents/estimate/service.py` — similar split: prompt-building / inventory
-  fetch / LLM extraction / totals calc are each their own concern.
+- `agents/estimate/service.py` — ~3500 lines after the 2026-04-20 Maple CRUD
+  handlers landed. Similar split: prompt-building / inventory fetch / LLM
+  extraction / totals calc / CRUD read handlers are each their own concern.
+  Cleanest first cut: move the new CRUD methods
+  (`_handle_list_estimates`, `_handle_get_estimate`, `_crud_envelope`, plus
+  the small parsing helpers) into `agents/estimate/crud.py` as a mixin.
 - `agents/orchestrator/service.py` — 1007 lines. Not the worst, but the
   `_classify_with_rules()` and `process()` methods both duplicate the
   same short-circuit patterns (see MEDIUM #12 below).
