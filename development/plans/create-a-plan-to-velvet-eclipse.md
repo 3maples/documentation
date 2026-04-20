@@ -73,6 +73,7 @@ Same fixes applied across all three:
 | Architectural gaps in matrix (`verbless` 0/12, `implicit_relationship` 3/12, `possessive` 2/12 rules-only) | hours / design | high | Need a name resolver + cross-resource query model — not regex tweaks. **Next conversation, not next commit.** |
 | Labour `_extract_name_from_message` over-eagerness | small | low | Patched the symptom (skip name extraction for count queries) but the underlying regex still over-matches phrases like "labour roles do I have". Tighten the regex to require role-title shapes. |
 | Field-extraction parity for Labour and Equipment if they ever come back into scope | medium | low | Equipment is currently blocked; replicating fixes would only matter if it's unblocked |
+| Stale xfail markers in coverage matrix (9 `XPASS` in Tier 1) | small | low | Cases in the `possessive` / `field_targeted_update` / `implicit_relationship` gap categories that now pass — e.g. `possessive/labour/show_me_landscapers_details`, `field_targeted_update/contact/change_the_phone_of_john_doe_to_555-1111`, `implicit_relationship/material/find_estimates_with_concrete_blocks`. Markers are category-wide booleans in [_maple_coverage_data.py](platform/tests/_maple_coverage_data.py); tightening means adding per-case exemption lists. `xfail(strict=False)` so they don't fail the suite. |
 
 ## Materials drilldown — live bugs + coverage gaps
 
@@ -138,7 +139,7 @@ Material's domain is richer than the others — `sizes` is a list of `MaterialSi
 
 The previous drilldown closed the live bugs and added field-level coverage. Phase 2 expands Maple's Material vocabulary to handle category-aware queries and richer size operations.
 
-**Status:** Categories shipped ✅ (intent + refusal + filter + 22 + 7 + 5 tests, no regressions across 481 Maple-layer tests). Sizes CRUD is the next commit.
+**Status:** Categories shipped ✅. Sizes CRUD shipped ✅ (5 new tests: per-size price update without clobbering cost, per-size unit update, remove one of many, rename size label, refuse to remove the last size).
 
 ### Category support (new) ✅ shipped
 
@@ -161,24 +162,27 @@ The previous drilldown closed the live bugs and added field-level coverage. Phas
 5. ✅ `list_material_categories` branch in [agents/material/service.py](platform/agents/material/service.py) — queries `MaterialCategory.find(MaterialCategory.company == ...).to_list()` (Beanie direct, same pattern as the bug fix), friendly tone, count form via `format_count_response`.
 6. ✅ `_resolve_category_filter()` helper + category-filter branch in `list_materials`. Runs *before* `name_hint` lookup because phrases like "find materials in the Hardscape category" cause the name extractor to grab "Hardscape" — the category lookup disambiguates and wins when it matches.
 
-### Sizes CRUD (extend) — pending
+### Sizes CRUD (extend) — ✅ shipped
 
-We already test:
-- ✅ Update cost on a specific size
+Previously tested:
+- ✅ Update cost on a specific size (via existing `cost` alias that writes both price+cost)
 - ✅ Add a new size (merges with existing)
 
-Add coverage for:
-- **Update price on a specific size** — separate from cost (cost = what you pay, price = what you charge; both can move independently)
-- **Update unit on a specific size** — e.g. switch a size from "sq ft" to "sq yd"
-- **Remove a size from a material** — when the material has multiple sizes
-- **Rename a size label** — e.g. rename "1 sq ft" to "1 square foot"
-- **Refuse to remove the last size** — `MaterialSizeCost` requires `min 1 item` per the model; attempting to delete the only size must clarify, not silently accept
+Now added:
+- ✅ **Update price on a specific size** — separate from cost. Previously a price-only update silently overwrote cost (because `_build_sizes_from_fields` set `item["cost"] = price` as a fallback). The update-existing branch now only touches cost when the caller explicitly supplied it.
+- ✅ **Update unit on a specific size** — resolves the unit name to a `MaterialUnit` ObjectId and writes it into the matching size entry only. Other sizes retain their unit.
+- ✅ **Remove a size from a material** — drops the matching entry by size label.
+- ✅ **Rename a size label** — changes the `size` text on the matching entry; price/cost/unit carry through.
+- ✅ **Refuse to remove the last size** — `MaterialSizeCost` requires `min 1 item` per the model. The Material agent returns a clarification ("I can't remove the last size from this material …") instead of producing a zero-size payload Pydantic would reject.
 
-**Implementation:**
-1. Identify each size operation by its size label (the `size: str` field in `MaterialSizeCost`). When the user says "remove the 1 sq ft size from Concrete Mix", extract the label and operate on that entry.
-2. New helper methods on the Material agent: `_update_size_in_material`, `_remove_size_from_material`. Both operate on the `sizes` list and produce the merged payload that `_update_material_via_api` consumes.
-3. Add validation: removing the only remaining size must return clarification with the refusal message above.
-4. Add the recognized phrasings to `_extract_fields_from_message` so the agent can parse "remove the X size" / "rename the X size to Y" / "set the price for X to $Y" etc.
+**Implementation (all shipped):**
+1. ✅ New allowed fields: `size_op ∈ {"remove","rename"}`, `new_size`, `unit_oid` — registered in [agents/material/service.py](platform/agents/material/service.py) `MATERIAL_ALLOWED_FIELDS` and handled in `_normalize_fields`.
+2. ✅ `_build_sizes_from_fields` extended with branches for `size_op=="remove"`, `size_op=="rename"`, and per-size unit-only updates. The price-update branch no longer clobbers cost.
+3. ✅ `_normalize_sizes_field` + the existing-sizes block in `_material_payload_from_fields` preserve the per-size `unit` field so size-level ops don't drop it.
+4. ✅ `process()` update_material branch: detects `size_op=="remove"` with `len(existing_sizes) <= 1` and returns a clarification response *before* building the payload; resolves `unit` (string) → ObjectId via `_find_or_create_unit` and stashes as `fields["unit_oid"]` when the update is a pure per-size unit change.
+
+**Deferred (low value for this commit):**
+- Regex extraction in `_extract_fields_from_message` for size-op phrasings. The tests mock `_classify_with_llm` to emit `size_op`/`new_size` directly; in production the LLM is expected to emit these fields (the extraction prompt will be updated alongside). Rule-level regex fallback can land later if production phrasings drift.
 
 ### Test coverage
 
@@ -196,26 +200,26 @@ Add coverage for:
 | `test_list_materials_no_category_match_falls_back_to_unfiltered` | ✅ (added) |
 | `is_material_category_management_request` parametrized helper tests | ✅ (10 positive + 10 negative) |
 | `test_material_category_refusal_message_names_what_maple_can_do` | ✅ |
-| **Sizes CRUD coverage** (next commit) | |
-| `test_material_size_update_price` | ⏳ |
-| `test_material_size_update_unit` | ⏳ |
-| `test_material_size_remove_one_of_many` | ⏳ |
-| `test_material_size_rename_label` | ⏳ |
-| `test_material_size_remove_last_size_refuses` | ⏳ |
+| **Sizes CRUD coverage** (shipped) | |
+| `test_material_size_update_price_preserves_cost` | ✅ |
+| `test_material_size_update_unit` | ✅ |
+| `test_material_size_remove_one_of_many` | ✅ |
+| `test_material_size_rename_label` | ✅ |
+| `test_material_size_remove_last_size_refuses` | ✅ |
 
 Deferred from the original spec (low value relative to current coverage; revisit if needed):
 - `test_get_material_response_surfaces_category` — already covered indirectly by existing get_material tests + the response template
 - `test_update_material_category_by_name` — partial coverage exists in `test_material_update_category_field`; add an end-to-end variant alongside sizes work if it matters
 
-### Implementation order — categories phase complete
+### Implementation order — categories + sizes phases complete
 
 1. ✅ Helper + refusal message in `agents/text_utils.py`
 2. ✅ Intent registration + orchestrator rule + orchestrator-level tests
 3. ✅ Material agent: `list_material_categories` branch + Beanie call + friendly response
 4. ✅ Material agent: category-filter branch in `list_materials`
-5. ⏳ Material agent: size update/remove/rename helpers + extraction patterns (next commit)
-6. Tests at each step (TDD)
-7. Re-run Tier 1 + Tier 2 after sizes ship
+5. ✅ Material agent: size update/remove/rename helpers + per-size unit resolution + refuse-last-size guard
+6. ✅ Tests at each step (TDD)
+7. ⏳ Re-run Tier 1 + Tier 2 after sizes ship (Tier 1 clean; Tier 2 requires `OPENAI_API_KEY`)
 
 ### Out of scope for this phase
 
