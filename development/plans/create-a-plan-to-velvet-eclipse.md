@@ -339,10 +339,10 @@ Once the Estimate agent is green on these, add estimate as a 5th resource to [_m
 ### Implementation order
 
 1. **Baseline failing tests** (TDD red) for the list/count/get surface — these will all fail against the current generation-only agent. ✅ shipped (4 agent tests red, 5 orchestrator tests already green)
-2. **Envelope refactor** in EstimateAgent so `process(message, context)` returns the CRUD envelope when intent is a query; generation path keeps its existing shape internally but wraps into the CRUD envelope on return.
-3. **Read surface** — list, get, count, filter by status/division, sort by total/date. Beanie-direct.
+2. **Envelope refactor** in EstimateAgent so `process(message, context)` returns the CRUD envelope when intent is a query; generation path keeps its existing shape internally but wraps into the CRUD envelope on return. ✅ shipped as a CRUD short-circuit at the top of `process()` — full signature normalization deferred (legacy generation keys still returned alongside the CRUD envelope for backward compatibility).
+3. **Read surface** — list, get, count, filter by status/division, sort by total/date. Beanie-direct. ✅ shipped: status/division/property filters, count form, sort by `grand_total` / `created_at` with `limit(1)`, ambiguity refusal for multi-match addresses.
 4. **Status transitions** — archive / unarchive / mark won/lost/approved, with the whitelist guard.
-5. **Property link** — resolve address → property id, support set/change/clear. Add the ambiguity refusal.
+5. **Property link** — resolve address → property id, support set/change/clear. Add the ambiguity refusal. ✅ shipped: `_handle_update_estimate` handles `link` / `unlink` sub-ops. Other `update_estimate` phrasings return an explicit "not yet supported" clarification pointing at the UI.
 6. **Work Items CRUD** — add / remove / rename / update_field with name-based targeting + ambiguity refusal + refuse-remove-last guard. Recalculate totals after each mutation.
 7. **Activities CRUD** — add / remove / rename / update_field scoped to a parent work item; same ambiguity refusal when the activity name is not unique within the estimate.
 8. **Delete with confirmation** — mirror Material delete.
