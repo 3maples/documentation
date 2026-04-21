@@ -252,9 +252,9 @@ Originally out of scope because the EstimateAgent is architecturally different f
 | Status transition | "archive estimate EST-2026-001", "mark EST-2026-001 as won", "unarchive EST-2026-001" | `update_estimate` (restricted to status changes from chat) |
 | Property link | "link estimate EST-2026-001 to 123 Main St", "change the property on EST-2026-001 to 456 Oak Ave", "remove the property from EST-2026-001" | `update_estimate` with `property` field (resolve by address → `PydanticObjectId`) |
 | Work Item add | "add a work item 'build patio' to EST-2026-001" | `update_estimate` with `work_item_op=add` (the orchestrator already has a partial match for "add … job/work item" — see [agents/orchestrator/service.py:155](platform/agents/orchestrator/service.py#L155)) |
-| Work Item remove | "remove the patio work item from EST-2026-001" | `update_estimate` with `work_item_op=remove` |
+| Work Item remove | "remove the patio work item from EST-2026-001" | `update_estimate` with `work_item_op=remove`. **Requires confirmation** (2026-04-21 safety decision): agent sets pending fuzzy-confirmation on first call; user's "yes"/"confirm" re-dispatches with `context["confirmed"]=True` and the mutation runs. Mirrors the delete-estimate confirmation pattern. |
 | Work Item rename | "rename the patio work item to stone patio" | `update_estimate` with `work_item_op=rename` + `new_name` |
-| Work Item field update | "change the division of the patio work item to Design/Build", "set profit margin on the patio work item to 20%", "update the tax rate on the patio work item to 5%" | `update_estimate` with `work_item_op=update_field` (field ∈ {division, profit_margin, overhead_allocation, labor_burden, tax, recurring, recurrence}) |
+| Work Item field update | "change the division of the patio work item to Design/Build" | `update_estimate` with `work_item_op=update_field` (field ∈ {division}). **Scope decision 2026-04-21**: `profit_margin`, `overhead_allocation`, `labor_burden`, `tax`, `recurring`, `recurrence` are UI-only — user adjusts those manually. Chat-driven updates here would risk accidental financial changes with less context than the UI gives. |
 | Work Items list | "list work items on EST-2026-001", "show me the work items for EST-2026-001" | `get_estimate` (response surfaces the `job_items` list rather than the full estimate blob) |
 | Activity add | "add a 'laying sod' activity to the patio work item in EST-2026-001" | `update_estimate` with `activity_op=add` |
 | Activity remove | "remove the excavation activity from the patio work item" | `update_estimate` with `activity_op=remove` |
@@ -270,6 +270,7 @@ Originally out of scope because the EstimateAgent is architecturally different f
 - **Material/labour/equipment line items inside a Work Item** — `MaterialItem` / `LabourItem` / `EquipmentItem` are cost-catalog line items auto-sized by the pipeline. Editing them from chat mixes cost arithmetic with catalog resolution; the UI owns that surface. Chat CRUD stops at the Activity level (which is the user-facing unit of work).
 - **Effort rate card + effort card items** — deep cross-references inside Activities. Chat can *set* an activity's role and basic hours; swapping the rate-card reference itself stays UI-only.
 - **Numeric recalculation** — sub_total / grand_total / labour & material totals are computed, not user-set. The CRUD branch should recalculate after any work-item or activity mutation, never accept them as chat inputs.
+- **Financial fields on Work Items** (scope decision 2026-04-21) — `profit_margin`, `overhead_allocation`, `labor_burden`, `tax`, `recurring`, `recurrence` are user-adjusted via the UI, not via chat. A one-word chat mistake could push margin to 0% on a six-figure estimate; the UI gives the numeric context (current value, company default, effective $ impact) that a chat confirmation can't. Chat can update a work item's `division` (enum-validated, reversible) and nothing else on the financial surface.
 - **Doc generation** — Google Docs export lives on its own endpoint; out of Maple's chat surface.
 
 ### Implementation approach
@@ -298,6 +299,8 @@ Following the [test_material_agent.py](platform/tests/test_material_agent.py) pa
 | `test_estimates_filter_by_division` | "list estimates in Maintenance" → filtered list |
 | `test_estimates_sort_highest_total` | "what's my highest estimate?" → sorted + limit=1 |
 | `test_estimates_sort_latest` | "show me the latest estimate" → sort by created_at desc, limit=1 |
+| `test_estimates_sort_latest_n_with_explicit_count` | "show me the 5 most recent estimates" → sort by created_at desc, limit=5 |
+| `test_estimates_sort_top_n_by_value` | "top 3 estimates" → sort by grand_total desc, limit=3 |
 | `test_estimates_get_by_code` | "show estimate EST-2026-001" → get by `estimate_id` |
 | `test_estimates_status_transition_archive` | "archive estimate EST-2026-001" → PATCH archive |
 | `test_estimates_status_transition_won` | "mark EST-2026-001 as won" → update status |
@@ -317,8 +320,8 @@ Following the [test_material_agent.py](platform/tests/test_material_agent.py) pa
 | `test_estimates_remove_work_item` | "remove the patio work item from EST-2026-001" → filtered out |
 | `test_estimates_rename_work_item` | "rename the patio work item to stone patio" → `work_item_op=rename`, description updated |
 | `test_estimates_update_work_item_division` | "change the division of the patio work item to Design/Build" → division enum validated |
-| `test_estimates_update_work_item_profit_margin` | "set profit margin on the patio work item to 20%" → `profit_margin=20.0` |
 | `test_estimates_update_work_item_invalid_division_refuses` | "change the division of the patio work item to Nonsense" → refuse (not an enum value) |
+| `test_estimates_update_work_item_profit_margin_refuses` | "set profit margin on the patio work item to 20%" → refuse with a pointer to the UI (scope decision 2026-04-21) |
 | `test_estimates_remove_last_work_item_refuses` | Mirrors the Materials "refuse to remove last size" guard — an estimate with zero work items makes no sense |
 | `test_estimates_list_work_items_for_estimate` | "show me the work items for EST-2026-001" → list of names + divisions |
 | `test_estimates_work_item_ambiguous_name_refuses` | Two work items share a name — return numbered clarification |
@@ -340,20 +343,21 @@ Once the Estimate agent is green on these, add estimate as a 5th resource to [_m
 
 1. **Baseline failing tests** (TDD red) for the list/count/get surface — these will all fail against the current generation-only agent. ✅ shipped (4 agent tests red, 5 orchestrator tests already green)
 2. **Envelope refactor** in EstimateAgent so `process(message, context)` returns the CRUD envelope when intent is a query; generation path keeps its existing shape internally but wraps into the CRUD envelope on return. ✅ shipped as a CRUD short-circuit at the top of `process()` — full signature normalization deferred (legacy generation keys still returned alongside the CRUD envelope for backward compatibility).
-3. **Read surface** — list, get, count, filter by status/division, sort by total/date. Beanie-direct. ✅ shipped: status/division/property filters, count form, sort by `grand_total` / `created_at` with `limit(1)`, ambiguity refusal for multi-match addresses.
-4. **Status transitions** — archive / unarchive / mark won/lost/approved, with the whitelist guard.
+3. **Read surface** — list, get, count, filter by status/division, sort by total/date. ✅ shipped: status/division/property filters, count form, sort by `grand_total` / `created_at` with explicit-count support ("top 3 estimates", "5 most recent estimates"), ambiguity refusal for multi-match addresses.
+4. **Status transitions** — archive / unarchive / mark won/lost/approved, with the whitelist guard. ✅ shipped.
 5. **Property link** — resolve address → property id, support set/change/clear. Add the ambiguity refusal. ✅ shipped: `_handle_update_estimate` handles `link` / `unlink` sub-ops. Other `update_estimate` phrasings return an explicit "not yet supported" clarification pointing at the UI.
-6. **Work Items CRUD** — add / remove / rename / update_field with name-based targeting + ambiguity refusal + refuse-remove-last guard. Recalculate totals after each mutation.
-7. **Activities CRUD** — add / remove / rename / update_field scoped to a parent work item; same ambiguity refusal when the activity name is not unique within the estimate.
-8. **Delete with confirmation** — mirror Material delete.
+6. **Work Items CRUD — Phase 6a (remove + rename)** ✅ shipped with confirmation flow for remove (2026-04-21 safety decision mirrors delete-estimate). Refuse-remove-last guard + ambiguity refusal included.
+6b. **Work Items CRUD — Phase 6b (add + update_field division)** — not yet shipped. Add sub-op interops with the router's existing generation-based "add work items" flow; update_field restricted to `division` per 2026-04-21 scope decision (financial fields UI-only).
+7. **Activities CRUD** — **DROPPED 2026-04-21** at user direction. Activity-level mutations stay UI-only for now. Chat CRUD stops at the Work Item level.
+8. **Delete with confirmation** ✅ shipped: every delete (exact or fuzzy match) prompts for confirmation via the pending state; only "yes" executes the hard-delete. Also added a work-item-op guard at the top of the delete_estimate router handler so phrasings like "remove work item X from estimate Y" misclassified as delete_estimate are redirected to the agent instead of destroying the estimate.
 9. **Enum help** for statuses + divisions (reuse the existing HELP_ENUM path).
 10. **Matrix extension** — add `"estimate"` to `_CRUD_RESOURCES`, regenerate the gap report, drive any remaining phrasings green.
-11. **Docs** — add an Estimate section to [CLAUDE.md](CLAUDE.md) under the Maple policies block, including the work-item / activity vocabulary and the ambiguity-refusal policy.
+11. **Docs** — add an Estimate section to [CLAUDE.md](CLAUDE.md) under the Maple policies block, including the work-item vocabulary, the confirmation-required policy for destructive mutations (delete_estimate, work_item_remove), and the ambiguity-refusal policy.
 
 ### Out of scope for this phase
 
-- **Material / Labour / Equipment line items inside a Work Item** — stop CRUD at the Activity level; the cost-catalog line items remain UI-only.
-- **Effort rate-card reference swaps** — chat can set `role` / `hours` on an activity but not the deep `effort_rate_card` reference.
+- **Activities CRUD (dropped 2026-04-21)** — add/remove/rename/update_field on `ActivityItem` entries nested inside a Work Item is deferred indefinitely at user direction. Chat CRUD stops at the Work Item level. Activity management stays in the UI.
+- **Material / Labour / Equipment line items inside a Work Item** — the cost-catalog line items remain UI-only regardless of what happens with Activities.
 - **Numeric totals as user input** — `sub_total` / `grand_total` / line-item totals are computed. Chat never accepts them as inputs.
 - **Arithmetic / reporting queries** ("what's the total of all won estimates this quarter?") — BI, not CRUD. Out of this phase.
 - **Google Docs version management** from chat — out of Maple's chat surface.
