@@ -321,6 +321,179 @@ looks descriptive.
 
 ---
 
+## 2026-04-22 third review (external warnings triage)
+
+Eight warnings raised by an external pass; each verified against current
+source before filing. One was a hallucination and is noted under Deferred.
+
+### 25. Regex email lookup in `_resolve_user()`
+**File**: `dependencies.py:17-26`
+**Severity**: MEDIUM
+
+Email is `.lower()`'d at line 17, then looked up with
+`User.find_one({"email": {"$regex": f"^{escaped_email}$", "$options": "i"}})`
+at line 25-26. The case-insensitive regex defeats index usage on the
+`email` field and runs on every authenticated request. `User.email` in
+`models/user.py` is stored without normalization, so the regex is defending
+against historical mixed-case data rather than the current write path.
+
+Fix: two-step. (a) Add a one-shot backfill script under
+`scripts/` that lowercases `User.email` for all existing rows. (b) Normalize
+on write (override `__init__` / validator so any create or update lowercases
+the field). (c) Replace the regex with `User.find_one(User.email == email)`.
+Don't do (c) before (a) — a stray capitalized row would silently fail auth.
+
+### 26. `find_contacts_by_name` fetches whole company, filters in Python
+**File**: `agents/contact/utils.py:158-170`
+**Severity**: MEDIUM
+
+`Contact.find(Contact.company == ...).to_list()` pulls every contact for
+the tenant, then lines 163-170 iterate and match names in Python. Fine at
+dozens of contacts; degrades linearly with tenant size.
+
+Fix: push the name match into Mongo. Either a `$regex` with
+`^<escaped>$` and `$options: "i"` (bearable here because the query is
+per-tenant-scoped and low-frequency), or — better — a case-insensitive
+collation index on `first_name` / `last_name` with an equality query. If
+fuzzy matching is required, keep the Python filter but pre-narrow with a
+Mongo text-ish prefix filter so the in-memory set is small.
+
+### 27. Inefficient merge pattern in bulk work-item endpoint
+**File**: `routers/agents.py:1621-1632`
+**Severity**: LOW (code clarity)
+
+The code calls
+`merge_job_items_with_original_descriptions([], new_job_items_raw, ...)`
+with an empty first argument, which turns the helper into a no-op, then
+manually appends the parsed items to `target_estimate.job_items`. The
+helper at `routers/estimates.py:404-415` is designed for reconciliation
+between an existing request list and newly parsed items — passing `[]`
+bypasses that contract. Canonical usage is in `prepare_generated_estimate`.
+
+Fix: either call the helper with the real existing items (if reconciliation
+is wanted) or drop the call entirely and just build items from
+`new_job_items_raw` via `build_job_items_from_parsed`. Works fine today; the
+concern is that the next reader will assume reconciliation is happening.
+
+### 28. Unbounded `ChangeLogEntry.find_all()`
+**File**: `routers/change_logs.py:23-26`
+**Severity**: LOW
+
+`ChangeLogEntry.find_all().sort(...).to_list()` with no `.limit()`. Current
+volume is small (curated changelog), so this is an anti-pattern waiting to
+bite rather than an active problem.
+
+Fix: add `.limit(100)` and accept an optional `?limit=` / `?offset=` query
+param. Cheap to do; reviewer should have filed as LOW, not WARNING.
+
+### 29. `update_estimate` recalculates totals on any `job_items`-present edit
+**File**: `routers/estimates.py:1868-2016`
+**Severity**: LOW (likely won't fix)
+
+When `payload.job_items is not None`, the handler recalculates the entire
+estimate's totals — even if the client sent back unchanged items alongside a
+notes/title edit. Overhead is real but CPU-bound and negligible at normal
+estimate sizes.
+
+The reviewer framed this as waste, but the *safer* reading is that
+gating recalculation on change-detection would risk stale totals if the
+change-detector missed a case. Leave alone unless profiling shows latency.
+Filed so we don't re-litigate.
+
+### 30. `[A-Z]{2}` with `re.IGNORECASE` for state-code parsing
+**File**: `agents/property/service.py:520` (regex) and `:527` (flag)
+**Severity**: LOW (nit)
+
+The compiled pattern matches any two-letter substring when run with
+`IGNORECASE` — "in", "or", "to", "me" all pass. In practice the match runs
+against address-shaped input and the result flows through
+`_normalize_prov_state_token` (`service.py:298-323`) which does additional
+validation, so false positives in free prose aren't reaching users.
+
+Fix (when touching this file): drop the `IGNORECASE` flag and match
+`[A-Z]{2}` strictly, or validate the token against a `VALID_STATES` /
+`VALID_PROVINCES` set inside `_normalize_prov_state_token`. No hurry.
+
+---
+
+## 2026-04-22 fourth review (post-#24 bulk-fetch fix)
+
+Follow-ups from the `/code-review` pass on the #24 fix (bulk-fetch in CSV
+upload handlers). The fix itself is good — these are residuals that didn't
+warrant blocking the commit.
+
+### 31. Intra-CSV duplicate rows now upsert silently instead of erroring
+**Files**: `routers/equipments.py:148-170`, `routers/labours.py:204-229`
+**Severity**: MEDIUM
+
+Before the #24 fix, a CSV with two rows sharing the same `(name, unit)`
+would insert the first and crash the second (captured into `errors[]`).
+After the fix, the handler registers each newly-inserted row back into
+`existing_by_key`, so the second occurrence upserts the first. The behavior
+is arguably friendlier, but (a) it's undocumented, (b) no test exercises
+it, and (c) the response payload reports N `created` IDs for an N-row
+upload even when the user effectively paid for duplicate rows.
+
+Fix: pick one of — (i) add a test pinning the new upsert-on-duplicate
+behavior; (ii) or revert to the pre-fix error behavior by omitting the
+`existing_by_key[(name, unit)] = row` registration line. If staying with
+(i), consider splitting the response into `created` vs `updated` lists so
+the caller can see what actually happened (materials.py already does this).
+
+### 32. `hasattr(l.unit, "value")` defensive check with unclear motivation
+**File**: `routers/labours.py:202`
+**Severity**: MEDIUM
+
+`existing_by_key = {(l.name, l.unit.value if hasattr(l.unit, "value") else l.unit): l for l in candidates}` —
+the `Labour.unit` field is typed as `LabourUnit` enum in the model, so
+`.value` should always work. The `hasattr` fallback either (a) defends
+against legacy string-valued rows in prod, or (b) is defensive coding
+without cause. If (a), document it; if (b), drop it.
+
+Fix: grep production data once to check whether any `Labour` rows have
+`unit` stored as a raw string. If none, simplify to `l.unit.value`. If
+some, add a one-line comment and file a data-migration task.
+
+### 33. `$in` × `$in` bulk-fetch over-fetches the cross-product
+**Files**: `routers/equipments.py:138-144`, `routers/labours.py:195-201`
+**Severity**: MEDIUM (theoretical) / LOW (in practice)
+
+For a CSV with N distinct names and M distinct units, the query
+`{"name": {"$in": names}, "unit": {"$in": units}}` matches every name ×
+unit combination in Mongo — up to N×M rows — even though only exact-tuple
+matches are used. The Python-side filter `existing_by_key.get((name, unit))`
+discards the extras. Harmless for typical CSVs (one unit type, many
+names), grows quadratically with mixed CSVs.
+
+Fix (when it bites): switch to `{"$or": [{"name": n, "unit": u} for ...]}`
+— exact tuples, no bloat. Not worth doing until we see a CSV where this
+matters.
+
+### 34. Missing type hint on `existing_by_key` dict
+**Files**: `routers/equipments.py:136`, `routers/labours.py:193`
+**Severity**: LOW
+
+Materials.py added the annotation (`existing_by_key: Dict[str, Material] = {}`);
+equipments.py and labours.py did not. Consistency gap introduced by the
+same commit.
+
+Fix: `existing_by_key: Dict[Tuple[str, str], Equipment] = {}` (and
+similarly for Labour). Import `Dict, Tuple` from typing.
+
+### 35. `names` list in materials bulk-fetch may contain casing duplicates
+**File**: `routers/materials.py:295`
+**Severity**: LOW
+
+`names = [md["name"] for md in grouped.values()]` — `grouped` is keyed by
+`name.lower()`, so names are unique by casefold but not by original
+casing. A CSV with both `"Patio Stone"` and `"patio stone"` would produce
+two `$in` entries that both resolve to the same Mongo row.
+
+Fix: `list({md["name"] for md in grouped.values()})`. Micro-optimization;
+skip unless already editing the file.
+
+---
+
 ## Deferred — not on the fix list
 
 These were considered and intentionally NOT filed as follow-ups:
@@ -331,6 +504,13 @@ These were considered and intentionally NOT filed as follow-ups:
   in the model's docstring.
 - **Firebase/Brevo credentials in `.env`**: correct pattern. Only the
   service-account-key on disk was problematic, and that was rotated.
+- **Duplicate `getEstimateDivision` in DashboardPage + EstimatesTable**
+  (2026-04-22 third review): verified and rejected. No such function
+  exists anywhere in `portal/`. Division aggregation lives only in
+  `DashboardPage.tsx:169-184` as a `useMemo`; `EstimatesTable.tsx` is a
+  generic props-driven table with no division logic. No `divisionBadge.ts`
+  file exists. Reviewer appears to have described a state of the code
+  that is not present in this repo.
 
 ---
 
