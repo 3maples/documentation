@@ -170,6 +170,157 @@ job; don't chase stylistic purity.
 
 ---
 
+## 2026-04-22 review (Maple estimate flow session)
+
+MEDIUM and LOW findings from the `/code-review` pass after the tax / division
+/ description / work-item-delete work. The HIGH finding from that pass
+("last work item" inconsistency) was fixed in the same session; these are
+the residuals.
+
+### 14. Unused `ESTIMATE_GENERATION_PROMPT` import
+**File**: `agents/estimate/service.py:15`
+**Severity**: MEDIUM (hygiene)
+
+The module-level `ESTIMATE_GENERATION_PROMPT` constant is imported but never
+referenced — only `build_estimate_generation_prompt()` function calls are
+used (lines 446, 2008, 4830). Pre-existing; surfaced during investigation of
+why prompt edits weren't taking effect.
+
+Fix: drop the import.
+
+### 15. Split Example block may anchor LLM back to terse descriptions
+**File**: `prompts/estimate_generation.py`, ~lines 99-109
+**Severity**: MEDIUM (prompt quality)
+
+Rule 4d now requires 1-2 sentence (~15-40 word) descriptions with materials,
+sizes, and method. The Split Example block still shows short labels like
+`Paver patio installation`, `Low-voltage landscape lighting installation`,
+`Lawn refresh and grading`. LLMs latch onto examples as implicit targets, so
+these short labels may be undermining rule 4d's guidance.
+
+Fix: rewrite each Split Example entry to the richer 4d shape, e.g.
+`Paver patio installation — 400 sq ft porcelain pavers on compacted base
+with edge restraints and polymeric sand joints`. Low effort, likely
+meaningful impact on what Maple actually emits.
+
+### 16. Delete-button propagation on touch devices
+**File**: `portal/src/pages/NewEstimateWithActivityPage.tsx` (trash button
+per work item row)
+**Severity**: LOW (needs manual verification)
+
+The row has an `onClick` that opens the work-item editor, and the trash
+button inside the row calls `e.stopPropagation()`. On some touch devices a
+long-press can fire both `pointerdown`/`click` paths and both handlers run.
+Not verifiable from source — needs a mobile-browser test.
+
+Fix (if the test shows leakage): add
+`onPointerDown={(e) => e.stopPropagation()}` alongside the existing
+`onClick` on the trash button.
+
+### 17. Architect prompt rule 5 still mentions "quantities" ambiguously
+**File**: `prompts/estimate_architect.py`, rule 5
+**Severity**: LOW (prompt quality)
+
+Rule 5 now says "DO NOT include prices, labour rates, or inventory IDs/SKUs.
+Sizes and quantities … ARE allowed." A stricter LLM may read the word
+"quantities" as still-discouraged overall, because this rule used to ban all
+quantities.
+
+Fix: tighten to "DO NOT include prices, labour rates, inventory IDs, or
+**purchase quantities** (how many to buy). Scope-describing sizes,
+dimensions, coverage area, linear feet, and spacing ARE allowed."
+
+### 18. File-size threshold — `agents/estimate/service.py` now at 5,098 lines
+**Severity**: MEDIUM (architectural drift)
+
+Entry #4 above already flags the HIGH-threshold files. Updating the
+numbers: after the 2026-04-22 session, `agents/estimate/service.py` is now
+~5,098 lines, `routers/agents.py` is ~2,892, `routers/estimates.py` is
+~2,548. The extraction plan in entry #4 still applies; nothing added this
+session is individually large, but the pile keeps growing.
+
+---
+
+## 2026-04-22 second review (six-phrasing coverage session)
+
+HIGH tenant-leak (`_resolve_latest_estimate` unscoped fallback) and the
+notes-overwrite safety finding were fixed in the same session. Residuals
+below were deferred per reviewer direction.
+
+### 19. `_handle_get_work_item` is 112 lines
+**File**: `agents/estimate/service.py:4385-4497`
+**Severity**: HIGH (code hygiene, per the 50-line threshold)
+
+The handler mixes estimate-loading, not-found / DB-error branches, work-item
+resolution, and response formatting in a single body. Consistent with other
+oversized handlers in this file (see entry #4) but the new landing for
+get-work-item work is a clean place to start the extraction pattern.
+
+Fix: extract `_load_estimate_for_read(query, company_id, context)` returning
+`(target, error_envelope)` (mirroring `_load_estimate_for_update`), and
+split the response formatting into `_build_work_item_details_text(idx,
+item)`. Handler body should shrink to ~30 lines. Same treatment applies
+to `_handle_get_estimate` now that the latest-estimate logic landed.
+
+### 20. Narrow `except Exception` in the latest-estimate resolver's ObjectId cast
+**File**: `agents/estimate/service.py` — the first of two `except Exception`
+clauses in `_resolve_latest_estimate` (around line 3266 post-fix).
+**Severity**: MEDIUM (hygiene, matches entry #0 of the original batch)
+
+The `PydanticObjectId(company_id)` cast is wrapped in `except Exception:
+return None`. Only `InvalidId` / `TypeError` can arise from a bad cast, so
+broadening to `Exception` masks unrelated failures.
+
+Fix: narrow to `except (InvalidId, TypeError)` (import from `bson.errors`).
+Keep the second broad-except (around line 3277 post-fix) — it logs via
+`logger.exception` so a surprise failure is still observable.
+
+### 21. Module-scope vs. method-scope inconsistency for note/work-item helpers
+**File**: `agents/estimate/service.py`
+**Severity**: MEDIUM (style)
+
+`_detect_note_update`, `_is_property_link_request`, and
+`_detect_status_transition` are all instance methods on the agent class,
+but `_detect_get_work_item_request` and `_parse_work_item_position` live at
+module scope. Callers have to know which helper is where.
+
+Fix: promote the two module-level helpers to methods, or demote the three
+instance methods to module functions and thread any needed state through.
+Low effort; no behavior change.
+
+### 22. "Last estimate" with zero estimates falls back to generic "Which estimate?"
+**File**: `agents/estimate/service.py` — the `_handle_get_estimate` branch
+that falls through when `_resolve_latest_estimate` returns `None`.
+**Severity**: LOW (UX polish)
+
+When a user asks "what is the grand total for the last estimate" and the
+company has no estimates yet, the handler shows the generic "Which
+estimate? Please share the estimate code (e.g. EST-2026-001)." prompt.
+Correct behavior but confusing for a new user.
+
+Fix: detect the latest-estimate intent (via `_looks_like_latest_estimate_query`)
+before the generic clarification and respond with "You don't have any
+estimates yet."
+
+### 23. `_NOTE_WITH_IMPLICIT_TAIL` can false-positive on descriptive phrasings
+**File**: `agents/estimate/service.py` — the `_NOTE_WITH_IMPLICIT_TAIL`
+regex inside `_detect_note_update`.
+**Severity**: LOW (edge-case UX)
+
+The pattern `\b(?:with|add(?:ing)?|append(?:ing)?)\s+(?:a(?:nother)?\s+)?
+notes?\s+(?P<value>.+?)\s*$` will match phrasings like "update estimate X
+with notes about the call" and capture "about the call" as a note body.
+Very unlikely in practice (users rarely ask Maple to describe things), but
+the capture is silent so a false positive would append unwanted text to
+the estimate.
+
+Fix: require a cue token after `note/notes` signaling that a value is
+coming — e.g. a quote, a colon, or a preposition like `to`/`saying`/
+`that reads`. Or fall back to the quoted-only path when the implicit tail
+looks descriptive.
+
+---
+
 ## Deferred — not on the fix list
 
 These were considered and intentionally NOT filed as follow-ups:
