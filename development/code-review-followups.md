@@ -12,68 +12,6 @@ touching the affected area. Items are ordered by impact within each severity.
 
 ## HIGH
 
-### 0. Bare `except Exception` in material-agent category filter + estimate CRUD handlers
-**Files**: `agents/material/service.py`, `agents/estimate/service.py`
-**Lines**: material ~980 and ~987 (inside `_resolve_category_filter`); estimate
-~2949 and ~3024 (inside `_handle_list_estimates` / `_handle_get_estimate`,
-around the `PydanticObjectId(company_id)` coercion).
-
-**Why it matters**: same class of defect as the ones narrowed in the
-2026-04-19 critical sweep. The first except catches the `PydanticObjectId`
-cast failure (should be `(InvalidId, TypeError)`). The second catches
-`MaterialCategory.find(...)` failures and silently returns `None`, which the
-caller interprets as "no category filter" — so a MongoDB outage would degrade
-a filtered list request into an *unfiltered* one with no log. User sees every
-material in the catalog instead of the filtered subset they asked for.
-
-The estimate variant (added 2026-04-20 in the Estimates drilldown) re-uses the
-same broad `except Exception` pattern for the `PydanticObjectId(company_id)`
-coercion. The Beanie query failures in those handlers were fixed in the same
-review (they now return an error envelope), so only the coercion except
-remains.
-
-Fix:
-- Narrow the first except to `except (InvalidId, TypeError)` (import from
-  `bson.errors`).
-- On the second except, `logger.exception(...)` and re-raise — or at minimum
-  log and return an explicit sentinel that the caller treats as "DB unhappy,
-  surface a friendly error" rather than silently unfiltering.
-- Same review also flagged an unchecked `PydanticObjectId(company_id)` in the
-  `list_material_categories` branch at ~line 1944 — validate once at the top
-  of `process()` rather than letting `InvalidId` bubble into a 500.
-- Apply the same narrow-except treatment to the new estimate handlers.
-
-### 1. Async hygiene in route handlers
-**Why it matters**: blocking calls inside `async def` freeze the event loop —
-other requests stall for the duration of the blocking call.
-
-- `services/google_drive_service.py` — the `googleapiclient` client is
-  synchronous; all Drive/Docs calls inside `async def` route handlers
-  (`routers/estimates.py` Drive folder + Doc endpoints) block the loop. Wrap
-  with `asyncio.to_thread(...)` or switch to an async Drive client.
-- Audit `routers/` for `requests.get`, `time.sleep`, and any sync DB drivers
-  inside `async def`. Known suspects: any code path that calls
-  `GoogleDriveService._initialize()` or `httpx.Client` (sync) — use the async
-  `httpx.AsyncClient` instead.
-- `fetch_link()` inside loops — known N+1 pattern. Replace with a single
-  `fetch_all_links=True` fetch or a manual `$in` batch query. Grep for
-  `fetch_link` inside `for`/`async for` bodies.
-
-### 2. Per-company rate limiting — Google Maps
-**File**: `services/address_service.py`
-**Scope**: `autocomplete`, `resolve_place_id`, `normalize_address_parts`
-**Why it matters**: without per-tenant throttling, one company can exhaust the
-platform-wide Google Maps quota and deny service to all other tenants. Also
-protects against accidental runaway retries in an agent loop.
-
-Implementation sketch:
-- Thread `company_id: str` through each public method signature.
-- Wire `services/request_protection.py`'s existing limiter (the same primitive
-  `auth_rate_limiter` uses) keyed by `f"maps:{company_id}"`.
-- Caller audit: `routers/addresses.py` already has `company_id` from auth
-  context, so threading is local. Add a test that confirms a second request
-  within the window gets a `429`.
-
 ### 3. Type hints on public functions
 Scattered across `routers/` and `agents/`. The ones that matter are public
 functions exported across package boundaries — start with:
@@ -491,6 +429,230 @@ two `$in` entries that both resolve to the same Mongo row.
 
 Fix: `list({md["name"] for md in grouped.values()})`. Micro-optimization;
 skip unless already editing the file.
+
+---
+
+## 2026-04-22 fifth review (post-#1 async-hygiene fix)
+
+Follow-ups from the `/code-review` pass on the #1 fix (Firebase wraps +
+Contact N+1 batching). Same-session fixes: silent-swallow logging on
+`_fetch_linked_contacts`, and a test-assertion shape cleanup on the new
+batched-find test. Residuals below were deferred.
+
+### 36. No unit test for the N+1 batch fix in `generate_google_doc`
+**File**: `routers/estimates.py:2368`
+**Severity**: MEDIUM
+
+The loop → `Contact.find({"_id": {"$in": list(property_info.contacts)}})`
+batch change is covered only by inspection. A targeted unit test requires
+a full TestClient + Drive mock + Mongo fixtures, which is why it didn't
+land in the #1 fix. The agent-level sibling (`_fetch_linked_contacts`) is
+tested in [tests/test_property_agent.py](../../platform/tests/test_property_agent.py).
+
+Fix: either (a) add a TestClient case in
+[tests/test_estimate_doc_generator.py](../../platform/tests/test_estimate_doc_generator.py)
+that asserts `Contact.find` is called once and `Contact.get` is never
+called; or (b) extract the contact-fetch out of the route into a helper
+in `services/` and test the helper directly. Option (b) has the side
+benefit of letting the same helper back the Maple-side path.
+
+### 37. `_handle_get_estimate` falls through to an unscoped `Estimate.find_one` when `company_id` is invalid
+**File**: `agents/estimate/service.py` — inside `_handle_get_estimate`,
+around the `if company_oid is not None: ... else: ...` branch
+(~lines 3787-3794 post-fix).
+**Severity**: LOW (tenant-isolation gap — narrow path, but real)
+
+When `PydanticObjectId(company_id)` fails (invalid hex string), the
+narrowed `(InvalidId, TypeError)` except sets `company_oid = None`, and
+the subsequent handler runs `await Estimate.find_one(Estimate.estimate_id
+== code)` — an **unscoped** query that returns any estimate in the
+platform with that code. Pre-existing pattern; the #1 narrow-except
+change preserved it rather than introducing it. The sibling
+`_handle_list_estimates` already gates behind `company_oid is None` and
+returns a clarification envelope — get_estimate should mirror that.
+
+Fix: after the ObjectId cast, if `company_oid is None`, return a
+"need a company" clarification envelope (same shape as
+`_handle_list_estimates` uses) instead of running the unscoped
+`find_one`. Theme-adjacent to entry #20 (narrow-except in the latest
+resolver) and the tenant-leak fix that already landed for
+`_resolve_latest_estimate`.
+
+---
+
+## 2026-04-22 sixth review (post-#2 Maps rate-limit fix)
+
+Residuals from the `/code-review` pass on the #2 fix (per-company Maps
+rate limiting + auth dep on the addresses router). The docstring MEDIUM
+was fixed in the same session; these are what's left.
+
+### 38. `_enrich_address_fields_with_google` now crosses the 50-line threshold
+**Files**: `agents/property/service.py:787` (52 lines),
+`agents/contact/service.py:905` (55 lines)
+**Severity**: HIGH (function size)
+
+Pre-existing length (~48 lines); the #2 fix added the `company_id`
+keyword arg and the `try/except HTTPException` fallback, pushing both
+functions over the 50-line threshold. Theme-adjacent to entry #4 which
+already flags these files at the 800-line level.
+
+Fix: extract the post-`normalize_address_parts` merge logic (city /
+prov / country conflict check + country-inferred fallback) into a
+helper like `_apply_resolved_address(candidate, resolved, *,
+overwrite_existing)`. Would drop both functions to ~30 lines and the
+helper is easy to unit-test directly. Cleanest if done in the same PR
+as the rest of entry #4's property/contact splits.
+
+### 39. `_RATE_LIMIT_DETAIL` constant is misplaced in `address_service.py`
+**File**: `services/address_service.py:15`
+**Severity**: LOW (code layout)
+
+The `_RATE_LIMIT_DETAIL` module-level constant sits between the import
+block and the unrelated `SUPPORTED_COUNTRY_CODES` set, separated from
+its only caller (`_enforce_maps_rate_limit`) by one line. Cohesion with
+the helper would read better.
+
+Fix: either inline the literal as `detail=` inside
+`_enforce_maps_rate_limit`, or move the constant to sit directly above
+the helper. Cosmetic; do when next touching the file.
+
+---
+
+## 2026-04-23 `/security-review` pass (post-LLM rate-limit fix)
+
+HIGH finding (missing per-company rate limiting on `/agents/orchestrate`
+and `/agents/estimate`) was fixed in the same session as the pass. The
+two items below are the residual MEDIUM findings. LOW finding
+("`_handle_get_estimate` unscoped fallback") duplicates entry #37 and
+is not re-filed.
+
+### 40. `portal/firebase.json` has no security-header config
+**File**: [portal/firebase.json](portal/firebase.json)
+**Severity**: MEDIUM
+
+The hosting block contains only `public`, `ignore`, and `rewrites` — no
+`headers` array. That means the deployed portal serves no CSP, no HSTS,
+no `X-Frame-Options`, no `X-Content-Type-Options`, no `Referrer-Policy`,
+and no `Permissions-Policy`. Firebase Hosting emits these only when
+they are explicitly configured.
+
+Fix: add a `headers` array covering at minimum:
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+
+A real CSP is a larger undertaking — enumerate allowed `script-src`
+(Vite chunks), `connect-src` (the API host from `VITE_API_URL` plus
+Firebase Auth domains), `img-src` (user-uploaded assets, Firebase
+Storage if used), and `style-src`. Ship the four simple headers first;
+tackle CSP as its own change once the allow-lists are stable.
+
+### 41. `except Exception` around httpx calls in `address_service.py` could mask future `HTTPException`
+**File**: [services/address_service.py](platform/services/address_service.py) lines 324-418 (three sites)
+**Severity**: MEDIUM (defensive)
+
+Each of `autocomplete`, `resolve_place_id`, and `normalize_address_parts`
+has a `try/except Exception:` wrapping the httpx call that returns `[]`
+or `{}` on any failure. This is fine today — `_enforce_maps_rate_limit`
+runs **before** the `try`, so its `HTTPException(429)` propagates
+naturally. The concern is that a future refactor that moves the
+enforce call inside the `try` would silently swallow the 429 and turn
+a rate-limit rejection into an empty result, defeating the point of
+the limiter.
+
+Fix: narrow each `except Exception:` to
+`except (httpx.HTTPError, httpx.TimeoutException):` so unrelated
+failures (including any `HTTPException` raised from inside the block)
+propagate naturally. Zero behaviour change in the happy path; makes
+the invariant explicit to the next reader.
+
+---
+
+## 2026-04-23 `/code-review` pass (estimate status state machine + detail-page layout)
+
+MEDIUM and LOW residuals from the `/code-review` pass on the layout +
+status-state-machine work. No CRITICAL or HIGH findings. Recommendation
+was "Warning — safe to commit" — items below are quality-of-life.
+
+### 42. No unit test for the `handleStatusChange` dispatcher
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) — `handleStatusChange` around line 444
+**Severity**: MEDIUM
+
+The consolidated handler routes between three API paths (`estimatesApi.archive`,
+`estimatesApi.unarchive`, `estimatesApi.update`) based on `target` +
+`currentNormalized`. `getAllowedTransitions` is covered by 15 vitest cases,
+but the routing decision inside the page is not tested anywhere.
+CLAUDE.md's TDD rule applies to `.tsx` behaviour changes.
+
+Fix: extract the routing decision into a pure helper beside
+`getAllowedTransitions` — e.g. `resolveStatusChangeApi(currentStatus,
+target): { kind: "archive" | "unarchive" | "update", payload?: { status?:
+string; approved_by?: string } }` — and unit-test it. The page handler
+becomes a thin switch on `kind`. Cheap.
+
+### 43. Trash-icon-only buttons have no accessible name
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) — Preview version-row delete (~line 1017) and work-item row delete (~line 1147)
+**Severity**: MEDIUM (a11y)
+
+Both buttons render only `<Trash2 />` inside. Each is wrapped in a
+`<Tooltip content="Delete this version">` (or similar), but tooltip
+content is typically not announced by screen readers — the button has
+no accessible name. Same pattern appears on other icon-only trash
+buttons across the portal (EquipmentsPage, ContactsPage, PropertiesPage,
+RateCardsTab, etc.) — this is a portal-wide gap, not specific to this
+change.
+
+Fix: add `aria-label={`Delete version ${v.version}`}` (or equivalent
+row-specific label) on every icon-only trash button. Sweep-style PR;
+grep for `<Trash2 ` and audit each site.
+
+### 44. `(err as Error).message` fallback in catch blocks can render `undefined`
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) — three catch blocks: `handleDelete` (~L427), `handleStatusChange` (~L458), `handleGenerateGoogleDoc` (~L481)
+**Severity**: MEDIUM
+
+If the rejected value isn't an `Error` instance (plain string from
+`ApiError`, JSON object, aborted fetch signal), `(err as Error).message`
+evaluates to `undefined` and `setFormError(undefined)` clears the banner
+instead of showing a useful message. Pre-existing pattern carried through
+the refactor; third catch (`handleGenerateGoogleDoc`) already has an
+OR-fallback, the first two do not.
+
+Fix: unify to `setFormError(err instanceof Error ? err.message :
+"Failed to update status")` (pick appropriate fallback copy per handler).
+One-line change per catch.
+
+### 45. `.gitignore` widened from filename to directory without comment
+**File**: [platform/.gitignore](../../platform/.gitignore):145
+**Severity**: LOW
+
+`service-account-key.json` → `secrets/` is functionally fine (the
+`service-account-key*.json` and `*-key.json` sibling patterns still
+catch loose keys), but the diff reads as "why did a specific-file rule
+become a directory rule?" without context.
+
+Fix: add a one-line comment above the `secrets/` entry — e.g.
+`# local secrets directory (service-account keys, tokens, etc.)` — so
+the next reader understands the broadening.
+
+### 46. State machine is frontend-only (by design, re-filed for visibility)
+**File**: [platform/routers/estimates.py](../../platform/routers/estimates.py) — `update_estimate` handler (~L1777), `unarchive_estimate` (~L2244)
+**Severity**: LOW
+
+Per the plan (see `documentation/development/plans/create-a-plan-to-lively-karp.md`),
+backend PUT `/estimates/{id}` still accepts any `{status: "..."}` value.
+An API caller bypassing the UI can drive invalid transitions (e.g. Lost →
+Won, or reopening Archived via PUT instead of `/unarchive`). The UI
+enforces the state table via `getAllowedTransitions`; the backend does
+not.
+
+Fix: when a non-UI API surface matters (public API, external
+integrations, Maple agent moves beyond current verbs), add a
+`validate_transition(current, target)` check in the PUT handler before
+`estimate.set(...)`. Shape: raise `HTTPException(status_code=400,
+detail=f"Invalid transition: {current.value} → {target.value}")`. Mirror
+the `TRANSITIONS_BY_STATUS` map from the frontend, or better, define it
+once in `models/estimate.py` and import from both.
 
 ---
 
