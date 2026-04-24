@@ -861,6 +861,76 @@ the Drive latency window to trigger the race.
 
 ---
 
+## 2026-04-24 external review (indexes + httpx + DB-side sort)
+
+Three warnings raised by an external reviewer; each verified against
+current source before filing. None are active bugs. Filed per user
+request for later triage.
+
+### 60. No unique compound index on Material / Contact
+**Files**: [platform/models/material.py:32](../../platform/models/material.py),
+[platform/models/contact.py:45](../../platform/models/contact.py)
+**Severity**: LOW–MEDIUM (data integrity, not an active bug)
+
+Both models declare only `IndexModel([("company", ASCENDING)])`. Concurrent
+inserts can produce duplicates for the same `(company, name)`.
+
+The reviewer's proposed fix — "compound unique index on (company, name)
+for all inventory models" — is correct for Material but **wrong for
+Contact**. Two contacts can legitimately share a full name (two different
+"John Smith" homeowners). A Contact uniqueness constraint would need to
+include email/phone, and even that is debatable.
+
+Fix: for Material, add `IndexModel([("company", ASCENDING), ("name",
+ASCENDING)], unique=True)` — but only after auditing prod data for
+existing duplicates; index creation fails if violations exist. For
+Contact, no unique index (reviewer was wrong on this one); if
+deduplication is a real concern, surface it in the UI on create/update
+instead.
+
+### 61. Trello httpx client rebuilt per request
+**File**: [platform/services/trello_service.py:40](../../platform/services/trello_service.py)
+**Severity**: TRIVIAL (don't fix unless path becomes hot)
+
+`async with httpx.AsyncClient(timeout=15.0) as client:` inside
+`create_trello_card` tears down the connection pool on every call.
+Reviewer correctly flagged that a module-scoped client would enable
+connection pooling.
+
+In practice: this endpoint fires once per estimate → card creation. The
+pool-churn cost is microseconds on a call that already takes hundreds of
+ms over the network. Premature optimization at current volume.
+
+Fix (if it ever matters): promote to a module-level
+`_client = httpx.AsyncClient(timeout=15.0)` and swap the `async with`
+for `await _client.post(...)`. Add a FastAPI lifespan hook to close it
+on shutdown.
+
+### 62. Python-side sort in `get_material_categories` / `get_material_units`
+**Files**: [platform/routers/material_categories.py:48](../../platform/routers/material_categories.py),
+[platform/routers/material_units.py:49](../../platform/routers/material_units.py)
+**Severity**: LOW (cleanliness, not performance)
+
+Both handlers call `sorted(items, key=lambda x: x.name.lower())` after
+`.to_list()`. Reviewer framed this as "unscalable" — overstated, since
+category/unit counts per company are dozens, not millions. Real reason
+to fix is consistency, not throughput.
+
+Caveat on the fix: the reviewer's proposed
+`.sort(+MaterialCategory.name)` is byte-order (case-sensitive) unless a
+collation is attached. The current Python sort is case-insensitive via
+`.name.lower()`. A straight DB-side sort would change ordering for
+mixed-case names (e.g., "apple" vs "Banana").
+
+Fix (when next touching these files): switch to
+`await MaterialCategory.find(...).sort(+MaterialCategory.name).to_list()`
+**with a collation** `{locale: "en", strength: 2}` so case-insensitive
+order is preserved. Same shape for `MaterialUnit`. If attaching a
+collation is awkward via Beanie, leave the Python sort — clarity beats
+a half-done DB push-down.
+
+---
+
 ## Deferred — not on the fix list
 
 These were considered and intentionally NOT filed as follow-ups:
