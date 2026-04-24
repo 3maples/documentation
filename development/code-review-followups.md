@@ -42,9 +42,12 @@ Files over the 800-line HIGH threshold:
   Cleanest first cut: move the new CRUD methods
   (`_handle_list_estimates`, `_handle_get_estimate`, `_crud_envelope`, plus
   the small parsing helpers) into `agents/estimate/crud.py` as a mixin.
-- `agents/orchestrator/service.py` — 1007 lines. Not the worst, but the
-  `_classify_with_rules()` and `process()` methods both duplicate the
-  same short-circuit patterns (see MEDIUM #12 below).
+- `agents/orchestrator/service.py` — 1185 lines after the 2026-04-23
+  verbless-gap fix (was 1007). Not the worst, but
+  `_classify_with_rules()` is now 215 lines and `process()` still
+  duplicates the same short-circuit patterns (see MEDIUM #12 below).
+  See also entry #47 for the specific extraction inside
+  `_classify_with_rules`.
 
 No function in this repo should exceed 50 lines. Grep for long bodies with
 a line-count tool after each refactor pass.
@@ -653,6 +656,160 @@ integrations, Maple agent moves beyond current verbs), add a
 detail=f"Invalid transition: {current.value} → {target.value}")`. Mirror
 the `TRANSITIONS_BY_STATUS` map from the frontend, or better, define it
 once in `models/estimate.py` and import from both.
+
+---
+
+## 2026-04-23 `/code-review` pass (verbless-gap fix)
+
+Residuals from the `/code-review` pass on the Phase 1 + 2a + 2b verbless
+classification fix. No CRITICAL or HIGH findings blocked commit;
+recommendation was "Warning — safe to commit." Items below are quality
+debt from the heuristic-driven implementation of Phase 2b that the
+original plan's catalog-backed Phase 2a-proper would largely retire.
+
+Plan: [plans/fix-maple-verbless-gap.md](plans/fix-maple-verbless-gap.md).
+
+### 47. `_classify_with_rules` is 215 lines
+**File**: [agents/orchestrator/service.py:156](../../platform/agents/orchestrator/service.py)
+**Severity**: HIGH (50-line threshold)
+
+Function was ~180 lines before Phase 2; the new domain-supplementation
+and implicit-get branches (lines 294–335) are logically distinct from
+the existing hint-matching. Theme-adjacent to entry #4.
+
+Fix: extract two helpers on the class:
+- `_supplement_domain_from_entity_signals(normalized, original, action)
+  -> Optional[str]`
+- `_infer_implicit_get(normalized, original, domain) -> Optional[str]`
+  (merges with existing `_is_bare_entity_reference`)
+
+Gets `_classify_with_rules` back below 180 lines.
+
+### 48. `_LABOUR_ROLE_TOKENS` drifts from `DOMAIN_HINTS["labour"]`
+**File**: [agents/orchestrator/service.py:77](../../platform/agents/orchestrator/service.py)
+**Severity**: MEDIUM
+
+The frozenset is maintained manually with a "kept in sync with
+intents.py" comment. If a new role is added to `DOMAIN_HINTS["labour"]`,
+the set won't auto-update and verbless-labour bare tokens silently stop
+working.
+
+Fix: split `DOMAIN_HINTS["labour"]` in `intents.py` into
+`_GENERIC_LABOUR_HINTS` + `_LABOUR_ROLE_HINTS`, export the role-hints
+list, and re-use it in `service.py`. Cleaner than the alternative of
+filtering generic keywords out of the combined list at import time.
+
+### 49. `_ADDRESS_PATTERN` can false-match "N <word>+ way/court"
+**File**: [agents/orchestrator/service.py:65](../../platform/agents/orchestrator/service.py)
+**Severity**: MEDIUM
+
+Pattern uses `.search()` (not `.fullmatch()`) with permissive suffixes
+including `way`, `court`, `ct`. Phrasings like `"3 days back way"` or
+`"60 minutes one way"` trigger `domain=property` → `get_property`. Low
+real-world frequency but demonstrably triggerable.
+
+Fix (quick win): drop the most-ambiguous suffixes (`way`, `court`,
+`ct`). Smaller coverage, fewer false positives. For the permanent fix,
+require the match to be the entire residual after stripping any
+action-phrase prefix via `_bare_entity_residual`. Catalog-backed
+lookup (per the plan's deferred Phase 2a-proper) would retire the
+concern entirely.
+
+### 50. Duplicate stopword lists in the orchestrator
+**File**: [agents/orchestrator/service.py:88, :130](../../platform/agents/orchestrator/service.py)
+**Severity**: MEDIUM
+
+`_PERSON_NAME_STOPWORDS` and `_MATERIAL_RESIDUAL_STOPWORDS` share ~14
+entries (`hi`, `hey`, `the`, `that`, `my`, `your`, `our`, `no`, `yes`,
+`ok`, `okay`, `thank`, `thanks`, `please`, `sorry`). Two lists to keep
+in sync when adding a new filler.
+
+Fix: extract `_COMMON_FILLER_STOPWORDS` frozenset; union with
+domain-specific additions for each downstream use.
+
+### 51. No direct unit tests for the new bare-entity helpers
+**File**: [agents/orchestrator/service.py:372, :395, :404](../../platform/agents/orchestrator/service.py)
+**Severity**: MEDIUM (TDD policy)
+
+`_is_bare_entity_reference`, `_looks_like_person_name`, and
+`_bare_entity_residual` are covered end-to-end via
+`tests/test_maple_crud_coverage.py` but have no direct unit tests.
+Edge cases (empty string, unicode names like "Renée Dupont",
+punctuation-heavy input, adversarial input) aren't exercised.
+CLAUDE.md's TDD rule applies to new `.py` behaviour.
+
+Fix: add `tests/test_orchestrator_bare_entity_helpers.py` with ~10
+parametrized cases per helper — edge cases plus golden paths.
+
+### 52. Inline comments instead of docstrings on new helpers
+**File**: [agents/orchestrator/service.py:395, :404](../../platform/agents/orchestrator/service.py)
+**Severity**: LOW (style)
+
+Project leans toward docstrings on methods (see `_format_chat_history`,
+`_build_entity_context_summary`, etc.). My new helpers use inline
+`# ` comments instead. Cosmetic only.
+
+Fix: convert the prose comments to proper docstrings. Do when next
+touching the file.
+
+### 53. `_CONFIRMED_WORKING_CASE_IDS` has no entry-validation
+**File**: [tests/_maple_coverage_data.py](../../platform/tests/_maple_coverage_data.py)
+**Severity**: LOW
+
+The override set grows monotonically and is manually curated. A
+mistyped case ID silently does nothing — the override never applies,
+and the phrasing stays marked as an XFAIL without the reviewer
+realizing.
+
+Fix: at module load, assert that every entry in
+`_CONFIRMED_WORKING_CASE_IDS` corresponds to a real `case_id` in the
+matrix; raise `ValueError` on mismatch. ~5 lines.
+
+### 54. Tier 1 gap: `set <name>'s <field> to <value>` pattern
+**File**: [agents/orchestrator/intents.py:106-111](../../platform/agents/orchestrator/intents.py) (`ACTION_HINTS["update"]`)
+**Severity**: MEDIUM (surfaced by the coverage matrix)
+
+4/4 resources fail on Tier 1 for the `set X's Y to Z` phrasing because
+`ACTION_HINTS["update"]` has no `"set"` entry. Tier 2 LLM rescues 2/4
+but not reliably.
+
+Fix: add `"set"` to `ACTION_HINTS["update"]`. Shake out regressions
+carefully — `set` is also referenced in the work-item-edit regex at
+service.py:244 and the `ADD_SET_FIELD_PATTERN_ORCHESTRATOR` guard at
+service.py:279, so check both paths still behave.
+
+### 55. Tier 2 gap: implicit-relationship cross-resource phrasings
+**Files**: LLM system prompt in
+[agents/orchestrator/service.py:~674](../../platform/agents/orchestrator/service.py) (and entity-knowledge graph if extended)
+**Severity**: MEDIUM (Tier 2 coverage 4/12)
+
+Phrasings like `who owns 123 Main St?`, `where does John Doe live?`,
+`which properties use concrete blocks?`, `what estimates use the
+Landscaper role?` expect Maple to return `list_<related_resource>`
+intents. LLM handles these inconsistently and rules can't infer
+cross-resource semantics at all.
+
+Fix (sketch): add 4–6 few-shot examples to the LLM system prompt that
+pair each implicit-relationship phrasing with the expected
+`list_<related_resource>` intent. Then re-run Tier 2 and see whether
+the LLM picks them up. If prompt alone doesn't close it, the
+orchestrator would need to resolve the referenced entity first, then
+infer the target resource based on the relationship verb — that's a
+larger design change.
+
+### 56. Tier 1 gap: `what's <name>'s <field>?` contraction not handled
+**File**: [agents/orchestrator/intents.py:131-150](../../platform/agents/orchestrator/intents.py) (`ACTION_HINTS["get"]`)
+**Severity**: LOW
+
+`ACTION_HINTS["get"]` contains `"what is"` but not `"what's"` — the
+contraction. Phrasings like `"what's John Doe's phone?"` or `"what's
+Landscaper's cost?"` therefore fail rule-level action detection, even
+when the domain resolves via `phone` / `cost` / the name heuristic.
+
+Fix: either add `"what's"` to `ACTION_HINTS["get"]`, or pre-normalize
+common contractions (`what's` → `what is`, `who's` → `who is`, etc.)
+in `_classify_with_rules` before hint matching. Normalizing is more
+general; adding hints is cheaper.
 
 ---
 
