@@ -813,6 +813,54 @@ general; adding hints is cheaper.
 
 ---
 
+## 2026-04-23 review (Estimate Detail + Maple panel session)
+
+Findings deferred from the `/code-review` pass on the Estimate Detail page
+polish, Maple list-formatting helper, and Maple-panel footer nav work.
+HIGH items in that review were fixed in-session; these are the MEDIUM /
+LOW items the user chose not to land right now.
+
+### 57. Stale closure of `estimate` in `handleGenerateGoogleDoc`
+In `portal/src/pages/NewEstimateWithActivityPage.tsx`, after
+`await handleSaveEstimate()` resolves, the local `estimate` identifier
+still refers to the pre-save snapshot — only `getEntityId(estimate)` is
+read afterward, and the ID doesn't change, so no current bug. But anyone
+extending this path to read a field that can change mid-save (e.g.,
+`estimate.status`, `estimate.updated_at`) will silently use stale data.
+
+Fix: widen `handleSaveEstimate` to return
+`Promise<EstimateWithExtras | null>` and use the resolved value instead
+of the closure reference.
+
+### 58. `PortalLayout.tsx` is now 2,148 lines
+Preexisting; this session added ~45 lines (`openMaple`, `openFeedback`,
+`openChangeLog`, `mapleNavFooter`, ESC wiring on the panels) and removed
+the two composer-level button rows for a net +20. Still well over the
+800-line HIGH threshold.
+
+Fix: extract the Maple panel (header + messages + composer + footer +
+Feedback/ChangeLog overlays) into `components/maple/MaplePanel.tsx`.
+Both the mobile and desktop branches render nearly-identical markup and
+could share one component with a `variant="mobile" | "desktop"` prop.
+
+### 59. Drive-filename filename-collision policy still implicit
+The 2026-04-23 fix put the estimate_id back into the Drive filename
+(`Estimate-{estimate_id}-V{n}`), which resolves traceability. However,
+Drive still permits duplicate filenames within a folder — there is no
+enforcement that `(estimate_id, version)` is globally unique *as a
+filename*. If two concurrent generate-doc requests race, they could
+produce two Drive files with the same name. The version-number
+computation in `routers/estimates.py:2376-2379` is also read-modify-
+write without a lock.
+
+Fix: add a unique index on `(estimate_id, version)` inside the
+`GoogleDocsVersion` embedded array, or wrap the version-bump + create
+in an optimistic-concurrency retry keyed on `estimate.updated_at`.
+Low priority — the user would need to double-click "New Version" within
+the Drive latency window to trigger the race.
+
+---
+
 ## Deferred — not on the fix list
 
 These were considered and intentionally NOT filed as follow-ups:
