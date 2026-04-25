@@ -931,6 +931,114 @@ a half-done DB push-down.
 
 ---
 
+## 2026-04-25 review (configurable divisions session)
+
+Findings from `/code-review` after migrating Work Item divisions from a
+hardcoded `EstimateDivision` enum to a per-company configurable list
+(see [`plans/configurable-divisions.md`](plans/configurable-divisions.md)).
+Zero CRITICAL, one HIGH (pre-existing file size), three MEDIUM, three LOW.
+
+### 63. SettingsPage.tsx is 3,282 lines
+**File**: [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx)
+**Severity**: HIGH (file > 800 lines per spec)
+
+Pre-existing — was already 3,000+ before the Divisions tab landed; this
+change added ~150 lines. Long render-everything pages slow IDE feedback
+and make refactors error-prone.
+
+Fix (when next touching the page): extract each tab into its own file
+the way `RateCardsTab.tsx` already is — `MaterialCategoriesTab`,
+`MaterialUnitsTab`, `DivisionsTab`. Each owns its state, fetch, handlers,
+and dialogs. The parent page becomes a thin tab router.
+
+### 64. WorkItem divisions fetch swallows errors silently
+**File**: [portal/src/components/estimates/WorkItemInlineContent.tsx:73](../../portal/src/components/estimates/WorkItemInlineContent.tsx)
+**Severity**: MEDIUM
+
+`.catch(() => setDivisions([]))` hides API failures. If the divisions
+endpoint is down, users see an empty dropdown with no signal whether
+it's a transient failure or just a freshly-created company. Mirrors the
+pre-existing rate-cards pattern, so consistent — but support has no
+breadcrumb when this fires.
+
+Fix: log via `console.error` (or a shared error reporter if one exists
+later) before the empty fallback. Apply the same change to the
+rate-cards `.catch` for consistency.
+
+### 65. "Unknown" division is selectable in the Work Item dropdown
+**File**: [portal/src/components/estimates/WorkItemInlineContent.tsx:236-238](../../portal/src/components/estimates/WorkItemInlineContent.tsx)
+**Severity**: MEDIUM
+
+When the stored `division` value isn't in the company's fetched list,
+the dropdown renders `"Unknown"` as the displayed value. The locked
+spec said "Unknown" should be a display-only fallback — but the option
+is currently `<option value="Unknown">Unknown</option>`, so a user
+clicking it persists the literal string `"Unknown"` to the DB. That
+value will never match a real division on subsequent loads, so it
+self-perpetuates.
+
+Fix: render the Unknown `<option>` with `disabled`, or in the `onChange`
+handler ignore the literal `"Unknown"` value and keep the prior state.
+Add a frontend test that exercises the fallback path with a stale
+division name.
+
+### 66. No unique compound index on Division `(name, company)`
+**Files**: [platform/models/division.py](../../platform/models/division.py),
+[platform/services/division_bootstrap.py](../../platform/services/division_bootstrap.py)
+**Severity**: MEDIUM
+
+The Division model indexes `company` only. The bootstrap's "find then
+insert" pattern and the POST endpoint both check existence before
+inserting, but there's no unique constraint backing them — two
+concurrent POSTs with the same name produce two rows. Same gap exists
+on `MaterialCategory` (entry #60), so this is propagating a known
+pattern rather than introducing a new one. Flagging it explicitly so
+both can be fixed together.
+
+Fix: add `IndexModel([("company", ASCENDING), ("name", ASCENDING)],
+unique=True)` to `Division.Settings.indexes` (and to MaterialCategory
+in the same pass). Backfill existing duplicates via a one-off cleanup
+script before applying the index in production.
+
+### 67. `PydanticObjectId(company)` returns 500 on garbage input
+**File**: [platform/routers/divisions.py:44](../../platform/routers/divisions.py)
+**Severity**: LOW
+
+A malformed `?company=xyz` query raises `bson.errors.InvalidId` →
+unhandled → 500 instead of a clean 422. Mirrors `material_categories`
+and `material_units`. Pre-existing pattern; defer.
+
+Fix: wrap in try/except → `HTTPException(422, "Invalid company id")`,
+or factor a Pydantic dependency that validates ObjectIds and use it
+across all `?company=` query routers.
+
+### 68. `backfill_divisions.py` uses broad `except Exception`
+**File**: [platform/scripts/db/backfill_divisions.py:54](../../platform/scripts/db/backfill_divisions.py)
+**Severity**: LOW (script context, not a service handler)
+
+The script intentionally swallows per-company exceptions to keep going
+through the company list, then reports failures and exits non-zero.
+Acceptable for a one-off backfill — flagging only because spec calls
+broad excepts CRITICAL by default. No action expected unless the script
+gets reused for repeated migrations.
+
+### 69. Bootstrap services log nothing on success
+**Files**: [platform/services/division_bootstrap.py](../../platform/services/division_bootstrap.py),
+[platform/services/material_category_bootstrap.py](../../platform/services/material_category_bootstrap.py),
+[platform/services/material_unit_bootstrap.py](../../platform/services/material_unit_bootstrap.py)
+**Severity**: LOW
+
+All three bootstrap helpers run silently on success. The wrapper in
+`company_service.py` does `logger.exception(...)` on failure, so
+failures are observable, but successful seeding leaves no audit trail.
+Useful diagnostic when investigating "why does this company not have X"
+questions.
+
+Fix (low value, low effort): emit `logger.info("Seeded N {resource}
+templates for company %s", company_id)` from each bootstrap function.
+
+---
+
 ## Deferred — not on the fix list
 
 These were considered and intentionally NOT filed as follow-ups:
