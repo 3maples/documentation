@@ -1037,6 +1037,50 @@ questions.
 Fix (low value, low effort): emit `logger.info("Seeded N {resource}
 templates for company %s", company_id)` from each bootstrap function.
 
+## 2026-04-25 review (configurable material units session)
+
+### 70. Missing type hints in `backfill_material_units.py` helpers
+**File**: [platform/scripts/db/backfill_material_units.py:50, 68](../../platform/scripts/db/backfill_material_units.py)
+**Severity**: MEDIUM (script context, not production code)
+
+`remap_materials_for_unit(company_id, old_unit_id, new_unit_id)` and
+`migrate_company(company)` lack annotations. The divisions backfill set
+the same precedent, but for consistency with the model APIs these would
+be more self-documenting as
+`remap_materials_for_unit(company_id: PydanticObjectId, old_unit_id: PydanticObjectId, new_unit_id: PydanticObjectId) -> int`
+and `migrate_company(company: Company) -> dict`.
+
+### 71. Sequential `material.replace()` per remap is slow at scale
+**File**: [platform/scripts/db/backfill_material_units.py:60](../../platform/scripts/db/backfill_material_units.py)
+**Severity**: MEDIUM (performance, fine for current scale)
+
+`remap_materials_for_unit` iterates materials and calls
+`await material.replace()` one at a time, so the cost is roughly
+`O(companies × renamed_units × materials_per_company)`. The 2026-04-25
+production run touched 191 materials in seconds; at 10k+ materials per
+company this would hurt.
+
+Fix (if reused): batch via
+```python
+Material.find_many({"company": company_id, "sizes.unit": old_unit_id}).update_many(
+    {"$set": {"sizes.$[el].unit": new_unit_id, "updated_at": now}},
+    array_filters=[{"el.unit": old_unit_id}],
+)
+```
+Skips the `before_event` hook, so set `updated_at` explicitly.
+
+### 72. `getCategoryName` / `getUnitName` re-allocated each render
+**File**: [portal/src/pages/MaterialsPage.tsx:183-193](../../portal/src/pages/MaterialsPage.tsx)
+**Severity**: LOW (pre-existing pattern; not introduced by the
+configurable-units change)
+
+Both helpers are defined in the component body, so they're new function
+references on every render. No memoized child currently depends on
+referential equality, so this is purely cosmetic — flagging only because
+the same lookup pattern shows up across `MaterialsPage`,
+`AddMaterialGapDialog`, and the (eventual) inventory drawer. A shared
+`useMemo`-wrapped lookup hook would centralise the cache.
+
 ---
 
 ## Deferred — not on the fix list
