@@ -42,25 +42,23 @@ Files over the 800-line HIGH threshold:
   Cleanest first cut: move the new CRUD methods
   (`_handle_list_estimates`, `_handle_get_estimate`, `_crud_envelope`, plus
   the small parsing helpers) into `agents/estimate/crud.py` as a mixin.
-- `agents/orchestrator/service.py` — 1185 lines after the 2026-04-23
-  verbless-gap fix (was 1007). Not the worst, but
-  `_classify_with_rules()` is now 215 lines and `process()` still
-  duplicates the same short-circuit patterns (see MEDIUM #12 below).
-  See also entry #47 for the specific extraction inside
-  `_classify_with_rules`.
+- `agents/orchestrator/service.py` — 1257 lines (post-2026-04-25
+  `_classify_with_rules` extraction). `_classify_with_rules` is now 209
+  lines, down from 268, but still over the 50-line ceiling. `process()`
+  still duplicates the same short-circuit patterns (see MEDIUM #12).
 
 No function in this repo should exceed 50 lines. Grep for long bodies with
 a line-count tool after each refactor pass.
 
 ### 5. Pydantic validation on router inputs
-Grep pattern: `request: Request` or raw `dict` in a POST/PUT handler. Each one
-is an opportunity to define a Pydantic model and move validation out of the
-handler body. Start with any handler that reaches into `await request.json()`
-directly.
+Re-scoped 2026-04-25: a repo-wide grep for `await request.json()` returns
+**only two sites**, both in `platform/routers/auth.py` (lines 303 and 787).
+Other `request: Request` parameters are paired with Pydantic payloads and
+used for context (IP, user-agent, rate-limit keys), not validation bypass.
 
-### 6. Mutable default arguments
-Scattered `def f(x=[])` / `def f(x={})` — classic Python gotcha. A single PR
-can sweep all of them. `ruff check` with `B006` enabled finds them for free.
+Fix: replace the two `await request.json()` calls in `auth.py` with proper
+Pydantic request models. Effective severity is MEDIUM at this point, not
+HIGH — kept here under the original number for traceability.
 
 ### 7. Missing tests for new public functions
 Per `CLAUDE.md` mandatory-testing rule. To identify gaps: for each new public
@@ -669,22 +667,6 @@ original plan's catalog-backed Phase 2a-proper would largely retire.
 
 Plan: [plans/fix-maple-verbless-gap.md](plans/fix-maple-verbless-gap.md).
 
-### 47. `_classify_with_rules` is 215 lines
-**File**: [agents/orchestrator/service.py:156](../../platform/agents/orchestrator/service.py)
-**Severity**: HIGH (50-line threshold)
-
-Function was ~180 lines before Phase 2; the new domain-supplementation
-and implicit-get branches (lines 294–335) are logically distinct from
-the existing hint-matching. Theme-adjacent to entry #4.
-
-Fix: extract two helpers on the class:
-- `_supplement_domain_from_entity_signals(normalized, original, action)
-  -> Optional[str]`
-- `_infer_implicit_get(normalized, original, domain) -> Optional[str]`
-  (merges with existing `_is_bare_entity_reference`)
-
-Gets `_classify_with_rules` back below 180 lines.
-
 ### 48. `_LABOUR_ROLE_TOKENS` drifts from `DOMAIN_HINTS["labour"]`
 **File**: [agents/orchestrator/service.py:77](../../platform/agents/orchestrator/service.py)
 **Severity**: MEDIUM
@@ -1080,6 +1062,108 @@ referential equality, so this is purely cosmetic — flagging only because
 the same lookup pattern shows up across `MaterialsPage`,
 `AddMaterialGapDialog`, and the (eventual) inventory drawer. A shared
 `useMemo`-wrapped lookup hook would centralise the cache.
+
+---
+
+## 2026-04-26 review (rate-card unit dropdown + default seeding session)
+
+MEDIUM and LOW residuals from the `/code-review` pass after the rate-card
+unit Literal, dropdown, Effort Calculator column, JSON-fixture seeding, and
+on-signup bootstrap landed. The HIGH finding from that pass (missing
+`aria-label`s on the rate-card row inputs) was fixed in the same session.
+
+### 73. N+1 `find_one` inside bootstrap loops
+**File**: [platform/services/rate_card_bootstrap.py:48-54](../../platform/services/rate_card_bootstrap.py)
+**Severity**: MEDIUM
+**Why it's MEDIUM, not HIGH**: matches the existing pattern in
+`division_bootstrap.py`, `material_category_bootstrap.py`, and
+`material_unit_bootstrap.py`. Volume is small today (6 templates × 12
+companies = 72 queries during backfill), but the cost compounds as more
+bootstrappers join the chain.
+
+Fix: pre-load existing names with one query and check membership in the
+loop, e.g.
+```python
+existing_names = {
+    rc.name for rc in await RateCard.find({
+        "company": normalized_company_id,
+        "name": {"$in": [t["name"] for t in templates]},
+    }).to_list()
+}
+```
+Apply consistently across all `*_bootstrap.py` modules in one pass to keep
+them aligned.
+
+### 74. JSON re-parsed on every `bootstrap_company_rate_cards` call
+**File**: [platform/services/rate_card_bootstrap.py:20](../../platform/services/rate_card_bootstrap.py)
+**Severity**: MEDIUM
+The loader reads + parses `default_rate_cards.json` on every call. Cheap
+individually, wasteful in the backfill loop (12× during the recent
+backfill, more whenever a new bootstrapper is added).
+
+Fix: `@functools.lru_cache(maxsize=1)` on `load_default_rate_card_templates`,
+or assign at module import. Tests already monkey-patch
+`DEFAULT_RATE_CARDS_PATH`, so any cache must be invalidated in those tests
+(via `cache_clear()` in a fixture).
+
+### 75. `CardItem.easy/standard/hard` unbounded
+**File**: [platform/models/rate_card.py:26-28](../../platform/models/rate_card.py)
+**Severity**: MEDIUM
+**Why it's MEDIUM**: pre-existing — predates the unit-Literal change. But
+the dropdown work tightened `unit` validation, and the same rigour should
+apply to the rate fields: today negative, zero, NaN, and Infinity all pass
+Pydantic. Frontend rejects negatives (`min="0"`); a direct API client or
+malformed `default_rate_cards.json` can poison data and break effort
+calculations (division by zero on a row's chosen difficulty).
+
+Fix: `easy: float = Field(..., gt=0)` (and same for `standard`/`hard`).
+Will require touching test fixtures that pass `0` and updating the frontend
+helper text. Coordinate with whoever owns the Effort Calculator's
+zero-handling so we don't change semantics underneath.
+
+### 76. Backfill swallows per-company exceptions
+**File**: [documentation/development/migration_scripts/seed_rate_cards_for_existing_companies.py:32](../../documentation/development/migration_scripts/seed_rate_cards_for_existing_companies.py)
+**Severity**: MEDIUM
+The backfill catches every `Exception` per company and prints a one-liner.
+A misconfigured DB (auth failure, etc.) scrolls past silently as N
+identical errors. Pre-existing convention across migration scripts.
+
+Fix: differentiate infrastructure errors (`ServerSelectionTimeoutError`,
+`OperationFailure`) from per-document validation errors and let the former
+propagate. Apply the same shape to other migration scripts in one pass.
+
+### 77. `SEED_COMPANY_ID` is a magic constant tied to live data
+**File**: [documentation/development/migration_scripts/export_default_rate_cards.py:26](../../documentation/development/migration_scripts/export_default_rate_cards.py)
+**Severity**: MEDIUM
+The hard-coded ObjectId is documented in the module docstring but not
+guarded. If this script is re-run after the seed company evolves, it
+silently overwrites `default_rate_cards.json`.
+
+Fix: either accept the company id as a CLI arg with no default, or refuse
+to overwrite an existing `default_rate_cards.json` without a `--force`
+flag. Low priority since the script is clearly labeled "one-shot".
+
+### 78. Validation error message doesn't list allowed units
+**File**: [portal/src/lib/rateCards.ts:28](../../portal/src/lib/rateCards.ts)
+**Severity**: LOW
+`"Item ${i+1}: Unit must be one of the allowed values."` is unactionable
+for any user who hits it (which shouldn't happen via the UI, but could from
+a stale tab or a copy-paste).
+
+Fix: include the list:
+```ts
+` Item ${i + 1}: Unit must be one of: ${RATE_CARD_UNITS.join(", ")}.`
+```
+
+### 79. `load_default_rate_card_templates` returns loose `list[dict]`
+**File**: [platform/services/rate_card_bootstrap.py:13](../../platform/services/rate_card_bootstrap.py)
+**Severity**: LOW
+Returning `list[dict]` loses the schema; callers can't tell what keys
+exist without reading the validator.
+
+Fix: define `RateCardTemplate` and `CardItemTemplate` as `TypedDict`s in
+the same module and return `list[RateCardTemplate]`. Pure ergonomics — no
+runtime change.
 
 ---
 
