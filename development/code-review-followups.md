@@ -12,15 +12,23 @@ touching the affected area. Items are ordered by impact within each severity.
 
 ## HIGH
 
-### 3. Type hints on public functions
-Scattered across `routers/` and `agents/`. The ones that matter are public
-functions exported across package boundaries — start with:
-- `agents/orchestrator/service.py` — `process()` and the rule/intent helpers
-- `agents/estimate/service.py` — public methods called from routers
-- `services/` — any module exporting a function consumed by a router
+### 3. mypy baseline — themed gaps (271 errors across 38 files)
+Generated 2026-04-26 via `mypy . --ignore-missing-imports --explicit-package-bases`
+after fixing the 7 implicit-Optional `http_request: Request = None` router
+sites (the only mechanically safe category — `Optional[Request]` breaks
+FastAPI's request injection, so the kept-default + `# type: ignore[assignment]`
+form is the canonical fix). Remaining errors split into the themed entries
+below; see [#86](#86-mypy-no_implicit_optional-defaults-on-agentestimateservicepy)
+through [#90](#90-models-estimate-arithmetic-on-optional-int-fields) for
+specific scopes.
 
-Tooling: `mypy . --ignore-missing-imports` will surface the list. Consider
-adding mypy to CI once the baseline is clean.
+Pre-fix CI gate is **not** recommended yet — too many false positives from
+LangChain/Beanie type erasure. The right next move is one of:
+- enable `mypy --strict` only on `services/` (the smallest, most type-clean
+  package), or
+- add a `mypy.ini` with the noisy categories disabled (e.g. `disable_error_code = union-attr,arg-type` while the agents are refactored).
+
+Categories below are sorted by error count.
 
 ### 4. File and function size
 Files over the 800-line HIGH threshold:
@@ -49,16 +57,6 @@ Files over the 800-line HIGH threshold:
 
 No function in this repo should exceed 50 lines. Grep for long bodies with
 a line-count tool after each refactor pass.
-
-### 5. Pydantic validation on router inputs
-Re-scoped 2026-04-25: a repo-wide grep for `await request.json()` returns
-**only two sites**, both in `platform/routers/auth.py` (lines 303 and 787).
-Other `request: Request` parameters are paired with Pydantic payloads and
-used for context (IP, user-agent, rate-limit keys), not validation bypass.
-
-Fix: replace the two `await request.json()` calls in `auth.py` with proper
-Pydantic request models. Effective severity is MEDIUM at this point, not
-HIGH — kept here under the original number for traceability.
 
 ### 7. Missing tests for new public functions
 Per `CLAUDE.md` mandatory-testing rule. To identify gaps: for each new public
@@ -1232,6 +1230,146 @@ Fix: add ~6-8 parametrized cases to a new
 `tests/test_estimate_load_helpers.py` (or extend `test_estimate_agent.py`
 with a small section). Quick to write since both helpers are pure or
 near-pure.
+
+---
+
+## 2026-04-26 mypy baseline (themed entries from #3)
+
+The themed split of the 271-error mypy baseline. See entry #3 for the run
+command and the rationale for not gating CI yet.
+
+### 86. `union-attr` on `dict.get(...)` chains (92 errors)
+**Files**: `agents/property/service.py`, `agents/contact/service.py`,
+`agents/material/service.py`, `agents/labour/service.py`,
+`agents/equipment/service.py` — typically `context.get("...")` followed by
+attribute access without a None guard.
+**Severity**: MEDIUM (mostly false positives — context is always a dict in
+practice, but mypy can't see the call-site contract)
+
+The agent `process()` methods all accept `context: Optional[dict[str, Any]] =
+None` and call `context.get(...)` deep in the body. Pydantic narrows the
+type at the entry point, but mypy doesn't see the early `if context is
+None: context = {}` guard because it's done implicitly via `.get()`-on-None
+(which crashes at runtime if it ever happens).
+
+Fix (per-agent): early in each `process()`, normalize the context with
+`context = context or {}` and re-bind to a `dict[str, Any]` local. Mypy
+sees the narrowed type and the 92 false positives collapse. Apply
+opportunistically when next refactoring each agent.
+
+### 87. `arg-type` on `PydanticObjectId | None` → required (~25 errors)
+**Files**: `routers/companies.py`, `routers/estimates.py`,
+`routers/materials.py`, `routers/properties.py`,
+`services/company_service.py`, `scripts/db/backfill_divisions.py`
+**Severity**: MEDIUM (legitimate gap)
+
+`current_user.company` is `Optional[PydanticObjectId]` because users can
+exist without a company (pre-onboarding). Functions like
+`assert_company_access` and `get_company_defaults` declare a required
+`PydanticObjectId` param. The handlers should explicitly raise 401/403
+when `current_user.company is None` instead of leaning on Pydantic's
+runtime coercion.
+
+Fix: add a `_require_company(current_user)` helper in `dependencies.py`
+that returns `PydanticObjectId` or raises `HTTPException(401, "User has
+no company")`. Use it at the top of every handler that currently passes
+`current_user.company` to a function expecting required ObjectId.
+
+### 88. `assignment` — implicit-Optional defaults (~50 errors)
+**Files**: `agents/estimate/service.py` (~20 sites including 7 `tokens:
+TokenUsageAccumulator = None`), `agents/orchestrator/service.py`,
+`prompts/estimate_react.py`, `prompts/estimate_architect.py`,
+`agents/estimate/conversation_guide.py`
+**Severity**: MEDIUM (mechanical, but high volume)
+
+Pattern is `def f(x: T = None)` where T is non-Optional. Two fixes:
+- For agent helpers where None is a real signal (e.g.
+  `tokens: TokenUsageAccumulator = None`), change to `Optional[T] = None`.
+- For prompt-builder kwargs (`property: str = None`, `industry: str =
+  None`, `company: str = None`), change to `str = ""` if empty-string is
+  the actual sentinel — many of these immediately do `(value or "").strip()`
+  so the empty-string default is closer to the true contract.
+
+Do NOT apply to FastAPI `Request = None` params (see entry #3 fix notes).
+
+### 89. `arg-type` on `agents/*/service.py` — `Material | None` → `Material` (~30 errors)
+**Files**: `agents/material/service.py`, `agents/labour/service.py`,
+`agents/equipment/service.py`, `agents/property/service.py`,
+`agents/contact/service.py`
+**Severity**: MEDIUM (real defensiveness gap)
+
+After `await Material.find_one(...)` the result is `Material | None`,
+but the result is passed directly to `_material_to_dict(material)`
+without checking. If the lookup misses, the helper crashes with
+`AttributeError`. In practice the find calls are guarded by an earlier
+existence check, so the misses don't reach the dict helper — but the
+guards are easy to forget when adding new branches.
+
+Fix: in each agent, change `_material_to_dict(material: Material)` to
+accept `Optional[Material]` and return an empty-dict envelope on None.
+Callers no longer need to guard. Same shape for Labour, Equipment,
+Property, Contact.
+
+### 90. `models/estimate.py` arithmetic on `Optional[int]` fields (16 errors)
+**File**: [models/estimate.py:157, 206-215](../../platform/models/estimate.py)
+**Severity**: MEDIUM (latent bug if any nullable field is actually null)
+
+Several `EstimateVersion` / `Estimate` fields are typed `Optional[int]`
+but used in arithmetic (`<=`, `>=`, `-`, `len()`) without None guards.
+Today they're always populated (the create/update handlers fill defaults),
+but the types disagree with the runtime invariant.
+
+Fix: tighten the model declarations to `int = 0` (or whatever the real
+invariant is), or add `assert version.foo is not None` guards at the
+arithmetic sites. Tightening the model is cleaner — touch a fixture or
+two and the arithmetic just works.
+
+### 91. `call-arg` — `ChatOpenAI(openai_api_key=...)` signature drift (5 errors)
+**Files**: `agents/orchestrator/service.py:148`,
+`agents/material/service.py:167`, `agents/labour/service.py:125`,
+`agents/equipment/service.py:115`, `agents/contact/service.py:112`,
+`agents/property/service.py:88`
+**Severity**: LOW (langchain version skew, runtime works)
+
+mypy says `ChatOpenAI` doesn't accept `openai_api_key=`. The langchain
+stub is out of date — the kwarg exists at runtime and the call works.
+
+Fix: either upgrade `langchain-openai` to a version with synced stubs
+(check the pin in `requirements.txt`), or pass the key via env-var
+(`OPENAI_API_KEY`) and drop the kwarg. The env-var path is more
+idiomatic and removes the dependency on stub freshness.
+
+### 92. `call-arg` — agent → router calls missing `http_request` (5 errors)
+**Files**: `agents/material/service.py:1154-1157`,
+`agents/labour/service.py:719-722`,
+`agents/equipment/service.py:571-586`
+**Severity**: LOW (agents pass None but the router's `http_request: Request
+= None` default accepts it, see entry #3)
+
+Each Maple CRUD agent calls the corresponding router function directly
+(e.g. `await update_material(...)`) but doesn't pass `http_request`. The
+router's `# type: ignore[assignment]` default makes this work at runtime.
+
+Fix (long-term): extract the router body into a service helper that
+doesn't need `http_request`, and have both the HTTP route and the agent
+call the service. Audit logging would shift into the service or wrap the
+service call. Big refactor — not blocking. In the short term, suppress
+with `# type: ignore[call-arg]` at the agent call sites.
+
+### 93. `BlockingPortal | None` errors in tests (12 errors)
+**Files**: `tests/test_rate_card_bootstrap.py` (9 sites),
+`tests/test_audit_integration.py` (3 sites),
+`tests/test_feedback_api.py` (2 sites),
+`tests/test_company_api.py` (1 site),
+`tests/test_divisions_api.py` (1 site)
+**Severity**: LOW (tests, not production)
+
+`pytest-anyio` returns `BlockingPortal | None` from the
+`portal_blocking_portal` fixture. Tests call `portal.call(...)` without a
+None guard.
+
+Fix: add `assert portal is not None` (or a thin `_get_portal()` helper) at
+the top of each test that uses the fixture. Pure mypy hygiene.
 
 ---
 
