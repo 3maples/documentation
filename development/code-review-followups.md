@@ -31,21 +31,22 @@ LangChain/Beanie type erasure. The right next move is one of:
 Categories below are sorted by error count.
 
 ### 4. File and function size
-Files over the 800-line HIGH threshold:
-- `routers/agents.py` — 2670 lines. Orchestrate/estimate endpoints are
+Files over the 800-line HIGH threshold (line counts refreshed 2026-04-26):
+- `routers/agents.py` — 2917 lines. Orchestrate/estimate endpoints are
   ~300 lines each. Candidates for extraction:
   - The fuzzy-confirmation state machine (pending intent store, match lookup,
     confirm/deny routing) → its own module under `routers/agent_helpers/`.
   - The follow-up-stage machinery (property-select, confirm, optional value)
     → separate from the top-level dispatch.
-- `agents/material/service.py` — 2078 lines. `process()` is a mega-switch
-  that inserts a new 50-line inline handler per intent. Easiest extraction
-  target: the recently-added `list_material_categories` block
-  ([service.py:1942](../../platform/agents/material/service.py:1942)) → a
-  `_handle_list_material_categories()` method. Apply the same pattern to the
-  other branches over time.
-- `agents/estimate/service.py` — ~3500 lines after the 2026-04-20 Maple CRUD
-  handlers landed. Similar split: prompt-building / inventory fetch / LLM
+- `agents/material/service.py` — 2438 lines. `process()` is a mega-switch
+  that inserts a new 50-line inline handler per intent. ~~Easiest extraction
+  target: the `list_material_categories` block~~ landed 2026-04-26 as
+  `_handle_list_material_categories()` (44 lines) plus a static
+  `_format_material_categories_response()` helper. Apply the same pattern
+  to the other inline branches in `process()` (e.g. the create/update/delete
+  envelopes, the size-search clarification block).
+- `agents/estimate/service.py` — 5685 lines after the 2026-04-26 #80
+  refactor. Similar split: prompt-building / inventory fetch / LLM
   extraction / totals calc / CRUD read handlers are each their own concern.
   Cleanest first cut: move the new CRUD methods
   (`_handle_list_estimates`, `_handle_get_estimate`, `_crud_envelope`, plus
