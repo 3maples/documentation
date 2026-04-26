@@ -186,29 +186,20 @@ HIGH tenant-leak (`_resolve_latest_estimate` unscoped fallback) and the
 notes-overwrite safety finding were fixed in the same session. Residuals
 below were deferred per reviewer direction.
 
-### 19. `_handle_get_work_item` is 112 lines
-**File**: `agents/estimate/service.py:4385-4497`
-**Severity**: HIGH (code hygiene, per the 50-line threshold)
-
-The handler mixes estimate-loading, not-found / DB-error branches, work-item
-resolution, and response formatting in a single body. Consistent with other
-oversized handlers in this file (see entry #4) but the new landing for
-get-work-item work is a clean place to start the extraction pattern.
-
-Fix: extract `_load_estimate_for_read(query, company_id, context)` returning
-`(target, error_envelope)` (mirroring `_load_estimate_for_update`), and
-split the response formatting into `_build_work_item_details_text(idx,
-item)`. Handler body should shrink to ~30 lines. Same treatment applies
-to `_handle_get_estimate` now that the latest-estimate logic landed.
-
-### 20. Narrow `except Exception` in the latest-estimate resolver's ObjectId cast
-**File**: `agents/estimate/service.py` — the first of two `except Exception`
-clauses in `_resolve_latest_estimate` (around line 3266 post-fix).
+### 20. Narrow `except Exception` around `PydanticObjectId(company_id)` casts
+**Files**: `agents/estimate/service.py` —
+- `_resolve_latest_estimate` (first of two `except Exception` clauses,
+  around line 3266 post-fix).
+- `_load_estimate_for_update` (around line 4341).
+- `_load_estimate_for_read` (around line 4389; new in 2026-04-26).
 **Severity**: MEDIUM (hygiene, matches entry #0 of the original batch)
 
 The `PydanticObjectId(company_id)` cast is wrapped in `except Exception:
-return None`. Only `InvalidId` / `TypeError` can arise from a bad cast, so
-broadening to `Exception` masks unrelated failures.
+return None` / `company_oid = None`. Only `InvalidId` / `TypeError` can
+arise from a bad cast, so broadening to `Exception` masks unrelated
+failures. The pattern was preserved verbatim when `_load_estimate_for_read`
+was extracted from `_handle_get_work_item` in the 2026-04-26 #19 fix; fix
+all three sites in the same pass.
 
 Fix: narrow to `except (InvalidId, TypeError)` (import from `bson.errors`).
 Keep the second broad-except (around line 3277 post-fix) — it logs via
@@ -486,23 +477,6 @@ resolver) and the tenant-leak fix that already landed for
 Residuals from the `/code-review` pass on the #2 fix (per-company Maps
 rate limiting + auth dep on the addresses router). The docstring MEDIUM
 was fixed in the same session; these are what's left.
-
-### 38. `_enrich_address_fields_with_google` now crosses the 50-line threshold
-**Files**: `agents/property/service.py:787` (52 lines),
-`agents/contact/service.py:905` (55 lines)
-**Severity**: HIGH (function size)
-
-Pre-existing length (~48 lines); the #2 fix added the `company_id`
-keyword arg and the `try/except HTTPException` fallback, pushing both
-functions over the 50-line threshold. Theme-adjacent to entry #4 which
-already flags these files at the 800-line level.
-
-Fix: extract the post-`normalize_address_parts` merge logic (city /
-prov / country conflict check + country-inferred fallback) into a
-helper like `_apply_resolved_address(candidate, resolved, *,
-overwrite_existing)`. Would drop both functions to ~30 lines and the
-helper is easy to unit-test directly. Cleanest if done in the same PR
-as the rest of entry #4's property/contact splits.
 
 ### 39. `_RATE_LIMIT_DETAIL` constant is misplaced in `address_service.py`
 **File**: `services/address_service.py:15`
@@ -920,19 +894,6 @@ hardcoded `EstimateDivision` enum to a per-company configurable list
 (see [`plans/configurable-divisions.md`](plans/configurable-divisions.md)).
 Zero CRITICAL, one HIGH (pre-existing file size), three MEDIUM, three LOW.
 
-### 63. SettingsPage.tsx is 3,282 lines
-**File**: [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx)
-**Severity**: HIGH (file > 800 lines per spec)
-
-Pre-existing — was already 3,000+ before the Divisions tab landed; this
-change added ~150 lines. Long render-everything pages slow IDE feedback
-and make refactors error-prone.
-
-Fix (when next touching the page): extract each tab into its own file
-the way `RateCardsTab.tsx` already is — `MaterialCategoriesTab`,
-`MaterialUnitsTab`, `DivisionsTab`. Each owns its state, fetch, handlers,
-and dialogs. The parent page becomes a thin tab router.
-
 ### 64. WorkItem divisions fetch swallows errors silently
 **File**: [portal/src/components/estimates/WorkItemInlineContent.tsx:73](../../portal/src/components/estimates/WorkItemInlineContent.tsx)
 **Severity**: MEDIUM
@@ -1164,6 +1125,82 @@ exist without reading the validator.
 Fix: define `RateCardTemplate` and `CardItemTemplate` as `TypedDict`s in
 the same module and return `list[RateCardTemplate]`. Pure ergonomics — no
 runtime change.
+
+---
+
+## 2026-04-26 `/code-review` pass (HIGH cleanup session — #19, #38, #47, #63)
+
+Findings from the `/code-review` after the four HIGH refactors landed
+(`_classify_with_rules` extraction, `_handle_get_work_item` extraction,
+`_enrich_address_fields_with_google` shared helper, SettingsPage tab
+extractions). One HIGH (`_load_estimate_for_read` length, parity with
+`_load_estimate_for_update`), two MEDIUM, one LOW. The MEDIUM ObjectId
+issue in `_load_estimate_for_read` is folded into entry #20.
+
+### 80. `_load_estimate_for_read` and `_load_estimate_for_update` both over 50 lines
+**Files**: [platform/agents/estimate/service.py:4322](../../platform/agents/estimate/service.py) (`_load_estimate_for_update`, 57 lines),
+[platform/agents/estimate/service.py:4379](../../platform/agents/estimate/service.py) (`_load_estimate_for_read`, 67 lines)
+**Severity**: HIGH (50-line threshold)
+
+Both helpers carry three near-identical error envelopes (no-code for the
+read variant, db-error, not-found). Cleanest fix is a shared
+`_estimate_load_error_envelope(query, intent, message, *, needs_clarification, clarifying_question, context)`
+builder used by both — reduces both bodies under the 50-line ceiling and
+removes the divergence risk between them (the only difference today is
+intent string `"get_estimate"` vs `"update_estimate"`).
+
+Theme-adjacent to entry #4. Don't fix in isolation — bundle with the next
+estimate-service refactor that already touches one of these helpers.
+
+### 81. `react-hooks/exhaustive-deps` disabled in 3 new settings tab components
+**Files**: [portal/src/components/settings/DivisionsTab.tsx:55](../../portal/src/components/settings/DivisionsTab.tsx),
+[portal/src/components/settings/MaterialUnitsTab.tsx:55](../../portal/src/components/settings/MaterialUnitsTab.tsx),
+[portal/src/components/settings/MaterialCategoriesTab.tsx:56](../../portal/src/components/settings/MaterialCategoriesTab.tsx)
+**Severity**: MEDIUM
+
+All three new tab components use
+`// eslint-disable-next-line react-hooks/exhaustive-deps` on the
+`useEffect` that calls `fetchX()` when `active` flips to true. Disabling
+the rule masks a stale-closure risk if `companyId` ever changes between
+renders. The existing `RateCardsTab.tsx` solves the same problem cleanly
+with `useCallback`.
+
+Fix: wrap each fetch helper in
+`useCallback(async () => { ... }, [companyId])`, list the callback in the
+effect's deps, and drop the eslint-disable comment. ~6 lines per file.
+Mirror the pattern in `portal/src/components/settings/RateCardsTab.tsx`
+(lines 46-61).
+
+### 82. `alert(...)` for save errors in 3 settings tab components
+**Files**: [portal/src/components/settings/DivisionsTab.tsx](../../portal/src/components/settings/DivisionsTab.tsx) (`handleSaveDivision`),
+[portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx) (`handleSaveUnit`),
+[portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx) (`handleSaveCategory`)
+**Severity**: LOW (UX inconsistency)
+
+The save handlers surface API errors via browser `alert(...)`. The delete
+flows in the same files render an inline error inside the modal instead.
+Pattern was preserved verbatim from the pre-extraction `SettingsPage.tsx`
+during the 2026-04-26 #63 fix — pre-existing, not introduced.
+
+Fix: lift the error into a `formError` state inside the dialog, displayed
+above the action buttons. Consistent with the delete-modal pattern in the
+same files. Theme-adjacent to entry #44.
+
+### 83. Inconsistent ID extraction across settings tab components
+**Files**: [portal/src/components/settings/DivisionsTab.tsx](../../portal/src/components/settings/DivisionsTab.tsx),
+[portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx),
+[portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx)
+**Severity**: LOW (style)
+
+The new tab components use the non-null assertion operator
+(`editingDivision.id!`, `categoryToDelete!.id!`) when calling the API.
+The sibling `RateCardsTab.tsx` instead uses `extractEntityId(rc)` from
+`lib/entityId`, which handles the union shape from the API response
+without requiring a non-null assertion. Pattern was preserved verbatim
+during the 2026-04-26 #63 extraction — pre-existing, not introduced.
+
+Fix: switch to `extractEntityId(...)` for consistency with `RateCardsTab`.
+~6 call sites across the three files.
 
 ---
 
