@@ -32,19 +32,35 @@ Categories below are sorted by error count.
 
 ### 4. File and function size
 Files over the 800-line HIGH threshold (line counts refreshed 2026-04-26):
-- `routers/agents.py` — 2917 lines. Orchestrate/estimate endpoints are
-  ~300 lines each. Candidates for extraction:
-  - The fuzzy-confirmation state machine (pending intent store, match lookup,
-    confirm/deny routing) → its own module under `routers/agent_helpers/`.
+- `routers/agents.py` — 2631 lines (was 2917 before 2026-04-26).
+  Orchestrate/estimate endpoints are ~300 lines each. Recent extractions
+  landed under `routers/agent_helpers/`:
+  - `text_helpers.py` — `is_affirmative_text` / `is_negative_text` (50 lines).
+  - `estimate_update.py` — `run_update_estimate` add-items flow (175 lines).
+  - `fuzzy_confirmation.py` — `handle_estimate_fuzzy_confirmation` +
+    `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY` (180 lines).
+
+  Candidates for the next extraction round:
   - The follow-up-stage machinery (property-select, confirm, optional value)
-    → separate from the top-level dispatch.
-- `agents/material/service.py` — 2438 lines. `process()` is a mega-switch
+    → separate from the top-level dispatch. Largest remaining inline closure
+    is `_handle_pending_estimate_follow_up` (~530 lines).
+  - `_handle_pending_optional_follow_up` and the small builders around it
+    (`_build_optional_follow_up_prompt` / `_build_optional_follow_up_update_message`
+    / `_get_optional_follow_up_spec`) — natural cluster for an
+    `optional_follow_up.py` helper.
+- `agents/material/service.py` — 2560 lines. `process()` is a mega-switch
   that inserts a new 50-line inline handler per intent. ~~Easiest extraction
   target: the `list_material_categories` block~~ landed 2026-04-26 as
   `_handle_list_material_categories()` (44 lines) plus a static
-  `_format_material_categories_response()` helper. Apply the same pattern
-  to the other inline branches in `process()` (e.g. the create/update/delete
-  envelopes, the size-search clarification block).
+  `_format_material_categories_response()` helper. Follow-up extractions
+  landed 2026-04-26: `_handle_create_material`, `_handle_get_material`
+  (incl. size-scoped lookup), `_handle_delete_material` (post-resolve
+  confirmation flow), and `_handle_list_materials` (count + category-filter
+  + name-hint dispatch). `process()` is now ~680 lines, down from ~1072.
+  Remaining inline blocks: the `update_material` branch (~250 lines,
+  tangled with multi-turn field-then-value state + size_op resolution +
+  unit-OID lookup) and the `delete_material` early-confirm shortcut that
+  fires before `_resolve_target_material`.
 - `agents/estimate/service.py` — 5685 lines after the 2026-04-26 #80
   refactor. Similar split: prompt-building / inventory fetch / LLM
   extraction / totals calc / CRUD read handlers are each their own concern.
@@ -1391,6 +1407,111 @@ These were considered and intentionally NOT filed as follow-ups:
   generic props-driven table with no division logic. No `divisionBadge.ts`
   file exists. Reviewer appears to have described a state of the code
   that is not present in this repo.
+
+---
+
+## 2026-04-26 `/code-review` pass (post-#4 material + routers extractions)
+
+Findings from the `/code-review` after the material-service handler
+extractions (`_handle_create_material`, `_handle_get_material`,
+`_handle_delete_material`, `_handle_list_materials`) and the
+`routers/agent_helpers/` package landed (`text_helpers.py`,
+`estimate_update.py`, `fuzzy_confirmation.py`). Zero CRITICAL, three
+HIGH, three MEDIUM, two LOW. The HIGH items are all function-size
+inheritances from the original closures — they came over verbatim during
+the extraction and remain as the next iteration's target.
+
+### 94. New material handlers all exceed the 50-line ceiling
+**File**: [platform/agents/material/service.py](../../platform/agents/material/service.py)
+**Severity**: HIGH (continuation of entry #4)
+
+Extracted handlers and their line counts:
+- `_handle_create_material` — 175 lines (1366)
+- `_handle_get_material` — 122 lines (1757)
+- `_handle_list_materials` — 112 lines (1542)
+- `_handle_delete_material` — 101 lines (1655)
+
+Each one is mostly a single response-builder per branch. Next
+extraction: factor out the repeated envelope shape (12 keys: `success`,
+`query`, `intent`, `agent`, `confidence`, `matches`,
+`needs_clarification`, `clarifying_question`, `response`, `result`,
+`context`, `error`, `completion_ready`, `missing_fields`,
+`accuracy_suggestions`) into a small builder helper. That alone would
+shrink each handler by 30–40 lines.
+
+`_handle_list_material_categories` (44 lines, 2026-04-26) is the only
+existing handler under threshold and is the model to mirror.
+
+### 95. New `agent_helpers/` extractions exceed the 50-line ceiling
+**Files**: [platform/routers/agent_helpers/estimate_update.py](../../platform/routers/agent_helpers/estimate_update.py),
+[platform/routers/agent_helpers/fuzzy_confirmation.py](../../platform/routers/agent_helpers/fuzzy_confirmation.py)
+**Severity**: HIGH (continuation of entry #4)
+
+- `run_update_estimate` — 136 lines (estimate_update.py:40). The
+  modify-vs-add detection block (~30 lines) and the
+  parsed-job-items-to-grand-total tail (~30 lines) split out cleanly.
+- `handle_estimate_fuzzy_confirmation` — 150 lines
+  (fuzzy_confirmation.py:31). The `if is_affirmative_text(message):`
+  branch is 75 lines; extract `_dispatch_confirmed_intent(...)` for the
+  delete / update / work-item-remove sub-dispatch. That also flattens
+  entry #97's nesting issue.
+
+Same as #94, these came across verbatim from the original closures and
+are next-iteration work.
+
+### 96. ~~Pre-existing failing tests in `test_agents_api.py`~~ — FIXED 2026-04-26
+
+Both tests were stale assertions left over from before the 2026-04-21
+delete-safety hardening (`routers/agents.py:1975-1982`), which unified
+exact-code and fuzzy-title delete paths to always require confirmation.
+
+- `test_fuzzy_estimate_delete_requires_confirmation`: assertion at
+  line 526 changed from `["fuzzy_confirmation"]` to `["confirmation"]`
+  to match the unified envelope. The `is_fuzzy_match` flag still
+  distinguishes the two paths on the result side.
+- `test_exact_estimate_delete_executes_directly` → renamed to
+  `test_exact_estimate_delete_requires_confirmation` and the assertions
+  flipped: `needs_clarification=True`, `deleted_flags["deleted"] is
+  False`, plus `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY` IS now
+  present. Source unchanged.
+
+### 97. `text_helpers` import uses private aliases at the call site
+**File**: [platform/routers/agents.py:54-56](../../platform/routers/agents.py)
+**Severity**: MEDIUM (style)
+
+`routers/agent_helpers/text_helpers.py` exports
+`is_affirmative_text` / `is_negative_text` as public functions. The
+caller imports them with leading-underscore aliases (`as
+_is_affirmative_text`) to avoid touching ~10 call sites inside
+`orchestrate_agent_endpoint`. Hides the public/private boundary at the
+call site.
+
+Fix: rename the call sites to drop the underscore prefix and remove
+the `as` clause. Mechanical, ~10 substitutions.
+
+### 98. No direct unit tests for the four new agent_helpers public functions
+**Files**: [platform/routers/agent_helpers/text_helpers.py](../../platform/routers/agent_helpers/text_helpers.py),
+[platform/routers/agent_helpers/estimate_update.py](../../platform/routers/agent_helpers/estimate_update.py),
+[platform/routers/agent_helpers/fuzzy_confirmation.py](../../platform/routers/agent_helpers/fuzzy_confirmation.py)
+**Severity**: LOW (refactor, transitively covered)
+
+Public functions added 2026-04-26:
+- `is_affirmative_text(text: str) -> bool`
+- `is_negative_text(text: str) -> bool`
+- `run_update_estimate(...)` (async)
+- `handle_estimate_fuzzy_confirmation(...)` (async)
+
+End-to-end coverage exists via `tests/test_agents_api.py` (64 passing)
+and `tests/test_orchestrator_endpoint.py`. CLAUDE.md's mandatory-testing
+rule applies softly to refactors — but the two text predicates are pure
+and would be a 5-minute parametrized test file. The async helpers carry
+the same dependencies (DB + EstimateAgent) as the orchestrate endpoint
+and are harder to pin in isolation.
+
+Fix: add `tests/test_agent_helpers_text.py` with ~10 parametrized cases
+covering each predicate (affirmative, negative, empty, whitespace,
+mixed-case, leading/trailing punctuation). Defer the async-helper
+direct tests until #94/#95 are split — easier to test smaller units.
 
 ---
 
