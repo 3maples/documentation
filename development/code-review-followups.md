@@ -186,22 +186,22 @@ HIGH tenant-leak (`_resolve_latest_estimate` unscoped fallback) and the
 notes-overwrite safety finding were fixed in the same session. Residuals
 below were deferred per reviewer direction.
 
-### 20. Narrow `except Exception` around `PydanticObjectId(company_id)` casts
-**Files**: `agents/estimate/service.py` —
-- `_resolve_latest_estimate` (first of two `except Exception` clauses,
-  around line 3266 post-fix).
-- `_load_estimate_for_update` (around line 4341).
-- `_load_estimate_for_read` (around line 4389; new in 2026-04-26).
+### 20. Narrow `except Exception` around `PydanticObjectId(company_id)` cast in `_resolve_latest_estimate`
+**File**: `agents/estimate/service.py` — the first of two `except Exception`
+clauses in `_resolve_latest_estimate` (around line 3266 post-fix).
 **Severity**: MEDIUM (hygiene, matches entry #0 of the original batch)
 
 The `PydanticObjectId(company_id)` cast is wrapped in `except Exception:
-return None` / `company_oid = None`. Only `InvalidId` / `TypeError` can
-arise from a bad cast, so broadening to `Exception` masks unrelated
-failures. The pattern was preserved verbatim when `_load_estimate_for_read`
-was extracted from `_handle_get_work_item` in the 2026-04-26 #19 fix; fix
-all three sites in the same pass.
+return None`. Only `InvalidId` / `TypeError` can arise from a bad cast,
+so broadening to `Exception` masks unrelated failures.
 
-Fix: narrow to `except (InvalidId, TypeError)` (import from `bson.errors`).
+The same defect in `_load_estimate_for_update` and `_load_estimate_for_read`
+was fixed in the 2026-04-26 #80 refactor by extracting the shared
+`_coerce_company_oid` helper with a narrowed `except (InvalidId, TypeError)`.
+The same helper can be used here.
+
+Fix: replace the inline cast with `self._coerce_company_oid(company_id)`,
+or apply the same `except (InvalidId, TypeError)` narrowing inline.
 Keep the second broad-except (around line 3277 post-fix) — it logs via
 `logger.exception` so a surprise failure is still observable.
 
@@ -1133,24 +1133,13 @@ runtime change.
 Findings from the `/code-review` after the four HIGH refactors landed
 (`_classify_with_rules` extraction, `_handle_get_work_item` extraction,
 `_enrich_address_fields_with_google` shared helper, SettingsPage tab
-extractions). One HIGH (`_load_estimate_for_read` length, parity with
-`_load_estimate_for_update`), two MEDIUM, one LOW. The MEDIUM ObjectId
-issue in `_load_estimate_for_read` is folded into entry #20.
-
-### 80. `_load_estimate_for_read` and `_load_estimate_for_update` both over 50 lines
-**Files**: [platform/agents/estimate/service.py:4322](../../platform/agents/estimate/service.py) (`_load_estimate_for_update`, 57 lines),
-[platform/agents/estimate/service.py:4379](../../platform/agents/estimate/service.py) (`_load_estimate_for_read`, 67 lines)
-**Severity**: HIGH (50-line threshold)
-
-Both helpers carry three near-identical error envelopes (no-code for the
-read variant, db-error, not-found). Cleanest fix is a shared
-`_estimate_load_error_envelope(query, intent, message, *, needs_clarification, clarifying_question, context)`
-builder used by both — reduces both bodies under the 50-line ceiling and
-removes the divergence risk between them (the only difference today is
-intent string `"get_estimate"` vs `"update_estimate"`).
-
-Theme-adjacent to entry #4. Don't fix in isolation — bundle with the next
-estimate-service refactor that already touches one of these helpers.
+extractions). The HIGH (`_load_estimate_for_read` / `_load_estimate_for_update`
+both over 50 lines, originally filed as #80) was fixed in the same
+session via the shared `_estimate_load_error_envelope` and
+`_coerce_company_oid` helpers — that fix also resolved the
+`_load_estimate_for_read` and `_load_estimate_for_update` portions of
+entry #20. Two MEDIUM (#81, #84) and three LOW (#82, #83, #85) remain
+below.
 
 ### 81. `react-hooks/exhaustive-deps` disabled in 3 new settings tab components
 **Files**: [portal/src/components/settings/DivisionsTab.tsx:55](../../portal/src/components/settings/DivisionsTab.tsx),
@@ -1201,6 +1190,48 @@ during the 2026-04-26 #63 extraction — pre-existing, not introduced.
 
 Fix: switch to `extractEntityId(...)` for consistency with `RateCardsTab`.
 ~6 call sites across the three files.
+
+### 84. `_coerce_company_oid` returns `Optional[Any]` to keep lazy beanie import
+**File**: [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) — `_coerce_company_oid` (added 2026-04-26)
+**Severity**: MEDIUM (style / future-proofing)
+
+The new helper has return annotation `Optional[Any]` so the
+`from beanie import PydanticObjectId` import can stay lazy (inside the
+function body), matching ~20 other lazy-import sites in this file. The
+docstring documents the actual return shape, but static-typing precision
+is lost at every call site.
+
+The lazy-import pattern itself looks like a leftover artifact rather
+than a deliberate decision — `bson.ObjectId` is already imported at
+module level (line 22), and beanie is fully loaded by the time
+`agents/estimate/service.py` is evaluated. There's no obvious circular
+import to defend against.
+
+Fix: when entry #3 (mypy baseline) lands, promote
+`from beanie import PydanticObjectId` to module level and tighten
+`_coerce_company_oid`'s return annotation to `Optional[PydanticObjectId]`.
+~20 in-function `from beanie import PydanticObjectId` lines can also be
+removed at the same time. Don't fix in isolation — bundle with the mypy
+work since it's the easiest place to verify nothing breaks.
+
+### 85. No direct unit tests for `_estimate_load_error_envelope` and `_coerce_company_oid`
+**File**: [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) — both helpers added 2026-04-26 in the #80 refactor
+**Severity**: LOW (TDD policy, private helpers)
+
+Both helpers are exercised transitively via `_load_estimate_for_update`
+and `_load_estimate_for_read`, but lack direct tests. Edge cases worth
+pinning: empty `company_id`, malformed ObjectId hex (e.g. "abc"),
+`TypeError` cast input (e.g. `None`), and the `probability` fallback
+when `orchestrator_confidence` is missing from the context dict.
+
+Theme-adjacent to entry #51 (`_is_bare_entity_reference` etc. covered
+only end-to-end). CLAUDE.md's TDD rule applies softly to private
+helpers, so this is filed as LOW rather than MEDIUM.
+
+Fix: add ~6-8 parametrized cases to a new
+`tests/test_estimate_load_helpers.py` (or extend `test_estimate_agent.py`
+with a small section). Quick to write since both helpers are pure or
+near-pure.
 
 ---
 
