@@ -1515,6 +1515,133 @@ direct tests until #94/#95 are split — easier to test smaller units.
 
 ---
 
+## 2026-04-27 review (US address parsing + estimate navigation session)
+
+### 99. `_extract_fields_from_message` length growing past 200 lines
+File: `platform/agents/property/service.py:369`
+
+Now ~210 lines after the US-style "City, ST ZIP" regex was added. It's a
+sequence of 6 independent regex parsers chained by `setdefault`, and every
+new address shape will keep accreting. Pre-existing — not introduced by
+the US address fix — but worth tracking under the file/function-size theme
+in #4.
+
+Fix: when next touched, extract each address-shape parser into a small
+helper (e.g. `_try_us_zip_address`, `_try_partial_canadian_address`,
+`_try_chunked_canadian_address`) returning a partial dict, with
+`_extract_fields_from_message` reduced to a fold:
+
+```python
+for parser in (_try_canadian_full, _try_us_zip, _try_chunked, _try_partial, _try_at_prefix):
+    for k, v in parser(normalized).items():
+        extracted.setdefault(k, v)
+```
+
+Each parser becomes individually unit-testable and the coordinator drops
+under 50 lines.
+
+### 100. Defensive `|| canEdit` clause in estimate-page row visibility is dead today
+File: `portal/src/pages/NewEstimateWithActivityPage.tsx:879`
+
+```tsx
+{isEditMode && estimate && (allowedTransitions.length > 0 || canEdit) && (
+```
+
+`canEdit` is true only for `draft`/`review`. Both statuses have ≥2
+transitions even after the non-admin Approve filter, so
+`allowedTransitions.length > 0` is always true when `canEdit` is true.
+The `|| canEdit` clause is dead today.
+
+Keeping it is defensible — it documents intent ("show the row when we have
+either buttons or a Save to render") and the cost is one boolean OR. But
+if `isEditableStatus` or `TRANSITIONS_BY_STATUS` ever changes such that
+the implication breaks, the clause would silently start mattering, which
+is the kind of thing that surfaces only via a runtime regression.
+
+Fix: either drop `|| canEdit` or add a one-line comment noting the
+defensive intent. No runtime impact today.
+
+### 101. US-address regex could match noisy mid-message text
+File: `platform/agents/property/service.py:457-480`
+
+The new pattern matches anywhere in the message:
+`\d{1,6}` + 3-120 chars + `,` + city + `,` + 2-letter state + space + ZIP.
+A free-form sentence like "I owe 23456 dollars, paid via bank, NY 11768
+reference" technically matches and would produce spurious `street`/`city`/
+`prov_state`/`postal_zip` extractions. The same false-positive surface
+exists in the pre-existing Canadian regex variants in this file, so it's
+consistent — but worth noting.
+
+Fix: acceptable for now. The downstream Google address-enrichment step or
+LLM extraction usually overrides nonsense. If false positives surface in
+production, anchor the pattern to the start of a line or after a verb hint
+(`at|address[: ]`).
+
+---
+
+## 2026-04-28 `/code-review` pass (Templates resource)
+
+After implementing the Templates CRUD page (model + router + dialog + list).
+HIGH (`PUT /templates/id/{id}` allowed cross-tenant move via the request body)
+and MEDIUMs (missing `role="alert"` on the dialog error banner; race between
+page mount and "New Template" click before company defaults loaded) were
+fixed in the same change. The four LOW findings below remain.
+
+### 102. `duplicate` insert lacks 409 fallback
+File: `platform/routers/templates.py:120-136`
+
+`_next_copy_name` does a `find_one` for the candidate name, then
+`copy.insert()`. Between those two awaits, another caller could insert the
+same name, and the unique `(company, name)` index would surface a
+`DuplicateKeyError` to the client as a 500 instead of a clean 409.
+
+Fix: wrap the insert in `try/except DuplicateKeyError` and either retry
+once with the next `(copy N)` suffix or raise 409. Low likelihood — the
+window is sub-millisecond and same-user duplicate spam is the only realistic
+trigger.
+
+### 103. `delete_template` returns 200 on non-existent id
+File: `platform/routers/templates.py:158-160`
+
+```python
+if not template:
+    return {"message": "Template not found"}
+```
+
+200 with a body that says "not found" is misleading. Mirrors
+`routers/labours.py:336-338`, so it's a project convention rather than a
+regression. If we ever standardize, fix all four (labours, templates, etc.)
+together.
+
+Fix: change to `raise HTTPException(404, "Template not found")` and update
+the parallel routers in the same PR.
+
+### 104. `TemplateDialog` captures `initialName` only on mount
+File: `portal/src/components/estimates/TemplateDialog.tsx:36`
+
+`useState(initialName ?? "")` reads `initialName` only on first render.
+Switching from create-mode to edit-mode without remount would leave `name`
+empty. Currently safe because `TemplatesPage.tsx` passes `key={dialogKey}`
+and gates with `{isFormOpen && <TemplateDialog ... />}`, forcing a fresh
+mount each time.
+
+Fix: only required if either the key or the gate is removed. If so, sync
+`name` via a `useEffect` on `initialName` change.
+
+### 105. Templates page re-fetches `/companies/{id}` on every mount
+File: `portal/src/pages/TemplatesPage.tsx:60-74`
+
+Every visit to `/templates` re-fetches the company doc just to read profit
+margin / overhead / labor burden / tax. Other pages
+(`NewEstimateWithActivityPage`, `PeoplePage`) do the same, so it's a
+codebase-wide convention.
+
+Fix: hoist company defaults to a context provider or React Query cache in
+a follow-up that addresses all the consumers at once. Not worth a one-page
+change.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
