@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-04-24 (added §9 Help intent catalog).
+**Last updated:** 2026-04-27 (Property §2.x — US-style "City, ST ZIP" address parsing now ✅ rule).
 
 ## How to read this doc
 
@@ -53,25 +53,26 @@ Estimate is not in the CRUD coverage matrix — its generation is multi-turn and
 
 ## 1.1 Count & status queries
 
-| Phrasing | Intent → Agent | Status |
-|---|---|---|
-| `how many estimates do I have?` | `list_estimates` → Estimate Agent | ✅ rule |
-| `count my estimates` | `list_estimates` → Estimate Agent | ✅ rule |
-| `how many estimates with status draft?` | `list_estimates` → Estimate Agent | ✅ rule |
-| `what's the total estimates with status approved?` | `list_estimates` → Estimate Agent | ✅ rule |
-| `can you add up the estimates with status approved?` | `list_estimates` → Estimate Agent | ✅ rule *(closed in Phase A1)* |
-| `how many approved estimates do I have?` | `list_estimates` → Estimate Agent | ✅ rule |
-| `count my draft quotes` (quotes = synonym) | `list_estimates` → Estimate Agent | ✅ rule |
+| Phrasing                                             | Intent → Agent                                                        | Status                        |
+| ---------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------- |
+| `how many estimates do I have?`                      | `list_estimates` → Estimate Agent                                     | ✅ rule                        |
+| `count my estimates`                                 | `list_estimates` → Estimate Agent                                     | ✅ rule                        |
+| `how many estimates with status draft?`              | `list_estimates` → Estimate Agent                                     | ✅ rule                        |
+| `what's the total estimates with status approved?`   | `list_estimates` → Estimate Agent                                     | ✅ rule                        |
+| `can you add up the estimates with status approved?` | `list_estimates` → Estimate Agent                                     | ✅ rule *(closed in Phase A1)* |
+| `how many approved estimates do I have?`             | `list_estimates` → Estimate Agent                                     | ✅ rule                        |
+| `count my draft quotes` (quotes = synonym)           | `list_estimates` → Estimate Agent                                     | ✅ rule                        |
+| `what is the total value of the open estimates`      | open estimates are those with status DRAFT, APPROVED, REVIEW, and WON | ⚠️ gap                        |
 
 ## 1.2 Value / total queries for a specific estimate
 
-| Phrasing | Intent → Agent | Status |
-|---|---|---|
-| `what is the value of estimate {EST}?` | `get_estimate` → Estimate Agent | ✅ rule |
-| `what's the total for {EST}?` | `get_estimate` → Estimate Agent | ✅ rule *(closed in Phase A2)* |
-| `how much is {EST}?` | `get_estimate` → Estimate Agent | ✅ rule *(closed in Phase A3)* |
-| `what's the grand total for {EST}?` | `get_estimate` → Estimate Agent | ✅ rule |
-| `worth of {EST}` | `get_estimate` → Estimate Agent | ✅ rule |
+| Phrasing                               | Intent → Agent                  | Status                        |
+| -------------------------------------- | ------------------------------- | ----------------------------- |
+| `what is the value of estimate {EST}?` | `get_estimate` → Estimate Agent | ✅ rule                        |
+| `what's the total for {EST}?`          | `get_estimate` → Estimate Agent | ✅ rule *(closed in Phase A2)* |
+| `how much is {EST}?`                   | `get_estimate` → Estimate Agent | ✅ rule *(closed in Phase A3)* |
+| `what's the grand total for {EST}?`    | `get_estimate` → Estimate Agent | ✅ rule                        |
+| `worth of {EST}`                       | `get_estimate` → Estimate Agent | ✅ rule                        |
 
 Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads the response with the dollar amount.
 
@@ -137,12 +138,12 @@ When session context carries `active_estimate_code` (user recently worked on an 
 
 ## 1.8 Estimate gaps
 
-| Phrasing | Intended behavior | Status |
-|---|---|---|
-| `show me draft estimates from last week` | `list_estimates` with date + status filter | ⚠️ gap (date range) |
-| `approved quotes over $10k` | `list_estimates` with status + amount filter | ⚠️ gap (amount range) |
-| `what materials does {EST} use?` | `list_materials` scoped to estimate | ⚠️ gap |
-| `what roles are on {EST}?` | `list_labours` scoped to estimate | ⚠️ gap |
+| Phrasing                                 | Intended behavior                            | Status                |
+| ---------------------------------------- | -------------------------------------------- | --------------------- |
+| `show me draft estimates from last week` | `list_estimates` with date + status filter   | ⚠️ gap (date range)   |
+| `approved quotes over $10k`              | `list_estimates` with status + amount filter | ⚠️ gap (amount range) |
+| `what materials does {EST} use?`         | `list_materials` scoped to estimate          | ⚠️ gap                |
+| `what roles are on {EST}?`               | `list_labours` scoped to estimate            | ⚠️ gap                |
 
 ---
 
@@ -188,7 +189,22 @@ When session context carries `active_estimate_code` (user recently worked on an 
 | `update the city on {property} to Vancouver` | `update_property` → Property Agent | ✅ rule |
 | `set {property}'s city to Vancouver` | `update_property` → Property Agent | ⚠️ gap |
 
-## 2.7 Verbless (all ✅ rule — Phase 2a address-pattern resolver)
+## 2.7 Address formats accepted on create (all ✅ rule)
+
+The regex fallback in `_extract_fields_from_message` parses these single-line formats so the user can supply a complete address in one message:
+
+| Format | Example |
+|---|---|
+| Canadian, comma-separated with postal | `123 Main Street, Vancouver, BC, V1V 2A2` |
+| Canadian, comma-separated with country | `123 Main Street, Vancouver, BC, Canada, V1V 2A2` (or postal-then-country) |
+| Canadian, partial (street + city + state) | `888 River Road, Richmond, BC` |
+| Canadian, "at" prefix space-separated state | `at 123 Maple Drive, Surrey BC V3T 4R5` |
+| **US, "City, ST ZIP"** (no comma between state and ZIP) | `155 Asharoken Ave, Northport, NY 11768` |
+| **US, ZIP+4** | `155 Asharoken Ave, Northport, NY 11768-1234` |
+
+Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are intentionally **not** parsed by regex — the LLM entity extractor handles them.
+
+## 2.8 Verbless (all ✅ rule — Phase 2a address-pattern resolver)
 
 | Phrasing | Intent → Agent |
 |---|---|
@@ -196,7 +212,7 @@ When session context carries `active_estimate_code` (user recently worked on an 
 | `I want the details for {property}` | `get_property` → Property Agent |
 | `tell me about {property}` | `get_property` → Property Agent |
 
-## 2.8 Property gaps
+## 2.9 Property gaps
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
@@ -264,12 +280,12 @@ When session context carries `active_estimate_code` (user recently worked on an 
 
 ## 4.3 Possessive — all ⚠️ gap
 
-| Phrasing                           | Intended behavior          | Status |
-| ---------------------------------- | -------------------------- | ------ |
-| `show me {material}'s details`     | `get_material`             | ⚠️ gap |
-| `what's {material}'s price?`       | `get_material` field focus | ⚠️ gap |
-| `update {material}'s record`       | `update_material`          | ⚠️ gap |
-| `How much does (a material) cost?` | `get_material` field focus | ⚠️ gap |
+| Phrasing                         | Intended behavior          | Status |
+| -------------------------------- | -------------------------- | ------ |
+| `show me {material}'s details`   | `get_material`             | ⚠️ gap |
+| `what's {material}'s price?`     | `get_material` field focus | ⚠️ gap |
+| `update {material}'s record`     | `update_material`          | ⚠️ gap |
+| `How much does {material} cost?` | `get_material` field focus | ⚠️ gap |
 
 ## 4.4 Count
 
