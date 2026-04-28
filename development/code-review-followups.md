@@ -1642,6 +1642,62 @@ change.
 
 ---
 
+## 2026-04-28 `/code-review` pass (Use Template on estimate page)
+
+After wiring `UseTemplateDialog` + the split-button on the estimate detail
+page. Two MEDIUMs (search input missing `aria-label`; `setExpandedWorkItemIndex`
+read stale closure of `workItems.length`) were fixed in the same change.
+The deferred MEDIUM and two LOWs remain.
+
+### 106. `autoFocus` on dialog open may interrupt screen-reader announcements
+File: `portal/src/components/estimates/UseTemplateDialog.tsx:84`
+
+`autoFocus` on the search input pulls focus immediately when the dialog
+opens. On some assistive tech this races with the modal's open
+announcement, so the user hears a partial label. Same pattern is used in
+several other dialogs (e.g. `TemplateDialog.tsx`), so it's a codebase-wide
+concern, not specific to this dialog.
+
+The standard fix is to focus the modal container (or first heading) on
+open and let the user Tab into the search field. That requires changes
+inside `components/common/Modal.tsx` and ripples to every dialog. Not
+worth a one-dialog fix — defer until an a11y pass that addresses Modal
+focus management as a single change.
+
+Fix: address as part of a future Modal a11y refactor; do not patch
+per-dialog.
+
+### 107. Inventory-gaps panel does not reflect template-inserted work items until save
+File: `portal/src/pages/NewEstimateWithActivityPage.tsx:418-424`
+
+`inventoryGaps` is memoized off `estimate` (the server snapshot), not
+`workItems` (the editor state). When a user inserts a template, any
+unmatched materials/activities the template carries don't surface in the
+gaps panel until the estimate is saved and reloaded. Same behavior as
+`handleAddWorkItem` — pre-existing limitation, not a regression — but
+worth knowing because templates are more likely to carry unmatched items
+than from-scratch work items.
+
+Fix: rebuild gaps from `workItems` rather than `estimate.job_items` so
+in-progress edits surface immediately. Out of scope for the Templates
+feature; revisit if the gaps panel becomes a primary editing surface.
+
+### 108. `templates.find()` could return undefined on stale state
+File: `portal/src/components/estimates/UseTemplateDialog.tsx:51`
+
+If templates were re-fetched mid-confirm and the list shrank,
+`templates.find((t) => getEntityId(t) === selectedId)` returns undefined.
+The `if (chosen)` guard handles it correctly (the OK click silently does
+nothing), so the path is safe. Could improve UX by clearing `selectedId`
+when it disappears from the list — but with the dialog gated by
+conditional mount, the templates list never refreshes mid-session.
+
+Fix: none required while the dialog is mounted-on-open. If we ever switch
+to keep-mounted-with-refresh, add `useEffect` to clear `selectedId` when
+it disappears from `templates`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
