@@ -1698,6 +1698,207 @@ it disappears from `templates`.
 
 ---
 
+## 2026-04-29 review (improvements.md consolidation)
+
+Items consolidated from `documentation/development/improvements.md`. The
+".gitignore `*-key.json` is broad" suggestion from that file was dropped as
+already covered by #45 (which explicitly notes the `*-key.json` sibling
+pattern is functionally fine).
+
+### 109. Silent fallthrough when `add/set` override has no `update_*` intent
+**File**: [platform/agents/orchestrator/service.py:298](../../platform/agents/orchestrator/service.py)
+**Severity**: LOW (observability)
+
+In the `add/set a <field> to <entity>` create→update override:
+
+```python
+update_intent = resolve_intent("update", domain)
+if update_intent:
+    intent = update_intent
+```
+
+If a future read-only domain has a `create_*` but no `update_*` intent, the
+override silently falls through and the misclassified `create_*` is
+returned. Failure is invisible.
+
+Fix: log a warning on the miss so it's diagnosable in production:
+
+```python
+if update_intent:
+    intent = update_intent
+else:
+    logger.warning("add/set override: no update intent for domain=%s", domain)
+```
+
+### 110. `FeedbackPanel` error message has no live-region announcement
+**File**: [portal/src/components/common/FeedbackPanel.tsx:169](../../portal/src/components/common/FeedbackPanel.tsx)
+**Severity**: LOW (accessibility)
+
+The submission-error div is a plain `<div className="text-xs text-red-600">{error}</div>`.
+Screen readers don't announce it when it appears, so a visually impaired
+user gets no audible signal that submission failed — they have to walk the
+DOM to find out why nothing happened.
+
+Fix: add `role="alert"` (or `aria-live="polite"`) to the error div. The
+same applies to `ChangeLogPanel.tsx:166`, which uses the identical
+pattern.
+
+### 111. Missing test: anonymous Firebase token → "Unknown User <unknown>" fallback
+**File**: [platform/tests/test_feedback_api.py](../../platform/tests/test_feedback_api.py), [platform/routers/feedback.py:87-89](../../platform/routers/feedback.py)
+**Severity**: LOW (test gap)
+
+Every existing feedback test injects `X-Test-Email`, so the defensive
+branch in `submit_feedback` that handles a verified token *without* an
+email (`full_name = "Unknown User"`, `email = "unknown"`) never runs in
+the test suite. A regression that breaks the fallback (e.g. a future
+refactor that drops the `or "unknown"` clause and 500s instead) would
+ship undetected.
+
+Fix: add a test that posts with a token that has `uid` but no `email`,
+and assert the Trello card payload is built with `Unknown User <unknown>`.
+
+### 112. Replace `isMountedRef`/`fetchTokenRef` race-guards with `AbortController`
+**Files**: [portal/src/components/common/ChangeLogPanel.tsx](../../portal/src/components/common/ChangeLogPanel.tsx), [portal/src/components/common/FeedbackPanel.tsx](../../portal/src/components/common/FeedbackPanel.tsx), [portal/src/api/client.ts](../../portal/src/api/client.ts)
+**Severity**: LOW (refactor)
+
+Both panels copy a manual race-guard pattern (`isMountedRef`,
+`submitTokenRef` / `fetchTokenRef`, post-await staleness checks) to drop
+results from superseded fetches. The cleaner shape is `AbortController`
++ `signal`, but it requires changing the shared API client.
+
+Fix:
+1. Teach `apiRequest` in `portal/src/api/client.ts` to accept an
+   `AbortSignal` and pass it through to `fetch`.
+2. Migrate `ChangeLogPanel` and `FeedbackPanel` together — abort the
+   in-flight request on unmount or on a new submit/fetch, then drop the
+   ref-based guards.
+
+Migrate both call sites in the same PR so the pattern is consistent.
+
+### 113. Test bypass `FIREBASE_AUTH_DISABLED=true` hides unauthenticated paths
+**File**: [platform/tests/conftest.py:7](../../platform/tests/conftest.py)
+**Severity**: LOW (testing infra)
+
+The whole suite runs with `os.environ.setdefault("FIREBASE_AUTH_DISABLED", "true")`,
+so a test that hits a router without `X-Test-Email` doesn't actually
+exercise the Firebase verification path — it just routes through the
+test bypass. Endpoints that *should* 401 for missing auth are not
+verifying that behavior.
+
+Fix: add a fixture that temporarily clears (or sets to `"false"`) the
+flag for the duration of one test, so router-level auth dependencies are
+genuinely exercised. Apply it to at least one endpoint per router family
+(feedback, change-logs, companies). Treat as shared testing-infra work
+rather than per-PR add-ons.
+
+---
+
+## 2026-04-29 `/code-review` pass (public Maple widget)
+
+Hygiene findings from the post-implementation review of the public Maple
+Q&A widget (marketing site). HIGH `/code-review` items #3, #5, and #6
+landed in the same session; these are the residual MEDIUM/LOW items.
+
+### 114. Unused `Optional` import in `refusal.py`
+**File**: [platform/agents/maple_public/refusal.py:21](../../platform/agents/maple_public/refusal.py)
+**Severity**: LOW (hygiene)
+
+`from typing import Optional` is imported but no symbol from this module
+references it. (Was used before the instructional-question short-circuit
+landed and the function signature changed.)
+
+Fix: drop the line.
+
+### 115. Mixed string-vs-regex tuples in `refusal.py`
+**File**: [platform/agents/maple_public/refusal.py:27-55](../../platform/agents/maple_public/refusal.py)
+**Severity**: MEDIUM (maintainability)
+
+`_ACTION_VERBS` and `_DOMAIN_NOUNS` mostly hold plain strings, but a few
+entries embed raw regex fragments (`"set\\s*up"`, `"job\\s*site"`,
+`"team\\s*member"`, `"work\\s*item"`, `"rate\\s*card"`). The values are
+joined into a `|` alternation and never `re.escape`d. A maintainer
+adding a literal noun with a regex metacharacter (e.g. a hyphen, parens,
+or a dot) would silently get the wrong match.
+
+Fix: either (a) add a one-line comment near the tuples saying "values
+are raw regex fragments — do NOT pre-escape", or (b) split into two
+tuples (literal vs regex), `re.escape` the literal one before joining.
+
+### 116. Duplicated "I'm not sure" fallback copy in `service.py`
+**File**: [platform/agents/maple_public/service.py:90-91, 194-198](../../platform/agents/maple_public/service.py)
+**Severity**: LOW (maintainability)
+
+The "I'm not sure — that's not something I can answer from here. Sign
+up at {signup_url} and I can help you with that in the app." line lives
+both inside the LLM strict prompt (rule 5) and as the Python-side
+fallback when the LLM returns empty content. They will drift over time.
+
+Fix: extract a small helper or module constant that produces the
+phrasing; reuse from both sites.
+
+### 117. `_LLMHolder` class is more scaffolding than the use needs
+**File**: [platform/agents/maple_public/service.py:99-127](../../platform/agents/maple_public/service.py)
+**Severity**: LOW (style)
+
+The lazy-init holder class plus `set_llm_for_tests` is more structure
+than the single-LLM use needs. A module-level
+`_llm: Optional[ChatOpenAI] = None` plus a getter and a test-only
+setter would be flatter.
+
+Fix: optional refactor; not blocking. Keeps the test injection path
+clean either way.
+
+### 118. Hand-rolled `import.meta` cast in widget API client
+**File**: [website/widget/api.ts:25-27](../../website/widget/api.ts)
+**Severity**: MEDIUM (DX)
+
+`(import.meta as { env?: ... }).env?.VITE_PUBLIC_API_URL` works but
+exists because the website project doesn't pull in Vite's client
+types. Every future env-var lookup in the widget will repeat the cast.
+
+Fix: add a one-line `website/widget/vite-env.d.ts` containing
+`/// <reference types="vite/client" />`. Drop the cast and read
+`import.meta.env.VITE_PUBLIC_API_URL` directly.
+
+### 119. URL build via string concatenation in widget API client
+**File**: [website/widget/api.ts:36](../../website/widget/api.ts)
+**Severity**: LOW (robustness)
+
+`resolveApiUrl().replace(/\/+$/, "") + "/public/maple/ask"` hand-rolls
+the join. A misconfigured env (e.g. trailing whitespace, missing
+scheme, accidental query string) builds a broken URL silently.
+
+Fix: use `new URL("/public/maple/ask", base)`. Surface a clear error
+if the base is malformed.
+
+### 120. Unused CSS variable in widget palette
+**File**: [website/widget/widget.css:6](../../website/widget/widget.css)
+**Severity**: LOW (hygiene)
+
+`--mw-bg-alt: #3b3f5c;` is declared but never referenced.
+
+Fix: remove the line.
+
+### 121. Implicit "welcome bubble has id 0" coupling
+**Files**: [website/widget/MapleWidget.tsx:31, 69, 108](../../website/widget/MapleWidget.tsx)
+**Severity**: LOW (style)
+
+The widget treats the welcome bubble specially in two unrelated places:
+- Line 69: `bubbles.filter((b) => b.id !== 0)` — strip the welcome
+  before building the API history.
+- Line 108: `showStarterChips = bubbles.length === 1 && !pending` —
+  show starter chips only on initial state.
+
+Both rely on the convention that the welcome bubble has id 0 and is
+the only bubble at start. A rename / re-numbering would have to touch
+both spots.
+
+Fix: tag the welcome bubble with a flag (`isWelcome: true`) on the
+`Bubble` type, or move the welcome state into a separate variable
+outside the `bubbles` array.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
