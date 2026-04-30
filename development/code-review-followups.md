@@ -1899,6 +1899,71 @@ outside the `bubbles` array.
 
 ---
 
+## 2026-04-30 `/code-review` pass (HELP intent → users-guide refactor)
+
+Scope: shared `agents.maple_guide` responder, `HelpHandler` rewrite,
+public-widget refactor, orchestrator interrogative→guide fallback,
+extracted `formatOrchestratorReply` portal utility.
+
+### 122. `_apply_low_confidence_fallback` is now ~84 lines
+**File**: [platform/agents/orchestrator/service.py:756-838](../../platform/agents/orchestrator/service.py)
+**Severity**: HIGH (function size)
+
+Two responsibilities co-mingled: (1) confidence math + early-return,
+(2) the new interrogative→guide fallback decision tree (~50 lines).
+Original method was ~30 lines.
+
+Fix: extract `_try_guide_fallback(self, result, message, context,
+best_confidence) -> Optional[Dict[str, Any]]`. Caller does
+`if (override := self._try_guide_fallback(...)): return override`.
+Each method then under ~40 lines.
+
+### 123. `formatOrchestratorReply` mutates input parameter
+**File**: [portal/src/lib/orchestratorReply.ts:54](../../portal/src/lib/orchestratorReply.ts)
+**Severity**: MEDIUM (mutation)
+
+Sets `result._outOfScope = true` so the caller can read it. Inherited
+from the original closure inside `PortalLayout.tsx`, copied verbatim
+during the extraction. The extraction was the right time to fix this
+contract; we kept it for parity instead.
+
+Fix: return `{ text, outOfScope }` (or a tuple). Caller assigns
+`result._outOfScope = outOfScope` explicitly. Cleaner contract; easier
+to test side effects independently.
+
+### 124. `openai_api_key=` keyword on ChatOpenAI flags mypy
+**Files**:
+- [platform/agents/maple_guide/service.py:111](../../platform/agents/maple_guide/service.py)
+- [platform/agents/maple_public/service.py](../../platform/agents/maple_public/service.py) (pre-existing — pattern was copied into the new shared module)
+
+**Severity**: MEDIUM (type hygiene)
+
+`openai_api_key` is accepted via Pydantic alias on `ChatOpenAI`, but
+mypy reports `Unexpected keyword argument` because the public type
+signature uses `api_key`. Pre-existing pattern that propagated into
+the new shared service.
+
+Fix: rename to `api_key=settings.openai_api_key` everywhere. Functional
+behavior identical; mypy clean.
+
+### 125. `platform/agents/orchestrator/service.py` at 1358 lines
+**File**: [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py)
+**Severity**: LOW (file size)
+
+Pre-existing breach of the 800-line threshold; this PR added ~70 net
+lines. Tracked under existing item [#4](#4-file-and-function-size).
+
+### 126. `portal/src/components/Layout/PortalLayout.tsx` at 2105 lines
+**File**: [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx)
+**Severity**: LOW (file size)
+
+This PR shrunk the file by ~35 lines via the
+`lib/orchestratorReply.ts` extraction. Continue extracting closures
+(`dispatchAgentMutation`, chip-set logic, agent-mutation handlers) into
+`lib/` to keep chipping at this. Tracked under existing item [#4](#4-file-and-function-size).
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
