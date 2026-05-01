@@ -1964,6 +1964,191 @@ This PR shrunk the file by ~35 lines via the
 
 ---
 
+## 2026-05-01 `/code-review` pass (Estimate detail UI overhaul + Work Item dialog refactor)
+
+Items below were called out across two `/code-review` passes during a UI
+overhaul of `NewEstimateWithActivityPage.tsx` (info/notes/status/docs
+icons, auto-saving description+property, Documents dropdown, status
+dropdown, Work Items table redesign, and the Work Item editor refactor
+from inline expansion to a Cancel/Save dialog).
+
+The two HIGH items addressed in-session:
+- Dialog now stays open during save with a "Saving…" state and an
+  inline error banner; revert path on failure.
+- Material/role gap resolvers fold their resolution into
+  `workItemDraft` when the dialog is open, bumping `workItemDialogKey`
+  to remount `WorkItemInlineContent` so the change is visible. The Save
+  Work Item button is now the persistence path for those edits.
+
+### 127. New-estimate flow has no save mechanism
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: HIGH
+
+`persistWorkItems` falls back to `setIsDirty(true)` when not in edit
+mode. Save Estimate was removed earlier in the session, so a user on
+the new-estimate flow can fill in title/description/work items but has
+no UI affordance to actually create the estimate. Pre-existing problem
+that the dialog refactor cements.
+
+Fix options:
+- Re-introduce a "Create Estimate" button that's only visible on the
+  new flow.
+- Auto-create the estimate on first interaction (e.g., title blur)
+  then fall through to the auto-save path for subsequent edits.
+
+### 128. ~~Title and notes have no auto-save path~~ — RESOLVED 2026-05-01
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: HIGH (resolved)
+
+Both fields now auto-save:
+- Title: `commitTitle` runs on blur + Enter → `autoSaveField({ title })`,
+  with diff guard against `estimate.title`.
+- Notes: `saveNotesDialog` runs from the Notes dialog Save button →
+  `estimatesApi.update({ notes })`. Diff-guarded against `notes`. Dialog
+  stays open during save, shows "Saving…" + inline error on failure;
+  Cancel and backdrop close are blocked while saving. Mirrors the work
+  item dialog pattern.
+
+### 129. Missing tests for auto-save + dialog flows
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: HIGH
+
+Per `CLAUDE.md` mandatory-testing rule, new behaviour needs tests.
+None of the following has a test:
+- `autoSaveField` (description/property success and failure paths)
+- `persistWorkItems` (insert vs replace)
+- `saveWorkItemDialog` open-on-failure / close-on-success branches
+- Status dropdown filtering of `delete`
+- Description blur compares trimmed values, only saves on real
+  change
+- Documents dropdown fallback (selected version is removed →
+  reset to latest)
+
+Fix: extract the helpers into a small testable module, or add
+component tests using the existing testing setup. Start with
+`saveWorkItemDialog`.
+
+### 130. `autoSaveField` has no concurrency guard
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM
+
+Rapid blurs/changes/saves can fire overlapping `PATCH /estimates/:id`
+requests. With `job_items` now flowing through this path the failure
+mode is more impactful — out-of-order responses can mangle
+`unmatched_*` arrays.
+
+Fix: add `AbortController` or an in-flight request id ref so only the
+latest response is applied. Alternatively serialize through a queue.
+
+### 131. `saveError` displayed far from origin
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM
+
+`saveError` (description / property auto-save failures) is rendered in
+the Work Items header; users blurring the description at the top of
+the page won't see the message if scrolled. Work item dialog now uses
+its own `workItemDialogError` so this affects only description and
+property.
+
+Fix: render `saveError` adjacent to the field that failed, or use a
+toast. Simplest: append a small inline error under the description /
+property when their auto-save fails.
+
+### 132. Description read-only color is dead CSS
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM
+
+`className={'... ${canEdit ? "..." : "bg-gray-50 ... text-gray-500"} ${!description ? "text-gray-400" : "text-gray-900"}'}`.
+The trailing ternary always wins over the `!canEdit` `text-gray-500`
+because Tailwind utilities at the same specificity resolve by
+stylesheet source order, not className order. Read-only state ends up
+visually identical to editable.
+
+Fix: collapse to one expression:
+`canEdit ? (description ? "text-gray-900" : "text-gray-400") : "text-gray-500"`.
+
+### 133. Description blur compares against stale `estimate`
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM
+
+`handleDescriptionBlur` compares `description.trim()` to
+`estimate?.description`, but if a previous PATCH hasn't returned yet
+`estimate.description` reflects the older value. The diff check may
+treat a no-op edit as a real change → duplicate save. Harmless but
+wasteful.
+
+Fix: track "last saved description" in a ref independent of
+`estimate`.
+
+### 134. `<label>` without `htmlFor`
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM (accessibility)
+
+Three `<label>`s (Documents, Description, Property) aren't associated
+with form controls. Two pre-date this session; the Documents label is
+new.
+
+Fix: use `<span>` / `<h3>` with the same Tailwind classes (no form
+control to bind to), or add `id` on the textarea/dropdown plus
+`htmlFor` on the label.
+
+### 135. Description "button" wraps multi-line content
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM (accessibility)
+
+The read-only description div has `role="button"` and `tabIndex={0}`,
+so screen readers announce the entire description as the button's
+accessible name. Fine for short text, awkward for long ones.
+
+Fix: add `aria-label="Edit description"` so the announced label is
+concise; the visible text remains content.
+
+### 136. Docs menu items missing `role="menuitem"`
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM (accessibility)
+
+The status dropdown items use `role="menuitem"`; the docs dropdown's
+`<a>` / `<button>` items inside `role="menu"` do not. Inconsistent
+ARIA.
+
+Fix: add `role="menuitem"` to each item inside the docs `<li>`.
+
+### 137. `NewEstimateWithActivityPage.tsx` at 1900+ lines
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM (file size)
+
+Pre-existing breach of the 800-line guideline. The session added the
+Work Item dialog, Documents dropdown, Notes dialog, Details dialog,
+status dropdown, etc., without extracting siblings. Tracked under
+existing item [#4](#4-file-and-function-size).
+
+Most natural extraction targets:
+- `<WorkItemDialog>` (Modal + WorkItemInlineContent + Cancel/Save)
+- `<DocumentsBar>` (Documents label + dropdown + New Version + delete)
+- `<EstimateTitleBar>` (Title + Info + Notes + Status + Delete icons)
+
+### 138. `openEditWorkItemDialog` shares reference into `workItems`
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: LOW
+
+The draft is the same object reference as `workItems[idx]`. If
+something else mutates `workItems[idx]` while the dialog is open, the
+draft sees the change too. Materials/activities are arrays so the
+spreads in the gap resolvers are safe today, but it's a footgun.
+
+Fix: defensive deep-clone on open
+(`structuredClone(workItems[idx])`).
+
+### 139. Pre-existing `printWindow.document.write` deprecation hint
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: LOW
+
+TS `6387` hint at line ~545 in `handleChecklistPdfDownload`. Predates
+this session. Replace with `printWindow.document.body.innerHTML = …`
+or build the document via DOM APIs.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
