@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-05-02 (Phase 2 of xfail backlog closed — possessive (`X's <field>`) and field-targeted-update (`set X's <field> to Y`, `change/update the <field> of/on X to Y`) phrasings are now ✅ rule across Property, Contact, Material, and Labour. Backed by `_match_possessive_or_field_targeted` in the orchestrator with `FIELD_TO_DOMAIN` for material-domain inference. Phase 1 closed §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect on the same date. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
+**Last updated:** 2026-05-02 (Wave 2 Phase 1 of xfail backlog closed — cross-resource relationship queries ("who lives at X?", "what properties does X own?", "where is X used?", "what estimates use the X role?") are now ✅ rule on Tier 1 across all four CRUD resources. Routing only at this stage; the cross-resource filter (e.g. property=X) is wired by Wave 2 Phase 2 (filter_by payload + name resolver + agent-side join handlers). Backed by `_match_cross_resource_query` in the orchestrator. Tier 1 coverage now 117/117. — Earlier the same day, Wave 1 Phase 2 closed possessive (`X's <field>`) and field-targeted-update (`set X's <field> to Y`, `change/update the <field> of/on X to Y`) phrasings as ✅ rule across Property, Contact, Material, and Labour via `_match_possessive_or_field_targeted` + `FIELD_TO_DOMAIN`. Wave 1 Phase 1 closed §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
 
 ## How to read this doc
 
@@ -384,34 +384,34 @@ No outstanding people-specific gaps in scope for the current backlog. Cross-reso
 
 # 6. Cross-resource / implicit relationships
 
-Questions users ask when they think about the domain rather than the database. All currently ⚠️ gap on Tier 1 rules; LLM tier partially rescues.
+Questions users ask when they think about the domain rather than the database. **Phase 1 of xfail-wave-2 (shipped 2026-05-02)** routes all the question shapes below to the correct list intent on Tier 1 — the cross-resource filter (e.g. *which* contacts at the property) is **not yet wired through to the agent** so the response is currently the unfiltered list. Phase 2 will add a `filter_by` payload + name resolver + agent-side join handlers to deliver the filtered result. Routing is enforced via `_match_cross_resource_query` in the orchestrator.
 
 ## 6.1 Property ↔ Contact
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `who lives at {property}?` | `list_contacts` filtered by property | ⚠️ gap |
-| `what contacts are at {property}?` | `list_contacts` | ⚠️ gap |
-| `who owns {property}?` | `list_contacts` | ⚠️ gap |
-| `what properties does {contact} own?` | `list_properties` | ⚠️ gap |
-| `where does {contact} live?` | `list_properties` | ⚠️ gap |
-| `show me {contact}'s properties` | `list_properties` | ✅ rule |
+| `who lives at {property}?` | `list_contacts` filtered by property | ✅ rule (routing only — Phase 2 will add filter) |
+| `what contacts are at {property}?` | `list_contacts` filtered by property | ✅ rule (routing only) |
+| `who owns {property}?` | `list_contacts` filtered by property + role=owner | ✅ rule (routing only) |
+| `what properties does {contact} own?` | `list_properties` filtered by contact | ✅ rule (routing only) |
+| `where does {contact} live?` | `list_properties` filtered by contact | ✅ rule (routing only) |
+| `show me {contact}'s properties` | `list_properties` filtered by contact | ✅ rule (possessive flow) |
 
 ## 6.2 Material → Property / Estimate
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `which properties use {material}?` | `list_properties` | ⚠️ gap |
-| `where is {material} used?` | `list_properties` | ⚠️ gap |
-| `find estimates with {material}` | `list_estimates` | ✅ rule |
+| `which properties use {material}?` | `list_properties` joined via estimates | ✅ rule (routing only — Phase 2 will add join) |
+| `where is {material} used?` | `list_properties` joined via estimates | ✅ rule (routing only) |
+| `find estimates with {material}` | `list_estimates` filtered by material | ✅ rule (plural-aware list flip) |
 
 ## 6.3 Labour → Property / Estimate
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `which properties need a {role}?` | `list_properties` | ⚠️ gap |
-| `what estimates use the {role} role?` | `list_estimates` | ⚠️ gap |
-| `show me jobs needing a {role}` | `list_properties` | ✅ rule |
+| `which properties need a {role}?` | `list_properties` joined via estimates | ✅ rule (routing only — Phase 2 will add join) |
+| `what estimates use the {role} role?` | `list_estimates` filtered by labour | ✅ rule (routing only) |
+| `show me jobs needing a {role}` | `list_properties` joined via estimates | ✅ rule (plural-aware list flip) |
 
 ---
 
@@ -655,17 +655,17 @@ Snapshot as of 2026-05-02 — regenerate with the coverage test.
 |---|---|---|---|
 | direct_imperative | 12/12 | 9/12 | covered (LLM flubs "create a new X") |
 | casual | 12/12 | 12/12 | covered |
-| possessive | 12/12 | 6/12 | covered (Phase 2 closed the gap) |
+| possessive | 12/12 | 6/12 | covered (Wave 1 Phase 2) |
 | count | 12/12 | 12/12 | covered |
 | filter_find | 12/12 | 12/12 | covered |
-| field_targeted_update | 12/12 | 8/12 | covered (Phase 2 closed the gap) |
-| implicit_relationship | 3/12 | 4/12 | LLM partially rescues — Wave 2 |
+| field_targeted_update | 12/12 | 8/12 | covered (Wave 1 Phase 2) |
+| implicit_relationship | 12/12 | 4/12 | covered routing-only (Wave 2 Phase 1 — Phase 2 will add the cross-resource filter) |
 | bulk | 12/12 | 12/12 | refused correctly |
 | verbless | 12/12 | 11/12 | covered |
 | material_size | 6/6 | 6/6 | covered |
 | equipment_blocked | 3/3 | 3/3 | refused correctly |
 
-**Totals: Tier 1 108/117 · Tier 2 95/117.** Remaining 9 Tier 1 gaps are all in `implicit_relationship` (Wave 2 — needs cross-collection relationship-query intent).
+**Totals: Tier 1 117/117 · Tier 2 95/117.** All Tier 1 categories pass. The `implicit_relationship` cases route correctly but the response is still the unfiltered list of the target resource — Wave 2 Phase 2 will land the filter_by payload and agent-side join handlers so the response reflects the cross-resource constraint.
 
 ## 10.4 Related docs
 
