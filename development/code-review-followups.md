@@ -2270,6 +2270,61 @@ Fix: optional. Either fold the seeding into the `useState` initializer
 (reading from a route loader), or leave a stronger inline contract
 comment near the ref declarations.
 
+### 150. `HelpHandler.detect_topic` is now ~120 lines
+**File**: [platform/agents/orchestrator/help_handler.py:30-149](../../platform/agents/orchestrator/help_handler.py)
+**Severity**: HIGH (function size)
+
+Found by `/code-review` 2026-05-02 after Phase 1 of the xfail backlog
+([plan](./plans/maple-xfail-wave-1.md)) added cross-domain link detection,
+unit-enum routing, line-item alias, and a wider capability-cue list. The
+function nearly doubled (was ~62 lines, now ~120) and reads as one long
+procedural script with a 13-flag prefix block at the top. Future cue
+additions will keep growing it.
+
+Fix: extract three private helpers in `HelpHandler`:
+- `_detect_cross_domain_topic(flags) -> str | None`
+- `_detect_enum_topic(flags) -> str | None` (roles / status / category / units)
+- `_detect_instructional_topic(normalized) -> str | None`
+
+Keep `detect_topic` as a thin coordinator that builds the flag dict and
+walks the helpers in priority order.
+
+### 151. Capability vocab duplicated across `intents.py` and `help_handler.py`
+**Files**:
+- [platform/agents/orchestrator/intents.py:184-214](../../platform/agents/orchestrator/intents.py) (`HELP_DIRECT_HINTS`)
+- [platform/agents/orchestrator/help_handler.py:58-86](../../platform/agents/orchestrator/help_handler.py) (`has_capability_cue` token tuple)
+
+**Severity**: MEDIUM (DRY)
+
+Found by `/code-review` 2026-05-02. The two lists overlap on ~13
+phrasings (tutorial, getting started, docs, documentation, examples,
+list your features, explain maple, how does maple work, how does this
+work, i am lost, i am stuck, i'm lost, i'm stuck, what can i do, what
+should i ask, what kinds, what do you do). Adding a new capability cue
+requires editing both lists and they can drift silently — no test
+asserts they stay in sync.
+
+Fix: promote a `CAPABILITY_CUE_TOKENS` constant in `intents.py`. Have
+`HELP_DIRECT_HINTS` extend it, and have `help_handler.py` import and
+reuse it directly for `has_capability_cue`. Single source of truth;
+every future cue lands in one place.
+
+### 152. `plural_topic` dict rebuilt on every `detect_topic` call
+**File**: [platform/agents/orchestrator/help_handler.py:131-137](../../platform/agents/orchestrator/help_handler.py)
+**Severity**: MEDIUM (duplication / drift risk)
+
+Found by `/code-review` 2026-05-02 during Phase 1 of the xfail backlog.
+The `plural_topic` mapping is constructed inside `detect_topic`, so
+every classification rebuilds it. Perf cost is nil, but `intents.py`
+already exposes `PLURAL_ENTITY_BY_DOMAIN` with the same data —
+duplicating it here invites drift if any domain plural ever changes.
+The §9.5 entry in the phrasing reference doc already calls out
+`PLURAL_ENTITY_BY_DOMAIN` as the intended source of truth.
+
+Fix: replace the inline dict with `from .intents import
+PLURAL_ENTITY_BY_DOMAIN` and reference it directly at the manage-form
+return.
+
 ---
 
 ## How to work through this

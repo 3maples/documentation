@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-04-27 (Property §2.x — US-style "City, ST ZIP" address parsing now ✅ rule).
+**Last updated:** 2026-05-02 (Phase 1 of xfail backlog closed — §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect are now ✅ rule).
 
 ## How to read this doc
 
@@ -606,26 +606,28 @@ When a message contains **both** a CRUD intent (firm action+domain match) and an
 
 ## 9.5 Help gaps
 
+Phase 1 of the xfail backlog (plan: `documentation/development/plans/maple-xfail-wave-1.md`) closed most §9.5 entries on 2026-05-02. Remaining gaps below are awaiting Wave 2 design work.
+
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `tutorial` / `getting started` / `docs` / `documentation` | `how_to_use_system` capability hint | ⚠️ gap — classified as `unknown` (or `get_material` false-positive for "getting started"). |
-| `examples` / `give me some examples` / `what kinds of things can I ask?` | Capabilities with example phrasings | ⚠️ gap — `unknown`. |
-| `what can't you do?` / `what are your limitations?` | New topic: `limitations` | ⚠️ gap — `unknown`. Would list equipment + bulk-delete + material-category-management refusals. |
-| `does Maple support X?` / `is there a way to do X?` | Capability inquiry, optionally check against `SUPPORTED_INTENTS_BY_AGENT` | ⚠️ gap — `unknown`. |
-| `what is a work item?` / `what's a property?` | Glossary / terminology help | ⚠️ gap — `unknown`. |
-| `what fields does a contact have?` | Schema help — return Pydantic model fields | ⚠️ gap — `unknown`. |
-| `what happens when I approve an estimate?` / `what does archive do?` | Action-semantics help | ⚠️ gap — `unknown`. |
-| `how does Maple work?` / `explain Maple to me` / `what do you do?` | Capabilities variant | ⚠️ gap — `unknown` (no instructional-pattern match, no `HELP_DIRECT_HINTS` hit). |
-| `what are the labour units?` / `what are the material units?` | New enum topic for LabourUnit / MaterialUnit | ⚠️ gap — `unknown`. Units aren't wired into `HelpHandler`. |
-| `I am lost` / `I am stuck` | Implicit help request | ⚠️ gap — classified as `get_material` via some filter-find fallback. |
-| `what should I ask?` / `what can I do?` | Capability prompt | ⚠️ gap — `unknown`. |
-| `list your features` | Capability prompt | ⚠️ gap — `unknown` (rule prefers `list_*` CRUD). |
-| `how do I add a work item?` | `how_to_manage_estimates` (work item is estimate-scoped) | ⚠️ gap — resolves to `how_to_use_system` (no domain keyword matched because "work item" isn't in the domain list). |
-| `how do I link a contact to a property?` | Cross-domain topic like `how_to_link_contact_property` | ⚠️ gap — resolves to `how_to_manage_contacts` (contact wins by list ordering). |
+| `tutorial` / `getting started` / `docs` / `documentation` | `capabilities` topic via `HELP_DIRECT_HINTS` | ✅ rule (Phase 1). |
+| `examples` / `give me some examples` / `what kinds of things can I ask?` | `capabilities` topic | ✅ rule (Phase 1). |
+| `what can't you do?` / `what are your limitations?` | `general_question` via interrogative guide-fallback | ✅ rule (already covered before Phase 1). |
+| `does Maple support X?` / `is there a way to do X?` | `capabilities` / `general_question` via help routing | ✅ rule (Phase 1) — equipment refusal now gated by `_looks_interrogative`; `is there a way` and `does maple support` added to `HELP_INSTRUCTIONAL_PATTERNS`. |
+| `what is a work item?` / `what's a property?` | Glossary / terminology help via guide-fallback | ✅ rule (already covered). |
+| `what fields does a contact have?` | Schema help — return Pydantic model fields | ✅ rule (already covered via fallback). |
+| `what happens when I approve an estimate?` / `what does archive do?` | Action-semantics help | ✅ rule (already covered via fallback). |
+| `how does Maple work?` / `explain Maple to me` / `what do you do?` | `capabilities` topic | ✅ rule (Phase 1). |
+| `what are the labour units?` / `what are the material units?` | `labour_units` / `material_units` topics | ✅ rule (Phase 1) — `unit`/`units` added to `HELP_ENUM_KEYWORDS`; new §3.13 + §3.14 in `users_guide.md` provide source content. |
+| `I am lost` / `I am stuck` | `capabilities` topic | ✅ rule (Phase 1). |
+| `what should I ask?` / `what can I do?` | `capabilities` topic | ✅ rule (Phase 1). |
+| `list your features` | `capabilities` topic | ✅ rule (Phase 1). |
+| `how do I add a work item?` | `how_to_manage_estimates` (estimate line-item alias) | ✅ rule (Phase 1) — `work item`/`job item`/`line item` detected and routed to estimate scope. |
+| `how do I link a contact to a property?` | `how_to_link_contact_property` topic | ✅ rule (Phase 1) — cross-domain detection runs before single-domain loop; new §3.12 in `users_guide.md`. |
 
-### Pluralization defect — `how_to_manage_propertys`
+### Pluralization defect — `how_to_manage_propertys` (closed Phase 1)
 
-`HelpHandler.detect_topic()` at `help_handler.py:113` returns `f"how_to_manage_{domain_name}s"`, naively appending `s`. For `domain_name="property"` this produces `how_to_manage_propertys` instead of `how_to_manage_properties`. Guide lookup for that topic will always fail. Fix: map domain → plural via `PLURAL_ENTITY_BY_DOMAIN` from `intents.py`.
+`HelpHandler.detect_topic` previously returned `f"how_to_manage_{domain_name}s"`, which produced `how_to_manage_propertys` for the property domain. Phase 1 introduced an inline `plural_topic` map (`property → properties`, others append `s`) so the topic key round-trips correctly to `how_to_manage_properties`.
 
 ---
 
@@ -652,7 +654,7 @@ cd platform
 ./run_tests.sh tests/test_maple_crud_coverage.py                     # Tier 1 only (~8s)
 ./run_tests.sh tests/test_maple_crud_coverage.py -m ""               # Tier 1 + Tier 2 (~3min, ~$0.05, needs OPENAI_API_KEY)
 ./run_tests.sh tests/test_maple_estimate_status_queries.py tests/test_maple_material_size_operations.py
-./run_tests.sh tests/test_maple_help_coverage.py                     # HELP intent (44 passing + 30 xfail gaps)
+./run_tests.sh tests/test_maple_help_coverage.py                     # HELP intent (74 passing, 0 xfail after Phase 1)
 ```
 
 ## 10.3 Current matrix score (Tier 1 / Tier 2)
