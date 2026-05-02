@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-05-02 (Phase 1 of xfail backlog closed — §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect are now ✅ rule. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
+**Last updated:** 2026-05-02 (Phase 2 of xfail backlog closed — possessive (`X's <field>`) and field-targeted-update (`set X's <field> to Y`, `change/update the <field> of/on X to Y`) phrasings are now ✅ rule across Property, Contact, Material, and Labour. Backed by `_match_possessive_or_field_targeted` in the orchestrator with `FIELD_TO_DOMAIN` for material-domain inference. Phase 1 closed §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect on the same date. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
 
 ## How to read this doc
 
@@ -170,7 +170,7 @@ When session context carries `active_estimate_code` (user recently worked on an 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
 | `show me {property}'s details` | `get_property` → Property Agent | ✅ rule |
-| `what's {property}'s city?` | `get_property` → Property Agent | ⚠️ gap (field lookup via possessive) |
+| `what's {property}'s city?` | `get_property` → Property Agent | ✅ rule |
 | `update {property}'s record` | `update_property` → Property Agent | ✅ rule |
 
 ## 2.4 Count (all ✅ rule)
@@ -187,7 +187,7 @@ When session context carries `active_estimate_code` (user recently worked on an 
 |---|---|---|
 | `change the city of {property} to Vancouver` | `update_property` → Property Agent | ✅ rule |
 | `update the city on {property} to Vancouver` | `update_property` → Property Agent | ✅ rule |
-| `set {property}'s city to Vancouver` | `update_property` → Property Agent | ⚠️ gap |
+| `set {property}'s city to Vancouver` | `update_property` → Property Agent | ✅ rule |
 
 ## 2.7 Address formats accepted on create (all ✅ rule)
 
@@ -214,10 +214,7 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 
 ## 2.9 Property gaps
 
-| Phrasing | Intended behavior | Status |
-|---|---|---|
-| `set {property}'s city to Vancouver` | `update_property` | ⚠️ gap (possessive set) |
-| `what's {property}'s city?` | `get_property` with field focus | ⚠️ gap |
+No outstanding property-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §6.
 
 ---
 
@@ -236,7 +233,7 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 | Phrasing | Status |
 |---|---|
 | `show me {contact}'s details` | ✅ rule |
-| `what's {contact}'s phone?` | ⚠️ gap |
+| `what's {contact}'s phone?` | ✅ rule |
 | `update {contact}'s record` | ✅ rule |
 
 ## 3.4 Count (all ✅ rule)
@@ -253,7 +250,7 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 |---|---|
 | `change the phone of {contact} to 555-1111` | ✅ rule |
 | `update the phone on {contact} to 555-1111` | ✅ rule |
-| `set {contact}'s phone to 555-1111` | ⚠️ gap |
+| `set {contact}'s phone to 555-1111` | ✅ rule |
 
 ## 3.7 Verbless (all ✅ rule — Phase 2b person-name heuristic)
 
@@ -261,10 +258,7 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 
 ## 3.8 Contact gaps
 
-| Phrasing | Intended behavior | Status |
-|---|---|---|
-| `set {contact}'s phone to 555-1111` | `update_contact` via possessive | ⚠️ gap |
-| `what's {contact}'s phone?` | `get_contact` field focus | ⚠️ gap |
+No outstanding contact-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `where does {contact} live?`) are tracked under §6.
 
 ---
 
@@ -278,14 +272,14 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 
 `show me my materials` · `what materials do I have?` · `pull up material {material}`
 
-## 4.3 Possessive — all ⚠️ gap
+## 4.3 Possessive
 
 | Phrasing                         | Intended behavior          | Status |
 | -------------------------------- | -------------------------- | ------ |
-| `show me {material}'s details`   | `get_material`             | ⚠️ gap |
-| `what's {material}'s price?`     | `get_material` field focus | ⚠️ gap |
-| `update {material}'s record`     | `update_material`          | ⚠️ gap |
-| `How much does {material} cost?` | `get_material` field focus | ⚠️ gap |
+| `show me {material}'s details`   | `get_material`             | ✅ rule |
+| `what's {material}'s price?`     | `get_material` field focus | ✅ rule |
+| `update {material}'s record`     | `update_material`          | ✅ rule |
+| `How much does {material} cost?` | `get_material` field focus | ⚠️ gap (no possessive — uses "does X cost") |
 
 ## 4.4 Count
 
@@ -304,11 +298,11 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 
 | Phrasing | Status |
 |---|---|
-| `change the price of {material} to $5` | ⚠️ gap |
-| `update the price on {material} to $5` | ⚠️ gap |
-| `set {material}'s price to $5` | ⚠️ gap |
+| `change the price of {material} to $5` | ✅ rule |
+| `update the price on {material} to $5` | ✅ rule |
+| `set {material}'s price to $5` | ✅ rule |
 
-(Material-level "update the price of X" without a size specification currently falls to LLM tier.)
+Closed by Phase 2 of xfail-wave-1 — `_match_possessive_or_field_targeted` resolves the missing material domain via `FIELD_TO_DOMAIN["price"] → material` plus the material-shape residual on the captured entity name.
 
 ## 4.7 Verbless (all ✅ rule — Phase 2b material-shape residual)
 
@@ -335,8 +329,7 @@ All size-scoped phrasings require an explicit `size <X>` token to fire. Material
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `show me {material}'s details` | `get_material` via possessive | ⚠️ gap |
-| `change the price of {material} to $5` | `update_material` (material-level) | ⚠️ gap (Tier 1) / ✅ Tier 2 |
+| `How much does {material} cost?` | `get_material` field focus | ⚠️ gap (no possessive form — needs separate "how much does X cost" handler) |
 | `list materials under $10` | `list_materials` with price range | ⚠️ gap |
 | `rename size {old} to {new} for {material}` | `update_material` (size_op=rename) | ⚠️ gap at classifier (handler supports) |
 | `show all sizes for {material}` | `get_material` | 🤖 LLM |
@@ -360,7 +353,7 @@ Labour = catalog of **role definitions** (Landscaper, Foreman, Operator). Indivi
 | Phrasing | Status |
 |---|---|
 | `show me {role}'s details` | ✅ rule |
-| `what's {role}'s cost?` | ⚠️ gap |
+| `what's {role}'s cost?` | ✅ rule |
 | `update {role}'s record` | ✅ rule |
 
 ## 5.4 Count (all ✅ rule)
@@ -377,7 +370,7 @@ Labour = catalog of **role definitions** (Landscaper, Foreman, Operator). Indivi
 |---|---|
 | `change the cost of {role} to $50` | ✅ rule |
 | `update the cost on {role} to $50` | ✅ rule |
-| `set {role}'s cost to $50` | ⚠️ gap |
+| `set {role}'s cost to $50` | ✅ rule |
 
 ## 5.7 Verbless (all ✅ rule — DOMAIN_HINTS include role names)
 
@@ -385,10 +378,7 @@ Labour = catalog of **role definitions** (Landscaper, Foreman, Operator). Indivi
 
 ## 5.8 People gaps
 
-| Phrasing | Intended behavior | Status |
-|---|---|---|
-| `what's {role}'s cost?` | `get_labour` field focus | ⚠️ gap |
-| `set {role}'s cost to $50` | `update_labour` via possessive | ⚠️ gap |
+No outstanding people-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `which properties need a {role}?`) are tracked under §6.
 
 ---
 
@@ -659,23 +649,23 @@ cd platform
 
 ## 10.3 Current matrix score (Tier 1 / Tier 2)
 
-Snapshot as of 2026-04-24 — regenerate with the coverage test.
+Snapshot as of 2026-05-02 — regenerate with the coverage test.
 
 | Category | Tier 1 | Tier 2 | Verdict |
 |---|---|---|---|
 | direct_imperative | 12/12 | 9/12 | covered (LLM flubs "create a new X") |
 | casual | 12/12 | 12/12 | covered |
-| possessive | 6/12 | 6/12 | real gap |
+| possessive | 12/12 | 6/12 | covered (Phase 2 closed the gap) |
 | count | 12/12 | 12/12 | covered |
 | filter_find | 12/12 | 12/12 | covered |
-| field_targeted_update | 6/12 | 8/12 | LLM partially rescues |
-| implicit_relationship | 3/12 | 4/12 | LLM partially rescues |
+| field_targeted_update | 12/12 | 8/12 | covered (Phase 2 closed the gap) |
+| implicit_relationship | 3/12 | 4/12 | LLM partially rescues — Wave 2 |
 | bulk | 12/12 | 12/12 | refused correctly |
 | verbless | 12/12 | 11/12 | covered |
-| **material_size** | **6/6** | **6/6** | **covered (new)** |
+| material_size | 6/6 | 6/6 | covered |
 | equipment_blocked | 3/3 | 3/3 | refused correctly |
 
-**Totals: Tier 1 96/117 · Tier 2 95/117.**
+**Totals: Tier 1 108/117 · Tier 2 95/117.** Remaining 9 Tier 1 gaps are all in `implicit_relationship` (Wave 2 — needs cross-collection relationship-query intent).
 
 ## 10.4 Related docs
 
