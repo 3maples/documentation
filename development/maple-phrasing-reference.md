@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-05-02 (Phase 1 of xfail backlog closed — §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect are now ✅ rule).
+**Last updated:** 2026-05-02 (Phase 1 of xfail backlog closed — §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect are now ✅ rule. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
 
 ## How to read this doc
 
@@ -679,6 +679,54 @@ Snapshot as of 2026-04-24 — regenerate with the coverage test.
 
 ## 10.4 Related docs
 
-- `documentation/development/plans/maple-input-coverage-audit.md` — original audit of the matrix categories
-- `documentation/development/plans/maple-coverage-gaps-estimate-material-size.md` — Phase A + Phase B design doc
 - `CLAUDE.md` > "Maple (Orchestrator) — CRUD assistant policies" — architectural overview
+- `documentation/development/plans/maple-xfail-wave-1.md` — active plan for closing the remaining xfail backlog
+
+---
+
+# 11. Coverage blind spots & extension ideas
+
+The matrix is shape-complete for the nine CRUD categories but never exercises several phrasing families real users will type. This section is the gap-hunting backlog — entries here aren't tracked as ⚠️ gaps in §1–§7 because they're conceptual classes, not specific phrasings ready to wire. Promote an entry to a per-resource ⚠️ gap row once you've picked a concrete phrasing and a target intent.
+
+## 11.1 Language / phrasing variation
+
+- **Negations:** `I don't need the Landscaper role anymore`, `remove John Doe — he moved`
+- **Conjunctions / multi-action:** `create a contact and link it to {property}`, `delete the Foreman role and add Operator instead`
+- **Typos / stemming:** `delet the proprty at 123 Main`, `contacs`, `labours` vs `labour roles` — partly mitigated by `agents/fuzzy_utils.py`
+- **Pronouns / anaphora across turns:** `update it`, `that one`, `the last one I created` (estimate-scoped anaphora exists in §1.7; cross-resource anaphora is the gap)
+- **Questions that imply get vs list:** `is there a contact named John?`, `do I have concrete blocks?`
+
+## 11.2 Value / field shapes not exercised
+
+- **Dates / date ranges:** `contacts added this month`, `estimates from last week`
+- **Numeric ranges / comparisons:** `materials under $10` (already in §4.9), `labour roles costing more than $40/hr`
+- **Multi-field update:** `set John Doe's phone to X and email to Y`
+- **Nullable / clearing:** `remove John Doe's phone number`, `clear the description on {material}`
+
+## 11.3 Domain overlap ambiguity
+
+The matrix uses disjoint tokens by design — real users won't:
+
+- Same name across domains: a contact and a property both called "John's Place"
+- Role-name collisions: a contact named "Foreman Smith"
+- Addresses that look like material names
+
+A small `ambiguity` test category would assert the classifier's tiebreak behavior.
+
+## 11.4 Refusal surface beyond bulk + equipment
+
+- **Destructive at smaller scale:** `delete the last 5 contacts` (N>1 but not "all") — listed as a §7.4 ⚠️ gap
+- **Cross-tenant / out-of-scope:** `show me other companies' estimates`
+- **Non-CRUD slipping through:** `email John Doe`, `schedule a visit`
+
+## 11.5 Highest-value extensions (ranked by ROI)
+
+If we want to expand coverage, here's the order:
+
+1. **`status_transition` matrix category for estimates** — fixed verb set × 5 EstimateStatus values × 2-3 subjects. ~30 new cases. Cleanest starter; status transitions already exist in §1.4.
+2. **Active-entity anaphora** — exercises the `active_estimate_code` session path beyond what §1.7 currently asserts.
+3. **Filter by status / date** — `show me draft estimates from last week`, `approved quotes over $10k`. Needs date-range parsing.
+4. **Direct coverage of the add-work-item regex path** — `agents/orchestrator/service.py` work-item rules; today only hit by orchestrator unit tests.
+5. **Cross-resource outbound from estimate** — mirrors §6.2 / §6.3 inbound pattern (e.g. `which property is {EST} for?`, `what materials does {EST} use?`).
+6. **Ambiguity fixtures** — see §11.3.
+7. **Typo / stemming fixtures** — 5–10 common misspellings per resource to catch fuzzy-match regressions.
