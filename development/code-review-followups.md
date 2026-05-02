@@ -106,18 +106,6 @@ Grep for `TODO` and `FIXME` added in recent changes. Each should either:
 - be converted into a GitHub issue with a link back to the code.
 Comments that just say "TODO" with no owner / date / issue will rot.
 
-### 12. Duplicated short-circuit logic in the orchestrator
-**File**: `agents/orchestrator/service.py`
-The `_classify_with_rules()` method and the top of `process()` both match the
-same regex patterns (list-categories, bulk-delete refusal, equipment refusal,
-material-category-management refusal) and build near-identical result dicts
-in each branch. Two code paths can drift — a phrasing fixed in one can still
-misroute through the other.
-
-Fix: extract a single `_try_policy_short_circuits(message) ->
-Optional[Result]` helper and call it from both entry points. Same applies to
-the list-categories pattern match.
-
 ### 13. Mutation where immutable return would be clearer
 Case-by-case judgment. Only refactor if it actually simplifies the reader's
 job; don't chase stylistic purity.
@@ -1705,31 +1693,6 @@ Items consolidated from `documentation/development/improvements.md`. The
 already covered by #45 (which explicitly notes the `*-key.json` sibling
 pattern is functionally fine).
 
-### 109. Silent fallthrough when `add/set` override has no `update_*` intent
-**File**: [platform/agents/orchestrator/service.py:298](../../platform/agents/orchestrator/service.py)
-**Severity**: LOW (observability)
-
-In the `add/set a <field> to <entity>` create→update override:
-
-```python
-update_intent = resolve_intent("update", domain)
-if update_intent:
-    intent = update_intent
-```
-
-If a future read-only domain has a `create_*` but no `update_*` intent, the
-override silently falls through and the misclassified `create_*` is
-returned. Failure is invisible.
-
-Fix: log a warning on the miss so it's diagnosable in production:
-
-```python
-if update_intent:
-    intent = update_intent
-else:
-    logger.warning("add/set override: no update intent for domain=%s", domain)
-```
-
 ### 110. `FeedbackPanel` error message has no live-region announcement
 **File**: [portal/src/components/common/FeedbackPanel.tsx:169](../../portal/src/components/common/FeedbackPanel.tsx)
 **Severity**: LOW (accessibility)
@@ -2222,60 +2185,38 @@ Fix: optional. Either fold the seeding into the `useState` initializer
 (reading from a route loader), or leave a stronger inline contract
 comment near the ref declarations.
 
-### 150. `HelpHandler.detect_topic` is now ~120 lines
-**File**: [platform/agents/orchestrator/help_handler.py:30-149](../../platform/agents/orchestrator/help_handler.py)
-**Severity**: HIGH (function size)
+## 2026-05-02 `/code-review` pass (post-#12/#109/#150/#151/#152 batch)
 
-Found by `/code-review` 2026-05-02 after Phase 1 of the xfail backlog
-([plan](./plans/maple-xfail-wave-1.md)) added cross-domain link detection,
-unit-enum routing, line-item alias, and a wider capability-cue list. The
-function nearly doubled (was ~62 lines, now ~120) and reads as one long
-procedural script with a 13-flag prefix block at the top. Future cue
-additions will keep growing it.
+### 153. `_PolicyShortCircuit.response` field name overloaded
+**File**: [platform/agents/orchestrator/service.py:188](../../platform/agents/orchestrator/service.py)
+**Severity**: LOW (naming clarity)
 
-Fix: extract three private helpers in `HelpHandler`:
-- `_detect_cross_domain_topic(flags) -> str | None`
-- `_detect_enum_topic(flags) -> str | None` (roles / status / category / units)
-- `_detect_instructional_topic(normalized) -> str | None`
+Found by `/code-review` 2026-05-02 after the #12 extraction landed. The
+`response` field on `_PolicyShortCircuit` carries either a refusal
+message (negative case — bulk-delete / equipment / category-management)
+or `None` (positive `list_material_categories` case, where
+`_build_short_circuit_response` hardcodes `"I can help you with that."`).
+The polymorphic meaning isn't obvious from the field name and the class
+docstring doesn't mention it.
 
-Keep `detect_topic` as a thin coordinator that builds the flag dict and
-walks the helpers in priority order.
+Fix: either rename to `clarification` to match the legacy 5-tuple's
+last-position semantics in `_classify_with_rules`, or add a one-line
+note in the docstring: "None for positive routings; refusal copy for
+negative routings." Cosmetic only — behavior is correct and tested.
 
-### 151. Capability vocab duplicated across `intents.py` and `help_handler.py`
-**Files**:
-- [platform/agents/orchestrator/intents.py:184-214](../../platform/agents/orchestrator/intents.py) (`HELP_DIRECT_HINTS`)
-- [platform/agents/orchestrator/help_handler.py:58-86](../../platform/agents/orchestrator/help_handler.py) (`has_capability_cue` token tuple)
+### 154. `_TopicFlags.property` field name shadows Python builtin
+**File**: [platform/agents/orchestrator/help_handler.py:38](../../platform/agents/orchestrator/help_handler.py)
+**Severity**: LOW (naming clarity)
 
-**Severity**: MEDIUM (DRY)
+Found by `/code-review` 2026-05-02 after the #150 split landed. The
+`_TopicFlags` dataclass field `property` shadows the `property` builtin
+within the dataclass scope. Attribute access (`flags.property`) is
+safe, but if anyone later writes a bare `property` reference inside
+`help_handler.py` they'll get the boolean instead of the decorator.
 
-Found by `/code-review` 2026-05-02. The two lists overlap on ~13
-phrasings (tutorial, getting started, docs, documentation, examples,
-list your features, explain maple, how does maple work, how does this
-work, i am lost, i am stuck, i'm lost, i'm stuck, what can i do, what
-should i ask, what kinds, what do you do). Adding a new capability cue
-requires editing both lists and they can drift silently — no test
-asserts they stay in sync.
-
-Fix: promote a `CAPABILITY_CUE_TOKENS` constant in `intents.py`. Have
-`HELP_DIRECT_HINTS` extend it, and have `help_handler.py` import and
-reuse it directly for `has_capability_cue`. Single source of truth;
-every future cue lands in one place.
-
-### 152. `plural_topic` dict rebuilt on every `detect_topic` call
-**File**: [platform/agents/orchestrator/help_handler.py:131-137](../../platform/agents/orchestrator/help_handler.py)
-**Severity**: MEDIUM (duplication / drift risk)
-
-Found by `/code-review` 2026-05-02 during Phase 1 of the xfail backlog.
-The `plural_topic` mapping is constructed inside `detect_topic`, so
-every classification rebuilds it. Perf cost is nil, but `intents.py`
-already exposes `PLURAL_ENTITY_BY_DOMAIN` with the same data —
-duplicating it here invites drift if any domain plural ever changes.
-The §9.5 entry in the phrasing reference doc already calls out
-`PLURAL_ENTITY_BY_DOMAIN` as the intended source of truth.
-
-Fix: replace the inline dict with `from .intents import
-PLURAL_ENTITY_BY_DOMAIN` and reference it directly at the manage-form
-return.
+Fix: optional. Either accept the shadowing trade-off (current state
+keeps symmetry with the other domain flags), or rename every flag to
+`is_*` for consistency (`is_property`, `is_contact`, etc.).
 
 ---
 
