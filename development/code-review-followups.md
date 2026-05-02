@@ -2028,18 +2028,6 @@ Fix: extract the helpers into a small testable module, or add
 component tests using the existing testing setup. Start with
 `saveWorkItemDialog`.
 
-### 130. `autoSaveField` has no concurrency guard
-**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
-**Severity**: MEDIUM
-
-Rapid blurs/changes/saves can fire overlapping `PATCH /estimates/:id`
-requests. With `job_items` now flowing through this path the failure
-mode is more impactful — out-of-order responses can mangle
-`unmatched_*` arrays.
-
-Fix: add `AbortController` or an in-flight request id ref so only the
-latest response is applied. Alternatively serialize through a queue.
-
 ### 131. `saveError` displayed far from origin
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: MEDIUM
@@ -2066,19 +2054,6 @@ visually identical to editable.
 
 Fix: collapse to one expression:
 `canEdit ? (description ? "text-gray-900" : "text-gray-400") : "text-gray-500"`.
-
-### 133. Description blur compares against stale `estimate`
-**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
-**Severity**: MEDIUM
-
-`handleDescriptionBlur` compares `description.trim()` to
-`estimate?.description`, but if a previous PATCH hasn't returned yet
-`estimate.description` reflects the older value. The diff check may
-treat a no-op edit as a real change → duplicate save. Harmless but
-wasteful.
-
-Fix: track "last saved description" in a ref independent of
-`estimate`.
 
 ### 134. `<label>` without `htmlFor`
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
@@ -2126,18 +2101,6 @@ Most natural extraction targets:
 - `<WorkItemDialog>` (Modal + WorkItemInlineContent + Cancel/Save)
 - `<DocumentsBar>` (Documents label + dropdown + New Version + delete)
 - `<EstimateTitleBar>` (Title + Info + Notes + Status + Delete icons)
-
-### 138. `openEditWorkItemDialog` shares reference into `workItems`
-**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
-**Severity**: LOW
-
-The draft is the same object reference as `workItems[idx]`. If
-something else mutates `workItems[idx]` while the dialog is open, the
-draft sees the change too. Materials/activities are arrays so the
-spreads in the gap resolvers are safe today, but it's a footgun.
-
-Fix: defensive deep-clone on open
-(`structuredClone(workItems[idx])`).
 
 ### 139. Pre-existing `printWindow.document.write` deprecation hint
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
@@ -2199,6 +2162,113 @@ the app still use `font-medium` headers, so this is now inconsistent.
 
 Fix: pick one and apply globally. Either revert these three files to
 `font-medium`, or sweep the rest of the codebase up to `font-semibold`.
+
+---
+
+## 2026-05-01 review (Work Item dialog / Estimate page mobile-responsiveness — consolidated from `plans/portal-ui-refactor-followups.md`)
+
+The two HIGH items from this pass (file size of `WorkItemInlineContent.tsx`,
+fragile modal stacking) were addressed in the same change set; the items
+below are MEDIUM / LOW and were logged for later.
+
+### 144. Alternating row color computed inline twice
+**Files**:
+- [portal/src/components/estimates/MaterialsTable.tsx](../../portal/src/components/estimates/MaterialsTable.tsx)
+- [portal/src/components/estimates/WorkItemInlineContent.tsx](../../portal/src/components/estimates/WorkItemInlineContent.tsx) (Activities table)
+
+**Severity**: MEDIUM
+
+`const rowBg = idx % 2 === 1 ? "bg-emerald-50" : "bg-white"` is
+duplicated across two `map()` bodies. Logic is correct (works around
+the activities table's sub-row Fragment shifting `:nth-child(even)`
+parity) but the rule is in two places.
+
+Fix: extract a shared `getRowBg(idx: number)` helper into a small
+utility module or co-locate it where both tables can import it.
+
+### 145. App-wide brand color `#4D5589` duplicated in arbitrary Tailwind values
+**Files**: ~15 files across `portal/src/`
+
+**Severity**: MEDIUM
+
+Used `bg-[#4D5589]`, `hover:bg-[#3f476f]`, `border-[#3f476f]`,
+`focus:ring-[#4D5589]/40` via a global sed sweep. Works but the hex is
+repeated dozens of times; a future palette change needs another sweep.
+
+Fix: define `--color-brand` / `--color-brand-dark` in the Tailwind v4
+`@theme` block (or `tailwind.config` if still on v3 syntax) and rewrite
+usages as `bg-brand` / `hover:bg-brand-dark`. Single source of truth.
+
+### 146. EffortCalculator mobile dropdown initial-render flicker
+**File**: [portal/src/components/estimates/EffortCalculatorDialog.tsx](../../portal/src/components/estimates/EffortCalculatorDialog.tsx)
+
+**Severity**: MEDIUM
+
+When the modal opens with `selectedCardId === null` and
+`rateCards.length > 0`, the mobile `<select>` shows the first card's
+name while the right panel still reads "Select a rate card to begin"
+until the parent useEffect fires. Brief visual mismatch.
+
+Fix: initialise `selectedCardId` synchronously via `useState(() => …)`
+reading the first rate card so there's no null window. Keep the
+existing useEffect for the open/close transitions.
+
+### 147. `MaterialsPage` mobile card popup-clip fix is scoped
+**File**: [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx)
+
+**Severity**: LOW
+
+The previous `overflow-hidden` clip was fixed by removing
+`overflow-hidden` from the card and adding `rounded-b-xl
+overflow-hidden` to the expanded sizes section. This works for the
+current popup but if a future popup is added inside the expanded sizes
+section it'll be clipped again.
+
+Fix: if/when that case appears, switch popups to render via React
+portal so they aren't subject to ancestor clipping.
+
+### 148. Three near-identical settings tabs
+**Files**:
+- [portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx)
+- [portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx)
+- [portal/src/components/settings/DivisionsTab.tsx](../../portal/src/components/settings/DivisionsTab.tsx)
+
+**Severity**: LOW
+
+~95% identical markup and state machinery. Each round of UI work
+(icon buttons, Actions column width, Name column width) had to be
+applied three times. Divergence risk grows.
+
+Fix: extract a generic `<NameDescriptionResourceTab>` component
+parameterised by `api`, singular/plural labels, and any tab-specific
+extras.
+
+> Note: the seventh portal item ("`NewEstimateWithActivityPage.tsx` is
+> 1,990+ lines") duplicates existing finding [#137](#137-newestimatewithactivitypagetsx-at-1900-lines)
+> and is tracked there.
+
+---
+
+## 2026-05-02 `/code-review` pass (post-#143/#130/#133/#138 batch)
+
+### 149. `lastSavedDescriptionRef` / `lastSavedTitleRef` initial-value window
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: LOW
+
+The two refs added by #133 (and the title fix that landed alongside)
+are initialized to `""` and only seeded to the canonical server value
+inside the estimate-load `useEffect`. There is a brief window between
+mount and load where the ref is stale.
+
+In practice no save can fire during that window — `autoSaveField`
+returns early when `!estimateId`, and the title/description fields
+are not interactive until the page renders post-load — so this is
+theoretical only. Worth noting for future maintainers who might
+introduce a save path that bypasses those guards.
+
+Fix: optional. Either fold the seeding into the `useState` initializer
+(reading from a route loader), or leave a stronger inline contract
+comment near the ref declarations.
 
 ---
 
