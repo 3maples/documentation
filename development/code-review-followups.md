@@ -2009,24 +2009,31 @@ Both fields now auto-save:
   Cancel and backdrop close are blocked while saving. Mirrors the work
   item dialog pattern.
 
-### 129. Missing tests for auto-save + dialog flows
+### 129. Missing tests for auto-save + dialog flows (partial)
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: HIGH
 
-Per `CLAUDE.md` mandatory-testing rule, new behaviour needs tests.
-None of the following has a test:
-- `autoSaveField` (description/property success and failure paths)
-- `persistWorkItems` (insert vs replace)
-- `saveWorkItemDialog` open-on-failure / close-on-success branches
-- Status dropdown filtering of `delete`
-- Description blur compares trimmed values, only saves on real
-  change
-- Documents dropdown fallback (selected version is removed →
-  reset to latest)
+Component-level testing infrastructure landed 2026-05-02:
+`@testing-library/react` + `jsdom` added, `vite.config.js` matches
+`*.test.tsx` against jsdom. 29 component tests now cover the
+extracted dialog/bar wrappers:
 
-Fix: extract the helpers into a small testable module, or add
-component tests using the existing testing setup. Start with
-`saveWorkItemDialog`.
+- `WorkItemDialog`: title text, Cancel/Save callbacks, disabled state
+  while saving, errorMessage rendering.
+- `DocumentsBar`: empty-state, auto-seed selection, re-seed when
+  current selection becomes stale, generate/delete callbacks.
+- `EstimateTitleBar`: read-only ↔ edit transition, blur/Enter commit,
+  Details/Notes/Delete callbacks, status menu open + transition.
+
+Still TODO (require deeper page-level mocking):
+- `autoSaveField` race-handling end-to-end (the `sequenceGuard`
+  helper is unit-tested in `tests/sequenceGuard.test.ts`; the wiring
+  inside the page is not).
+- `persistWorkItems` insert-vs-replace path.
+- `saveWorkItemDialog` failure branches.
+- Description blur ↔ stale-comparison wiring (the
+  `lastSavedDescriptionRef` invariant; the helper-equivalent test
+  for sequence guards is the closest existing coverage).
 
 ### 131. `saveError` displayed far from origin
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
@@ -2055,18 +2062,6 @@ visually identical to editable.
 Fix: collapse to one expression:
 `canEdit ? (description ? "text-gray-900" : "text-gray-400") : "text-gray-500"`.
 
-### 134. `<label>` without `htmlFor`
-**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
-**Severity**: MEDIUM (accessibility)
-
-Three `<label>`s (Documents, Description, Property) aren't associated
-with form controls. Two pre-date this session; the Documents label is
-new.
-
-Fix: use `<span>` / `<h3>` with the same Tailwind classes (no form
-control to bind to), or add `id` on the textarea/dropdown plus
-`htmlFor` on the label.
-
 ### 135. Description "button" wraps multi-line content
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: MEDIUM (accessibility)
@@ -2088,19 +2083,22 @@ ARIA.
 
 Fix: add `role="menuitem"` to each item inside the docs `<li>`.
 
-### 137. `NewEstimateWithActivityPage.tsx` at 1900+ lines
+### 137. `NewEstimateWithActivityPage.tsx` extractions (partial)
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: MEDIUM (file size)
 
-Pre-existing breach of the 800-line guideline. The session added the
-Work Item dialog, Documents dropdown, Notes dialog, Details dialog,
-status dropdown, etc., without extracting siblings. Tracked under
-existing item [#4](#4-file-and-function-size).
+The three named extraction targets landed 2026-05-02:
+`<WorkItemDialog>`, `<DocumentsBar>`, `<EstimateTitleBar>`. Page is
+now 1733 lines, down from 2044 — still over the 800-line guideline.
+Further reductions need additional extractions:
 
-Most natural extraction targets:
-- `<WorkItemDialog>` (Modal + WorkItemInlineContent + Cancel/Save)
-- `<DocumentsBar>` (Documents label + dropdown + New Version + delete)
-- `<EstimateTitleBar>` (Title + Info + Notes + Status + Delete icons)
+- Work items table (~250 lines) — header row + map + per-row controls.
+- Gap dialogs / inventory gap helpers — currently inline.
+- Notes / Details / Delete / Delete-doc modals (small but repetitive).
+- `handleChecklistPdfDownload` (currently inline in JSX).
+
+Tracked under existing item [#4](#4-file-and-function-size). Next
+single extraction round should target the work-items table.
 
 ### 139. Pre-existing `printWindow.document.write` deprecation hint
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
@@ -2113,39 +2111,6 @@ or build the document via DOM APIs.
 ---
 
 ## 2026-05-01 `/code-review` pass (Green table headings + auto-create estimate)
-
-### 140. "View All Estimates" link affordance on green Dashboard header
-**File**: [portal/src/pages/DashboardPage.tsx](../../portal/src/pages/DashboardPage.tsx) (~line 353)
-**Severity**: MEDIUM
-
-The Recent Estimates header bar now uses `bg-emerald-100`. The
-"View All Estimates" link was changed from `text-slate-600
-hover:text-slate-900` to `text-emerald-900 hover:text-emerald-700`,
-which matches the `<h3>` heading text exactly and reads as part of
-the heading rather than as a clickable link. Contrast is fine; the
-problem is affordance.
-
-Fix: pick one of — (a) restore a distinct hue (a slate or blue tone
-that stands out against `bg-emerald-100`), (b) add `underline
-underline-offset-2` or `hover:underline`, or (c) include a small
-chevron/arrow icon for a clearer call-to-action.
-
-### 141. Defensive `if (!estimateId)` guard in `handleSaveEstimate` is unreachable
-**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) (~line 986)
-**Severity**: MEDIUM
-
-After the auto-create-on-mount redirect, `estimateId` is always set
-before any callsite of `handleSaveEstimate` (`handleGenerateGoogleDoc`,
-the unsaved-changes dialog) becomes reachable. The
-`if (!estimateId) { setSaveError("Estimate is not ready yet."); return false; }`
-branch is defensive but exposes an awkward user-facing message for a
-state that shouldn't occur, and conflicts with the project guideline
-"Don't add error handling, fallbacks, or validation for scenarios
-that can't happen."
-
-Fix: drop the branch, or replace with a `console.error` + early
-return (no UI message) so it logs as a programming error without
-leaking through to the user.
 
 ### 142. Table heading weight drift (`font-medium` → `font-semibold`)
 **Files**:
@@ -2185,19 +2150,6 @@ parity) but the rule is in two places.
 
 Fix: extract a shared `getRowBg(idx: number)` helper into a small
 utility module or co-locate it where both tables can import it.
-
-### 145. App-wide brand color `#4D5589` duplicated in arbitrary Tailwind values
-**Files**: ~15 files across `portal/src/`
-
-**Severity**: MEDIUM
-
-Used `bg-[#4D5589]`, `hover:bg-[#3f476f]`, `border-[#3f476f]`,
-`focus:ring-[#4D5589]/40` via a global sed sweep. Works but the hex is
-repeated dozens of times; a future palette change needs another sweep.
-
-Fix: define `--color-brand` / `--color-brand-dark` in the Tailwind v4
-`@theme` block (or `tailwind.config` if still on v3 syntax) and rewrite
-usages as `bg-brand` / `hover:bg-brand-dark`. Single source of truth.
 
 ### 146. EffortCalculator mobile dropdown initial-render flicker
 **File**: [portal/src/components/estimates/EffortCalculatorDialog.tsx](../../portal/src/components/estimates/EffortCalculatorDialog.tsx)
