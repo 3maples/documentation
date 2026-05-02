@@ -2220,6 +2220,86 @@ keeps symmetry with the other domain flags), or rename every flag to
 
 ---
 
+## 2026-05-02 `/code-review` pass (xfail-wave-2 Phase 2)
+
+### 155. `_list_properties_by_cross_resource` is 124 lines
+**File**: [platform/agents/property/service.py:946](../../platform/agents/property/service.py)
+**Severity**: HIGH (function-length policy)
+
+Cross-resource list-properties handler exceeds the 50-line CLAUDE.md
+threshold. Three near-identical resolve+filter blocks (contact /
+material / labour) plus a unified response builder. Most of the length
+is dispatch and comments, but reading it cold is a paragraph of work.
+
+Fix: extract the response-rendering tail (~30 lines) into a small
+helper that takes `(properties, constraint_name, cross_type,
+not_found_kind)` and returns the response dict. Drops parent to
+~90 lines. Further splitting per-type resolution into 3 helpers would
+add indirection without DRY payoff (each branch differs by ~3 lines).
+
+### 156. `_list_contacts_at_property` is 108 lines
+**File**: [platform/agents/contact/service.py:951](../../platform/agents/contact/service.py)
+**Severity**: HIGH (function-length policy)
+
+Same threshold breach as #155. Mostly comments + the single resolve-
+filter-render path; no dispatch branching, but still long.
+
+Fix: extract response-rendering (~35 lines) into a helper. Drops
+parent to ~75 lines. Or accept as-is — the linear flow is arguably
+easier to read in one place than split across helpers.
+
+### 157. Cross-resource transitive join uses two round-trips instead of $lookup
+**File**: [platform/agents/property/service.py:1071](../../platform/agents/property/service.py)
+**Severity**: MEDIUM (perf hook)
+
+`_properties_with_estimates_referencing` does TWO Beanie queries —
+`Estimate.find` to collect property IDs, then `Property.find` with
+those IDs. For tenants with thousands of estimates the first query
+loads full estimate documents just to read the `.property` field.
+
+Fix: replace with a single Mongo aggregation pipeline:
+```python
+Estimate.aggregate([
+    {"$match": {"company": ..., "<field>": {"$in": ids}}},
+    {"$group": {"_id": "$property"}},
+    {"$lookup": {"from": "properties", "localField": "_id",
+                 "foreignField": "_id", "as": "property"}},
+])
+```
+
+Defer until perf measurements demand it; current shape is correct
+and clear. Worth coupling with a fixture-based perf test.
+
+### 158. Property cross-resource type=contact loads full catalog
+**File**: [platform/agents/property/service.py:982](../../platform/agents/property/service.py)
+**Severity**: MEDIUM (perf hook)
+
+For "what properties does John Doe own?" the handler resolves
+`contact_id`, then calls `_list_properties_via_api(company_id)`
+(which loads ALL company properties) and filters in Python. Same
+pre-existing pattern as `_find_properties_by_name_or_address`; worth
+flagging when adopting it for new code paths.
+
+Fix: replace the in-memory filter with
+`Property.find({"company": ..., "contacts": {"$in": [contact_id]}})`.
+~5 line change. The pre-existing helper would benefit from the same
+treatment — separate refactor.
+
+### 159. `agents/cross_resource.py` filters in-Python on full collections
+**File**: [platform/agents/cross_resource.py](../../platform/agents/cross_resource.py)
+**Severity**: LOW (scaling)
+
+All four `find_X_by_name` helpers load the full collection and filter
+in Python. Acceptable for typical company sizes (<1k materials, <100
+labour roles, <100 properties) but won't scale to enterprise tenants.
+
+Fix: document the scaling boundary in the module docstring (already
+present — "pragmatic for typical company sizes; revisit if a tenant
+exceeds ~10k properties"). Future refactor: push substring matching
+to MongoDB via `$regex` filters with case-insensitive option.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.

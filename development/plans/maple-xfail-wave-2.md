@@ -1,6 +1,6 @@
 # Maple xfail backlog — Wave 2 (cross-resource relationship queries)
 
-**Status:** Draft
+**Status:** Shipped 2026-05-02 (Phase 1 routing + Phase 2 filter_by + agent-side joins)
 **Owner:** TBD
 **Date:** 2026-05-02
 **Depends on:** [maple-xfail-wave-1.md](maple-xfail-wave-1.md) (shipped 2026-05-02)
