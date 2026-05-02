@@ -2149,6 +2149,59 @@ or build the document via DOM APIs.
 
 ---
 
+## 2026-05-01 `/code-review` pass (Green table headings + auto-create estimate)
+
+### 140. "View All Estimates" link affordance on green Dashboard header
+**File**: [portal/src/pages/DashboardPage.tsx](../../portal/src/pages/DashboardPage.tsx) (~line 353)
+**Severity**: MEDIUM
+
+The Recent Estimates header bar now uses `bg-emerald-100`. The
+"View All Estimates" link was changed from `text-slate-600
+hover:text-slate-900` to `text-emerald-900 hover:text-emerald-700`,
+which matches the `<h3>` heading text exactly and reads as part of
+the heading rather than as a clickable link. Contrast is fine; the
+problem is affordance.
+
+Fix: pick one of — (a) restore a distinct hue (a slate or blue tone
+that stands out against `bg-emerald-100`), (b) add `underline
+underline-offset-2` or `hover:underline`, or (c) include a small
+chevron/arrow icon for a clearer call-to-action.
+
+### 141. Defensive `if (!estimateId)` guard in `handleSaveEstimate` is unreachable
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) (~line 986)
+**Severity**: MEDIUM
+
+After the auto-create-on-mount redirect, `estimateId` is always set
+before any callsite of `handleSaveEstimate` (`handleGenerateGoogleDoc`,
+the unsaved-changes dialog) becomes reachable. The
+`if (!estimateId) { setSaveError("Estimate is not ready yet."); return false; }`
+branch is defensive but exposes an awkward user-facing message for a
+state that shouldn't occur, and conflicts with the project guideline
+"Don't add error handling, fallbacks, or validation for scenarios
+that can't happen."
+
+Fix: drop the branch, or replace with a `console.error` + early
+return (no UI message) so it logs as a programming error without
+leaking through to the user.
+
+### 142. Table heading weight drift (`font-medium` → `font-semibold`)
+**Files**:
+- [portal/src/components/common/EstimatesTable.tsx](../../portal/src/components/common/EstimatesTable.tsx)
+- [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx)
+- [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx)
+
+**Severity**: LOW
+
+The 2026-05-01 "apply emerald-100 heading color" change also bumped
+`<th>` font weight from `font-medium` to `font-semibold` while
+recoloring. The user only asked for a color change. Other tables in
+the app still use `font-medium` headers, so this is now inconsistent.
+
+Fix: pick one and apply globally. Either revert these three files to
+`font-medium`, or sweep the rest of the codebase up to `font-semibold`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
