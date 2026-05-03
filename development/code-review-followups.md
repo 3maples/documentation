@@ -2222,31 +2222,39 @@ keeps symmetry with the other domain flags), or rename every flag to
 
 ## 2026-05-02 `/code-review` pass (xfail-wave-2 Phase 2)
 
-### 155. `_list_properties_by_cross_resource` is 124 lines
-**File**: [platform/agents/property/service.py:946](../../platform/agents/property/service.py)
-**Severity**: HIGH (function-length policy)
+### 155. ~~`_list_properties_by_cross_resource` is 124 lines~~ — FIXED 2026-05-03
+**File**: [platform/agents/property/service.py](../../platform/agents/property/service.py)
 
-Cross-resource list-properties handler exceeds the 50-line CLAUDE.md
-threshold. Three near-identical resolve+filter blocks (contact /
-material / labour) plus a unified response builder. Most of the length
-is dispatch and comments, but reading it cold is a paragraph of work.
+Resolved by extracting three helpers:
+- `_build_list_properties_envelope` (32 lines) — single response-shape
+  builder, replaces 5 duplicate envelope literals.
+- `_resolve_estimate_linked_property` (33 lines) — three-step estimate→
+  property resolution with `(property, error_message)` return.
+- `_resolve_cross_resource_properties` (62 lines) — contact/material/
+  labour dispatch returning `(properties, not_found_kind)`. Stays
+  slightly over the 50-line ceiling per the original analysis (each
+  branch differs by ~3 lines; further splitting is indirection without
+  DRY payoff).
 
-Fix: extract the response-rendering tail (~30 lines) into a small
-helper that takes `(properties, constraint_name, cross_type,
-not_found_kind)` and returns the response dict. Drops parent to
-~90 lines. Further splitting per-type resolution into 3 helpers would
-add indirection without DRY payoff (each branch differs by ~3 lines).
+Parent function dropped from 248 → 88 lines. Tests
+`tests/test_cross_resource_joins.py` and `tests/test_property_agent.py`
+both green (67/67).
 
-### 156. `_list_contacts_at_property` is 108 lines
-**File**: [platform/agents/contact/service.py:951](../../platform/agents/contact/service.py)
-**Severity**: HIGH (function-length policy)
+### 156. ~~`_list_contacts_at_property` is 108 lines~~ — FIXED 2026-05-03
+**File**: [platform/agents/contact/service.py](../../platform/agents/contact/service.py)
 
-Same threshold breach as #155. Mostly comments + the single resolve-
-filter-render path; no dispatch branching, but still long.
+Resolved by extracting two helpers:
+- `_build_list_contacts_envelope` (32 lines) — shared response-shape
+  builder, used by both cross-resource handlers in this file.
+- `_resolve_contacts_at_properties` (32 lines) — encapsulates the
+  property-IDs → contacts join with optional `role_hint == "owner"`
+  HOME_OWNER filter.
 
-Fix: extract response-rendering (~35 lines) into a helper. Drops
-parent to ~75 lines. Or accept as-is — the linear flow is arguably
-easier to read in one place than split across helpers.
+`_list_contacts_at_property` dropped from 108 → 70 lines.
+`_list_contacts_for_estimate` got a free win too (135 → 91 lines)
+since both call sites now share the envelope helper. Tests
+`tests/test_cross_resource_joins.py` and `tests/test_contact_agent.py`
+green (88/88).
 
 ### 157. Cross-resource transitive join uses two round-trips instead of $lookup
 **File**: [platform/agents/property/service.py:1071](../../platform/agents/property/service.py)
@@ -2270,20 +2278,25 @@ Estimate.aggregate([
 Defer until perf measurements demand it; current shape is correct
 and clear. Worth coupling with a fixture-based perf test.
 
-### 158. Property cross-resource type=contact loads full catalog
-**File**: [platform/agents/property/service.py:982](../../platform/agents/property/service.py)
-**Severity**: MEDIUM (perf hook)
+### 158. ~~Property cross-resource type=contact loads full catalog~~ — FIXED 2026-05-03
+**File**: [platform/agents/property/service.py](../../platform/agents/property/service.py)
 
-For "what properties does John Doe own?" the handler resolves
-`contact_id`, then calls `_list_properties_via_api(company_id)`
-(which loads ALL company properties) and filters in Python. Same
-pre-existing pattern as `_find_properties_by_name_or_address`; worth
-flagging when adopting it for new code paths.
+Resolved by introducing a `_properties_linked_to_contacts(company_id,
+contact_ids)` helper (paralleling `_properties_with_estimates_referencing`)
+that runs a single indexed Mongo query
+(`Property.find({"company": ..., "contacts": {"$in": contact_ids}})`)
+instead of loading the full property catalog and filtering in Python.
 
-Fix: replace the in-memory filter with
-`Property.find({"company": ..., "contacts": {"$in": [contact_id]}})`.
-~5 line change. The pre-existing helper would benefit from the same
-treatment — separate refactor.
+The contact path in `_resolve_cross_resource_properties` now calls
+this helper. Test
+`test_property_agent_lists_properties_for_contact` was updated to stub
+the new helper instead of `_list_properties_via_api`. Tests
+`tests/test_cross_resource_joins.py` and `tests/test_property_agent.py`
+green (67/67).
+
+The pre-existing in-memory pattern in `_find_properties_by_owner_name`
+and `_find_properties_by_name_or_address` is a separate refactor —
+flagged in #159.
 
 ### 159. `agents/cross_resource.py` filters in-Python on full collections
 **File**: [platform/agents/cross_resource.py](../../platform/agents/cross_resource.py)
@@ -2309,27 +2322,35 @@ follow-ups below. The `_OPEN_ESTIMATE_STATUSES` hardcoded-strings
 fragility was caught and fixed inline during the review (now derived
 from `EstimateStatus.{DRAFT,APPROVED,REVIEW,WON}.value`).
 
-### 160. `_handle_list_materials_for_estimate` is 98 lines
-**File**: [platform/agents/material/service.py:1611](../../platform/agents/material/service.py#L1611)
-**Severity**: MEDIUM
+### 160. ~~`_handle_list_materials_for_estimate` is 98 lines~~ — FIXED 2026-05-03
+**File**: [platform/agents/material/service.py](../../platform/agents/material/service.py)
 
-Above the 50-line CLAUDE.md guideline. Most of the bulk is the response-
-envelope dict literal repeated for the empty-code / not-found / items-
-found branches. Same shape as `_handle_list_labours_for_estimate` (#161).
+Resolved by:
+- Local `clarification()` closure dedupes the two clarification-shape
+  envelope returns inside the handler.
+- New `_collect_estimate_material_items` static helper (27 lines) flattens
+  matched + unmatched materials into display dicts (was a 22-line inline
+  loop with `(unmatched)` suffix duplication).
 
-Fix: extract a `_envelope_response()` helper to dedupe the dict literal
-across all handlers in the file. This would also help the much larger
-`_handle_list_estimates`, `_handle_create_material`, etc. Doing this in
-one Material-agent-wide pass is preferable to one-handler-at-a-time.
+Handler dropped from 98 → 74 lines. Still slightly over the 50-line
+guideline, but the remaining body is the final result-shape dict
+(used once) plus the items-empty / items-present branching — extracting
+further would add indirection without DRY payoff.
 
-### 161. `_handle_list_labours_for_estimate` is 91 lines
-**File**: [platform/agents/labour/service.py:861](../../platform/agents/labour/service.py#L861)
-**Severity**: MEDIUM
+The followup's "agent-wide envelope helper across `_handle_list_estimates`,
+`_handle_create_material`, etc." is a separate, larger pass — out of
+scope for this fix.
 
-Same shape as #160 — three response branches each rebuilding the full
-envelope dict. Fix together with #160 by introducing a shared envelope
-helper (could live in `agents/text_utils.py` if the contract is the
-same across all four CRUD agents).
+### 161. ~~`_handle_list_labours_for_estimate` is 91 lines~~ — FIXED 2026-05-03
+**File**: [platform/agents/labour/service.py](../../platform/agents/labour/service.py)
+
+Same shape as #160; same fix:
+- Local `clarification()` closure for the two clarification returns.
+- New `_collect_estimate_labour_items` static helper (26 lines).
+
+Handler dropped from 91 → 73 lines. Tests
+`tests/test_cross_resource_joins.py`, `tests/test_material_agent.py`,
+and `tests/test_labour_agent.py` green (101/101).
 
 ### 162. `_parse_estimate_date_filter` uses fixed day counts
 **File**: [platform/agents/estimate/service.py:354](../../platform/agents/estimate/service.py#L354)
@@ -2383,6 +2404,77 @@ return await Estimate.find_one(
 ```
 Requires confirming there's an index on `(company, estimate_id)`; if
 not, add one in `database.py:init_db()`.
+
+---
+
+## 2026-05-03 `/code-review` pass (post-#155/#156/#158/#160/#161 batch)
+
+Surfaced after the five-item refactor batch landed. No CRITICAL / HIGH
+findings; the four notes below are accepted trade-offs from the batch
+itself, logged for visibility so future refactors don't re-discover
+the same questions.
+
+### 165. `_list_properties_by_cross_resource` still 88 lines
+**File**: [platform/agents/property/service.py:1078](../../platform/agents/property/service.py#L1078)
+**Severity**: MEDIUM (function-length policy)
+
+After #155 the parent dropped from 248 → 88 lines. Still over the
+50-line CLAUDE.md guideline. Remaining body: estimate-branch label
+pick + final response-rendering tail (which already calls the shared
+`_build_list_properties_envelope` helper).
+
+Accepted as-is. Splitting further pushes one-line dispatch into helpers
+without DRY payoff. Re-flag only if a future change makes the function
+harder to read.
+
+### 166. `_list_contacts_for_estimate` still 91 lines
+**File**: [platform/agents/contact/service.py:1092](../../platform/agents/contact/service.py#L1092)
+**Severity**: MEDIUM (function-length policy)
+
+Got a free DRY win during #156 (135 → 91 lines via shared envelope
+helper) but remains over 50. Three guard clauses (estimate not found /
+property not linked / property deleted) + property_label compute +
+items-empty branching.
+
+Fix (deferred): extract `_resolve_estimate_linked_property` (currently
+only on the property agent) into `agents/cross_resource.py` so both
+agents share a single estimate→property resolver. Drops the contact
+helper to ~50 lines and removes the parallel implementation.
+
+### 167. `_resolve_cross_resource_properties` at 62 lines
+**File**: [platform/agents/property/service.py:1015](../../platform/agents/property/service.py#L1015)
+**Severity**: LOW (function-length policy)
+
+Three near-identical contact / material / labour resolve+filter blocks
+with ~3-line differences each. Extracted intentionally during #155;
+the original analysis flagged "splitting per-type resolution into 3
+helpers would add indirection without DRY payoff."
+
+Accepted as-is. Re-evaluate only if a fourth cross-resource type joins
+the dispatch.
+
+### 168. New helpers from #155/#156/#158/#160/#161 lack direct unit tests
+**Files**: property / contact / material / labour `service.py`
+**Severity**: LOW (test coverage)
+
+Nine new private helpers landed across the batch:
+- `_build_list_properties_envelope`, `_resolve_estimate_linked_property`,
+  `_resolve_cross_resource_properties`, `_properties_linked_to_contacts`
+  (property agent)
+- `_build_list_contacts_envelope`, `_resolve_contacts_at_properties`
+  (contact agent)
+- `_collect_estimate_material_items` (material agent)
+- `_collect_estimate_labour_items` (labour agent)
+
+All are exercised end-to-end by the existing 67–101 integration tests
+(`tests/test_cross_resource_joins.py`, `test_property_agent.py`,
+`test_contact_agent.py`, `test_material_agent.py`, `test_labour_agent.py`)
+that pass after the refactor.
+
+Per CLAUDE.md "Don't docstring private helpers" / pragmatic-coverage
+norms: integration coverage is sufficient for pure refactors. Re-flag
+only if these helpers grow public-facing semantics or if a regression
+slips through that a unit test would have caught.
 
 ---
 
