@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-05-02 (Wave 2 Phase 2 of xfail backlog closed — cross-resource list responses are now actually filtered by the cross-resource constraint. The orchestrator emits a `filter_by` payload on classification; the router threads it into the agent's context dict; Contact, Property, and Estimate agents read it in their list handlers and run the join. Direct lookups (Property.contacts) and transitive joins via Estimate (`materials.material` / `labours.labour`) both supported. Backed by `agents/cross_resource.py` for shared name resolution. — Same day, Wave 2 Phase 1 closed routing for cross-resource phrasings ("who lives at X?", "what properties does X own?", "where is X used?", "what estimates use the X role?") as ✅ rule on Tier 1 across all four CRUD resources via `_match_cross_resource_query`. Tier 1 coverage now 117/117. — Wave 1 Phase 2 closed possessive (`X's <field>`) and field-targeted-update (`set X's <field> to Y`, `change/update the <field> of/on X to Y`) phrasings as ✅ rule across Property, Contact, Material, and Labour via `_match_possessive_or_field_targeted` + `FIELD_TO_DOMAIN`. Wave 1 Phase 1 closed §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
+**Last updated:** 2026-05-02 (Stale-entry sweep — flipped three entries that were tagged ⚠️ but already covered by tests: §4.4 `how many materials do I have?` and `count my materials` exercised by `test_maple_crud_coverage.py` count category, §9.3 `guide to setting up a property` covered by `test_maple_help_coverage.py:445`. Removed a duplicate `How much does {material} cost?` row from §4.3 — canonical entry stays in §4.9. — Earlier the same day, Wave 2 Phase 2 of xfail backlog closed — cross-resource list responses are now actually filtered by the cross-resource constraint. The orchestrator emits a `filter_by` payload on classification; the router threads it into the agent's context dict; Contact, Property, and Estimate agents read it in their list handlers and run the join. Direct lookups (Property.contacts) and transitive joins via Estimate (`materials.material` / `labours.labour`) both supported. Backed by `agents/cross_resource.py` for shared name resolution. — Same day, Wave 2 Phase 1 closed routing for cross-resource phrasings ("who lives at X?", "what properties does X own?", "where is X used?", "what estimates use the X role?") as ✅ rule on Tier 1 across all four CRUD resources via `_match_cross_resource_query`. Tier 1 coverage now 117/117. — Wave 1 Phase 2 closed possessive (`X's <field>`) and field-targeted-update (`set X's <field> to Y`, `change/update the <field> of/on X to Y`) phrasings as ✅ rule across Property, Contact, Material, and Labour via `_match_possessive_or_field_targeted` + `FIELD_TO_DOMAIN`. Wave 1 Phase 1 closed §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
 
 ## How to read this doc
 
@@ -279,7 +279,6 @@ No outstanding contact-specific gaps in scope for the current backlog. Cross-res
 | `show me {material}'s details`   | `get_material`             | ✅ rule |
 | `what's {material}'s price?`     | `get_material` field focus | ✅ rule |
 | `update {material}'s record`     | `update_material`          | ✅ rule |
-| `How much does {material} cost?` | `get_material` field focus | ⚠️ gap (no possessive — uses "does X cost") |
 
 ## 4.4 Count
 
@@ -287,8 +286,8 @@ No outstanding contact-specific gaps in scope for the current backlog. Cross-res
 | -------------------------------------- | ----------------- | ------ |
 | `How many different materials I have?` | count materials   | ⚠️ gap |
 | `How many types of materials I have?`  | count materials   | ⚠️ gap |
-| `how many materials do I have?`        | count materials   | ⚠️ gap |
-| `count my materials`                   | count materials   | ⚠️ gap |
+| `how many materials do I have?`        | count materials   | ✅ rule |
+| `count my materials`                   | count materials   | ✅ rule |
 
 ## 4.5 Filter / find (all ✅ rule)
 
@@ -572,7 +571,7 @@ When an instructional pattern hits, `detect_topic()` tries to match an action ke
 
 | Phrasing | Topic | Status |
 |---|---|---|
-| `guide to setting up a property` | `how_to_manage_propertys` | ⚠️ bug — **pluralization defect** (should be `how_to_manage_properties`). See §9.5. |
+| `guide to setting up a property` | `how_to_manage_properties` | ✅ rule (pluralization defect closed by Wave 1 Phase 1) |
 | `what's the process for archiving an estimate?` | `how_to_manage_estimates` | ✅ rule |
 
 ### Generic how-to (no action, no domain)
