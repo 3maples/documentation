@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-05-02 (Stale-entry sweep — flipped three entries that were tagged ⚠️ but already covered by tests: §4.4 `how many materials do I have?` and `count my materials` exercised by `test_maple_crud_coverage.py` count category, §9.3 `guide to setting up a property` covered by `test_maple_help_coverage.py:445`. Removed a duplicate `How much does {material} cost?` row from §4.3 — canonical entry stays in §4.9. — Earlier the same day, Wave 2 Phase 2 of xfail backlog closed — cross-resource list responses are now actually filtered by the cross-resource constraint. The orchestrator emits a `filter_by` payload on classification; the router threads it into the agent's context dict; Contact, Property, and Estimate agents read it in their list handlers and run the join. Direct lookups (Property.contacts) and transitive joins via Estimate (`materials.material` / `labours.labour`) both supported. Backed by `agents/cross_resource.py` for shared name resolution. — Same day, Wave 2 Phase 1 closed routing for cross-resource phrasings ("who lives at X?", "what properties does X own?", "where is X used?", "what estimates use the X role?") as ✅ rule on Tier 1 across all four CRUD resources via `_match_cross_resource_query`. Tier 1 coverage now 117/117. — Wave 1 Phase 2 closed possessive (`X's <field>`) and field-targeted-update (`set X's <field> to Y`, `change/update the <field> of/on X to Y`) phrasings as ✅ rule across Property, Contact, Material, and Labour via `_match_possessive_or_field_targeted` + `FIELD_TO_DOMAIN`. Wave 1 Phase 1 closed §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
+**Last updated:** 2026-05-02 (Wave 3 Workstream C shipped — Estimate filters and drilldowns closed: aggregated-value queries (`what is the total value of the open estimates`) compute a single `sum(grand_total)` across `DRAFT/APPROVED/REVIEW/WON`; date-range qualifiers (`from last week`, `this month`) constrain `created_at`; amount-range qualifiers (`over $10k`, `under $5000`) constrain `grand_total` with `k`/`m` suffix support. Estimate-anchored cross-resource drilldowns: `what materials does EST-… use?` and `what roles are on EST-…?` route via `_CROSS_RESOURCE_QUERY_PATTERNS` with `filter_by={type=estimate, name=…}`; Material and Labour agents resolve the estimate via the new `find_estimate_by_code` helper in `agents/cross_resource.py` and project the embedded `materials`/`labours` snapshots. Verbless `{status} {plural-domain}` phrasings now infer `action=list` when paired with a status/date/amount qualifier (`_has_list_qualifier` helper) so phrasings like `approved quotes over $10k` no longer fall through to clarification. — Earlier the same day, Wave 3 Workstream B shipped — Material query variants closed: orchestrator `_match_size_scoped_material_op` extended for `rename size A to B for X` (size_op=rename routing), new top-level rule for `how much does X cost?` (non-possessive cost query → `get_material`), and `_parse_price_range_filter` in `agents/material/service.py` actually filters `_handle_list_materials` results by `under/over $N`. Count-modifier phrasings (`how many different/types of materials`) confirmed already routing via the standard hint flow. Coverage matrix gained `material_query_variants` category (5 phrasings), Tier 1 now 122/122. — Earlier the same day, Wave 3 Workstream A shipped — `_BULK_DELETE_PATTERNS` extended in `agents/text_utils.py` to refuse partial-bulk phrasings (`delete the last/first/next/previous N <plural>`); §7.4 entries flipped ⚠️ → 🛑. — Earlier the same day: Stale-entry sweep — flipped three entries that were tagged ⚠️ but already covered by tests: §4.4 `how many materials do I have?` and `count my materials` exercised by `test_maple_crud_coverage.py` count category, §9.3 `guide to setting up a property` covered by `test_maple_help_coverage.py:445`. Removed a duplicate `How much does {material} cost?` row from §4.3 — canonical entry stays in §4.9. — Earlier the same day, Wave 2 Phase 2 of xfail backlog closed — cross-resource list responses are now actually filtered by the cross-resource constraint. The orchestrator emits a `filter_by` payload on classification; the router threads it into the agent's context dict; Contact, Property, and Estimate agents read it in their list handlers and run the join. Direct lookups (Property.contacts) and transitive joins via Estimate (`materials.material` / `labours.labour`) both supported. Backed by `agents/cross_resource.py` for shared name resolution. — Same day, Wave 2 Phase 1 closed routing for cross-resource phrasings ("who lives at X?", "what properties does X own?", "where is X used?", "what estimates use the X role?") as ✅ rule on Tier 1 across all four CRUD resources via `_match_cross_resource_query`. Tier 1 coverage now 117/117. — Wave 1 Phase 2 closed possessive (`X's <field>`) and field-targeted-update (`set X's <field> to Y`, `change/update the <field> of/on X to Y`) phrasings as ✅ rule across Property, Contact, Material, and Labour via `_match_possessive_or_field_targeted` + `FIELD_TO_DOMAIN`. Wave 1 Phase 1 closed §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
 
 ## How to read this doc
 
@@ -62,7 +62,11 @@ Estimate is not in the CRUD coverage matrix — its generation is multi-turn and
 | `can you add up the estimates with status approved?` | `list_estimates` → Estimate Agent                                     | ✅ rule *(closed in Phase A1)* |
 | `how many approved estimates do I have?`             | `list_estimates` → Estimate Agent                                     | ✅ rule                        |
 | `count my draft quotes` (quotes = synonym)           | `list_estimates` → Estimate Agent                                     | ✅ rule                        |
-| `what is the total value of the open estimates`      | open estimates are those with status DRAFT, APPROVED, REVIEW, and WON | ⚠️ gap                        |
+| `what is the total value of the open estimates`      | aggregated `sum(grand_total)` across DRAFT/APPROVED/REVIEW/WON         | ✅ rule *(closed in xfail-wave-3 Workstream C — `_AGGREGATE_VALUE_QUERY_PATTERN` + `_OPEN_ESTIMATE_QUERY_PATTERN` short-circuit `_handle_list_estimates` to a single dollar figure)* |
+| `show me draft estimates from last week`             | `list_estimates` with `created_at` window                              | ✅ rule *(closed in xfail-wave-3 Workstream C — `_parse_estimate_date_filter` adds a `$gte/$lte` constraint on `created_at`)* |
+| `approved quotes over $10k`                          | `list_estimates` with status + `grand_total` range                     | ✅ rule *(closed in xfail-wave-3 Workstream C — verbless plural-domain inference + `_parse_estimate_amount_filter` adds a `$gt`/`$lt` constraint on `grand_total`; `k`/`m` suffixes supported)* |
+| `what materials does {EST} use?`                     | `list_materials` filtered to one estimate's snapshot                   | ✅ rule *(closed in xfail-wave-3 Workstream C — orchestrator routes via `_CROSS_RESOURCE_QUERY_PATTERNS` with `filter_by={type=estimate, name=EST-…}`; Material agent's `_handle_list_materials_for_estimate` resolves and projects the embedded `materials` array)* |
+| `what roles are on {EST}?`                          | `list_labours` filtered to one estimate's snapshot                     | ✅ rule *(closed in xfail-wave-3 Workstream C — symmetric Labour-agent drilldown via `_handle_list_labours_for_estimate`)* |
 
 ## 1.2 Value / total queries for a specific estimate
 
@@ -138,12 +142,16 @@ When session context carries `active_estimate_code` (user recently worked on an 
 
 ## 1.8 Estimate gaps
 
-| Phrasing                                 | Intended behavior                            | Status                |
-| ---------------------------------------- | -------------------------------------------- | --------------------- |
-| `show me draft estimates from last week` | `list_estimates` with date + status filter   | ⚠️ gap (date range)   |
-| `approved quotes over $10k`              | `list_estimates` with status + amount filter | ⚠️ gap (amount range) |
-| `what materials does {EST} use?`         | `list_materials` scoped to estimate          | ⚠️ gap                |
-| `what roles are on {EST}?`               | `list_labours` scoped to estimate            | ⚠️ gap                |
+| Phrasing                                           | Intended behavior                                                     | Status                |
+| -------------------------------------------------- | --------------------------------------------------------------------- | --------------------- |
+| `show me draft estimates from last week`           | `list_estimates` with date + status filter                            | ⚠️ gap (date range)   |
+| `approved quotes over $10k`                        | `list_estimates` with status + amount filter                          | ⚠️ gap (amount range) |
+| `what materials does {EST} use?`                   | `list_materials` scoped to estimate                                   | ⚠️ gap                |
+| `what roles are on {EST}?`                         | `list_labours` scoped to estimate                                     | ⚠️ gap                |
+| `who is this estimate {EST} for`?                  | return the property and contact information attached to the estimate. | ⚠️ gap                |
+| `which contact is this estimate {EST} for?`        | return the contact associated with this estimate                      | ⚠️ gap                |
+| `which property is this estimate {EST} linked to?` | return the property linked to this estimate                           | ⚠️ gap                |
+| `show me estimate for property {property}`         | return the estimate with the linked property                          | ⚠️ gap                |
 
 ---
 
@@ -282,12 +290,14 @@ No outstanding contact-specific gaps in scope for the current backlog. Cross-res
 
 ## 4.4 Count
 
-| Phrasing                               | Intended behavior | Status |
-| -------------------------------------- | ----------------- | ------ |
-| `How many different materials I have?` | count materials   | ⚠️ gap |
-| `How many types of materials I have?`  | count materials   | ⚠️ gap |
-| `how many materials do I have?`        | count materials   | ✅ rule |
-| `count my materials`                   | count materials   | ✅ rule |
+| Phrasing                                  | Intended behavior | Status |
+| ----------------------------------------- | ----------------- | ------ |
+| `how many different materials do I have?` | count materials   | ✅ rule |
+| `how many types of materials do I have?`  | count materials   | ✅ rule |
+| `how many materials do I have?`           | count materials   | ✅ rule |
+| `count my materials`                      | count materials   | ✅ rule |
+
+The "different" / "types of" modifiers don't change the routing — `how many` already pins the action to ``list`` and the trailing ``materials`` pins the domain. Confirmed via `material_query_variants` coverage category.
 
 ## 4.5 Filter / find (all ✅ rule)
 
@@ -328,9 +338,9 @@ All size-scoped phrasings require an explicit `size <X>` token to fire. Material
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `How much does {material} cost?` | `get_material` field focus | ⚠️ gap (no possessive form — needs separate "how much does X cost" handler) |
-| `list materials under $10` | `list_materials` with price range | ⚠️ gap |
-| `rename size {old} to {new} for {material}` | `update_material` (size_op=rename) | ⚠️ gap at classifier (handler supports) |
+| `How much does {material} cost?` | `get_material` field focus | ✅ rule *(closed in xfail-wave-3 Workstream B — non-possessive cost-query rule in orchestrator)* |
+| `list materials under $10` | `list_materials` with price range | ✅ rule *(closed in xfail-wave-3 Workstream B — `_parse_price_range_filter` in `agents/material/service.py` filters the list response by `under/over/below/above $N`)* |
+| `rename size {old} to {new} for {material}` | `update_material` (size_op=rename) | ✅ rule *(closed in xfail-wave-3 Workstream B — orchestrator `_match_size_scoped_material_op` rule routes the rename verb)* |
 | `show all sizes for {material}` | `get_material` | 🤖 LLM |
 
 ---
@@ -448,11 +458,13 @@ Material categories (Hardscape, Masonry, etc.) live in the catalog UI. Maple can
 | `rename the Masonry category` | 🛑 refusal |
 | `delete the Hardscape category` | 🛑 refusal |
 
-## 7.4 Partial bulk / small-N destructive — ⚠️ gap
+## 7.4 Partial bulk / small-N destructive — 🛑 refusal
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `delete the last 5 contacts` | Refuse (N > 1 but not "all") | ⚠️ gap — currently falls through to unknown or single-contact ambiguity |
+| `delete the last 5 contacts` | Refuse (N > 1 but not "all") | 🛑 refusal — extended `_BULK_DELETE_PATTERNS` to catch `last/first/next/previous N` quantifiers (xfail-wave-3 Workstream A) |
+| `remove the first 10 properties` | Refuse | 🛑 refusal |
+| `drop the next 3 materials` | Refuse | 🛑 refusal |
 
 ---
 
@@ -554,18 +566,18 @@ When an instructional pattern hits, `detect_topic()` tries to match an action ke
 
 ### Full how-to (action + domain matched)
 
-| Phrasing | Topic | Status |
-|---|---|---|
-| `how do I create an estimate?` | `how_to_create_estimate` | ✅ rule (guide loaded from `user_guides/content.py`) |
-| `how do I update a contact?` | `how_to_update_contact` | ✅ rule (guide loaded) |
-| `how do I create a contact?` | `how_to_create_contact` | ✅ rule (guide loaded) |
-| `how do I create a property?` | `how_to_create_property` | ✅ rule (guide loaded) |
-| `how do I archive an estimate?` | `how_to_manage_estimates` | ✅ rule *(no action keyword "archive", falls back to manage)* |
-| `steps to add a material` | `how_to_add_material` | ✅ rule (no guide; contextual example) |
-| `explain how to create an estimate` | `how_to_create_estimate` | ✅ rule |
-| `walk me through making a contact` | `how_to_manage_contacts` | ✅ rule *("making" isn't an action keyword)* |
-| `how can I update a material price?` | `how_to_update_material` | ✅ rule |
-| `how do I approve an estimate?` | `how_to_manage_estimates` | ✅ rule *("approve" not an action keyword)* |
+| Phrasing                             | Topic                     | Status                                                       |
+| ------------------------------------ | ------------------------- | ------------------------------------------------------------ |
+| `how do I create an estimate?`       | `how_to_create_estimate`  | ✅ rule (guide loaded from `user_guides/content.py`)          |
+| `how do I update a contact?`         | `how_to_update_contact`   | ✅ rule (guide loaded)                                        |
+| `how do I create a contact?`         | `how_to_create_contact`   | ✅ rule (guide loaded)                                        |
+| `how do I create a property?`        | `how_to_create_property`  | ✅ rule (guide loaded)                                        |
+| `how do I archive an estimate?`      | `how_to_manage_estimates` | ✅ rule *(no action keyword "archive", falls back to manage)* |
+| `steps to add a material`            | `how_to_add_material`     | ✅ rule (no guide; contextual example)                        |
+| `explain how to create an estimate`  | `how_to_create_estimate`  | ✅ rule                                                       |
+| `walk me through making a contact`   | `how_to_manage_contacts`  | ✅ rule *("making" isn't an action keyword)*                  |
+| `how can I update a material price?` | `how_to_update_material`  | ✅ rule                                                       |
+| `how do I approve an estimate?`      | `how_to_manage_estimates` | ✅ rule *("approve" not an action keyword)*                   |
 
 ### Domain-only how-to (no action keyword matched)
 

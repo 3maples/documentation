@@ -2300,6 +2300,92 @@ to MongoDB via `$regex` filters with case-insensitive option.
 
 ---
 
+## 2026-05-02 `/code-review` pass (xfail-wave-3 — all three workstreams)
+
+Surfaced after shipping `documentation/development/plans/maple-xfail-wave-3.md`
+(partial-bulk delete refusal + material query variants + estimate filters &
+drilldowns). Code review found 0 CRITICAL / 0 HIGH; only MEDIUM / LOW
+follow-ups below. The `_OPEN_ESTIMATE_STATUSES` hardcoded-strings
+fragility was caught and fixed inline during the review (now derived
+from `EstimateStatus.{DRAFT,APPROVED,REVIEW,WON}.value`).
+
+### 160. `_handle_list_materials_for_estimate` is 98 lines
+**File**: [platform/agents/material/service.py:1611](../../platform/agents/material/service.py#L1611)
+**Severity**: MEDIUM
+
+Above the 50-line CLAUDE.md guideline. Most of the bulk is the response-
+envelope dict literal repeated for the empty-code / not-found / items-
+found branches. Same shape as `_handle_list_labours_for_estimate` (#161).
+
+Fix: extract a `_envelope_response()` helper to dedupe the dict literal
+across all handlers in the file. This would also help the much larger
+`_handle_list_estimates`, `_handle_create_material`, etc. Doing this in
+one Material-agent-wide pass is preferable to one-handler-at-a-time.
+
+### 161. `_handle_list_labours_for_estimate` is 91 lines
+**File**: [platform/agents/labour/service.py:861](../../platform/agents/labour/service.py#L861)
+**Severity**: MEDIUM
+
+Same shape as #160 — three response branches each rebuilding the full
+envelope dict. Fix together with #160 by introducing a shared envelope
+helper (could live in `agents/text_utils.py` if the contract is the
+same across all four CRUD agents).
+
+### 162. `_parse_estimate_date_filter` uses fixed day counts
+**File**: [platform/agents/estimate/service.py:354](../../platform/agents/estimate/service.py#L354)
+**Severity**: LOW
+
+`days_per_unit = {"day":1, "week":7, "month":30, "quarter":91, "year":365}`
+— calendar-month edges and leap years are not handled. "Estimates from
+this month" on Jan 31 will look back to Jan 1, but on Mar 1 will look
+back to Jan 30, not Feb 1. Matches the docstring's "no calendar-month
+edge cases" note but worth flagging.
+
+Fix: swap to `dateutil.relativedelta` (already a transitive dep of
+`langchain` so no new requirement) for strict calendar-aligned windows
+when a user complaint surfaces. Defer until then.
+
+### 163. Wave 3 file growth — three large agent files grew further
+**Files**:
+- [platform/agents/material/service.py](../../platform/agents/material/service.py) — 2,560 → 2,659 lines
+- [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) — 5,719 → 5,873 lines
+- [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) — 1,712 → 1,830 lines
+
+**Severity**: MEDIUM
+
+Pre-existing condition (all three were already far above the 800-line
+CLAUDE.md guideline before Wave 3); this change does not make it
+materially worse but contributes ~370 lines across the three files.
+Tracked here so the pressure stays visible.
+
+Fix: one of three options for each file —
+- Material: extract `_handle_list_materials_for_estimate`, `_handle_get_material`, `_handle_list_materials` into a `material/handlers/` package.
+- Estimate: split the 5,873-line file by phase (generation / extraction / CRUD / status-transitions are natural seams).
+- Orchestrator: extract `_match_size_scoped_material_op`, `_match_possessive_or_field_targeted`, `_match_cross_resource_query` into `orchestrator/matchers/` modules.
+
+Out of scope for any single feature commit; would warrant its own refactor PR.
+
+### 164. `find_estimate_by_code` loads full estimate collection
+**File**: [platform/agents/cross_resource.py:97](../../platform/agents/cross_resource.py#L97)
+**Severity**: LOW (scaling)
+
+Mirrors the existing `find_properties_by_name_or_address` /
+`find_materials_by_name` pattern (in-memory linear scan after loading
+the company's full estimate collection). Pragmatic for typical company
+sizes; could matter once a tenant exceeds ~1k estimates.
+
+Fix: replace with a Beanie indexed lookup —
+```python
+return await Estimate.find_one(
+    Estimate.company == PydanticObjectId(company_id),
+    Estimate.estimate_id == code_text.upper(),
+)
+```
+Requires confirming there's an index on `(company, estimate_id)`; if
+not, add one in `database.py:init_db()`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
