@@ -2522,6 +2522,66 @@ build the className dynamically.
 
 ---
 
+## 2026-05-04 `/code-review` pass (Adjust Work Item Total feature)
+
+Findings from the session that added the "Adjust" pill on the Work Item
+Total row, the `AdjustTotalDialog` component, the `original_profit_margin`
+field round-trip (frontend type + backend `JobItem`), the
+`backCalculateProfitMargin` helper, and the `NumericInput` precision-
+preserving blur. The lint error caught during review
+(`react-hooks/set-state-in-effect` on `AdjustTotalDialog`) was fixed in
+the same change by remounting the dialog via a `key` prop on open. All
+items below were deferred.
+
+### 172. `WorkItemInlineContent.tsx` now 834 lines (over the 800-line HIGH threshold)
+This change pushed the file from ~760 to 834 lines (Adjust pill + dialog
+mount + Original line + handleAdjustSet + handleProfitMarginChange +
+originalTotal useMemo). The component was already at the limit before
+this feature.
+
+Natural extraction: the entire Pricing Breakdown block (Materials/Labor
+subtotals → Overhead → Subtotal → + Profit → Tax → Work Item Total → Adjust
+pill → Original line) is a self-contained ~150-line slice that takes only
+the breakdown numbers and a handful of setters as props. Pulling it into
+a `WorkItemPricingBreakdown` component would restore this file to under
+800 lines and isolate the back-calc / Original-line logic with the rest
+of the pricing UI.
+
+### 173. `<input>` in `AdjustTotalDialog` uses `aria-label`, not a real `<label>`
+`AdjustTotalDialog.tsx:65–73` — the visible "Adjust Amount" text comes
+from the modal title (`<h3>`), not from a `<label htmlFor=…>` on the
+input. The input has `aria-label="Adjust Amount"`, so screen readers do
+announce the field correctly, but there's no clickable visual association
+between the heading and the input.
+
+Fix: render an explicit `<label htmlFor="adjust-amount-input">Adjust
+Amount</label>` inside the modal body and drop the `aria-label`. Keep
+the modal's `<h3>` title as-is for the dialog heading. Minor a11y polish.
+
+### 174. Reset button doesn't refocus the input
+`AdjustTotalDialog.tsx:77` — clicking Reset replaces the input value but
+leaves keyboard focus on the Reset button. Users frequently want to
+glance at or tweak the field before clicking Set.
+
+Fix: hold a `useRef` on the input and call `inputRef.current?.focus()`
+inside the Reset handler. Tiny UX polish.
+
+### 175. `JobItemCreate` margin/tax fields accept unbounded floats
+`platform/routers/estimates.py:609–614` — `original_profit_margin`,
+`profit_margin`, `overhead_allocation`, `labor_burden`, and `tax` are all
+`Optional[float] = None` with no bounds. Pydantic accepts NaN, ±Infinity,
+and arbitrarily large/negative values. A malicious or buggy client could
+persist garbage. Pre-existing pattern across the model — I added one more
+field with the same loose typing rather than tightening it.
+
+Fix: introduce shared `Annotated[float, Field(ge=…, le=…, allow_inf_nan=False)]`
+type aliases for percentage fields (e.g. `PercentField`) and apply across
+`JobItemCreate` + the corresponding `JobItem` model fields. Coordinate so
+existing data still validates on read (use `model_validate` not strict
+parsing on legacy docs).
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
