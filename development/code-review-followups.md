@@ -2478,6 +2478,50 @@ slips through that a unit test would have caught.
 
 ---
 
+## 2026-05-03 `/code-review` pass (Maple FAB + Modal AI-panel awareness)
+
+Findings from the session that introduced `AiPanelContext`, the Modal
+backdrop carve-out for the desktop Maple rail, and the bottom-right
+floating Sparkles button. The actionable items (decoupling divisions
+fetch, FAB ARIA, removing the unused `coverAiPanel` prop) were fixed in
+the same change. The items below were deferred.
+
+### 169. `PortalLayout.tsx` is ~1500 lines
+File is well over the 800-line guideline. The session's edits added
+~10 lines on top of an already over-budget file. Natural extraction
+candidates: the AI panel composer + message renderer, the settings/
+account modal, and the feedback/changelog panel wiring — each ~200-300
+lines and largely self-contained.
+
+Pre-existing; flagging here so it's recorded against this file
+specifically rather than rediscovered each pass.
+
+### 170. No component tests for `Modal` or `DashboardPage` division-seeding behavior
+CLAUDE.md mandates tests for behavior changes; the portal currently has
+no component-test infrastructure under `src/` (vitest is configured at
+the package level via `npm test`, but there are zero `*.test.tsx` files).
+The Modal change (conditional positioning when AI panel is open) and
+the Dashboard division-seeding logic are untested as a result.
+
+First component test added will need to pull in
+`@testing-library/react` + jsdom setup — not a one-line task. Worth
+landing once another test-worthy frontend change comes along so the
+scaffolding pays for itself.
+
+### 171. `lg:right-[26rem]` in `Modal.tsx` duplicates `AI_PANEL_WIDTH`
+`Modal.tsx:32` hard-codes `lg:right-[26rem]` to match the desktop Maple
+rail width, which is also declared in `PortalLayout.tsx:129` as
+`AI_PANEL_WIDTH = 416 // w-[26rem]` and on the `<aside>` itself as
+`w-[26rem]`. Three sites must agree; if the rail width changes, the
+modal backdrop will silently misalign.
+
+Fix: export an `AI_PANEL_WIDTH_CLASS` (or similar) constant from a
+shared module (e.g. `lib/aiPanelContext.ts`) and reference it from all
+three sites — or expose the value via `AiPanelContext` so consumers
+build the className dynamically.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
