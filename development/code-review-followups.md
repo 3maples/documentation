@@ -2582,6 +2582,31 @@ parsing on legacy docs).
 
 ---
 
+## 2026-05-05 `/code-review` pass (header recolor + Maple FAB realignment + NumericInput blur-format)
+
+### 176. `PortalLayout.tsx` is ~1500 lines (pre-existing)
+`portal/src/components/Layout/PortalLayout.tsx` — sidebar, mobile sidebar,
+top-bar logo regions, AI panel header (desktop + mobile), the floating
+Maple FAB, and the Account modal all live in one file. Not introduced by
+this change, but every edit here adds reach.
+
+Fix: split into siblings — at minimum `MapleFloatingButton`, `AiPanel`,
+and `AccountModal`. Out of scope for the recolor work; track for the next
+time someone touches this file substantially.
+
+### 177. Grand Total contrast borderline at small text sizes
+`portal/src/pages/NewEstimateWithActivityPage.tsx:1273` — the new
+`bg-total-bg` (`#38A776`) with `text-white` measures ~3.03:1. Passes WCAG
+AA only via the large-bold exemption (text is `text-lg font-bold`).
+Acceptable here, but if the same token is reused for normal-weight or
+smaller text it will fail AA.
+
+Fix: if reuse is needed, define a darker variant (e.g.
+`--total-bg-strong: #2E8A60`) for normal-weight text. Or document on the
+token in `theme.css` that it's only safe for large-bold copy.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
