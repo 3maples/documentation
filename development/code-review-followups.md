@@ -2607,6 +2607,35 @@ token in `theme.css` that it's only safe for large-bold copy.
 
 ---
 
+## 2026-05-06 `/code-review` pass (People pricing — Standard Unbillable %)
+
+### 178. `WorkItemInlineContent.tsx` over the 800-line HIGH threshold
+`portal/src/components/estimates/WorkItemInlineContent.tsx` is now **850
+lines** (up from ~800 before this change). The activities `<table>` block
+(materials are already extracted into `MaterialsTable.tsx`) is the
+biggest local concentration — header, row, rate-card detail row, and the
+new Total column live inline. Extracting an `ActivitiesTable.tsx` mirror
+of `MaterialsTable.tsx` would drop this file back under threshold and
+make the per-row JSX easier to read.
+
+Fix: lift the activities table into its own component, taking
+`activityRows`, `peopleItems`, `rateCards`, `readOnly`, and the `update*`/
+`removeActivityRow`/`setCalcActivityIndex` callbacks as props. The
+rate-card detail row and `activityTotal` calc move with it.
+
+### 179. Inline `reduce` on `activityRows` recomputed every render
+`portal/src/components/estimates/WorkItemInlineContent.tsx:701` —
+the "N.NN hours total" pill walks `activityRows` on every render via
+inline `.reduce(...)`. Cheap (<50 rows), but inconsistent with the
+surrounding `breakdown` value which is properly memoized via the
+`computeBreakdown(...)` hook.
+
+Fix: hoist into a `useMemo(() => activityRows.reduce(...), [activityRows])`
+to match the file's existing pattern. Defer until a perf complaint or
+the next time someone is in this code path.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
