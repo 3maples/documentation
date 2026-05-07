@@ -2858,6 +2858,49 @@ the call site.
 
 ---
 
+## 2026-05-07 `/code-review` pass (estimate title bar — mobile kebab + checklist consolidation)
+
+Findings from review of the EstimateTitleBar mobile-kebab refactor,
+Property/Contact deep-link wiring, and Checklist button move into the
+title bar. Zero CRITICAL / HIGH; two LOW polish items in
+`NewEstimateWithActivityPage.tsx`. The pre-existing 1,783-line size of
+that file is already covered by the file-size refactor item further up.
+
+### 187. Redundant `&& property` truthy check in property-info card
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx:1080](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: LOW (dead code)
+
+The address-link branch reads
+`{selectedPropertyData?.street && property ? (...) : (...)}`, but the
+entire block is already gated on `{property && (...)}` at line 1076,
+so `&& property` inside the inner ternary is unreachable-to-falsify.
+Harmless, but it implies a guard that doesn't exist.
+
+Fix: simplify to `selectedPropertyData?.street ? (...) : (...)`. One-line
+edit — roll into any future Property card edit.
+
+### 188. Contact deep-link still renders when contact name is empty
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx:1094-1101](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: LOW (UX)
+
+When `selectedPropertyContact` resolves but both `first_name` and
+`last_name` are empty/whitespace, `.trim() || "-"` falls back to
+literal `"-"`, but the surrounding `<Link>` still renders. Users see a
+clickable hyphen with no context. Accessibility is fine
+(`title="View contact details"` provides hover text), but the
+affordance is weak.
+
+Fix options:
+- Gate the `<Link>` on a non-empty trimmed name, falling back to the
+  plain `<span>"-"</span>` branch.
+- Substitute a descriptive fallback like `"Unnamed contact"` so the
+  link target is meaningful.
+
+Same pattern likely worth checking in any other card that renders
+contact-name-or-dash next to a deep link.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
