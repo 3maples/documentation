@@ -526,7 +526,17 @@ Firebase Auth domains), `img-src` (user-uploaded assets, Firebase
 Storage if used), and `style-src`. Ship the four simple headers first;
 tackle CSP as its own change once the allow-lists are stable.
 
-### 41. `except Exception` around httpx calls in `address_service.py` could mask future `HTTPException`
+### 41. ~~`except Exception` around httpx calls in `address_service.py` could mask future `HTTPException`~~ — RESOLVED 2026-05-07
+
+Narrowed to `except (httpx.HTTPError, httpx.TimeoutException):` in
+`autocomplete`, `resolve_place_id`, and `normalize_address_parts`. Added
+`test_google_address_service_propagates_http_exception_from_inside_request`
+which monkeypatches `httpx.AsyncClient.get` to raise
+`HTTPException(429)` from inside the `try` and asserts all three methods
+re-raise instead of returning empty results. Original entry below for
+context.
+
+
 **File**: [services/address_service.py](platform/services/address_service.py) lines 324-418 (three sites)
 **Severity**: MEDIUM (defensive)
 
@@ -553,7 +563,19 @@ MEDIUM and LOW residuals from the `/code-review` pass on the layout +
 status-state-machine work. No CRITICAL or HIGH findings. Recommendation
 was "Warning — safe to commit" — items below are quality-of-life.
 
-### 42. No unit test for the `handleStatusChange` dispatcher
+### 42. ~~No unit test for the `handleStatusChange` dispatcher~~ — RESOLVED 2026-05-07
+
+Extracted `resolveStatusChangeApi(currentStatus, target, { approvedBy })`
+as a pure helper alongside `getAllowedTransitions` in
+`portal/src/lib/estimateStatus.ts`. Returns
+`{ kind: "archive" | "unarchive" | "update", payload?: { status?: string;
+approved_by?: string } }`. `NewEstimateWithActivityPage.handleStatusChange`
+is now a thin switch on `kind`. Six new unit tests in
+`tests/estimateStatus.test.ts` cover all routing branches (archive,
+unarchive-from-archived-only, approved+approver, plain status update,
+review-from-non-archived). Original entry below.
+
+
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) — `handleStatusChange` around line 444
 **Severity**: MEDIUM
 
@@ -644,7 +666,18 @@ original plan's catalog-backed Phase 2a-proper would largely retire.
 
 Plan: [plans/fix-maple-verbless-gap.md](plans/fix-maple-verbless-gap.md).
 
-### 48. `_LABOUR_ROLE_TOKENS` drifts from `DOMAIN_HINTS["labour"]`
+### 48. ~~`_LABOUR_ROLE_TOKENS` drifts from `DOMAIN_HINTS["labour"]`~~ — RESOLVED 2026-05-07
+
+Added `LABOUR_ROLE_HINTS: Tuple[str, ...]` export to
+`agents/orchestrator/intents.py` as the single source of truth for the
+sufficient-on-their-own role tokens. `_LABOUR_ROLE_TOKENS` in
+`service.py` now derives via `frozenset(LABOUR_ROLE_HINTS)`. New test
+`test_labour_role_hints_are_single_source_of_truth` asserts the role
+hints are a subset of `DOMAIN_HINTS["labour"]` and equal to the
+service-level frozenset. Adding a new role now means appending to one
+constant. Original entry below.
+
+
 **File**: [agents/orchestrator/service.py:77](../../platform/agents/orchestrator/service.py)
 **Severity**: MEDIUM
 
@@ -674,7 +707,17 @@ action-phrase prefix via `_bare_entity_residual`. Catalog-backed
 lookup (per the plan's deferred Phase 2a-proper) would retire the
 concern entirely.
 
-### 50. Duplicate stopword lists in the orchestrator
+### 50. ~~Duplicate stopword lists in the orchestrator~~ — RESOLVED 2026-05-07
+
+Extracted `_COMMON_FILLER_STOPWORDS` frozenset (19 entries — the
+greeting/pronoun/acknowledgement fillers shared by both heuristics).
+`_PERSON_NAME_STOPWORDS` and `_MATERIAL_RESIDUAL_STOPWORDS` now derive
+via `_COMMON_FILLER_STOPWORDS | frozenset({...domain-specific delta})`.
+New test `test_stopword_sets_share_common_filler_base` asserts the
+common set's exact contents and that both downstream sets are
+supersets. Original entry below.
+
+
 **File**: [agents/orchestrator/service.py:88, :130](../../platform/agents/orchestrator/service.py)
 **Severity**: MEDIUM
 
@@ -1150,7 +1193,15 @@ session via the shared `_estimate_load_error_envelope` and
 entry #20. Two MEDIUM (#81, #84) and three LOW (#82, #83, #85) remain
 below.
 
-### 81. `react-hooks/exhaustive-deps` disabled in 3 new settings tab components
+### 81. ~~`react-hooks/exhaustive-deps` disabled in 3 new settings tab components~~ — RESOLVED 2026-05-07
+
+Wrapped `fetchDivisions` / `fetchUnits` / `fetchCategories` in
+`useCallback(..., [companyId])` and added the callback to the effect's
+dependency array — matches the pattern in `RateCardsTab.tsx`. The three
+`// eslint-disable-next-line react-hooks/exhaustive-deps` comments are
+gone. Original entry below.
+
+
 **Files**: [portal/src/components/settings/DivisionsTab.tsx:55](../../portal/src/components/settings/DivisionsTab.tsx),
 [portal/src/components/settings/MaterialUnitsTab.tsx:55](../../portal/src/components/settings/MaterialUnitsTab.tsx),
 [portal/src/components/settings/MaterialCategoriesTab.tsx:56](../../portal/src/components/settings/MaterialCategoriesTab.tsx)
@@ -2648,7 +2699,15 @@ Findings from the post-implementation review of the ten-item follow-up
 batch that closed #28/#37/#40/#43/#44/#65/#67/#136 in code and resolved
 #54/#56 by documentation. No CRITICAL / HIGH; three MEDIUM, one LOW.
 
-### 180. `raise HTTPException` inside `except` lacks `from None`
+### 180. ~~`raise HTTPException` inside `except` lacks `from None`~~ — RESOLVED 2026-05-07
+
+Appended `from None` to all three `raise HTTPException(status_code=422,
+detail="Invalid company id")` lines in `divisions.py`,
+`material_categories.py`, `material_units.py`. Behaviour-neutral
+mechanical sweep; the existing 422-test in each router file still
+passes.
+
+
 **Files**:
 - [platform/routers/divisions.py:46](../../platform/routers/divisions.py)
 - [platform/routers/material_categories.py:46](../../platform/routers/material_categories.py)
@@ -2664,7 +2723,17 @@ when we deliberately want to suppress the inner cause from the response.
 Fix: append `from None` to all three `raise HTTPException(422)` lines.
 Mechanical, three-line sweep.
 
-### 181. Duplicate `PydanticObjectId` coercion pattern in estimate agent
+### 181. ~~Duplicate `PydanticObjectId` coercion pattern in estimate agent~~ — RESOLVED 2026-05-07
+
+Replaced the inline `try / PydanticObjectId(company_id) if company_id
+else None` casts in both `_handle_list_estimates` and
+`_handle_get_estimate` with `self._coerce_company_oid(company_id)`. The
+now-unused lazy `from beanie import PydanticObjectId` at the top of
+`_handle_get_estimate` was also removed. The 112 `test_estimate_agent.py`
+tests still pass. (#84's promote-import-to-module-level recommendation
+still stands and is bundled with the mypy baseline work.)
+
+
 **File**: [platform/agents/estimate/service.py:4156](../../platform/agents/estimate/service.py)
 **Severity**: MEDIUM (DRY)
 
@@ -2682,7 +2751,15 @@ done in the same pass as [#84](#84-_coerce_company_oid-returns-optionalany-to-ke
 (promoting `from beanie import PydanticObjectId` to module level and
 tightening the helper's return annotation).
 
-### 182. Two near-duplicate trash-button blocks in `EquipmentsPage`
+### 182. ~~Two near-duplicate trash-button blocks in `EquipmentsPage`~~ — RESOLVED 2026-05-07
+
+Extracted a small `<DeleteEquipmentButton onClick={...} />` component
+inside `EquipmentsPage.tsx`. Both the desktop-row (line ~354) and
+mobile-card (line ~419) sites now render the shared component, so the
+`aria-label` / `title` / className / icon stay in lockstep. Behaviour
+unchanged; lint clean.
+
+
 **File**: [portal/src/pages/EquipmentsPage.tsx:354, 416](../../portal/src/pages/EquipmentsPage.tsx)
 **Severity**: MEDIUM (DRY / a11y consistency)
 
@@ -2709,6 +2786,75 @@ Fix: `from pymongo import DESCENDING` and pass
 `("date", DESCENDING), ("version", DESCENDING)`. Roll into a file-wide
 Beanie sort-tuple sweep when the mypy baseline cleanup ([#3](#3-mypy-baseline--themed-gaps-271-errors-across-38-files))
 lands; don't touch in isolation.
+
+---
+
+## 2026-05-07 `/code-review` pass (second batch — #41/#42/#48/#50/#81/#180/#181/#182)
+
+Findings from the post-implementation review of the second eight-item
+follow-up batch. No CRITICAL / HIGH; one MEDIUM behaviour-change to
+consider, two LOW style nits.
+
+### 184. `response.json()` decode errors no longer caught in `address_service.py`
+**File**: [platform/services/address_service.py:366, :409, :468](../../platform/services/address_service.py)
+**Severity**: MEDIUM (behaviour change)
+
+Narrowing `except Exception` → `except (httpx.HTTPError,
+httpx.TimeoutException)` (the [#41](#41-except-exception-around-httpx-calls-in-address_servicepy-could-mask-future-httpexception)
+fix) achieved the followup's stated goal: any `HTTPException(429)`
+raised from inside the `try` propagates instead of being silently
+swallowed. The narrower side effect is that `response.json()` —
+which raises `json.JSONDecodeError` (subclass of `ValueError`) on
+malformed payloads — used to fall into the `[]`/`{}` empty result and
+now propagates as a 500 to the caller.
+
+In practice Google Maps returns well-formed JSON, so this is
+theoretical. Arguably an improvement (loud failure beats silent empty),
+but it's a behaviour change beyond what the followup wording implied.
+
+Fix: if you want the previous soft-fail on malformed payloads, expand
+to `except (httpx.HTTPError, httpx.TimeoutException, ValueError):`.
+Otherwise leave as-is and accept the loud-fail behaviour.
+
+### 185. Redundant `httpx.TimeoutException` in narrowed except tuple
+**File**: [platform/services/address_service.py:366, :409, :468](../../platform/services/address_service.py)
+**Severity**: LOW (style)
+
+`httpx.TimeoutException` is a subclass of `httpx.HTTPError` (via
+`RequestError`), so the tuple `(httpx.HTTPError, httpx.TimeoutException)`
+is redundant — the second arm never matches. Harmless and explicit;
+matches the [#41](#41-except-exception-around-httpx-calls-in-address_servicepy-could-mask-future-httpexception)
+followup wording exactly.
+
+Fix: optional simplification to `except httpx.HTTPError:`. Keeping the
+explicit tuple is documentary, so this is style-only. Don't fix in
+isolation; roll into any future address-service edit.
+
+### 186. Non-null assertion on `call.payload` in `handleStatusChange`
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx:478](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: LOW (type safety)
+
+`await estimatesApi.update(id, call.payload!)` uses `!` to assert
+`payload` is defined inside the `kind === "update"` branch. Type-safe
+in practice because `resolveStatusChangeApi` always returns a payload
+when `kind === "update"`, but a future change that returns
+`{ kind: "update" }` without a payload would break the invariant
+silently.
+
+Fix: tighten `StatusChangeApiCall` into a discriminated union so the
+relationship between `kind` and `payload` is encoded in the type:
+
+```ts
+export type StatusChangeApiCall =
+  | { kind: "archive" }
+  | { kind: "unarchive" }
+  | { kind: "update"; payload: { status?: string; approved_by?: string } };
+```
+
+`call.payload` is then provably defined inside the `else` branch, the
+`!` goes away, and `StatusChangeApiKind` becomes the narrowable
+discriminator. ~10 lines in `lib/estimateStatus.ts` plus one cleanup at
+the call site.
 
 ---
 
