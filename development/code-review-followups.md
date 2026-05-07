@@ -724,18 +724,20 @@ Fix: at module load, assert that every entry in
 `_CONFIRMED_WORKING_CASE_IDS` corresponds to a real `case_id` in the
 matrix; raise `ValueError` on mismatch. ~5 lines.
 
-### 54. Tier 1 gap: `set <name>'s <field> to <value>` pattern
-**File**: [agents/orchestrator/intents.py:106-111](../../platform/agents/orchestrator/intents.py) (`ACTION_HINTS["update"]`)
-**Severity**: MEDIUM (surfaced by the coverage matrix)
+### 54. ~~Tier 1 gap: `set <name>'s <field> to <value>` pattern~~ — RESOLVED 2026-05-07
 
-4/4 resources fail on Tier 1 for the `set X's Y to Z` phrasing because
-`ACTION_HINTS["update"]` has no `"set"` entry. Tier 2 LLM rescues 2/4
-but not reliably.
+Closed without changing `ACTION_HINTS["update"]`. The dedicated
+`SET_POSSESSIVE_UPDATE_PATTERN` regex (`agents/text_utils.py:467`) and
+`FIELD_OF_UPDATE_PATTERN` (`agents/text_utils.py:481`) — invoked from
+`_match_possessive_or_field_targeted` — now handle the `set X's Y to Z`
+and `set the <field> of/on/for <name> to <value>` shapes for all four
+resources. The latest `tests/reports/maple_crud_gap_report.md` confirms
+Tier 1 ✅ for every documented `set …` phrasing.
 
-Fix: add `"set"` to `ACTION_HINTS["update"]`. Shake out regressions
-carefully — `set` is also referenced in the work-item-edit regex at
-service.py:244 and the `ADD_SET_FIELD_PATTERN_ORCHESTRATOR` guard at
-service.py:279, so check both paths still behave.
+Adding a bare `"set"` (or `"set "`) entry to `ACTION_HINTS["update"]`
+was rejected: the matcher uses `text.find()` substring scan, so `"set "`
+false-positives on tokens like `asset `, `subset `, and `sunset `,
+which would mis-route benign phrasings to update.
 
 ### 55. Tier 2 gap: implicit-relationship cross-resource phrasings
 **Files**: LLM system prompt in
@@ -765,10 +767,14 @@ contraction. Phrasings like `"what's John Doe's phone?"` or `"what's
 Landscaper's cost?"` therefore fail rule-level action detection, even
 when the domain resolves via `phone` / `cost` / the name heuristic.
 
-Fix: either add `"what's"` to `ACTION_HINTS["get"]`, or pre-normalize
-common contractions (`what's` → `what is`, `who's` → `who is`, etc.)
-in `_classify_with_rules` before hint matching. Normalizing is more
-general; adding hints is cheaper.
+**RESOLVED 2026-05-07** — closed without changing `ACTION_HINTS["get"]`.
+The `POSSESSIVE_LOOKUP_PATTERN` invoked from
+`_match_possessive_or_field_targeted` (Shape 3) now anchors before
+action-hint matching and resolves `[verb] <name>'s <field>` /
+`<name>'s <field>` directly to `get_<domain>`, bypassing the
+contraction gap entirely. The latest `tests/reports/maple_crud_gap_report.md`
+shows ✅ Tier 1 for every `what's <name>'s <field>?` case across all
+four resources.
 
 ---
 
@@ -2633,6 +2639,76 @@ surrounding `breakdown` value which is properly memoized via the
 Fix: hoist into a `useMemo(() => activityRows.reduce(...), [activityRows])`
 to match the file's existing pattern. Defer until a perf complaint or
 the next time someone is in this code path.
+
+---
+
+## 2026-05-07 `/code-review` pass (top-10 followups batch — #28/#37/#40/#43/#44/#54/#56/#65/#67/#136)
+
+Findings from the post-implementation review of the ten-item follow-up
+batch that closed #28/#37/#40/#43/#44/#65/#67/#136 in code and resolved
+#54/#56 by documentation. No CRITICAL / HIGH; three MEDIUM, one LOW.
+
+### 180. `raise HTTPException` inside `except` lacks `from None`
+**Files**:
+- [platform/routers/divisions.py:46](../../platform/routers/divisions.py)
+- [platform/routers/material_categories.py:46](../../platform/routers/material_categories.py)
+- [platform/routers/material_units.py:48](../../platform/routers/material_units.py)
+**Severity**: MEDIUM (style)
+
+The new `try / except (InvalidId, TypeError) → HTTPException(422)` blocks
+in all three routers chain the original `InvalidId` via Python's implicit
+`__context__`. Functional, but flake8-bugbear's `B904` flags the missing
+`from` clause. Idiomatic shape is `raise HTTPException(...) from None`
+when we deliberately want to suppress the inner cause from the response.
+
+Fix: append `from None` to all three `raise HTTPException(422)` lines.
+Mechanical, three-line sweep.
+
+### 181. Duplicate `PydanticObjectId` coercion pattern in estimate agent
+**File**: [platform/agents/estimate/service.py:4156](../../platform/agents/estimate/service.py)
+**Severity**: MEDIUM (DRY)
+
+The tenant-isolation fix added a third copy of
+`try: company_oid = PydanticObjectId(company_id) if company_id else None
+ except (InvalidId, TypeError): company_oid = None`
+inside `_handle_get_estimate`. The same pattern lives in
+`_handle_list_estimates` (line 3670) and is already encapsulated by the
+shared `_coerce_company_oid` helper at line 4721. Theme-adjacent to the
+deferred half of [#20](#20-narrow-except-exception-around-pydanticobjectidcompany_id-cast-in-_resolve_latest_estimate).
+
+Fix: replace the inline cast in both `_handle_list_estimates` and
+`_handle_get_estimate` with `self._coerce_company_oid(company_id)`. Best
+done in the same pass as [#84](#84-_coerce_company_oid-returns-optionalany-to-keep-lazy-beanie-import)
+(promoting `from beanie import PydanticObjectId` to module level and
+tightening the helper's return annotation).
+
+### 182. Two near-duplicate trash-button blocks in `EquipmentsPage`
+**File**: [portal/src/pages/EquipmentsPage.tsx:354, 416](../../portal/src/pages/EquipmentsPage.tsx)
+**Severity**: MEDIUM (DRY / a11y consistency)
+
+The 2026-05-07 a11y sweep added `aria-label="Delete equipment"` /
+`title="Delete equipment"` to both the desktop-row and mobile-card
+trash buttons. They render identical click handlers and inner icons.
+The pre-existing duplication continues — drift risk if the label /
+handler diverges in only one site.
+
+Fix: extract a small `<DeleteEquipmentButton equipment={…} />` shared
+between the two layouts. Out of scope for the a11y fix itself; flag
+only so it isn't rediscovered on the next pass.
+
+### 183. `change_logs.py` `.sort()` tuple type mismatch (pre-existing)
+**File**: [platform/routers/change_logs.py:28](../../platform/routers/change_logs.py)
+**Severity**: LOW (mypy / pre-existing)
+
+mypy reports `expected tuple[str, SortDirection]` for the literal
+`[("date", -1), ("version", -1)]`. Predates the 2026-05-07 `?limit/?offset`
+addition — only the trailing `.skip().limit()` calls are new. Same shape
+exists in other Beanie sort sites repo-wide.
+
+Fix: `from pymongo import DESCENDING` and pass
+`("date", DESCENDING), ("version", DESCENDING)`. Roll into a file-wide
+Beanie sort-tuple sweep when the mypy baseline cleanup ([#3](#3-mypy-baseline--themed-gaps-271-errors-across-38-files))
+lands; don't touch in isolation.
 
 ---
 
