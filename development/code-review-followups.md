@@ -1487,22 +1487,46 @@ shrink each handler by 30–40 lines.
 `_handle_list_material_categories` (44 lines, 2026-04-26) is the only
 existing handler under threshold and is the model to mirror.
 
-### 95. New `agent_helpers/` extractions exceed the 50-line ceiling
+### 95. ~~New `agent_helpers/` extractions exceed the 50-line ceiling~~ — RESOLVED 2026-05-07
 **Files**: [platform/routers/agent_helpers/estimate_update.py](../../platform/routers/agent_helpers/estimate_update.py),
 [platform/routers/agent_helpers/fuzzy_confirmation.py](../../platform/routers/agent_helpers/fuzzy_confirmation.py)
-**Severity**: HIGH (continuation of entry #4)
+**Severity**: HIGH (continuation of entry #4 — resolved)
 
-- `run_update_estimate` — 136 lines (estimate_update.py:40). The
-  modify-vs-add detection block (~30 lines) and the
-  parsed-job-items-to-grand-total tail (~30 lines) split out cleanly.
-- `handle_estimate_fuzzy_confirmation` — 150 lines
-  (fuzzy_confirmation.py:31). The `if is_affirmative_text(message):`
-  branch is 75 lines; extract `_dispatch_confirmed_intent(...)` for the
-  delete / update / work-item-remove sub-dispatch. That also flattens
-  entry #97's nesting issue.
+`estimate_update.py` — `run_update_estimate` (136 lines) split into
+three focused functions:
+- `_modify_items_refusal()` — modify-vs-add detection + refusal dict
+  (54 lines incl. multi-line signature; 41 lines body)
+- `_persist_added_job_items()` — merge / build / persist / response
+  build (58 lines; 49 lines body)
+- `run_update_estimate()` — orchestration shell (58 lines; 48 lines body)
 
-Same as #94, these came across verbatim from the original closures and
-are next-iteration work.
+`fuzzy_confirmation.py` — `handle_estimate_fuzzy_confirmation` (150
+lines) split into two focused functions plus a small envelope helper:
+- `_envelope()` — standard 11-key result template that deduplicates the
+  three response-dict shapes (28 lines)
+- `_dispatch_confirmed_intent()` — affirmative-branch dispatcher for
+  delete / work-item-remove / add-items (69 lines)
+- `handle_estimate_fuzzy_confirmation()` — main router for negative /
+  affirmative / break / re-ask paths (79 lines)
+
+The deep nesting flagged in entry #97 (`if is_affirmative_text:` branch
+at 75 lines) is gone — the affirmative path is now a single delegation
+to `_dispatch_confirmed_intent`.
+
+TDD cycle: 5 direct unit tests for `_modify_items_refusal` and 3 direct
+unit tests for `_dispatch_confirmed_intent` (delete success, work-item-
+remove redispatch with `confirmed=True`, add-items pipeline with
+mocked `run_update_estimate`). Pure refactor — 186 related tests
+(orchestrator endpoint, agents API, estimate agent, new helpers) all
+green.
+
+Two methods (`_dispatch_confirmed_intent` 69 / `handle_estimate_fuzzy_confirmation`
+79) remain over the strict 50-line ceiling — each path inside the
+dispatcher is ~16 lines × 3 paths, and the main function still owns
+pending-unpack + 3 distinct branch handlers. Splitting further would
+be over-decomposition. Net win: 286 lines of two methods became 234
+lines across five focused units, with single responsibilities and
+direct test coverage.
 
 ### 96. ~~Pre-existing failing tests in `test_agents_api.py`~~ — FIXED 2026-04-26
 
@@ -1925,18 +1949,25 @@ Scope: shared `agents.maple_guide` responder, `HelpHandler` rewrite,
 public-widget refactor, orchestrator interrogative→guide fallback,
 extracted `formatOrchestratorReply` portal utility.
 
-### 122. `_apply_low_confidence_fallback` is now ~84 lines
-**File**: [platform/agents/orchestrator/service.py:756-838](../../platform/agents/orchestrator/service.py)
-**Severity**: HIGH (function size)
+### 122. ~~`_apply_low_confidence_fallback` is now ~84 lines~~ — RESOLVED 2026-05-07
+**File**: [platform/agents/orchestrator/service.py:1424](../../platform/agents/orchestrator/service.py)
+**Severity**: HIGH (function size — resolved)
 
-Two responsibilities co-mingled: (1) confidence math + early-return,
-(2) the new interrogative→guide fallback decision tree (~50 lines).
-Original method was ~30 lines.
+Extracted `_try_guide_fallback(self, result, message, context,
+best_confidence) -> Optional[Dict[str, Any]]` per the proposed plan.
+Caller now uses `override = self._try_guide_fallback(...); if override
+is not None: return override`. Final line counts:
+- `_apply_low_confidence_fallback`: 40 lines (was 84 — confidence math
+  + early-return + delegation only)
+- `_try_guide_fallback`: 50 lines (interrogative→guide decision tree
+  in one method with a single responsibility)
 
-Fix: extract `_try_guide_fallback(self, result, message, context,
-best_confidence) -> Optional[Dict[str, Any]]`. Caller does
-`if (override := self._try_guide_fallback(...)): return override`.
-Each method then under ~40 lines.
+Both methods are now within the 50-line ceiling. TDD cycle: 4 direct
+tests for `_try_guide_fallback` (off_topic short-circuit, non-
+interrogative short-circuit, interrogative-with-guide-text mutation,
+empty-guide passthrough) added in `tests/test_orchestrator_intents.py`.
+All 185 orchestrator-intent tests + 124 related help/endpoint tests
+green.
 
 ### 123. `formatOrchestratorReply` mutates input parameter
 **File**: [portal/src/lib/orchestratorReply.ts:54](../../portal/src/lib/orchestratorReply.ts)
@@ -2898,6 +2929,39 @@ Fix options:
 
 Same pattern likely worth checking in any other card that renders
 contact-name-or-dash next to a deep link.
+
+---
+
+## 2026-05-08 `/code-review` pass (post-#95 split)
+
+Review of the `run_update_estimate` / `handle_estimate_fuzzy_confirmation`
+split. No CRITICAL / HIGH beyond the function-size residuals already
+acknowledged in #95's resolution; one LOW symmetry nit.
+
+### 189. `estimate_update.py` could mirror `fuzzy_confirmation._envelope`
+**File**: [platform/routers/agent_helpers/estimate_update.py](../../platform/routers/agent_helpers/estimate_update.py)
+**Severity**: LOW (DRY / symmetry)
+
+`fuzzy_confirmation.py` introduced a `_envelope(...)` helper during the
+#95 split that deduplicates the standard 11-key result dict across 4
+call sites. `estimate_update.py` still has three near-identical
+envelope shapes:
+- `_modify_items_refusal` refusal dict (~14 lines)
+- `run_update_estimate` empty-result dict (~13 lines)
+- `_persist_added_job_items` success dict (~14 lines)
+
+These differ in `success`, `result`, `needs_clarification`, and
+`error` but otherwise share the same key set. Extracting an
+`_envelope` helper local to this file would shave ~20 total lines and
+nudge `_persist_added_job_items` (49-line body) and `_modify_items_refusal`
+(41-line body) closer to the 50-line ceiling measured incl. signature.
+
+Why LOW, not MEDIUM: the envelope-builder pattern is also flagged as
+the higher-leverage fix in [#94](#94-new-material-handlers-all-exceed-the-50-line-ceiling)
+for `agents/material/service.py`. Worth considering whether to factor
+a single shared `_envelope` into `routers/agent_helpers/responses.py`
+that both modules can import — but that's #94-scope work, not a
+standalone cleanup.
 
 ---
 
