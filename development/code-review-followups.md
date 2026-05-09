@@ -2965,6 +2965,63 @@ standalone cleanup.
 
 ---
 
+## 2026-05-08 `/code-review` pass (Choose-Your-Plan dialog polish + onboarding tweaks)
+
+Review of the plan-card type-scale changes, Enterprise theme darkening,
+WelcomeStep list extension, CompletionStep green-accent sparkle, and the
+SettingsPage Company-tab cleanup (estimate count/allowance moved to
+Billing). No CRITICAL / HIGH; two MEDIUMs and two LOWs below.
+
+### 190. Typo "iintegrations" in Pro plan feature copy
+**File**: [portal/src/lib/billing-plans.ts](../../portal/src/lib/billing-plans.ts) line 111
+**Severity**: MEDIUM (user-visible copy)
+
+`PLAN_DETAILS.plan_pro.features` ships `"All systems iintegrations"` —
+double `i`. Visible in onboarding's PlanStep and the Manage Plan modal.
+Pre-existing in the uncommitted diff (not introduced this session) but
+flagged so it gets fixed before the next plan-cards commit lands.
+
+Fix: `"All systems integrations"` (or revisit phrasing entirely — the
+prior copy was `"Integrate with top accounting packages"`).
+
+### 191. Decorative Sparkles icons missing `aria-hidden`
+**File**: [portal/src/components/onboarding/CompletionStep.tsx](../../portal/src/components/onboarding/CompletionStep.tsx) lines 16-17
+**Severity**: MEDIUM (a11y)
+
+The completion bubble now stacks two `<Sparkles>` (brand + green
+accent). Both are purely decorative but neither carries
+`aria-hidden="true"`, so screen readers announce two unlabeled
+graphics in a row. The pre-existing single-icon version had the same
+gap; doubling it makes the noise more noticeable.
+
+Fix: add `aria-hidden="true"` to both `<Sparkles>` here, and apply the
+same to `WelcomeStep.tsx:20` for consistency while in the area.
+
+### 192. Plan-name `<h3>` visually outsizes the dialog `<h2>`
+**File**: [portal/src/components/billing/PlanPickerGrid.tsx](../../portal/src/components/billing/PlanPickerGrid.tsx) line 219
+**Severity**: LOW (visual hierarchy)
+
+Plan names are now `text-3xl uppercase` while the parent dialog
+heading "Choose Your Plan" is `text-2xl` (in both
+`PlanStep.tsx:38` and `ManagePlanModal.tsx:60`). Semantic hierarchy is
+still correct (h2 > h3), but visually the cards now hero over the
+section title.
+
+Fix (pick one): bump dialog `<h2>` to `text-3xl`, drop card `<h3>` to
+`text-2xl`, or accept as-is if the design intentionally hero's the
+plan name.
+
+### 193. Trailing whitespace in `ENTERPRISE_DISPLAY.features`
+**File**: [portal/src/lib/billing-plans.ts](../../portal/src/lib/billing-plans.ts) line 128
+**Severity**: LOW (cosmetic)
+
+`"Custom configuration"    ` has 4 trailing spaces. Linters and diff
+tools flag this; harmless at runtime.
+
+Fix: trim to `"Custom configuration"`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
