@@ -342,13 +342,13 @@ Idempotency key per event: `seats:{company_id}:{user_id}:{action}:{timestamp}` �
 - Covers companies whose seat count hasn't changed in days — without this, a long-running cycle with no roster activity would have *zero* seat events in Stripe for that period, and the meter aggregation would be 0 instead of the actual count.
 - Safe under `max`: if the cron posts the same number every day, the running max stays stable; if a hook missed an increment, the cron lifts the max to the correct value within 24 hours.
 
-Implementation: APScheduler-style job in `main.py` lifespan, or a dedicated worker if we add one. Idempotency key: `seats:daily:{company_id}:{YYYY-MM-DD}` — at most one daily snapshot per company per day.
+Implementation: Render Cron Job (`type: cron` in `platform/render.yaml`) running daily at 06:15 UTC, command `python scripts/snapshot_seat_counts.py`. The script calls `services.billing.meter_events.snapshot_all_seat_counts()`. Idempotency key: `seat_snapshot:{company_id}:{YYYY-MM-DD}` — at most one daily snapshot per company per day.
 
 **Path 3 — Cycle-start backstop.** When `customer.subscription.updated` fires with an advanced `current_period_start`, the meter has just rolled over to a new period (running max reset to 0 — see §2.3 D3 reset note). At that exact moment, neither the daily cron nor any roster-change has yet posted into the new cycle, so a brand-new period could read 0 if the user took no action and the daily cron hasn't ticked yet. To prevent that, the cycle-rollover webhook handler immediately re-posts the current active-user count, seeding the new period.
 
 **No payment method gate.** Same over-cap-no-card gate as estimates: if accepting an invitation or reactivating a user would push the company past the included seat count and there's no card on file, the BE returns 402 from the invite-accept / user-activate endpoint, and the FE surfaces the `AddPaymentMethodModal` (§5.3). After the card is attached, the original action is retried.
 
-**What "active user" means** — for seat counting we use `User.status == active` AND `User.company_id == <this company>` (excludes archived/disabled users). See open item §8.1 — this is the recommended definition pending a final lock.
+**What "active user" means** — every User where `User.company == <this company>`. The User model has no `status` / `is_active` field; a user is active by virtue of being attached to the company, and becomes inactive only when their membership is removed. Locked 2026-05-08 (see §8.1).
 
 ### 4.5 Idempotency & failure handling
 
@@ -533,11 +533,11 @@ Same modal is reusable from the Settings → Billing tab (proactive add-card) an
 
 ## 8. Risks & Open Items
 
-1. **Seat counting — what's an "active user"?** Need to lock the definition before Phase 1. Candidates: (a) all `User` rows for the company; (b) `User` rows excluding archived/disabled; (c) users who logged in this cycle. Recommendation: **(b)** — every non-archived User counts. Cheap to compute, predictable for the customer.
+1. ~~**Seat counting — what's an "active user"?**~~ ✅ **LOCKED 2026-05-08** — every User attached to the company (`User.company == <id>`). The User model has no archived/disabled flag, so this is option (a). Daily snapshot cron implemented as `services.billing.meter_events.snapshot_all_seat_counts()` invoked by `scripts/snapshot_seat_counts.py` from a Render `type: cron` job at 06:15 UTC.
 2. **Mid-cycle plan changes (Phase 5 only).** Stripe's `proration_behavior="create_prorations"` creates an immediate prorated invoice when upgrading. We should surface the proration preview in the UI before confirming. Not on the critical path for launch.
 3. **Test clocks for QA.** Stripe Test Clocks let us advance subscription time deterministically — required for any E2E test that exercises billing cycles or the `max` seat aggregation reset behavior.
 4. **Webhook reliability.** Stripe retries for ~3 days. If our service is down longer, events are lost. Mitigate with a daily reconciliation job that fetches active subscriptions from Stripe and diffs against the Company collection.
-5. **CORS / webhook routing.** `/stripe/webhook` is public and must NOT be gated by Firebase App Check or auth middleware. Confirm middleware order during Phase 1.
+5. ~~**CORS / webhook routing.**~~ ✅ **VERIFIED 2026-05-08** — `stripe_webhooks_router` is included in `main.py:203` without `protected_route_dependencies`, with an explicit comment that it MUST NOT be gated. CORS middleware doesn't block it. Signature verification happens inside the router.
 6. **Stripe Tax.** Out of scope for this plan. Likely needed before paid-plan launch (Phase 5) for Canadian/US tax. Tracked as a follow-up.
 7. **Customer-side data hygiene during migration.** When the Phase 2 backfill creates Stripe Customers for existing companies, double-check that we have a valid `email` on every Company doc; Stripe requires it. Backfill script should report (and skip) any company missing an email, not silently fail.
 
