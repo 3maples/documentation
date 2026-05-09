@@ -867,6 +867,7 @@ HIGH items in that review were fixed in-session; these are the MEDIUM /
 LOW items the user chose not to land right now.
 
 ### 57. Stale closure of `estimate` in `handleGenerateGoogleDoc`
+**Severity**: LOW
 In `portal/src/pages/NewEstimateWithActivityPage.tsx`, after
 `await handleSaveEstimate()` resolves, the local `estimate` identifier
 still refers to the pre-save snapshot — only `getEntityId(estimate)` is
@@ -879,6 +880,7 @@ Fix: widen `handleSaveEstimate` to return
 of the closure reference.
 
 ### 58. `PortalLayout.tsx` is now 2,148 lines
+**Severity**: HIGH
 Preexisting; this session added ~45 lines (`openMaple`, `openFeedback`,
 `openChangeLog`, `mapleNavFooter`, ESC wiring on the panels) and removed
 the two composer-level button rows for a net +20. Still well over the
@@ -890,6 +892,7 @@ Both the mobile and desktop branches render nearly-identical markup and
 could share one component with a `variant="mobile" | "desktop"` prop.
 
 ### 59. Drive-filename filename-collision policy still implicit
+**Severity**: LOW
 The 2026-04-23 fix put the estimate_id back into the Drive filename
 (`Estimate-{estimate_id}-V{n}`), which resolves traceability. However,
 Drive still permits duplicate filenames within a folder — there is no
@@ -1649,6 +1652,7 @@ direct tests until #94/#95 are split — easier to test smaller units.
 
 ### 99. `_extract_fields_from_message` length growing past 200 lines
 File: `platform/agents/property/service.py:369`
+**Severity**: HIGH
 
 Now ~210 lines after the US-style "City, ST ZIP" regex was added. It's a
 sequence of 6 independent regex parsers chained by `setdefault`, and every
@@ -1672,6 +1676,7 @@ under 50 lines.
 
 ### 100. Defensive `|| canEdit` clause in estimate-page row visibility is dead today
 File: `portal/src/pages/NewEstimateWithActivityPage.tsx:879`
+**Severity**: LOW
 
 ```tsx
 {isEditMode && estimate && (allowedTransitions.length > 0 || canEdit) && (
@@ -1693,6 +1698,7 @@ defensive intent. No runtime impact today.
 
 ### 101. US-address regex could match noisy mid-message text
 File: `platform/agents/property/service.py:457-480`
+**Severity**: LOW
 
 The new pattern matches anywhere in the message:
 `\d{1,6}` + 3-120 chars + `,` + city + `,` + 2-letter state + space + ZIP.
@@ -1719,6 +1725,7 @@ fixed in the same change. The four LOW findings below remain.
 
 ### 102. `duplicate` insert lacks 409 fallback
 File: `platform/routers/templates.py:120-136`
+**Severity**: LOW
 
 `_next_copy_name` does a `find_one` for the candidate name, then
 `copy.insert()`. Between those two awaits, another caller could insert the
@@ -1732,6 +1739,7 @@ trigger.
 
 ### 103. `delete_template` returns 200 on non-existent id
 File: `platform/routers/templates.py:158-160`
+**Severity**: MEDIUM
 
 ```python
 if not template:
@@ -1748,6 +1756,7 @@ the parallel routers in the same PR.
 
 ### 104. `TemplateDialog` captures `initialName` only on mount
 File: `portal/src/components/estimates/TemplateDialog.tsx:36`
+**Severity**: LOW
 
 `useState(initialName ?? "")` reads `initialName` only on first render.
 Switching from create-mode to edit-mode without remount would leave `name`
@@ -1760,6 +1769,7 @@ Fix: only required if either the key or the gate is removed. If so, sync
 
 ### 105. Templates page re-fetches `/companies/{id}` on every mount
 File: `portal/src/pages/TemplatesPage.tsx:60-74`
+**Severity**: LOW
 
 Every visit to `/templates` re-fetches the company doc just to read profit
 margin / overhead / labor burden / tax. Other pages
@@ -1781,6 +1791,7 @@ The deferred MEDIUM and two LOWs remain.
 
 ### 106. `autoFocus` on dialog open may interrupt screen-reader announcements
 File: `portal/src/components/estimates/UseTemplateDialog.tsx:84`
+**Severity**: MEDIUM
 
 `autoFocus` on the search input pulls focus immediately when the dialog
 opens. On some assistive tech this races with the modal's open
@@ -1799,6 +1810,7 @@ per-dialog.
 
 ### 107. Inventory-gaps panel does not reflect template-inserted work items until save
 File: `portal/src/pages/NewEstimateWithActivityPage.tsx:418-424`
+**Severity**: LOW
 
 `inventoryGaps` is memoized off `estimate` (the server snapshot), not
 `workItems` (the editor state). When a user inserts a template, any
@@ -1813,6 +1825,7 @@ in-progress edits surface immediately. Out of scope for the Templates
 feature; revisit if the gaps panel becomes a primary editing surface.
 
 ### 108. `templates.find()` could return undefined on stale state
+**Severity**: LOW
 File: `portal/src/components/estimates/UseTemplateDialog.tsx:51`
 
 If templates were re-fetched mid-confirm and the list shrank,
@@ -2636,6 +2649,7 @@ fetch, FAB ARIA, removing the unused `coverAiPanel` prop) were fixed in
 the same change. The items below were deferred.
 
 ### 169. `PortalLayout.tsx` is ~1500 lines
+**Severity**: HIGH
 File is well over the 800-line guideline. The session's edits added
 ~10 lines on top of an already over-budget file. Natural extraction
 candidates: the AI panel composer + message renderer, the settings/
@@ -2646,6 +2660,7 @@ Pre-existing; flagging here so it's recorded against this file
 specifically rather than rediscovered each pass.
 
 ### 170. No component tests for `Modal` or `DashboardPage` division-seeding behavior
+**Severity**: MEDIUM
 CLAUDE.md mandates tests for behavior changes; the portal currently has
 no component-test infrastructure under `src/` (vitest is configured at
 the package level via `npm test`, but there are zero `*.test.tsx` files).
@@ -2658,6 +2673,7 @@ landing once another test-worthy frontend change comes along so the
 scaffolding pays for itself.
 
 ### 171. `lg:right-[26rem]` in `Modal.tsx` duplicates `AI_PANEL_WIDTH`
+**Severity**: MEDIUM
 `Modal.tsx:32` hard-codes `lg:right-[26rem]` to match the desktop Maple
 rail width, which is also declared in `PortalLayout.tsx:129` as
 `AI_PANEL_WIDTH = 416 // w-[26rem]` and on the `<aside>` itself as
@@ -2683,6 +2699,7 @@ the same change by remounting the dialog via a `key` prop on open. All
 items below were deferred.
 
 ### 172. `WorkItemInlineContent.tsx` now 834 lines (over the 800-line HIGH threshold)
+**Severity**: HIGH
 This change pushed the file from ~760 to 834 lines (Adjust pill + dialog
 mount + Original line + handleAdjustSet + handleProfitMarginChange +
 originalTotal useMemo). The component was already at the limit before
@@ -2697,6 +2714,7 @@ a `WorkItemPricingBreakdown` component would restore this file to under
 of the pricing UI.
 
 ### 173. `<input>` in `AdjustTotalDialog` uses `aria-label`, not a real `<label>`
+**Severity**: LOW
 `AdjustTotalDialog.tsx:65–73` — the visible "Adjust Amount" text comes
 from the modal title (`<h3>`), not from a `<label htmlFor=…>` on the
 input. The input has `aria-label="Adjust Amount"`, so screen readers do
@@ -2708,6 +2726,7 @@ Amount</label>` inside the modal body and drop the `aria-label`. Keep
 the modal's `<h3>` title as-is for the dialog heading. Minor a11y polish.
 
 ### 174. Reset button doesn't refocus the input
+**Severity**: LOW
 `AdjustTotalDialog.tsx:77` — clicking Reset replaces the input value but
 leaves keyboard focus on the Reset button. Users frequently want to
 glance at or tweak the field before clicking Set.
@@ -2716,6 +2735,7 @@ Fix: hold a `useRef` on the input and call `inputRef.current?.focus()`
 inside the Reset handler. Tiny UX polish.
 
 ### 175. `JobItemCreate` margin/tax fields accept unbounded floats
+**Severity**: MEDIUM
 `platform/routers/estimates.py:609–614` — `original_profit_margin`,
 `profit_margin`, `overhead_allocation`, `labor_burden`, and `tax` are all
 `Optional[float] = None` with no bounds. Pydantic accepts NaN, ±Infinity,
@@ -2734,6 +2754,7 @@ parsing on legacy docs).
 ## 2026-05-05 `/code-review` pass (header recolor + Maple FAB realignment + NumericInput blur-format)
 
 ### 176. `PortalLayout.tsx` is ~1500 lines (pre-existing)
+**Severity**: HIGH
 `portal/src/components/Layout/PortalLayout.tsx` — sidebar, mobile sidebar,
 top-bar logo regions, AI panel header (desktop + mobile), the floating
 Maple FAB, and the Account modal all live in one file. Not introduced by
@@ -2744,6 +2765,7 @@ and `AccountModal`. Out of scope for the recolor work; track for the next
 time someone touches this file substantially.
 
 ### 177. Grand Total contrast borderline at small text sizes
+**Severity**: LOW
 `portal/src/pages/NewEstimateWithActivityPage.tsx:1273` — the new
 `bg-total-bg` (`#38A776`) with `text-white` measures ~3.03:1. Passes WCAG
 AA only via the large-bold exemption (text is `text-lg font-bold`).
@@ -2759,6 +2781,7 @@ token in `theme.css` that it's only safe for large-bold copy.
 ## 2026-05-06 `/code-review` pass (People pricing — Standard Unbillable %)
 
 ### 178. `WorkItemInlineContent.tsx` over the 800-line HIGH threshold
+**Severity**: HIGH
 `portal/src/components/estimates/WorkItemInlineContent.tsx` is now **850
 lines** (up from ~800 before this change). The activities `<table>` block
 (materials are already extracted into `MaterialsTable.tsx`) is the
@@ -2773,6 +2796,7 @@ Fix: lift the activities table into its own component, taking
 rate-card detail row and `activityTotal` calc move with it.
 
 ### 179. Inline `reduce` on `activityRows` recomputed every render
+**Severity**: LOW
 `portal/src/components/estimates/WorkItemInlineContent.tsx:701` —
 the "N.NN hours total" pill walks `activityRows` on every render via
 inline `.reduce(...)`. Cheap (<50 rows), but inconsistent with the
