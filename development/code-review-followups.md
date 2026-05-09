@@ -3223,6 +3223,33 @@ Fix: optional refactor — extract `<PlanSummaryBlock plan={plan} variant="onboa
 
 ---
 
+## 2026-05-09 `/code-review` pass (Choose Your Plan dialog refinements)
+
+Visual pass on `PlanPickerGrid` — reordered the card sections (tagline → title → price → action → features → support → limits), bumped tagline / shrunk title, hid non-monetary price labels, fixed outline-button contrast on dark cards, swapped the Enterprise "Contact Sales" CTA for a disabled "Coming Soon" button, and updated the modal subtitle. Two findings logged below; the orphaned `EnterpriseContactModal` and the `priceLabel.startsWith("$")` heuristic were both flagged but explicitly marked TEMP-only by the user and not tracked here.
+
+### 217. Cover the new PlanPickerGrid behaviors with tests
+**File**: `portal/tests/PlanPickerGrid.test.tsx`
+**Severity**: MEDIUM
+
+The 2026-05-09 visual refactor of `PlanPickerGrid` introduced three meaningful behaviors with no test coverage:
+1. The price slot renders an `aria-hidden` placeholder when the label isn't monetary (so subgrid alignment is preserved).
+2. The action button moved into the card body and now sits between the price and the features list (new row order).
+3. Outline buttons on dark cards (Pro, Enterprise) carry an explicit `text-foreground` to fix the white-on-white contrast bug.
+
+Per the CLAUDE.md TDD policy, behavior changes need test updates. Existing tests cover only the "no Current Plan ribbon" and "Enterprise Coming Soon disabled" cases.
+
+Fix: add at least one assertion that a non-Free card does **not** render the literal string "Coming Soon" inside a `<p>` price element (only inside its disabled button). Optionally assert the action button precedes the features list in document order via `compareDocumentPosition`, and that outline buttons render with the `text-foreground` class.
+
+### 218. Mark the price placeholder div for testability and clarity
+**File**: `portal/src/components/billing/PlanPickerGrid.tsx:209`
+**Severity**: LOW
+
+`<div aria-hidden="true" />` is correct ARIA usage but appears in DevTools as an unexplained empty div. The intent is documented in the comment block above the JSX, but the markup itself is opaque to a future reader scanning the rendered tree.
+
+Fix: optional — add `data-testid="price-placeholder"` (also lets #217's tests target the slot directly), or wrap it in a self-explanatory inline comment at the JSX site.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
