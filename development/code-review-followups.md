@@ -451,7 +451,16 @@ called; or (b) extract the contact-fetch out of the route into a helper
 in `services/` and test the helper directly. Option (b) has the side
 benefit of letting the same helper back the Maple-side path.
 
-### 37. `_handle_get_estimate` falls through to an unscoped `Estimate.find_one` when `company_id` is invalid
+### 37. ~~`_handle_get_estimate` falls through to an unscoped `Estimate.find_one` when `company_id` is invalid~~ — RESOLVED 2026-05-07
+
+Fixed in commit `dfb8184` (2026-05-07). `_handle_get_estimate` now coerces
+`company_id` to `company_oid` immediately after the latest-estimate
+shortcut and returns the same "need a company" clarification envelope
+that `_handle_list_estimates` uses when the cast fails. The downstream
+`Estimate.find_one(...)` is now scoped via `Estimate.company == company_oid`,
+closing the cross-tenant fallback. Original entry below.
+
+
 **File**: `agents/estimate/service.py` — inside `_handle_get_estimate`,
 around the `if company_oid is not None: ... else: ...` branch
 (~lines 3787-3794 post-fix).
@@ -504,7 +513,17 @@ two items below are the residual MEDIUM findings. LOW finding
 ("`_handle_get_estimate` unscoped fallback") duplicates entry #37 and
 is not re-filed.
 
-### 40. `portal/firebase.json` has no security-header config
+### 40. ~~`portal/firebase.json` has no security-header config~~ — RESOLVED 2026-05-07
+
+Landed in commit `692069f` ("chore: add HSTS and clickjacking headers to
+firebase hosting config"). `portal/firebase.json` now ships all four
+recommended headers on every response: `Strict-Transport-Security:
+max-age=31536000; includeSubDomains`, `X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`.
+A real CSP is still a larger undertaking and remains deferred. Original
+entry below.
+
+
 **File**: [portal/firebase.json](portal/firebase.json)
 **Severity**: MEDIUM
 
@@ -635,7 +654,26 @@ Fix: add a one-line comment above the `secrets/` entry — e.g.
 `# local secrets directory (service-account keys, tokens, etc.)` — so
 the next reader understands the broadening.
 
-### 46. State machine is frontend-only (by design, re-filed for visibility)
+### 46. ~~State machine is frontend-only (by design, re-filed for visibility)~~ — RESOLVED 2026-05-09
+
+Backend now mirrors `portal/src/lib/estimateStatus.ts:TRANSITIONS_BY_STATUS`.
+Added `ESTIMATE_STATUS_TRANSITIONS` map + `validate_estimate_status_transition(current, target)`
+helper in `platform/models/estimate.py`. The PUT `/estimates/{id}` handler
+calls the validator after `parse_estimate_status` and raises
+`HTTPException(400, "Invalid transition: {current} → {target}")` on
+forbidden moves (Lost → Won, Won → Approved, OnHold → Draft, etc.).
+`Approved` retains the "unapprove" escape hatch (any non-Approved target)
+so the existing role-gated unapprove flow keeps working; legacy/system
+statuses (Generating/Failed/Submitted/Scheduled/Completed/Deleted) are
+unconstrained.
+
+Tests: 11-case `TestValidateEstimateStatusTransition` unit class plus
+`test_update_estimate_rejects_invalid_status_transition` integration test
+(Lost → Won returns 400, Lost → Review returns 200). All 88
+`tests/test_estimate_api.py` cases plus the related versioning / quota
+suites green.
+
+
 **File**: [platform/routers/estimates.py](../../platform/routers/estimates.py) — `update_estimate` handler (~L1777), `unarchive_estimate` (~L2244)
 **Severity**: LOW
 
@@ -960,7 +998,30 @@ Fix: log via `console.error` (or a shared error reporter if one exists
 later) before the empty fallback. Apply the same change to the
 rate-cards `.catch` for consistency.
 
-### 65. "Unknown" division is selectable in the Work Item dropdown
+### 65. ~~"Unknown" division is selectable in the Work Item dropdown~~ — RESOLVED 2026-05-07
+
+Closed in two stages:
+1. Commit `1b75358` ("fix: render Unknown division fallback option as
+   disabled") — first pass making the fallback non-selectable.
+2. Commit `2008afe` ("feat: map legacy Others division to Unassigned in
+   the FE") — replaced the unrecognized "Unknown" sentinel with
+   "Unassigned", which is now a first-class division in the BE
+   (`EstimateDivision.UNASSIGNED`), the seed CSV
+   (`platform/data/default_divisions.csv`), and the FE resolver
+   (`portal/src/lib/divisionResolve.ts`). New companies bootstrap with
+   "Unassigned" as a real division row, so the synthetic dropdown option
+   appears only for legacy companies — and persisting it now writes the
+   universally-recognized sentinel rather than a dead string. Aggregation
+   helpers (`resolveDivisionName`, `bucketJobItemsByDivision`,
+   `filterStaleDivisions`) all bucket stale/missing values back into the
+   "Unassigned" canonical name.
+
+Coverage: `portal/tests/divisionResolve.test.ts` (resolution,
+bucket-into-Unassigned, legacy-Others rewrite, stale-name handling) and
+`portal/tests/WorkItemInlineContent.test.tsx` (`stale division values
+not in the company list are mapped to "Unassigned"`).
+
+
 **File**: [portal/src/components/estimates/WorkItemInlineContent.tsx:236-238](../../portal/src/components/estimates/WorkItemInlineContent.tsx)
 **Severity**: MEDIUM
 
@@ -3058,7 +3119,21 @@ Customers in `past_due` after a card decline are not notified by the platform. S
 
 Fix: send via `services/brevo_email.send_brevo_plain_email` from the `invoice.payment_failed` handler. Subject: "Payment failed — update your card." Link target: customer-portal session URL.
 
-### 197. Customer-portal `return_url` should not hardcode prod
+### 197. ~~Customer-portal `return_url` should not hardcode prod~~ — RESOLVED 2026-05-09
+
+Added `app_base_url: str` to `Settings` in `platform/config.py`, default
+`http://localhost:5173`, validation alias `APP_BASE_URL`. The Customer
+Portal `return_url` fallback in `routers/billing.py` now reads
+`f"{settings.app_base_url.rstrip('/')}/settings"` instead of the
+hardcoded prod URL. Dev/staging deployments set `APP_BASE_URL` and the
+portal returns customers to the right environment.
+
+Pinned by `test_portal_session_return_url_fallback_uses_app_base_url`
+(monkeypatches `app_base_url` to a staging URL and asserts Stripe is
+called with the staging-derived return_url when the request body omits
+its own).
+
+
 **File**: `platform/routers/billing.py:355`
 **Severity**: MEDIUM
 
@@ -3066,7 +3141,18 @@ The fallback `"https://app.3maples.ai/settings"` kicks dev/staging users into pr
 
 Fix: add `app_base_url: str` to `Settings` in `config.py` and use `f"{settings.app_base_url}/settings"` as the fallback. Default to `http://localhost:5173` in `.env.example`.
 
-### 198. Add `idempotency_key` to SetupIntent creation
+### 198. ~~Add `idempotency_key` to SetupIntent creation~~ — RESOLVED 2026-05-09
+
+`stripe.SetupIntent.create` in `platform/routers/billing.py` now passes
+`idempotency_key=f"setup_intent:{company.id}:{int(time.time() // 60)}"`.
+1-minute bucket — dedupes double-clicks and network-blip retries on the
+same company without making the key so durable that a deliberate retry
+ten minutes later lands on the cached result. Pinned by
+`test_setup_intent_passes_idempotency_key` (asserts the key is present
+and contains the company id, so two different companies cannot collide
+on Stripe's idempotency cache).
+
+
 **File**: `platform/routers/billing.py:267-275`
 **Severity**: MEDIUM
 
@@ -3074,7 +3160,29 @@ Other Stripe calls in this codebase pass an `idempotency_key` (e.g. `services/bi
 
 Fix: `idempotency_key=f"setup_intent:{company.id}:{int(time.time() // 60)}"` (1-minute window) or accept a client-supplied key from the request body.
 
-### 199. Narrow the `except` in `customer.py:67`
+### 199. ~~Narrow the `except` in `customer.py:67`~~ — RESOLVED 2026-05-09
+
+Replaced `except Exception` on the Customer-retrieve path with
+`except stripe.error.InvalidRequestError`. `resource_missing` (the
+legitimate "this ID is gone in the target env" signal) still falls
+through to recreate; transient `APIConnectionError`,
+`RateLimitError`, and 5xx variants now propagate so the request
+returns a 5xx the FE can retry cleanly, instead of silently spawning
+duplicate Stripe Customers and orphaning the company doc's existing
+`stripe_customer_id`.
+
+Tests added in `tests/test_billing_customer.py`:
+- `test_recreates_when_retrieve_raises_resource_missing` — pins the
+  one error class that should still recreate.
+- `test_propagates_when_retrieve_raises_transient_api_error` — fails
+  if we ever fall through on `APIConnectionError`.
+- `test_propagates_when_retrieve_raises_rate_limit_error` — same for
+  `RateLimitError`.
+
+Both new propagation tests assert `Customer.create` was NOT called, so
+a regression that re-broadens the catch will be caught immediately.
+
+
 **File**: `platform/services/billing/customer.py:67`
 **Severity**: MEDIUM
 
@@ -3082,7 +3190,22 @@ Bare `except Exception` on the Customer-retrieve path falls through to "create f
 
 Fix: catch only `stripe.error.InvalidRequestError` (which is what `resource_missing` raises). Re-raise `APIConnectionError` / `RateLimitError` so the request returns 5xx and the FE retries cleanly.
 
-### 200. Atomic high-water update in `meter_events.py`
+### 200. ~~Atomic high-water update in `meter_events.py`~~ — RESOLVED 2026-05-09
+
+Replaced the `company.seat_count_period_high_water = seat_count;
+await company.save()` last-writer-wins pattern with an atomic
+`find_one_and_update` keyed on
+`{"$lt": seat_count}` (with an `$or {"$exists": False}` arm for legacy
+docs). A slow writer that arrives after a faster writer with a higher
+seat_count now finds the predicate false and skips the write — the DB
+and Stripe meter stay consistent. New `TestReportSeatCountAtomicHighWater`
+class (2 cases): `test_does_not_lower_db_high_water_below_concurrent_writer`
+reproduces the original race (in-memory snapshot at 5, concurrent worker
+bumps DB to 8, this worker tries to set 7 — DB must remain 8) and
+`test_raises_db_high_water_when_seat_count_exceeds_db` covers the happy
+path. All 14 `tests/test_billing_meter_events.py` cases green.
+
+
 **File**: `platform/services/billing/meter_events.py:96-98`
 **Severity**: MEDIUM
 
@@ -3125,7 +3248,24 @@ The script writes the signing secret to `secrets/webhook_signing_secret.<id>.txt
 
 Fix: use `tempfile.NamedTemporaryFile(delete=False, dir="/tmp")` outside the repo, or print the secret to stderr and have the operator pipe to `.env` directly. Alternatively, register an `atexit` handler that clears the file unless `--keep-secret` was passed.
 
-### 205. Persist `selectedPlan` to localStorage during onboarding
+### 205. ~~Persist `selectedPlan` to localStorage during onboarding~~ — RESOLVED 2026-05-09
+
+`OnboardingPage` now persists the user's plan pick under
+`portal.onboardingSelectedPlan` alongside the step counter:
+- `useState(() => readPersistedPlanKey())` hydrates on mount,
+  validating the stored value against `VALID_PLAN_KEYS` so a stale
+  tab can't poison the state with garbage.
+- `persistSelectedPlan(plan)` writes both state and localStorage in
+  one shot when the user confirms a plan in step 6.
+- `handleFinish` removes both the step and plan keys when onboarding
+  completes (alongside the existing `clearOnboardingInProgress` call).
+
+A refresh on the CompletionStep now restores the user's actual plan
+pick. Pinned by `tests/onboardingPlanPersistence.test.tsx` (5 cases:
+empty / round-trip pro / round-trip free / garbage rejection / empty
+string rejection).
+
+
 **File**: `portal/src/pages/OnboardingPage.tsx:35,70`
 **Severity**: MEDIUM
 
@@ -3141,7 +3281,31 @@ Fix: persist `selectedPlan` alongside the step counter, OR call `billingApi.getS
 
 Fix: ``Select ${plan.displayLabel} Plan`` — or just "Select plan" if displayLabel feels redundant.
 
-### 207. Re-fetch SetupIntent on `companyId` change in AddPaymentMethodModal
+### 207. ~~Re-fetch SetupIntent on `companyId` change in AddPaymentMethodModal~~ — RESOLVED 2026-05-09
+
+Verified the shipped effect already does the right thing:
+`useEffect(..., [open, companyId, stripeConfigured])` re-runs on every
+`companyId` change, the cleanup sets a `cancelled` flag (so the prior
+fetch's `then`/`catch` no-op even if it resolves later), and
+`setClientSecret("")` in cleanup drops the Stripe `<Elements>` provider
+back to the "Loading secure form…" state until the new SetupIntent
+arrives. So a parent swapping `companyId` from A to B does not leak
+secret_A into Elements bound for customer B.
+
+Pinned with `tests/AddPaymentMethodModal.test.tsx`:
+- `re-fetches SetupIntent when companyId changes while open` — forces the
+  prior promise to resolve AFTER the swap and asserts no node ever
+  carries `secret_A` while the latest mount carries `secret_B`.
+- `does not call createSetupIntent when modal is closed` — guards the
+  `!open` short-circuit.
+
+Closing per the followup's Option 2 ("if companyId is documented to be
+stable per session, accept that and add a comment"). Both options fit
+because the current code already implements Option 1 (re-runs on
+`companyId` change) — the new tests stop a future "optimization" from
+silently regressing it.
+
+
 **File**: `portal/src/components/billing/AddPaymentMethodModal.tsx:48-76`
 **Severity**: MEDIUM
 
@@ -3149,7 +3313,23 @@ The effect early-returns on `!open` and only re-fetches when `open` toggles. If 
 
 Fix: don't early-return on `!open`. Use `let cancelled = false` and only short-circuit the network fetch on `!open`, but let the effect re-run on `companyId` change. Or, if companyId is documented to be stable per session, accept that and add a comment.
 
-### 208. Drive `billing-plans` constants from the BE `listPlans()` API
+### 208. ~~Drive `billing-plans` constants from the BE `listPlans()` API~~ — RESOLVED 2026-05-09 (stopgap)
+
+Stopgap shipped per the followup's recommendation. New
+`TestFrontendBackendPlanDriftGuard` class in
+`tests/test_billing_plan_config.py` parses
+`portal/src/lib/billing-plans.ts` for each plan's `flatPriceCents`,
+`includedEstimates`, `estimateOverageCents`, `includedSeats`, and
+`seatOverageCents`, then asserts the values match the BE `PLANS` dict.
+Parametrised across 3 plans × 5 fields = 15 drift cases. A change to
+either `plan_config.py` or `billing-plans.ts` without a matching update
+to the other side now fails CI with a message naming both files.
+
+The longer-term fix (drive the FE entirely from `billingApi.listPlans()`)
+remains open and is filed as the canonical resolution path. Stopgap is
+sufficient until the FE refactor lands.
+
+
 **File**: `portal/src/lib/billing-plans.ts:45-119`
 **Severity**: MEDIUM
 
@@ -3157,7 +3337,20 @@ The file's docstring acknowledges this is a hand-maintained mirror of `plan_conf
 
 Fix: `billingApi.listPlans()` already exists. Drive the card grid from BE data. Keep only the **display-only** fields (tagline, features, supportLines, bottomInfoLines) hardcoded in the frontend. As a stopgap: add a unit test that compares the BE `listPlans` response shape against the FE constants and fails on drift.
 
-### 209. Don't silently warn on `syncPaymentMethod` failure
+### 209. ~~Don't silently warn on `syncPaymentMethod` failure~~ — RESOLVED 2026-05-09
+
+`AddPaymentMethodModal` now fires `Sentry.captureException(e, { tags:
+{ feature: "billing", action: "sync_payment_method" }, extra: {
+companyId, paymentMethodId } })` alongside the existing
+`console.warn` so persistent backend-sync failures show up in Sentry's
+alerting instead of being lost in the dev console. `onSuccess()` fires
+unconditionally (already did pre-fix) so the parent's BillingTab
+reload runs whether or not the sync succeeded — meaning the user sees
+the actual backend state (either the synced card, or the still-stale
+"No card on file") rather than a fake "Saved" toast that misleads them
+into a retry loop.
+
+
 **File**: `portal/src/components/billing/AddPaymentMethodModal.tsx:181-186`
 **Severity**: MEDIUM
 
@@ -3247,6 +3440,128 @@ Fix: add at least one assertion that a non-Free card does **not** render the lit
 `<div aria-hidden="true" />` is correct ARIA usage but appears in DevTools as an unexplained empty div. The intent is documented in the comment block above the JSX, but the markup itself is opaque to a future reader scanning the rendered tree.
 
 Fix: optional — add `data-testid="price-placeholder"` (also lets #217's tests target the slot directly), or wrap it in a self-explanatory inline comment at the JSX site.
+
+---
+
+## 2026-05-09 `/code-review` pass (followups #37/#40/#46/#65/#197/#198/#199/#200/#205/#207/#208/#209 cleanup batch)
+
+Findings from the post-implementation review of the twelve-followup
+batch. No CRITICAL / HIGH; four MEDIUMs and three LOWs.
+
+### 219. `VALID_PLAN_KEYS` duplicates `PLAN_LOOKUP_KEYS` from `billing-plans.ts`
+**File**: [portal/src/pages/OnboardingPage.tsx:21-25](../../portal/src/pages/OnboardingPage.tsx)
+**Severity**: MEDIUM
+
+The new `VALID_PLAN_KEYS` set added by [#205](#205-persist-selectedplan-to-localstorage-during-onboarding)
+hardcodes the three plan lookup keys, but
+`portal/src/lib/billing-plans.ts:136-140` already exports
+`PLAN_LOOKUP_KEYS: PlanLookupKey[]`. Two lists to keep in sync — adding
+a fourth plan in `billing-plans.ts` would silently reject the new key
+during localStorage hydration without a single line in this file
+indicating why.
+
+Fix: `import { PLAN_LOOKUP_KEYS } from "../lib/billing-plans"` and
+derive `const VALID_PLAN_KEYS: ReadonlySet<string> = new Set(PLAN_LOOKUP_KEYS)`.
+Roll into the next OnboardingPage edit.
+
+### 220. Onboarding plan-persistence test reimplements `readPersistedPlanKey`
+**File**: [portal/tests/onboardingPlanPersistence.test.tsx:11-17](../../portal/tests/onboardingPlanPersistence.test.tsx)
+**Severity**: MEDIUM
+
+The new test landed alongside [#205](#205-persist-selectedplan-to-localstorage-during-onboarding)
+defines its own copy of `readPersistedPlanKey` and `VALID_PLAN_KEYS`
+rather than importing from `OnboardingPage.tsx`. If the production
+validation changes (e.g., adds `plan_enterprise` or tightens
+acceptance), the test still passes against the old logic and gives
+false confidence.
+
+Fix: extract `readPersistedPlanKey` (and `VALID_PLAN_KEYS`) into a
+small `portal/src/lib/onboardingPlanStorage.ts` helper, export it, and
+have both `OnboardingPage.tsx` and the test import from there. Drives
+both sides from one source.
+
+### 221. `meter_events.report_seat_count` atomic update inside broad `except` swallows DB errors
+**File**: [platform/services/billing/meter_events.py:99-122](../../platform/services/billing/meter_events.py)
+**Severity**: MEDIUM
+
+The atomic `find_one_and_update` added by [#200](#200-atomic-high-water-update-in-meter_eventspy)
+lives inside the same `try / except Exception` block originally meant
+to catch Stripe failures. A pymongo error from the conditional update
+gets logged with `"Failed to report seat-count meter event"` —
+misleading because the meter event already succeeded by that point.
+Worse, the silent swallow means the next `report_seat_count` call
+sees a stale local `company.seat_count_period_high_water` and may
+re-post the same value to Stripe (which is harmless thanks to the
+date-keyed idempotency key, but still wastes a round trip).
+
+Fix: split into two try blocks (Stripe → log+continue, DB → propagate
+or log via a distinct error path), OR tighten the except to
+`(stripe_sdk.error.StripeError,)` so DB errors surface, matching the
+narrow-except pattern landed in `customer.py` ([#199](#199-narrow-the-except-in-customerpy67)).
+
+### 222. `ESTIMATE_STATUS_TRANSITIONS` two-step construction in `models/estimate.py`
+**File**: [platform/models/estimate.py:36-92](../../platform/models/estimate.py)
+**Severity**: MEDIUM
+
+The map is declared empty (`ESTIMATE_STATUS_TRANSITIONS: dict[...] = {}`),
+then `.update(...)` populates it after `validate_estimate_status_transition`
+is defined. The forward-reference dance (`dict["EstimateStatus", set["EstimateStatus"]]`)
+implies a circular dependency that doesn't actually exist —
+`EstimateStatus` is fully defined at line 8, well before line 36.
+
+Fix: collapse to a single literal assignment with concrete type
+annotations (no string forward refs), placed once before
+`validate_estimate_status_transition`. Identical behavior, cleaner
+ordering, easier to read.
+
+### 223. SetupIntent idempotency window not configurable
+**File**: [platform/routers/billing.py:271](../../platform/routers/billing.py)
+**Severity**: LOW
+
+`int(time.time() // 60)` hardcodes a 60-second bucket. Fine in
+practice — Stripe SetupIntent.create returns in under 2s — but if the
+network ever degrades to >60s round-trips, a retry would mint a new
+key and create the duplicate intent the key was meant to prevent.
+
+Fix: optional. Either accept a client-supplied `idempotency_key` from
+the request body, or expose the bucket size as a `Settings` field
+(`stripe_idempotency_window_seconds: int = 60`). Don't fix in
+isolation; roll into the next billing router touch.
+
+### 224. Sentry extras include Stripe PaymentMethod ID
+**File**: [portal/src/components/billing/AddPaymentMethodModal.tsx:194-197](../../portal/src/components/billing/AddPaymentMethodModal.tsx)
+**Severity**: LOW
+
+The capture added by [#209](#209-dont-silently-warn-on-syncpaymentmethod-failure)
+attaches `paymentMethodId` (a Stripe PM ID like `pm_…`) to Sentry
+under `extra`. PM IDs aren't PII per Stripe's classification, but
+they're correlation keys someone with both Sentry and Stripe access
+could use to look up the underlying card brand/last4.
+
+Fix: optional, depends on Sentry retention policy. Either add an
+inline `// Stripe PM IDs aren't PII; safe to attach for debugging`
+comment to document the stance, or move `paymentMethodId` from
+`extra` (indexed) to `contexts` (free-form attached metadata, less
+prominent in alert UIs).
+
+### 225. `APP_BASE_URL` has a localhost default that ships to production
+**File**: [platform/config.py:80](../../platform/config.py)
+**Severity**: LOW
+
+The `app_base_url: str = Field(default="http://localhost:5173", ...)`
+default added by [#197](#197-customer-portal-return_url-should-not-hardcode-prod)
+is correct for dev, but a production deploy that forgets to set
+`APP_BASE_URL` bounces customers from the Stripe Customer Portal back
+to `http://localhost:5173/settings` — "site can't be reached" from
+their browser. Better than the prior hardcoded prod URL (the previous
+state guaranteed dev/staging users got bounced), but still relies on
+ops remembering to set it per environment.
+
+Fix: optional safety net at app startup — if
+`sentry_environment == "production"` and
+`app_base_url.startswith("http://localhost")`, log a CRITICAL warning
+or abort. Or change the Settings field to `str | None = None` and
+assert non-None at the use site for prod environments.
 
 ---
 
