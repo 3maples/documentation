@@ -4051,6 +4051,52 @@ don't get re-flagged each review pass.
 
 ---
 
+## 2026-05-10 `/code-review` pass (LLM token tracking + Stripe metering)
+
+LOW-severity items from the review of the LLM-token-usage-metering change.
+HIGH and MEDIUM findings from that pass were fixed in the same PR; these
+four are the remainder. See [`plans/llm-token-usage-metering.md`](./plans/llm-token-usage-metering.md)
+for the design context.
+
+### 251. Consolidate `ensure_*_price` helpers in `scripts/seed_stripe_products.py`
+`ensure_flat_price`, `ensure_metered_overage_price`, and
+`ensure_metered_token_overage_price` share ~70% of their logic
+(lookup-key search, tier-drift comparator, archive-and-recreate flow).
+
+Fix: refactor to a single `ensure_price(...)` driver that takes the
+Price-create kwargs plus a per-shape `drift_check(existing_full)` callable.
+Low risk, but defer until we add a fourth Price shape — premature otherwise.
+
+### 252. In-function imports in `services/billing/webhook_handlers.py`
+`handle_invoice_paid` does `from models import User` inside the function
+for the per-user token-counter reset path. The rest of the module imports
+models at the top. Mixed style.
+
+Fix: move to module-top imports for consistency. Trivial cleanup; bundle
+with the next functional change to this file.
+
+### 253. Remove `TokenUsageAccumulator` from `agents/estimate/service.py`
+Class is deprecated (banner comment in place) but still ships so v1
+clients don't see a payload regression on the estimate-agent HTTP response
+shape. Its data now flows through the callback-driven
+`record_llm_usage` pipeline.
+
+Fix: delete the class and its references **after one full billing cycle**
+on the new path (so we have confidence the callback flow is the source of
+truth before dropping the legacy in-flight accumulator). Open a calendar
+reminder once production starts emitting `LLMUsageEvent` rows.
+
+### 254. Wire `request_id` if/when middleware exists
+The optional `request_id` audit-log field on `LLMUsageEvent` was dropped
+this round because no caller passed it.
+
+Fix: if/when we add a FastAPI middleware that stamps a request-id
+contextvar, reintroduce the field on `LLMUsageEvent` and have
+`set_llm_context` carry it through to `record_llm_usage`. Don't add the
+field back speculatively.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
