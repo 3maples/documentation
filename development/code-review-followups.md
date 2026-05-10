@@ -879,17 +879,33 @@ Fix: widen `handleSaveEstimate` to return
 `Promise<EstimateWithExtras | null>` and use the resolved value instead
 of the closure reference.
 
-### 58. `PortalLayout.tsx` is now 2,148 lines
-**Severity**: HIGH
-Preexisting; this session added ~45 lines (`openMaple`, `openFeedback`,
-`openChangeLog`, `mapleNavFooter`, ESC wiring on the panels) and removed
-the two composer-level button rows for a net +20. Still well over the
-800-line HIGH threshold.
+### 58. `PortalLayout.tsx` over the 800-line HIGH threshold (canonical)
+**Severity**: HIGH (in progress — partial 2026-05-09)
+Canonical entry; #169 and #176 are duplicate flags from later review
+passes — consolidated here on 2026-05-09.
 
-Fix: extract the Maple panel (header + messages + composer + footer +
-Feedback/ChangeLog overlays) into `components/maple/MaplePanel.tsx`.
-Both the mobile and desktop branches render nearly-identical markup and
-could share one component with a `variant="mobile" | "desktop"` prop.
+Progress 2026-05-09: extracted pure-data and pure-helper layers out of
+the file:
+- `components/Layout/portalLayoutData.ts` — `countryOptions`,
+  `canadaProvinceOptions`, `usStateOptions`, `ProvinceStateOption`
+- `components/Layout/portalLayoutHelpers.tsx` — `getCompanyFormState`,
+  `getAccountFormState`, `createConversationId`,
+  `isAuthenticatedMember`, `ThinkingIndicator`, plus the
+  `CompanyFormState` / `AccountFormState` / `CompanyDetails` /
+  `PortalUser` / `TeamMember` interfaces.
+
+Result: 2,094 → 1,917 lines. Still over the 800 HIGH threshold; full
+suite (477 portal tests) and `tsc --noEmit` both clean.
+
+Next steps (left for a planned session — risky without component
+tests for `PortalLayout`): extract the three big in-file modals
+(Settings ~130 lines, Company ~378 lines, TeamMembers ~74 lines), the
+mobile + desktop AI panel branches, and the `MapleFloatingButton`.
+The Maple panel (header + messages + composer + footer +
+Feedback/ChangeLog overlays) is a natural `components/maple/MaplePanel.tsx`
+with a `variant="mobile" | "desktop"` prop since both branches render
+nearly-identical markup. Until component tests exist for PortalLayout,
+each modal extraction needs a manual UI smoke test.
 
 ### 59. Drive-filename filename-collision policy still implicit
 **Severity**: LOW
@@ -1532,13 +1548,47 @@ the extraction and remain as the next iteration's target.
 
 ### 94. New material handlers all exceed the 50-line ceiling
 **File**: [platform/agents/material/service.py](../../platform/agents/material/service.py)
-**Severity**: HIGH (continuation of entry #4)
+**Severity**: HIGH (continuation of entry #4 — partial 2026-05-09)
 
-Extracted handlers and their line counts:
-- `_handle_create_material` — 175 lines (1366)
-- `_handle_get_material` — 122 lines (1757)
-- `_handle_list_materials` — 112 lines (1542)
-- `_handle_delete_material` — 101 lines (1655)
+Progress 2026-05-09: extracted the response envelope into
+`_build_response_envelope(...)` (the ~25-line method centralises the
+canonical 15-key envelope used by every material handler). All 8
+inline-dict returns across the four big handlers and
+`_handle_list_material_categories` now call the helper. Material test
+suites pass: `test_material_agent.py` (56), `test_material_api.py`,
+`test_maple_material_size_operations.py` (78 total).
+
+Updated handler line counts (2026-05-09):
+- `_handle_create_material` — 163 (was 175; saved 12)
+- `_handle_get_material` — 106 (was 122; saved 16)
+- `_handle_list_materials` — 135 (was ~146; saved 11)
+- `_handle_delete_material` — 92 (was 101; saved 9)
+- `_handle_list_material_categories` — 33 (was 44)
+
+None hit the 50-line ceiling yet — the residual length is genuinely
+business logic (field resolution, sizing inference, pending-intent
+bookkeeping), not envelope boilerplate. To get the four big handlers
+fully under 50 lines, the next extraction targets are per-handler
+helpers:
+
+- `_handle_create_material`: split out the
+  category/unit-resolution ladder (lines ~1462-1494) and the
+  sizes-from-price construction (lines ~1496-1512) into private
+  helpers. ~80 lines that don't belong in the orchestration shell.
+- `_handle_list_materials`: extract the filter-resolution block
+  (name_hint cleaning + category_filter_id + price_filter combination
+  + the materials fetch dispatch) into `_resolve_list_filters(...)`.
+  ~50 lines.
+- `_handle_get_material`: split the size-scoped branch (lines
+  ~1989-2024) into `_handle_get_material_size_scoped(...)`. ~40
+  lines.
+- `_handle_delete_material`: extract the pending-context cleanup
+  (lines ~1942-1950) into `_clear_pending_delete_context(...)`. ~10
+  lines.
+
+Each is mechanical and the existing test suites cover the behavior.
+
+Original notes preserved below for context:
 
 Each one is mostly a single response-builder per branch. Next
 extraction: factor out the repeated envelope shape (12 keys: `success`,
@@ -1650,29 +1700,33 @@ direct tests until #94/#95 are split — easier to test smaller units.
 
 ## 2026-04-27 review (US address parsing + estimate navigation session)
 
-### 99. `_extract_fields_from_message` length growing past 200 lines
-File: `platform/agents/property/service.py:369`
-**Severity**: HIGH
+### 99. ~~`_extract_fields_from_message` length growing past 200 lines~~ — RESOLVED 2026-05-09
+File: `platform/agents/property/service.py:597`
+**Severity**: HIGH (resolved)
 
-Now ~210 lines after the US-style "City, ST ZIP" regex was added. It's a
-sequence of 6 independent regex parsers chained by `setdefault`, and every
-new address shape will keep accreting. Pre-existing — not introduced by
-the US address fix — but worth tracking under the file/function-size theme
-in #4.
+Resolved 2026-05-09 along the exact strategy proposed in the original
+fix note. Each address-shape parser is now its own helper returning
+a partial dict, and the coordinator is a 26-line fold:
 
-Fix: when next touched, extract each address-shape parser into a small
-helper (e.g. `_try_us_zip_address`, `_try_partial_canadian_address`,
-`_try_chunked_canadian_address`) returning a partial dict, with
-`_extract_fields_from_message` reduced to a fold:
+| Helper | Lines | Shape parsed |
+| --- | --- | --- |
+| `_extract_label_fields` | 30 | Labelled `name:`, `address:`, `city:`, `prov_state:`, `postal_zip:`, `country:`, `notes:` patterns + postal/prov normalisation |
+| `_try_canadian_full_address` | 25 | "1234 Main St, Vancouver, BC, V1V 2A2" |
+| `_try_us_zip_address` | 27 | "155 Asharoken Ave, Northport, NY 11768" |
+| `_try_chunked_address` | 38 | Either-order country/postal: "…, BC, 32333, Canada" |
+| `_try_partial_address` | 25 | Postal/country omitted: "888 River Rd, Richmond, BC" |
+| `_try_at_prefix_canadian_address` | 35 | "at 123 Maple Drive, Surrey BC V3T 4R5" |
 
-```python
-for parser in (_try_canadian_full, _try_us_zip, _try_chunked, _try_partial, _try_at_prefix):
-    for k, v in parser(normalized).items():
-        extracted.setdefault(k, v)
-```
+The label-pattern dict moved to a class attribute (`_LABEL_PATTERNS`)
+so it's not re-allocated on every call. The coordinator pre-applies
+the labelled-pattern extractor (whose matches win), then folds in
+each address-shape parser via `setdefault` — earlier matches take
+precedence, matching the original semantics. The at-prefix parser
+remains gated behind "no street found yet" as before.
 
-Each parser becomes individually unit-testable and the coordinator drops
-under 50 lines.
+Verified: 71 property tests pass (`test_property_agent.py`,
+`test_property_api.py`, `test_address_service.py`). Coordinator
+dropped from ~207 → 26 lines.
 
 ### 100. Defensive `|| canEdit` clause in estimate-page row visibility is dead today
 File: `portal/src/pages/NewEstimateWithActivityPage.tsx:879`
@@ -2648,16 +2702,17 @@ floating Sparkles button. The actionable items (decoupling divisions
 fetch, FAB ARIA, removing the unused `coverAiPanel` prop) were fixed in
 the same change. The items below were deferred.
 
-### 169. `PortalLayout.tsx` is ~1500 lines
-**Severity**: HIGH
+### 169. `PortalLayout.tsx` is ~1500 lines — duplicate of #58
+**Severity**: HIGH (consolidated into #58 on 2026-05-09)
+Same finding as #58. Both flag `PortalLayout.tsx` over the 800-line
+HIGH threshold; track the refactor under #58 going forward. Notes
+preserved below for context.
+
 File is well over the 800-line guideline. The session's edits added
 ~10 lines on top of an already over-budget file. Natural extraction
 candidates: the AI panel composer + message renderer, the settings/
 account modal, and the feedback/changelog panel wiring — each ~200-300
 lines and largely self-contained.
-
-Pre-existing; flagging here so it's recorded against this file
-specifically rather than rediscovered each pass.
 
 ### 170. No component tests for `Modal` or `DashboardPage` division-seeding behavior
 **Severity**: MEDIUM
@@ -2698,8 +2753,19 @@ preserving blur. The lint error caught during review
 the same change by remounting the dialog via a `key` prop on open. All
 items below were deferred.
 
-### 172. `WorkItemInlineContent.tsx` now 834 lines (over the 800-line HIGH threshold)
-**Severity**: HIGH
+### 172. ~~`WorkItemInlineContent.tsx` now 834 lines (over the 800-line HIGH threshold)~~ — RESOLVED 2026-05-09
+**Severity**: HIGH (resolved)
+
+Extracted the Activities table into `components/estimates/ActivitiesTable.tsx`
+(mirroring the existing `MaterialsTable.tsx` precedent). Props match
+the same shape: rows + lookup items + readOnly + onAddRow / onUpdateRow /
+onRemoveRow / onRoleSelect / onOpenCalc. `WorkItemInlineContent.tsx` is
+now 724 lines — back under the 800 HIGH threshold. The 11-test
+`WorkItemInlineContent.test.tsx` suite still passes; `tsc --noEmit`
+clean. Closes #178 (same file flagged again on 2026-05-06).
+
+Original notes preserved below for context:
+
 This change pushed the file from ~760 to 834 lines (Adjust pill + dialog
 mount + Original line + handleAdjustSet + handleProfitMarginChange +
 originalTotal useMemo). The component was already at the limit before
@@ -2753,8 +2819,11 @@ parsing on legacy docs).
 
 ## 2026-05-05 `/code-review` pass (header recolor + Maple FAB realignment + NumericInput blur-format)
 
-### 176. `PortalLayout.tsx` is ~1500 lines (pre-existing)
-**Severity**: HIGH
+### 176. `PortalLayout.tsx` is ~1500 lines (pre-existing) — duplicate of #58
+**Severity**: HIGH (consolidated into #58 on 2026-05-09)
+Same finding as #58 / #169. Track the refactor under #58. Notes
+preserved below for context.
+
 `portal/src/components/Layout/PortalLayout.tsx` — sidebar, mobile sidebar,
 top-bar logo regions, AI panel header (desktop + mobile), the floating
 Maple FAB, and the Account modal all live in one file. Not introduced by
@@ -2780,20 +2849,12 @@ token in `theme.css` that it's only safe for large-bold copy.
 
 ## 2026-05-06 `/code-review` pass (People pricing — Standard Unbillable %)
 
-### 178. `WorkItemInlineContent.tsx` over the 800-line HIGH threshold
-**Severity**: HIGH
-`portal/src/components/estimates/WorkItemInlineContent.tsx` is now **850
-lines** (up from ~800 before this change). The activities `<table>` block
-(materials are already extracted into `MaterialsTable.tsx`) is the
-biggest local concentration — header, row, rate-card detail row, and the
-new Total column live inline. Extracting an `ActivitiesTable.tsx` mirror
-of `MaterialsTable.tsx` would drop this file back under threshold and
-make the per-row JSX easier to read.
-
-Fix: lift the activities table into its own component, taking
-`activityRows`, `peopleItems`, `rateCards`, `readOnly`, and the `update*`/
-`removeActivityRow`/`setCalcActivityIndex` callbacks as props. The
-rate-card detail row and `activityTotal` calc move with it.
+### 178. ~~`WorkItemInlineContent.tsx` over the 800-line HIGH threshold~~ — RESOLVED 2026-05-09 (duplicate of #172)
+**Severity**: HIGH (resolved)
+Resolved together with #172 on 2026-05-09. The activities `<table>`
+block was extracted into `components/estimates/ActivitiesTable.tsx`
+(mirror of `MaterialsTable.tsx`), exactly as the fix recommendation
+proposed. File now 724 lines.
 
 ### 179. Inline `reduce` on `activityRows` recomputed every render
 **Severity**: LOW
@@ -3586,6 +3647,162 @@ Fix: optional safety net at app startup — if
 `app_base_url.startswith("http://localhost")`, log a CRITICAL warning
 or abort. Or change the Settings field to `str | None = None` and
 assert non-None at the use site for prod environments.
+
+---
+
+## 2026-05-09 `/code-review` pass (contact form pre-launch waitlist checkbox)
+
+Findings from the change that adds a "Join the pre-launch waitlist"
+checkbox to the website contact modal and surfaces the opt-in in the
+support email. Touches `website/public/contact-modal.js` (UI + payload)
+and `website/functions/index.js` (Cloud Function — accept the new
+boolean field, render it in the email body).
+
+### 226. `cm-waitlist` is used as both a CSS class and an element id
+**File**: [website/public/contact-modal.js:138, 252](../../website/public/contact-modal.js)
+**Severity**: MEDIUM
+
+The wrapper `<div class="cm-waitlist">` shares the literal string
+`cm-waitlist` with the `<input id="cm-waitlist">` it contains. CSS is
+unaffected (class vs id selectors don't collide), and
+`<label for="cm-waitlist">` correctly resolves to the input. But
+anyone who later writes `document.getElementById('cm-waitlist')`
+expecting the wrapper will instead get the checkbox — a quiet
+footgun, not a current bug.
+
+Fix: rename the wrapper class to `.cm-waitlist-block` (or rename the
+id to `cm-join-waitlist`), update the matching CSS selectors, and
+update the `<label for=…>` accordingly. ~5 line change. Roll into the
+next contact-modal touch.
+
+### 227. No automated tests for the new `joinWaitlist` field
+**File**: [website/public/contact-modal.js:331](../../website/public/contact-modal.js), [website/functions/index.js:46-69, 166](../../website/functions/index.js)
+**Severity**: LOW
+
+Per CLAUDE.md, functional changes should ship with tests. The Cloud
+Function has no test file (only `functions/lib/recaptcha.test.js`
+exists), and `contact-modal.js` has none. The new flag is small but
+crosses the client→server boundary with intentional type strictness
+(`joinWaitlist === true`).
+
+Fix: when test scaffolding is added for these files, cover at minimum:
+(a) `joinWaitlist: true` → email row "Yes",
+(b) missing / `undefined` → "No",
+(c) string `"true"` → "No" (verifies strict-equality rejects coerced
+truthy values).
+Not blocking — there's no existing test surface to extend, and the
+change is self-contained.
+
+### 228. `form.joinWaitlist.checked` relies on the named-elements collection
+**File**: [website/public/contact-modal.js:331](../../website/public/contact-modal.js)
+**Severity**: LOW
+
+Works because HTML form elements are exposed by `name` on the form
+object. If another element were ever added to this form with
+`name="joinWaitlist"`, the lookup would return a `RadioNodeList` and
+`.checked` would be `undefined`. The pattern matches the rest of the
+file (`form.firstName.value` etc.), so this is consistent — just
+inherited fragility.
+
+Fix: optional. Switch to
+`form.querySelector('#cm-waitlist').checked` (or use a captured
+reference like the other inputs at module scope) for clarity. Skip if
+you prefer to stay consistent with the existing style.
+
+### 229. Submit handler is ~60 lines after this change
+**File**: [website/public/contact-modal.js:316-386](../../website/public/contact-modal.js)
+**Severity**: LOW
+
+The inline `form.addEventListener('submit', async (e) => { … })`
+body is long enough to be hard to scan. Pre-existing issue; this
+change adds one line so it's not regressing meaningfully.
+
+Fix: extract the body into a named function (`handleSubmit`) in a
+follow-up if/when the file is touched again. No action needed for
+this commit.
+
+---
+
+## 2026-05-09 `/code-review` pass (file-size HIGH-followup batch — #94/#99/#172/#178/#58 partial)
+
+Findings from the post-implementation review of the size-refactor
+batch that closed #99 / #172 / #178, partially closed #58 / #94, and
+consolidated #169 / #176 into #58. No CRITICAL; one HIGH (precedent-
+matched), two MEDIUM, two LOW.
+
+### 230. `ActivitiesTable` default-export body exceeds 50-line ceiling
+**File**: [portal/src/components/estimates/ActivitiesTable.tsx:21](../../portal/src/components/estimates/ActivitiesTable.tsx)
+**Severity**: HIGH (precedent-matched)
+
+The new `ActivitiesTable` function body is ~165 lines, mostly inline
+table-row JSX. Mirrors `MaterialsTable.tsx` (also ~120-line body) so
+it follows precedent — but that precedent itself sits over the
+50-line ceiling.
+
+Fix: extract `<ActivityRow>` and the rate-card detail-row fragment
+into local sub-components, taking `row`, `idx`, `peopleItems`,
+`rateCards`, `readOnly`, and the per-row callbacks as props. Apply
+the same split to `MaterialsTable.tsx` in the same change so both
+extracted-row components stay in lockstep — otherwise this entry
+keeps re-flagging.
+
+### 231. No direct test for `ActivitiesTable`
+**File**: [portal/src/components/estimates/ActivitiesTable.tsx](../../portal/src/components/estimates/ActivitiesTable.tsx)
+**Severity**: MEDIUM
+
+New default-export component lacks its own `*.test.tsx`. Behaviour is
+transitively covered by `tests/WorkItemInlineContent.test.tsx`
+(11/11 still pass). Soft per CLAUDE.md mandatory-testing — pure
+code-motion refactor with no new behaviour — but a focused test
+would surface row-rendering / a11y regressions earlier than the
+parent suite.
+
+Fix: when `MaterialsTable.tsx` gets a sibling test (it currently
+doesn't either), add `tests/ActivitiesTable.test.tsx` covering:
+empty-state copy, row rendering with effort calculator button enabled
+vs. disabled by `rateCards.length`, the rate-card detail-row
+visibility on `effortCardItems.length > 0`, and `readOnly` mode
+hiding the trash and add buttons.
+
+### 232. `_build_response_envelope` lacks a direct shape test
+**File**: [platform/agents/material/service.py](../../platform/agents/material/service.py)
+**Severity**: MEDIUM
+
+The new helper is exercised transitively by 78 material-suite tests,
+but there's no direct unit test pinning the envelope's 15-key set or
+the `matches[0]` echo of `intent` / `agent` / `probability`. Future
+caller drift (typo'd kwarg, accidental key removal) would only
+surface via whichever handler test exercises that key — fine in
+practice, but a focused signal would catch it earlier.
+
+Fix: add `test_build_response_envelope_shape` in
+`tests/test_material_agent.py` calling the helper directly with two
+parametrised cases (clarification path, success path) and asserting
+the 15-key set + the `matches` echo. ~15-line parametrized test.
+
+### 233. `_LABEL_PATTERNS` is a mutable class-level dict
+**File**: [platform/agents/property/service.py:375](../../platform/agents/property/service.py)
+**Severity**: LOW
+
+Class-level `Dict[str, List[str]]` is allocated once and is technically
+mutable. Today nothing mutates it, but a future `_extract_label_fields`
+edit that did `self._LABEL_PATTERNS[field].append(...)` would silently
+corrupt subsequent calls (and other instances).
+
+Fix: either annotate as
+`_LABEL_PATTERNS: Final[Mapping[str, Sequence[str]]] = ...` (importing
+`Final` and `Mapping` / `Sequence` from `typing`) or convert the
+inner `List[str]` values to tuples. Cosmetic; safe today.
+
+### 234. ~~`portalLayoutHelpers.tsx` mixes type-only and runtime exports~~ — RESOLVED 2026-05-09
+**Severity**: LOW (resolved)
+
+Split during the same code-review pass that flagged it: the helpers
+file is now `portalLayoutHelpers.ts` (types + non-component helpers),
+and `ThinkingIndicator` lives in its own `ThinkingIndicator.tsx`.
+This was forced by `eslint-plugin-react-refresh`'s
+`only-export-components` rule, which blocks mixing components and
+non-component exports in `.tsx` files. `npm run lint` now clean.
 
 ---
 
