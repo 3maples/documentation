@@ -3934,9 +3934,10 @@ existing `text_helpers.py` / `estimate_update.py` /
 **Severity**: HIGH (in progress)
 
 Progress 2026-05-09: created `routers/estimate_helpers/` package
-mirroring the `routers/agent_helpers/` pattern, and moved the first
-two clusters of pure / well-bounded helpers out:
+mirroring the `routers/agent_helpers/` pattern. Four clusters of
+pure / well-bounded helpers moved out across two passes:
 
+Pass 1 (commit 1b9d37c):
 - `routers/estimate_helpers/calculations.py` — `DEFAULT_PROFIT_MARGIN`,
   `parse_profit_margin`, `apply_percentage_profit_margin`,
   `parse_overhead_allocation`, `apply_profit_and_overhead`,
@@ -3952,21 +3953,33 @@ two clusters of pure / well-bounded helpers out:
   and batch fetch (247 lines, was duplicated across
   `build_line_item_snapshots` + `enrich_job_items_in_place`).
 
-`routers/estimates.py` re-exports every name in both modules so test
-imports (`from routers.estimates import calculate_activities_total`,
-etc.) keep working unchanged. The `test_estimate_snapshot_helpers.py`
-patches were updated from `routers.estimates.Material` to
-`routers.estimate_helpers.snapshots.Material` (the lookups happen
-there now).
+Pass 2 (this commit):
+- `routers/estimate_helpers/division.py` — `ESTIMATE_DIVISION_KEYWORDS`,
+  `_normalize_division_text`, `infer_estimate_division` (100 lines).
+- `routers/estimate_helpers/job_item_merge.py` — the seven merge
+  helpers (`_normalize_job_item_text`, `_job_item_tokens`,
+  `_tokens_overlap`, `_parsed_item_matches_request_description`,
+  `_job_item_match_score`, `_build_merged_request_job_item`,
+  `merge_job_items_with_original_descriptions`) plus two new
+  private helpers (`_group_parsed_items_by_request`,
+  `_build_extra_parsed_item`) that split the 109-line
+  `merge_job_items_with_original_descriptions` into a
+  scoring/grouping step, a request-bucket build step, and an
+  extras-tail step (286 lines).
 
-File size: 2,572 → **2,254** lines. 290 platform tests pass across
-estimate API / quota / docs / job-item / orchestrator / Maple
-coverage suites.
+`routers/estimates.py` re-exports every name in all four modules so
+test imports + caller imports keep working unchanged. The
+`test_estimate_snapshot_helpers.py` patches were updated from
+`routers.estimates.Material` to
+`routers.estimate_helpers.snapshots.Material`. No test changes
+required for the merge cluster.
+
+File size: 2,572 → 2,254 → **1,961** lines (-611 total). 318
+platform tests pass across estimate API / snapshot / quota / docs /
+job-item / orchestrator / Maple-coverage / agents API suites.
 
 Remaining major extraction targets (see followup doc body for fix
 sketch):
-- Job-item matching helpers + `merge_job_items_with_original_descriptions`
-  (~377 lines)
 - Job-item builder functions `build_full_job_items_from_request`,
   `build_skeleton_job_items`, `build_job_items_from_parsed`
   (~370 lines)
