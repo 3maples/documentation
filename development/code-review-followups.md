@@ -3929,9 +3929,53 @@ to its own helper module, leaving the router as a dispatcher. The
 existing `text_helpers.py` / `estimate_update.py` /
 `fuzzy_confirmation.py` modules are the precedent.
 
-### 239. `platform/routers/estimates.py` is **2,572 lines**
+### 239. `platform/routers/estimates.py` is **2,572 lines** — partial 2026-05-09
 **File**: [platform/routers/estimates.py](../../platform/routers/estimates.py)
-**Severity**: HIGH
+**Severity**: HIGH (in progress)
+
+Progress 2026-05-09: created `routers/estimate_helpers/` package
+mirroring the `routers/agent_helpers/` pattern, and moved the first
+two clusters of pure / well-bounded helpers out:
+
+- `routers/estimate_helpers/calculations.py` — `DEFAULT_PROFIT_MARGIN`,
+  `parse_profit_margin`, `apply_percentage_profit_margin`,
+  `parse_overhead_allocation`, `apply_profit_and_overhead`,
+  `calculate_labour_total`, `calculate_materials_total`,
+  `calculate_activities_total`,
+  `apply_overhead_to_labour_and_profit_to_total` (118 lines).
+- `routers/estimate_helpers/snapshots.py` — `LineItemSnapshots`,
+  `_safe_parse_object_ids`, `build_line_item_snapshots`,
+  `enrich_job_items_in_place`, `_resolve_snapshot_pair`, plus three
+  new private decomposition helpers (`_collect_referenced_ids`,
+  `_fetch_snapshot_maps`, `_fetch_material_unit_map`,
+  `_build_material_map`) that DRY up the per-entity ID collection
+  and batch fetch (247 lines, was duplicated across
+  `build_line_item_snapshots` + `enrich_job_items_in_place`).
+
+`routers/estimates.py` re-exports every name in both modules so test
+imports (`from routers.estimates import calculate_activities_total`,
+etc.) keep working unchanged. The `test_estimate_snapshot_helpers.py`
+patches were updated from `routers.estimates.Material` to
+`routers.estimate_helpers.snapshots.Material` (the lookups happen
+there now).
+
+File size: 2,572 → **2,254** lines. 290 platform tests pass across
+estimate API / quota / docs / job-item / orchestrator / Maple
+coverage suites.
+
+Remaining major extraction targets (see followup doc body for fix
+sketch):
+- Job-item matching helpers + `merge_job_items_with_original_descriptions`
+  (~377 lines)
+- Job-item builder functions `build_full_job_items_from_request`,
+  `build_skeleton_job_items`, `build_job_items_from_parsed`
+  (~370 lines)
+- AI-generation pipeline `generate_estimate_from_ai`,
+  `prepare_generated_estimate`, `save_generated_estimate`,
+  fallback helpers (~265 lines)
+- Drive / version / GenerateDoc routes (~250 lines)
+
+Original notes:
 
 The Estimates REST API surface plus several Drive / version /
 GenerateDoc helpers. The version-bump and Drive-doc paths in
