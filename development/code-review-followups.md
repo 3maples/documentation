@@ -3906,36 +3906,74 @@ Pass 3 (commit c9ff0e1): CRUD parsing mixin
   summary/list-entry/details formatters, the _crud_envelope shaper
   (382 lines).
 
-EstimateAgent inheritance is now:
-``class EstimateAgent(CatalogMatchingMixin, CrudParsingMixin):``
+Pass 4 (commit ffd3757): work-item handler mixin
+- `agents/estimate/work_item_handlers.py` — WorkItemHandlersMixin
+  carrying the five work-item CRUD sub-ops
+  (_handle_update_estimate_work_item_{remove, rename, add, update_field})
+  plus the read-side _handle_get_work_item and their support helpers:
+  _detect_work_item_op, _find_work_item_matches,
+  _build_work_item_details_text, _no_work_item_match_response,
+  _ambiguous_work_item_response, _recalculate_grand_total (777
+  lines). Also swept the LOW finding from the code review — empty
+  `if TYPE_CHECKING: pass` block in crud_helpers.py removed.
 
-File size: 6,074 → 5,520 → 5,090 → **4,710** lines (-1,364 total).
-159 tests pass across the estimate-agent / prompt / tools /
-gathering / agent-helpers suites; the 2 failures
-(test_step1_architect_*) reproduce on HEAD without these changes
-and are unrelated to the refactor.
+Pass 5 (commit 905a128): list/get/update CRUD handlers mixin
+- `agents/estimate/crud_handlers.py` — CrudHandlersMixin carrying
+  the read-side _handle_list_estimates (with status / division /
+  property / labour / contact / date / amount / aggregate-value
+  filtering + sort prefs + count form) and _handle_get_estimate;
+  the write-side _handle_update_estimate dispatcher + status
+  transition / notes / property-link sub-ops; the shared load
+  helpers (_load_estimate_for_read, _load_estimate_for_update,
+  _coerce_company_oid, _estimate_load_error_envelope); the
+  write-side phrasing detectors (_detect_status_transition,
+  _detect_note_update, _is_property_link_request); and the
+  formatting helpers (_format_contact_constraint_label,
+  _count_phrase) — 1,359 lines.
+
+EstimateAgent inheritance is now:
+``class EstimateAgent(CatalogMatchingMixin, CrudParsingMixin,``
+``                    WorkItemHandlersMixin, CrudHandlersMixin):``
+
+File size: 6,074 → 5,520 → 5,090 → 4,710 → 4,002 → **2,732** lines
+(-3,342 total, 55% reduction). 421 tests pass across the
+estimate-agent / prompt / tools / gathering / agent_helpers_estimate_
+update / orchestrator_intents / fuzzy_confirmation / maple_help_
+coverage suites; the 2 pre-existing failures (test_step1_architect_*)
+reproduce on HEAD without these changes.
 
 Remaining major extraction targets (still over the 800-line
 threshold):
-- Work-item CRUD handlers cluster (~1,100 lines):
-  `_detect_work_item_op`, `_find_work_item_matches`,
-  `_build_work_item_details_text`, `_no_work_item_match_response`,
-  `_ambiguous_work_item_response`, `_recalculate_grand_total`,
-  `_handle_get_work_item`, `_handle_update_estimate_work_item_remove
-  / _rename / _add / _update_field`.
-- List/Get/Update orchestrators (~700 lines):
-  `_handle_list_estimates` (430 lines!),
-  `_handle_get_estimate` (150 lines),
-  `_handle_update_estimate` (orchestrator),
-  `_handle_update_estimate_status_transition`,
-  `_handle_update_estimate_notes`,
-  `_handle_update_estimate_property_link`.
-- `_fill_prices_and_calculate_totals` (235 lines, single function
+- LangChain research/architect pipeline cluster (~920 lines):
+  `_build_research_input`, `_collect_research_sources`,
+  `_normalize_research_result`, `_decompose_requirement`,
+  `_step1_architect`, `_step2_vector_retrieval`,
+  `_step3_research_for_scope`, `_reuse_past_work_item`,
+  `_step2_and_3_for_scope`, `_run_pipeline`, `_run_react_loop`,
+  `_run_estimate_research`, `_build_estimate_from_research`,
+  `_extract_estimate_with_llm`, `_fallback_accuracy_suggestions`,
+  `_generate_accuracy_suggestions` → `agents/estimate/llm_pipeline.py`.
+- Extraction normalization cluster (~285 lines):
+  `_normalize_extracted_estimate`, `_has_meaningful_value`,
+  `_merge_job_item_payloads`, `_merge_with_pending_estimate`,
+  `_build_optional_follow_up`, `_collect_missing_required_fields`,
+  `_build_clarifying_question`.
+- Gathering/sufficiency cluster (~200 lines):
+  `assess_sufficiency`, `extract_detail_from_reply`,
+  `_field_name_variants`, `_normalize_enum_value`,
+  `_extract_value_like_phrase`, `_detect_enum_help_field`,
+  `_infer_single_pending_field_value`.
+- Material/labour calculation cluster (~160 lines):
+  `_calculate_material_cost`, `_get_material_default_*`,
+  `_estimate_labour_hours`, `_merge_duplicate_line_items`,
+  `_merge_resolved_*_items`, `_calculate_total_estimate`.
+- LLM error / JSON parsing helpers (~130 lines):
+  `_format_llm_error`, `_build_json_parse_diagnostic`,
+  `_strip_json_comments`.
+- `_fill_prices_and_calculate_totals` (224 lines, single function
   that should split into helper steps).
-- `process` (340 lines) — main entry orchestrator.
-- LangChain pipeline (`_step1_architect`, `_step2_vector_retrieval`,
-  `_step3_research_for_scope`, `_run_pipeline`, `_run_react_loop`,
-  `_run_estimate_research`) → likely `agents/estimate/llm.py`.
+- `process` (337 lines) — main entry orchestrator.
+- `_fetch_inventory_items` (106 lines).
 
 Original notes:
 
@@ -4213,6 +4251,72 @@ so hover can never fire on the disabled current-plan button anyway.
 Fix: drop `hover:bg-emerald-600` from the `isCurrent` branch of
 `buttonClass`. Keep `bg-emerald-600 text-white border-transparent
 disabled:opacity-100 w-full`.
+
+---
+
+## 2026-05-11 `/code-review` pass (Maple plan-limit gates — Maple credits + estimate count)
+
+CRITICAL: 0, HIGH: 1 (fixed in the same PR), MEDIUM: 2, LOW: 1.
+
+The HIGH (`blocked` branch leaked billing — counter didn't advance and no
+Stripe meter event was posted when over-cap but card on file) was fixed
+in-PR by adding `services/estimate_quota.py:record_overage_estimate()`
+and calling it from the `blocked` branch in
+`routers/agents.py:_check_estimate_limit_or_refuse`. Counter now advances
+and the overage bills at cycle close. The MEDIUM/LOW items below are
+deferred.
+
+### 256. `detail` lacks an explicit type annotation in the orchestrate credits-gate try/except
+`platform/routers/agents.py:633` — `mypy . --ignore-missing-imports`
+reports `Need type annotation for "detail" (hint: "detail: dict[<type>, <type>] = ...")`
+on:
+
+```python
+detail = exc.detail if isinstance(exc.detail, dict) else {}
+```
+
+The narrowed type doesn't propagate because the `else {}` branch is an
+empty dict literal with no type context.
+
+Fix: annotate explicitly —
+```python
+detail: Dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
+```
+
+Small, mechanical. Apply next time `routers/agents.py` is touched.
+
+### 257. `routers/agents.py` is now 2810 lines (was 2631 pre-PR)
+This PR added ~120 lines (3 gate helpers + 2 refactored call sites,
+all small and focused). Builds on the existing file-size HIGH in
+[#4](#4-file-and-function-size). The next round of extractions could
+move the Maple gate helpers — `_maple_credits_refusal_payload`,
+`_estimate_limit_refusal_payload`, `_check_estimate_limit_or_refuse` —
+into `routers/agent_helpers/plan_gates.py`. The other
+`assert_token_quota` call site at `routers/agents.py:2672` (the
+standalone `/agents/estimate` endpoint) could reuse the same primitives
+if you want the same chat-style refusal there too.
+
+### 258. "Yes" button on the estimate-limit dialog needs an `aria-label` for screen readers
+`portal/src/pages/EstimatesPage.tsx:425` — the confirm button reads only
+"Yes". Sighted users see the modal body for context; assistive tech
+announces "Yes button" with nothing tying it to the action. Spec
+explicitly asked for "Yes" as the visible label, so don't change the
+visible text — just add an `aria-label`:
+
+```tsx
+<button
+  type="button"
+  aria-label="Yes, add a payment method"
+  onClick={() => { ... }}
+  ...
+>
+  Yes
+</button>
+```
+
+Same treatment would benefit the dialog's "Cancel" button to a lesser
+extent (`aria-label="Cancel — stay on estimates"`), but Cancel is
+already a well-known UI pattern, so lower priority.
 
 ---
 
