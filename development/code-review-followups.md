@@ -4097,6 +4097,21 @@ field back speculatively.
 
 ---
 
+## 2026-05-10 `/code-review` pass (Properties/Contacts name column + current-plan button)
+
+### 255. Redundant `hover:bg-emerald-600` on current-plan button
+`portal/src/components/billing/PlanPickerGrid.tsx:134` — the
+`buttonClass` for the current plan includes both `bg-emerald-600` and
+`hover:bg-emerald-600`. The hover variant matches the base, and the
+shared `Button` component already sets `disabled:pointer-events-none`,
+so hover can never fire on the disabled current-plan button anyway.
+
+Fix: drop `hover:bg-emerald-600` from the `isCurrent` branch of
+`buttonClass`. Keep `bg-emerald-600 text-white border-transparent
+disabled:opacity-100 w-full`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
