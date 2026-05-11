@@ -3865,9 +3865,79 @@ within each tier; severities are HIGH per the file-size guideline,
 but resolution will likely require multiple sessions per file. These
 are tracked under the broader #4 file/function-size theme.
 
-### 235. `platform/agents/estimate/service.py` is **6,066 lines** — the largest file in the repo
+### 235. `platform/agents/estimate/service.py` is **6,066 lines** — the largest file in the repo, partial 2026-05-11
 **File**: [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py)
-**Severity**: HIGH
+**Severity**: HIGH (in progress)
+
+Progress 2026-05-11: three extraction passes landed, splitting the
+file into a service shell + sibling helper modules.
+
+Pass 1 (commit a9da07c): module-level surface
+- `agents/estimate/token_usage.py` — deprecated TokenUsageAccumulator
+  dataclass + sunset note (50 lines).
+- `agents/estimate/schemas.py` — the ten Pydantic structured-output
+  schemas (ExtractedMaterialLine, ExtractedLabourLine,
+  ExtractedActivityLine, ExtractedJobItem, ExtractedEstimate,
+  AccuracySuggestions, EstimateResearchDeliverable,
+  EstimateResearchResult, ArchitectScope, DecomposedRequirement —
+  88 lines).
+- `agents/estimate/text_helpers.py` — every PENDING_* / CRUD_*
+  context key, all the work-item / status-transition / date-range /
+  amount-filter regex tables, the citation-strip helper, the
+  work-item position parser, the enum-option introspection, the
+  ESTIMATE_ENUM_FIELD_OPTIONS / ESTIMATE_ENUM_ALIASES tables (487
+  lines).
+
+Pass 2 (commit f66dee7): catalog matching mixin
+- `agents/estimate/catalog_matching.py` — CatalogMatchingMixin
+  carrying 18 catalog-matching methods + the _SYNONYM_GROUPS /
+  _SYNONYM_MAP tables: text normalization, synonym canonicalization,
+  fuzzy token overlap (SequenceMatcher), the scoring function,
+  inventory-match resolvers, measurement-unit aliasing,
+  material-size capacity parsing, purchase-quantity calc,
+  unmatched-line builders (487 lines). EstimateAgent now inherits
+  from CatalogMatchingMixin so call sites stay untouched.
+
+Pass 3 (commit c9ff0e1): CRUD parsing mixin
+- `agents/estimate/crud_helpers.py` — CrudParsingMixin carrying 17
+  read-side methods: status / code / division / sort-preference
+  text parsers, property address + name extractors, async DB
+  resolvers (_resolve_latest_estimate, _resolve_property_address),
+  summary/list-entry/details formatters, the _crud_envelope shaper
+  (382 lines).
+
+EstimateAgent inheritance is now:
+``class EstimateAgent(CatalogMatchingMixin, CrudParsingMixin):``
+
+File size: 6,074 → 5,520 → 5,090 → **4,710** lines (-1,364 total).
+159 tests pass across the estimate-agent / prompt / tools /
+gathering / agent-helpers suites; the 2 failures
+(test_step1_architect_*) reproduce on HEAD without these changes
+and are unrelated to the refactor.
+
+Remaining major extraction targets (still over the 800-line
+threshold):
+- Work-item CRUD handlers cluster (~1,100 lines):
+  `_detect_work_item_op`, `_find_work_item_matches`,
+  `_build_work_item_details_text`, `_no_work_item_match_response`,
+  `_ambiguous_work_item_response`, `_recalculate_grand_total`,
+  `_handle_get_work_item`, `_handle_update_estimate_work_item_remove
+  / _rename / _add / _update_field`.
+- List/Get/Update orchestrators (~700 lines):
+  `_handle_list_estimates` (430 lines!),
+  `_handle_get_estimate` (150 lines),
+  `_handle_update_estimate` (orchestrator),
+  `_handle_update_estimate_status_transition`,
+  `_handle_update_estimate_notes`,
+  `_handle_update_estimate_property_link`.
+- `_fill_prices_and_calculate_totals` (235 lines, single function
+  that should split into helper steps).
+- `process` (340 lines) — main entry orchestrator.
+- LangChain pipeline (`_step1_architect`, `_step2_vector_retrieval`,
+  `_step3_research_for_scope`, `_run_pipeline`, `_run_react_loop`,
+  `_run_estimate_research`) → likely `agents/estimate/llm.py`.
+
+Original notes:
 
 By a wide margin the largest single source file. Holds the
 EstimateAgent class plus dozens of helpers, prompt constants,
