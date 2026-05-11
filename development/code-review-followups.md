@@ -3929,9 +3929,14 @@ to its own helper module, leaving the router as a dispatcher. The
 existing `text_helpers.py` / `estimate_update.py` /
 `fuzzy_confirmation.py` modules are the precedent.
 
-### 239. `platform/routers/estimates.py` is **2,572 lines** — partial 2026-05-09
+### 239. ~~`platform/routers/estimates.py` is **2,572 lines**~~ — RESOLVED 2026-05-11
 **File**: [platform/routers/estimates.py](../../platform/routers/estimates.py)
-**Severity**: HIGH (in progress)
+**Severity**: HIGH
+
+Final size: **1,110 lines** (-1,462 from the original 2,572). The
+entire `routers/estimate_helpers/` package now carries the
+extracted logic; `routers/estimates.py` re-exports every public name
+so all caller + test imports keep working.
 
 Progress 2026-05-09: created `routers/estimate_helpers/` package
 mirroring the `routers/agent_helpers/` pattern. Four clusters of
@@ -3974,30 +3979,59 @@ test imports + caller imports keep working unchanged. The
 `routers.estimate_helpers.snapshots.Material`. No test changes
 required for the merge cluster.
 
-File size: 2,572 → 2,254 → **1,961** lines (-611 total). 318
-platform tests pass across estimate API / snapshot / quota / docs /
-job-item / orchestrator / Maple-coverage / agents API suites.
+Pass 3 (2026-05-11): three remaining clusters extracted:
+- `routers/estimate_helpers/job_item_builders.py` —
+  `build_full_job_items_from_request`,
+  `build_skeleton_job_items`,
+  `build_job_items_from_parsed` plus thirteen new private decomposition
+  helpers (`_resolve_request_profit_margin`,
+  `_resolve_request_overhead`, `_build_request_materials/equipments/labours/activities`,
+  `_build_request_unmatched_materials/labours/activities`,
+  `_build_parsed_materials/labours/unmatched_*/activities`,
+  `_resolve_parsed_tax`, `_resolve_parsed_division`,
+  `_compute_parsed_sub_total`). Split the three originally-monolithic
+  ~165-line builders into orchestrators that delegate to small
+  per-collection builders (530 lines).
+- `routers/estimate_helpers/common.py` — cross-cutting helpers that
+  the rest of `estimate_helpers/*` depends on:
+  `EstimateGenerationError`, `sort_estimate_versions`,
+  `parse_estimate_status`, `parse_object_id`, `get_company_defaults`
+  (115 lines). Extracting these first lets `ai_generation.py` and
+  `doc_versions.py` import them without re-introducing a circular
+  through `routers/estimates.py`.
+- `routers/estimate_helpers/ai_generation.py` —
+  `get_estimate_agent`, `build_estimate_requirement`,
+  `build_empty_estimate_fallback`, `extract_fallback_generation_error`,
+  `should_use_empty_estimate_fallback`, `generate_estimate_from_ai`,
+  `prepare_generated_estimate`, `save_generated_estimate`. The
+  112-line `generate_estimate_from_ai` was split into three
+  branch helpers — `_raise_or_fallback_on_agent_failure`,
+  `_raise_or_fallback_on_clarification`,
+  `_build_generated_payload_from_parsed` — so each path is
+  individually readable (430 lines).
+- `routers/estimate_helpers/doc_versions.py` —
+  `cleanup_estimate_external_resources` (background task) plus
+  ten new helpers (`fetch_estimate_doc_context`,
+  `calculate_next_doc_version`, `get_or_create_doc_folder`,
+  `create_doc_from_template`, `build_estimate_snapshot`,
+  `append_doc_version_to_estimate`, `prepare_doc_template`,
+  `trash_doc_version`, `remove_doc_version_from_estimate`,
+  `find_doc_version`, `require_drive_service`) that turn the
+  130-line `generate_google_doc` and 65-line `delete_docs_version`
+  route handlers into thin REST wrappers (259 lines).
 
-Remaining major extraction targets (see followup doc body for fix
-sketch):
-- Job-item builder functions `build_full_job_items_from_request`,
-  `build_skeleton_job_items`, `build_job_items_from_parsed`
-  (~370 lines)
-- AI-generation pipeline `generate_estimate_from_ai`,
-  `prepare_generated_estimate`, `save_generated_estimate`,
-  fallback helpers (~265 lines)
-- Drive / version / GenerateDoc routes (~250 lines)
+Test patches updated to follow the new call sites: six
+`monkeypatch.setattr(estimates_router, "get_estimate_agent", ...)`
+and `(estimates_router, "get_google_drive_service", ...)` calls
+across `test_estimate_api.py`, `test_estimate_docs_api.py`, and
+`test_estimate_quota.py` were redirected to
+`routers.estimate_helpers.ai_generation` / `…doc_versions`
+respectively, since the helpers themselves now own the call.
 
-Original notes:
-
-The Estimates REST API surface plus several Drive / version /
-GenerateDoc helpers. The version-bump and Drive-doc paths in
-particular are 100+ line functions that could move to a sibling
-`estimates_doc_versions.py` helper.
-
-Fix: extract the Drive-version + GenerateDoc helpers to a sibling
-helper module. The handler routes themselves are mostly thin REST
-wrappers and stay in the router.
+File size: 2,572 → 2,254 → 1,961 → 1,595 → 1,249 → **1,110** lines
+(-1,462 total). 138 platform tests pass across estimate API /
+snapshot / quota / docs / versioning / job-item / agent-helpers
+suites.
 
 ### 240. `platform/agents/property/service.py` is **2,386 lines**
 **File**: [platform/agents/property/service.py](../../platform/agents/property/service.py)
