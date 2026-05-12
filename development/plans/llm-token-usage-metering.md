@@ -122,7 +122,7 @@ Add `included_tokens` and `token_overage_lookup_key` fields to `PlanSpec`:
 
 | Plan | Included tokens | Overage rate |
 |---|---|---|
-| `plan_free` | 250,000 | $0.05 / 1k |
+| `plan_free` | 500,000 | $0.05 / 1k |
 | `plan_base` | 10,000,000 | $0.05 / 1k |
 | `plan_pro` | 10,000,000 | $0.05 / 1k |
 
