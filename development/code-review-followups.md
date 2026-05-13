@@ -4430,6 +4430,37 @@ being inside `wrapperRef`, mirroring the focus-tracking logic for
 the editor surface — safer for any future consumer that doesn't
 dedupe.
 
+## MEDIUM
+
+### 267. Mobile-vs-desktop breakpoint hardcoded inside MapleMarkdown click handler
+`portal/src/components/Layout/MapleMarkdown.tsx:75-82` — the new
+"close Maple panel after internal link click on mobile" behavior
+reads `window.matchMedia("(max-width: 1023px)")` inline. The 1023px
+threshold is silently coupled to the `lg:hidden` Tailwind class on
+the mobile aside in `PortalLayout.tsx:1240`; if Tailwind's `lg`
+breakpoint or the aside's class ever changes, the two will drift
+apart with no compile-time signal. Fix: extract a shared
+`useIsMobile()` hook (or read the breakpoint from a single
+constant) and use it in both places.
+
+## LOW
+
+### 268. `<AiPanelProvider>` top-level wrap not re-indented in PortalLayout
+`portal/src/components/Layout/PortalLayout.tsx:966` and `:1925` —
+when `AiPanelProvider` was hoisted to wrap the whole layout return,
+the inner `<div className="flex h-screen …">` was left at the same
+indentation as the new provider tag. Functionally fine, just
+inconsistent. Fix: Prettier pass over the file.
+
+### 269. `React.ReactNode` referenced without explicit React import in MapleMarkdown.test.tsx
+`portal/tests/MapleMarkdown.test.tsx:13` — `renderInRouter` types
+its `node` param as `React.ReactNode` but the file doesn't
+`import React` or `import type { ReactNode } from "react"`. Resolves
+today via the global `React` namespace from `@types/react`, but
+breaks if the project ever tightens `tsconfig.compilerOptions.types`
+or removes the global declaration. Fix: `import type { ReactNode }
+from "react"` and reference `ReactNode` directly.
+
 ---
 
 ## How to work through this
