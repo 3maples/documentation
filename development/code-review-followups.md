@@ -4320,6 +4320,49 @@ already a well-known UI pattern, so lower priority.
 
 ---
 
+## 2026-05-12 `/code-review` pass (estimate duplicate menu + Approved→Sent swap)
+
+The two HIGHs from this pass were fixed in-PR
+(`duplicate_estimate` quota rollback + PortalLayout refusal-sentence
+restructure). MEDIUMs and LOW captured here.
+
+### 259. Migration script uses Beanie field descriptors as `.set()` keys
+`platform/scripts/db/migrate_approved_to_sent.py:60` calls
+`estimate.set({Estimate.status: ..., Estimate.updated_at: ...})`. The
+rest of `routers/estimates.py` (3 call sites at 910, 993, 1071) uses
+string keys: `estimate.set({"status": ..., "updated_at": ...})`. Beanie
+tolerates both forms but the inconsistency is surprising. Low-effort
+fix — swap the keys to string literals to match the codebase.
+
+### 260. `routers/estimates.py` over the 800-line soft cap (1294 lines)
+Pre-existing under the file-size theme
+([#4](#4-file-and-function-size) and
+[#239](#239-platformroutersestimatespy-is-2572-lines--resolved-2026-05-11)).
+The Approved→Sent swap + new `duplicate_estimate` endpoint added ~95
+lines on top of an already-large file. Candidate extraction:
+`duplicate_estimate` could move into
+`routers/estimate_helpers/duplication.py` alongside the existing helper
+modules (`snapshots.py`, `job_item_builders.py`, etc.). The quota-claim
++ release pattern is the same as `create_estimate`, so a small shared
+helper would also DRY both paths.
+
+### 261. Session-stored estimate filter can be the now-removed "Approved" value (LOW)
+`portal/src/pages/EstimatesPage.tsx:96` —
+`sessionStorage.getItem("estimatesStatusFilter") ?? "Draft"` is read
+verbatim. Users who had `Approved` selected before the swap will see
+the `<select>` render an orphan value (not in `statusOptions`), which
+shows as a blank option in the dropdown. Defensive coerce:
+
+```tsx
+const saved = sessionStorage.getItem("estimatesStatusFilter");
+return saved && statusOptions.includes(saved) ? saved : "Draft";
+```
+
+Self-heals within a few days as users click a real option and overwrite
+the stale value, so LOW priority.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
