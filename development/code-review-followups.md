@@ -4361,6 +4361,21 @@ return saved && statusOptions.includes(saved) ? saved : "Draft";
 Self-heals within a few days as users click a real option and overwrite
 the stale value, so LOW priority.
 
+## 2026-05-12 /code-review pass (Dashboard pipeline histogram)
+
+Frontend-only change: recurring totals now flow into the division chart,
+Pipeline Status switched to a vertical histogram, status colors
+recolored across the app. Three MEDIUMs and the `<$1k` LOW were fixed
+in-PR. One LOW remains.
+
+### 262. `Math.max(heightPct, 4)` uses an unnamed minimum bar floor (LOW)
+`portal/src/pages/DashboardPage.tsx:367` — the `4` is the minimum
+bar-height percentage so a non-zero count is always visible above the
+2px empty-state line. Pull to a named constant
+(`MIN_BAR_HEIGHT_PCT = 4`) at the top of the file, or co-locate with
+`buildPipelineStatusRollup` if more dashboard chart code lands here.
+Pure nit — no behavior change.
+
 ---
 
 ## How to work through this
