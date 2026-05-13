@@ -4376,6 +4376,60 @@ bar-height percentage so a non-zero count is always visible above the
 `buildPipelineStatusRollup` if more dashboard chart code lands here.
 Pure nit — no behavior change.
 
+## 2026-05-12 `/code-review` pass (markdown description editor)
+
+Frontend-only change: replaced the textarea on the estimate description
+and the work item description with a WYSIWYG markdown editor
+(`@mdxeditor/editor`). Two MEDIUMs fixed in-PR (dead `prose` classes
+stripped from `MarkdownDescriptionEditor.tsx`; `npm audit fix` reduced
+vulnerabilities from 15 (1 critical / 4 high / 10 moderate) to 5
+moderate, all in dev-only `vite` / `vitest` / `esbuild` chains that
+require a semver-major upgrade — tracked as #263 below). Three LOWs
+remain.
+
+### 263. Remaining `vite` / `vitest` / `esbuild` advisories require a semver-major bump (LOW)
+`portal/package.json` — 5 moderate-severity advisories left after
+`npm audit fix`: vite path-traversal in optimized-deps `.map` handling,
+vite `server.fs` HTML-bypass, `@vitest/mocker`, `vite-node`, `vitest`.
+All dev-only (test runner / dev server), all require the semver-major
+fix path (`vite` 4.5 → 8.x, `vitest` 2.1 → 4.x). Bundle this with a
+broader tooling refresh — don't tack it onto a feature branch, since
+the Vite 8 / Vitest 4 migrations may surface config and plugin changes
+across the portal.
+
+### 264. Description label not programmatically associated with the editor (LOW)
+`portal/src/pages/NewEstimateWithActivityPage.tsx:1036` and
+`portal/src/components/estimates/WorkItemInlineContent.tsx:371` — the
+"Description" label renders as a plain `<span>` / `<h3>` with no `id`
+referenced by the editor's accessible name. Screen readers don't
+announce "Description" when the contenteditable receives focus.
+Matches the pre-mdxeditor textarea (also unlabeled), so it's a
+continuation, not a regression. Fix: add `id="..."` to the heading
+and pass `aria-labelledby="..."` through `MarkdownDescriptionEditor`
+to the underlying `MDXEditor` (props pass-through prop, or accept it
+on the wrapper).
+
+### 265. Generic `data-toolbar-visible` attribute could collide (LOW)
+`portal/src/styles/index.css:6` and
+`portal/src/components/common/MarkdownDescriptionEditor.tsx:124` —
+the CSS rule keys off a non-namespaced `data-toolbar-visible`
+attribute. Low collision risk today, but the name is generic enough
+that another component could reuse it. Rename to
+`data-mdx-toolbar-visible` in both the CSS rule and the wrapper so
+the contract is explicit.
+
+### 266. `onBlur` prop fires on every contenteditable blur, not just true wrapper-exit (LOW)
+`portal/src/components/common/MarkdownDescriptionEditor.tsx:132` —
+mdxeditor's `onBlur` is forwarded raw, so the parent's `onBlur` runs
+whenever focus leaves the contenteditable (e.g. when the user clicks
+a toolbar button, even though they're still editing). The estimate
+page dedupes via `lastSavedDescriptionRef`, so this is harmless in
+practice. Fix: gate the forwarded `onBlur` on `relatedTarget` not
+being inside `wrapperRef`, mirroring the focus-tracking logic for
+`handleBlurCapture`. Then `onBlur` only fires when focus truly leaves
+the editor surface — safer for any future consumer that doesn't
+dedupe.
+
 ---
 
 ## How to work through this
