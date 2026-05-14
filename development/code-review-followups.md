@@ -12,7 +12,7 @@ touching the affected area. Items are ordered by impact within each severity.
 
 ## HIGH
 
-### 3. mypy baseline — themed gaps (271 errors across 38 files)
+### 3. [HIGH] mypy baseline — themed gaps (271 errors across 38 files)
 Generated 2026-04-26 via `mypy . --ignore-missing-imports --explicit-package-bases`
 after fixing the 7 implicit-Optional `http_request: Request = None` router
 sites (the only mechanically safe category — `Optional[Request]` breaks
@@ -30,7 +30,7 @@ LangChain/Beanie type erasure. The right next move is one of:
 
 Categories below are sorted by error count.
 
-### 4. File and function size
+### 4. [HIGH] File and function size
 Files over the 800-line HIGH threshold (line counts refreshed 2026-04-26):
 - `routers/agents.py` — 2631 lines (was 2917 before 2026-04-26).
   Orchestrate/estimate endpoints are ~300 lines each. Recent extractions
@@ -75,7 +75,7 @@ Files over the 800-line HIGH threshold (line counts refreshed 2026-04-26):
 No function in this repo should exceed 50 lines. Grep for long bodies with
 a line-count tool after each refactor pass.
 
-### 7. Missing tests for new public functions
+### 7. [HIGH] Missing tests for new public functions
 Per `CLAUDE.md` mandatory-testing rule. To identify gaps: for each new public
 function added in the last N commits, verify there's a corresponding
 `tests/test_<module>.py::test_<fn>`. A `coverage report` run against
@@ -88,25 +88,25 @@ function added in the last N commits, verify there's a corresponding
 Cosmetic / hygiene. Safe to batch into a single "chore: code hygiene" PR, or
 clean up opportunistically when editing a file.
 
-### 8. `print()` → `logging`
+### 8. [MEDIUM] `print()` → `logging`
 Any `print()` left in `services/`, `routers/`, `agents/`, or `models/`. Keep
 `print()` in `scripts/` (operator-facing CLIs) — that's appropriate there.
 
-### 9. Magic numbers → named constants
+### 9. [MEDIUM] Magic numbers → named constants
 Examples found: timeout values, quota limits, retry counts, score thresholds.
 Give each a module-level constant with a short comment explaining its source.
 
-### 10. Missing docstrings on public APIs
+### 10. [MEDIUM] Missing docstrings on public APIs
 Focus only on functions exported across package boundaries. Don't docstring
 private helpers — named variables beat comments.
 
-### 11. TODO / FIXME triage
+### 11. [MEDIUM] TODO / FIXME triage
 Grep for `TODO` and `FIXME` added in recent changes. Each should either:
 - be resolved, or
 - be converted into a GitHub issue with a link back to the code.
 Comments that just say "TODO" with no owner / date / issue will rot.
 
-### 13. Mutation where immutable return would be clearer
+### 13. [MEDIUM] Mutation where immutable return would be clearer
 Case-by-case judgment. Only refactor if it actually simplifies the reader's
 job; don't chase stylistic purity.
 
@@ -119,7 +119,7 @@ MEDIUM and LOW findings from the `/code-review` pass after the tax / division
 ("last work item" inconsistency) was fixed in the same session; these are
 the residuals.
 
-### 14. Unused `ESTIMATE_GENERATION_PROMPT` import
+### 14. [MEDIUM] Unused `ESTIMATE_GENERATION_PROMPT` import
 **File**: `agents/estimate/service.py:15`
 **Severity**: MEDIUM (hygiene)
 
@@ -130,7 +130,7 @@ why prompt edits weren't taking effect.
 
 Fix: drop the import.
 
-### 15. Split Example block may anchor LLM back to terse descriptions
+### 15. [MEDIUM] Split Example block may anchor LLM back to terse descriptions
 **File**: `prompts/estimate_generation.py`, ~lines 99-109
 **Severity**: MEDIUM (prompt quality)
 
@@ -145,7 +145,7 @@ Fix: rewrite each Split Example entry to the richer 4d shape, e.g.
 with edge restraints and polymeric sand joints`. Low effort, likely
 meaningful impact on what Maple actually emits.
 
-### 16. Delete-button propagation on touch devices
+### 16. [LOW] Delete-button propagation on touch devices
 **File**: `portal/src/pages/NewEstimateWithActivityPage.tsx` (trash button
 per work item row)
 **Severity**: LOW (needs manual verification)
@@ -159,7 +159,7 @@ Fix (if the test shows leakage): add
 `onPointerDown={(e) => e.stopPropagation()}` alongside the existing
 `onClick` on the trash button.
 
-### 17. Architect prompt rule 5 still mentions "quantities" ambiguously
+### 17. [LOW] Architect prompt rule 5 still mentions "quantities" ambiguously
 **File**: `prompts/estimate_architect.py`, rule 5
 **Severity**: LOW (prompt quality)
 
@@ -172,7 +172,7 @@ Fix: tighten to "DO NOT include prices, labour rates, inventory IDs, or
 **purchase quantities** (how many to buy). Scope-describing sizes,
 dimensions, coverage area, linear feet, and spacing ARE allowed."
 
-### 18. File-size threshold — `agents/estimate/service.py` now at 5,098 lines
+### 18. [MEDIUM] File-size threshold — `agents/estimate/service.py` now at 5,098 lines
 **Severity**: MEDIUM (architectural drift)
 
 Entry #4 above already flags the HIGH-threshold files. Updating the
@@ -189,7 +189,7 @@ HIGH tenant-leak (`_resolve_latest_estimate` unscoped fallback) and the
 notes-overwrite safety finding were fixed in the same session. Residuals
 below were deferred per reviewer direction.
 
-### 20. Narrow `except Exception` around `PydanticObjectId(company_id)` cast in `_resolve_latest_estimate`
+### 20. [MEDIUM] Narrow `except Exception` around `PydanticObjectId(company_id)` cast in `_resolve_latest_estimate`
 **File**: `agents/estimate/service.py` — the first of two `except Exception`
 clauses in `_resolve_latest_estimate` (around line 3266 post-fix).
 **Severity**: MEDIUM (hygiene, matches entry #0 of the original batch)
@@ -208,7 +208,7 @@ or apply the same `except (InvalidId, TypeError)` narrowing inline.
 Keep the second broad-except (around line 3277 post-fix) — it logs via
 `logger.exception` so a surprise failure is still observable.
 
-### 21. Module-scope vs. method-scope inconsistency for note/work-item helpers
+### 21. [MEDIUM] Module-scope vs. method-scope inconsistency for note/work-item helpers
 **File**: `agents/estimate/service.py`
 **Severity**: MEDIUM (style)
 
@@ -221,7 +221,7 @@ Fix: promote the two module-level helpers to methods, or demote the three
 instance methods to module functions and thread any needed state through.
 Low effort; no behavior change.
 
-### 22. "Last estimate" with zero estimates falls back to generic "Which estimate?"
+### 22. [LOW] "Last estimate" with zero estimates falls back to generic "Which estimate?"
 **File**: `agents/estimate/service.py` — the `_handle_get_estimate` branch
 that falls through when `_resolve_latest_estimate` returns `None`.
 **Severity**: LOW (UX polish)
@@ -235,7 +235,7 @@ Fix: detect the latest-estimate intent (via `_looks_like_latest_estimate_query`)
 before the generic clarification and respond with "You don't have any
 estimates yet."
 
-### 23. `_NOTE_WITH_IMPLICIT_TAIL` can false-positive on descriptive phrasings
+### 23. [LOW] `_NOTE_WITH_IMPLICIT_TAIL` can false-positive on descriptive phrasings
 **File**: `agents/estimate/service.py` — the `_NOTE_WITH_IMPLICIT_TAIL`
 regex inside `_detect_note_update`.
 **Severity**: LOW (edge-case UX)
@@ -259,7 +259,7 @@ looks descriptive.
 Eight warnings raised by an external pass; each verified against current
 source before filing. One was a hallucination and is noted under Deferred.
 
-### 25. Regex email lookup in `_resolve_user()`
+### 25. [MEDIUM] Regex email lookup in `_resolve_user()`
 **File**: `dependencies.py:17-26`
 **Severity**: MEDIUM
 
@@ -276,7 +276,7 @@ on write (override `__init__` / validator so any create or update lowercases
 the field). (c) Replace the regex with `User.find_one(User.email == email)`.
 Don't do (c) before (a) — a stray capitalized row would silently fail auth.
 
-### 26. `find_contacts_by_name` fetches whole company, filters in Python
+### 26. [MEDIUM] `find_contacts_by_name` fetches whole company, filters in Python
 **File**: `agents/contact/utils.py:158-170`
 **Severity**: MEDIUM
 
@@ -291,7 +291,7 @@ collation index on `first_name` / `last_name` with an equality query. If
 fuzzy matching is required, keep the Python filter but pre-narrow with a
 Mongo text-ish prefix filter so the in-memory set is small.
 
-### 27. Inefficient merge pattern in bulk work-item endpoint
+### 27. [LOW] Inefficient merge pattern in bulk work-item endpoint
 **File**: `routers/agents.py:1621-1632`
 **Severity**: LOW (code clarity)
 
@@ -308,7 +308,7 @@ is wanted) or drop the call entirely and just build items from
 `new_job_items_raw` via `build_job_items_from_parsed`. Works fine today; the
 concern is that the next reader will assume reconciliation is happening.
 
-### 28. Unbounded `ChangeLogEntry.find_all()`
+### 28. [LOW] Unbounded `ChangeLogEntry.find_all()`
 **File**: `routers/change_logs.py:23-26`
 **Severity**: LOW
 
@@ -319,7 +319,7 @@ bite rather than an active problem.
 Fix: add `.limit(100)` and accept an optional `?limit=` / `?offset=` query
 param. Cheap to do; reviewer should have filed as LOW, not WARNING.
 
-### 29. `update_estimate` recalculates totals on any `job_items`-present edit
+### 29. [LOW] `update_estimate` recalculates totals on any `job_items`-present edit
 **File**: `routers/estimates.py:1868-2016`
 **Severity**: LOW (likely won't fix)
 
@@ -333,7 +333,7 @@ gating recalculation on change-detection would risk stale totals if the
 change-detector missed a case. Leave alone unless profiling shows latency.
 Filed so we don't re-litigate.
 
-### 30. `[A-Z]{2}` with `re.IGNORECASE` for state-code parsing
+### 30. [LOW] `[A-Z]{2}` with `re.IGNORECASE` for state-code parsing
 **File**: `agents/property/service.py:520` (regex) and `:527` (flag)
 **Severity**: LOW (nit)
 
@@ -355,7 +355,7 @@ Follow-ups from the `/code-review` pass on the #24 fix (bulk-fetch in CSV
 upload handlers). The fix itself is good — these are residuals that didn't
 warrant blocking the commit.
 
-### 31. Intra-CSV duplicate rows now upsert silently instead of erroring
+### 31. [MEDIUM] Intra-CSV duplicate rows now upsert silently instead of erroring
 **Files**: `routers/equipments.py:148-170`, `routers/labours.py:204-229`
 **Severity**: MEDIUM
 
@@ -373,7 +373,7 @@ behavior; (ii) or revert to the pre-fix error behavior by omitting the
 (i), consider splitting the response into `created` vs `updated` lists so
 the caller can see what actually happened (materials.py already does this).
 
-### 32. `hasattr(l.unit, "value")` defensive check with unclear motivation
+### 32. [MEDIUM] `hasattr(l.unit, "value")` defensive check with unclear motivation
 **File**: `routers/labours.py:202`
 **Severity**: MEDIUM
 
@@ -387,7 +387,7 @@ Fix: grep production data once to check whether any `Labour` rows have
 `unit` stored as a raw string. If none, simplify to `l.unit.value`. If
 some, add a one-line comment and file a data-migration task.
 
-### 33. `$in` × `$in` bulk-fetch over-fetches the cross-product
+### 33. [MEDIUM] `$in` × `$in` bulk-fetch over-fetches the cross-product
 **Files**: `routers/equipments.py:138-144`, `routers/labours.py:195-201`
 **Severity**: MEDIUM (theoretical) / LOW (in practice)
 
@@ -402,7 +402,7 @@ Fix (when it bites): switch to `{"$or": [{"name": n, "unit": u} for ...]}`
 — exact tuples, no bloat. Not worth doing until we see a CSV where this
 matters.
 
-### 34. Missing type hint on `existing_by_key` dict
+### 34. [LOW] Missing type hint on `existing_by_key` dict
 **Files**: `routers/equipments.py:136`, `routers/labours.py:193`
 **Severity**: LOW
 
@@ -413,7 +413,7 @@ same commit.
 Fix: `existing_by_key: Dict[Tuple[str, str], Equipment] = {}` (and
 similarly for Labour). Import `Dict, Tuple` from typing.
 
-### 35. `names` list in materials bulk-fetch may contain casing duplicates
+### 35. [LOW] `names` list in materials bulk-fetch may contain casing duplicates
 **File**: `routers/materials.py:295`
 **Severity**: LOW
 
@@ -434,7 +434,7 @@ Contact N+1 batching). Same-session fixes: silent-swallow logging on
 `_fetch_linked_contacts`, and a test-assertion shape cleanup on the new
 batched-find test. Residuals below were deferred.
 
-### 36. No unit test for the N+1 batch fix in `generate_google_doc`
+### 36. [MEDIUM] No unit test for the N+1 batch fix in `generate_google_doc`
 **File**: `routers/estimates.py:2368`
 **Severity**: MEDIUM
 
@@ -451,7 +451,7 @@ called; or (b) extract the contact-fetch out of the route into a helper
 in `services/` and test the helper directly. Option (b) has the side
 benefit of letting the same helper back the Maple-side path.
 
-### 37. ~~`_handle_get_estimate` falls through to an unscoped `Estimate.find_one` when `company_id` is invalid~~ — RESOLVED 2026-05-07
+### 37. [LOW] ~~`_handle_get_estimate` falls through to an unscoped `Estimate.find_one` when `company_id` is invalid~~ — RESOLVED 2026-05-07
 
 Fixed in commit `dfb8184` (2026-05-07). `_handle_get_estimate` now coerces
 `company_id` to `company_oid` immediately after the latest-estimate
@@ -490,7 +490,7 @@ Residuals from the `/code-review` pass on the #2 fix (per-company Maps
 rate limiting + auth dep on the addresses router). The docstring MEDIUM
 was fixed in the same session; these are what's left.
 
-### 39. `_RATE_LIMIT_DETAIL` constant is misplaced in `address_service.py`
+### 39. [LOW] `_RATE_LIMIT_DETAIL` constant is misplaced in `address_service.py`
 **File**: `services/address_service.py:15`
 **Severity**: LOW (code layout)
 
@@ -513,7 +513,7 @@ two items below are the residual MEDIUM findings. LOW finding
 ("`_handle_get_estimate` unscoped fallback") duplicates entry #37 and
 is not re-filed.
 
-### 40. ~~`portal/firebase.json` has no security-header config~~ — RESOLVED 2026-05-07
+### 40. [MEDIUM] ~~`portal/firebase.json` has no security-header config~~ — RESOLVED 2026-05-07
 
 Landed in commit `692069f` ("chore: add HSTS and clickjacking headers to
 firebase hosting config"). `portal/firebase.json` now ships all four
@@ -545,7 +545,7 @@ Firebase Auth domains), `img-src` (user-uploaded assets, Firebase
 Storage if used), and `style-src`. Ship the four simple headers first;
 tackle CSP as its own change once the allow-lists are stable.
 
-### 41. ~~`except Exception` around httpx calls in `address_service.py` could mask future `HTTPException`~~ — RESOLVED 2026-05-07
+### 41. [MEDIUM] ~~`except Exception` around httpx calls in `address_service.py` could mask future `HTTPException`~~ — RESOLVED 2026-05-07
 
 Narrowed to `except (httpx.HTTPError, httpx.TimeoutException):` in
 `autocomplete`, `resolve_place_id`, and `normalize_address_parts`. Added
@@ -582,7 +582,7 @@ MEDIUM and LOW residuals from the `/code-review` pass on the layout +
 status-state-machine work. No CRITICAL or HIGH findings. Recommendation
 was "Warning — safe to commit" — items below are quality-of-life.
 
-### 42. ~~No unit test for the `handleStatusChange` dispatcher~~ — RESOLVED 2026-05-07
+### 42. [MEDIUM] ~~No unit test for the `handleStatusChange` dispatcher~~ — RESOLVED 2026-05-07
 
 Extracted `resolveStatusChangeApi(currentStatus, target, { approvedBy })`
 as a pure helper alongside `getAllowedTransitions` in
@@ -610,7 +610,7 @@ target): { kind: "archive" | "unarchive" | "update", payload?: { status?:
 string; approved_by?: string } }` — and unit-test it. The page handler
 becomes a thin switch on `kind`. Cheap.
 
-### 43. Trash-icon-only buttons have no accessible name
+### 43. [MEDIUM] Trash-icon-only buttons have no accessible name
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) — Preview version-row delete (~line 1017) and work-item row delete (~line 1147)
 **Severity**: MEDIUM (a11y)
 
@@ -626,7 +626,7 @@ Fix: add `aria-label={`Delete version ${v.version}`}` (or equivalent
 row-specific label) on every icon-only trash button. Sweep-style PR;
 grep for `<Trash2 ` and audit each site.
 
-### 44. `(err as Error).message` fallback in catch blocks can render `undefined`
+### 44. [MEDIUM] `(err as Error).message` fallback in catch blocks can render `undefined`
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) — three catch blocks: `handleDelete` (~L427), `handleStatusChange` (~L458), `handleGenerateGoogleDoc` (~L481)
 **Severity**: MEDIUM
 
@@ -641,7 +641,7 @@ Fix: unify to `setFormError(err instanceof Error ? err.message :
 "Failed to update status")` (pick appropriate fallback copy per handler).
 One-line change per catch.
 
-### 45. `.gitignore` widened from filename to directory without comment
+### 45. [LOW] `.gitignore` widened from filename to directory without comment
 **File**: [platform/.gitignore](../../platform/.gitignore):145
 **Severity**: LOW
 
@@ -654,7 +654,7 @@ Fix: add a one-line comment above the `secrets/` entry — e.g.
 `# local secrets directory (service-account keys, tokens, etc.)` — so
 the next reader understands the broadening.
 
-### 46. ~~State machine is frontend-only (by design, re-filed for visibility)~~ — RESOLVED 2026-05-09
+### 46. [LOW] ~~State machine is frontend-only (by design, re-filed for visibility)~~ — RESOLVED 2026-05-09
 
 Backend now mirrors `portal/src/lib/estimateStatus.ts:TRANSITIONS_BY_STATUS`.
 Added `ESTIMATE_STATUS_TRANSITIONS` map + `validate_estimate_status_transition(current, target)`
@@ -704,7 +704,7 @@ original plan's catalog-backed Phase 2a-proper would largely retire.
 
 Plan: [plans/fix-maple-verbless-gap.md](plans/fix-maple-verbless-gap.md).
 
-### 48. ~~`_LABOUR_ROLE_TOKENS` drifts from `DOMAIN_HINTS["labour"]`~~ — RESOLVED 2026-05-07
+### 48. [MEDIUM] ~~`_LABOUR_ROLE_TOKENS` drifts from `DOMAIN_HINTS["labour"]`~~ — RESOLVED 2026-05-07
 
 Added `LABOUR_ROLE_HINTS: Tuple[str, ...]` export to
 `agents/orchestrator/intents.py` as the single source of truth for the
@@ -729,7 +729,7 @@ Fix: split `DOMAIN_HINTS["labour"]` in `intents.py` into
 list, and re-use it in `service.py`. Cleaner than the alternative of
 filtering generic keywords out of the combined list at import time.
 
-### 49. `_ADDRESS_PATTERN` can false-match "N <word>+ way/court"
+### 49. [MEDIUM] `_ADDRESS_PATTERN` can false-match "N <word>+ way/court"
 **File**: [agents/orchestrator/service.py:65](../../platform/agents/orchestrator/service.py)
 **Severity**: MEDIUM
 
@@ -745,7 +745,7 @@ action-phrase prefix via `_bare_entity_residual`. Catalog-backed
 lookup (per the plan's deferred Phase 2a-proper) would retire the
 concern entirely.
 
-### 50. ~~Duplicate stopword lists in the orchestrator~~ — RESOLVED 2026-05-07
+### 50. [MEDIUM] ~~Duplicate stopword lists in the orchestrator~~ — RESOLVED 2026-05-07
 
 Extracted `_COMMON_FILLER_STOPWORDS` frozenset (19 entries — the
 greeting/pronoun/acknowledgement fillers shared by both heuristics).
@@ -767,7 +767,7 @@ in sync when adding a new filler.
 Fix: extract `_COMMON_FILLER_STOPWORDS` frozenset; union with
 domain-specific additions for each downstream use.
 
-### 51. No direct unit tests for the new bare-entity helpers
+### 51. [MEDIUM] No direct unit tests for the new bare-entity helpers
 **File**: [agents/orchestrator/service.py:372, :395, :404](../../platform/agents/orchestrator/service.py)
 **Severity**: MEDIUM (TDD policy)
 
@@ -781,7 +781,7 @@ CLAUDE.md's TDD rule applies to new `.py` behaviour.
 Fix: add `tests/test_orchestrator_bare_entity_helpers.py` with ~10
 parametrized cases per helper — edge cases plus golden paths.
 
-### 52. Inline comments instead of docstrings on new helpers
+### 52. [LOW] Inline comments instead of docstrings on new helpers
 **File**: [agents/orchestrator/service.py:395, :404](../../platform/agents/orchestrator/service.py)
 **Severity**: LOW (style)
 
@@ -792,7 +792,7 @@ Project leans toward docstrings on methods (see `_format_chat_history`,
 Fix: convert the prose comments to proper docstrings. Do when next
 touching the file.
 
-### 53. `_CONFIRMED_WORKING_CASE_IDS` has no entry-validation
+### 53. [LOW] `_CONFIRMED_WORKING_CASE_IDS` has no entry-validation
 **File**: [tests/_maple_coverage_data.py](../../platform/tests/_maple_coverage_data.py)
 **Severity**: LOW
 
@@ -805,7 +805,7 @@ Fix: at module load, assert that every entry in
 `_CONFIRMED_WORKING_CASE_IDS` corresponds to a real `case_id` in the
 matrix; raise `ValueError` on mismatch. ~5 lines.
 
-### 54. ~~Tier 1 gap: `set <name>'s <field> to <value>` pattern~~ — RESOLVED 2026-05-07
+### 54. [LOW] ~~Tier 1 gap: `set <name>'s <field> to <value>` pattern~~ — RESOLVED 2026-05-07
 
 Closed without changing `ACTION_HINTS["update"]`. The dedicated
 `SET_POSSESSIVE_UPDATE_PATTERN` regex (`agents/text_utils.py:467`) and
@@ -820,7 +820,7 @@ was rejected: the matcher uses `text.find()` substring scan, so `"set "`
 false-positives on tokens like `asset `, `subset `, and `sunset `,
 which would mis-route benign phrasings to update.
 
-### 55. Tier 2 gap: implicit-relationship cross-resource phrasings
+### 55. [MEDIUM] Tier 2 gap: implicit-relationship cross-resource phrasings
 **Files**: LLM system prompt in
 [agents/orchestrator/service.py:~674](../../platform/agents/orchestrator/service.py) (and entity-knowledge graph if extended)
 **Severity**: MEDIUM (Tier 2 coverage 4/12)
@@ -839,7 +839,7 @@ orchestrator would need to resolve the referenced entity first, then
 infer the target resource based on the relationship verb — that's a
 larger design change.
 
-### 56. Tier 1 gap: `what's <name>'s <field>?` contraction not handled
+### 56. [LOW] Tier 1 gap: `what's <name>'s <field>?` contraction not handled
 **File**: [agents/orchestrator/intents.py:131-150](../../platform/agents/orchestrator/intents.py) (`ACTION_HINTS["get"]`)
 **Severity**: LOW
 
@@ -866,7 +866,7 @@ polish, Maple list-formatting helper, and Maple-panel footer nav work.
 HIGH items in that review were fixed in-session; these are the MEDIUM /
 LOW items the user chose not to land right now.
 
-### 57. Stale closure of `estimate` in `handleGenerateGoogleDoc`
+### 57. [LOW] Stale closure of `estimate` in `handleGenerateGoogleDoc`
 **Severity**: LOW
 In `portal/src/pages/NewEstimateWithActivityPage.tsx`, after
 `await handleSaveEstimate()` resolves, the local `estimate` identifier
@@ -879,7 +879,7 @@ Fix: widen `handleSaveEstimate` to return
 `Promise<EstimateWithExtras | null>` and use the resolved value instead
 of the closure reference.
 
-### 58. `PortalLayout.tsx` over the 800-line HIGH threshold (canonical)
+### 58. [HIGH] `PortalLayout.tsx` over the 800-line HIGH threshold (canonical)
 **Severity**: HIGH (in progress — partial 2026-05-09)
 Canonical entry; #169 and #176 are duplicate flags from later review
 passes — consolidated here on 2026-05-09.
@@ -907,7 +907,7 @@ with a `variant="mobile" | "desktop"` prop since both branches render
 nearly-identical markup. Until component tests exist for PortalLayout,
 each modal extraction needs a manual UI smoke test.
 
-### 59. Drive-filename filename-collision policy still implicit
+### 59. [LOW] Drive-filename filename-collision policy still implicit
 **Severity**: LOW
 The 2026-04-23 fix put the estimate_id back into the Drive filename
 (`Estimate-{estimate_id}-V{n}`), which resolves traceability. However,
@@ -932,7 +932,7 @@ Three warnings raised by an external reviewer; each verified against
 current source before filing. None are active bugs. Filed per user
 request for later triage.
 
-### 60. No unique compound index on Material / Contact
+### 60. [MEDIUM] No unique compound index on Material / Contact
 **Files**: [platform/models/material.py:32](../../platform/models/material.py),
 [platform/models/contact.py:45](../../platform/models/contact.py)
 **Severity**: LOW–MEDIUM (data integrity, not an active bug)
@@ -953,7 +953,7 @@ Contact, no unique index (reviewer was wrong on this one); if
 deduplication is a real concern, surface it in the UI on create/update
 instead.
 
-### 61. Trello httpx client rebuilt per request
+### 61. [LOW] Trello httpx client rebuilt per request
 **File**: [platform/services/trello_service.py:40](../../platform/services/trello_service.py)
 **Severity**: TRIVIAL (don't fix unless path becomes hot)
 
@@ -971,7 +971,7 @@ Fix (if it ever matters): promote to a module-level
 for `await _client.post(...)`. Add a FastAPI lifespan hook to close it
 on shutdown.
 
-### 62. Python-side sort in `get_material_categories` / `get_material_units`
+### 62. [LOW] Python-side sort in `get_material_categories` / `get_material_units`
 **Files**: [platform/routers/material_categories.py:48](../../platform/routers/material_categories.py),
 [platform/routers/material_units.py:49](../../platform/routers/material_units.py)
 **Severity**: LOW (cleanliness, not performance)
@@ -1003,7 +1003,7 @@ hardcoded `EstimateDivision` enum to a per-company configurable list
 (see [`plans/configurable-divisions.md`](plans/configurable-divisions.md)).
 Zero CRITICAL, one HIGH (pre-existing file size), three MEDIUM, three LOW.
 
-### 64. WorkItem divisions fetch swallows errors silently
+### 64. [MEDIUM] WorkItem divisions fetch swallows errors silently
 **File**: [portal/src/components/estimates/WorkItemInlineContent.tsx:73](../../portal/src/components/estimates/WorkItemInlineContent.tsx)
 **Severity**: MEDIUM
 
@@ -1017,7 +1017,7 @@ Fix: log via `console.error` (or a shared error reporter if one exists
 later) before the empty fallback. Apply the same change to the
 rate-cards `.catch` for consistency.
 
-### 65. ~~"Unknown" division is selectable in the Work Item dropdown~~ — RESOLVED 2026-05-07
+### 65. [MEDIUM] ~~"Unknown" division is selectable in the Work Item dropdown~~ — RESOLVED 2026-05-07
 
 Closed in two stages:
 1. Commit `1b75358` ("fix: render Unknown division fallback option as
@@ -1057,7 +1057,7 @@ handler ignore the literal `"Unknown"` value and keep the prior state.
 Add a frontend test that exercises the fallback path with a stale
 division name.
 
-### 66. No unique compound index on Division `(name, company)`
+### 66. [MEDIUM] No unique compound index on Division `(name, company)`
 **Files**: [platform/models/division.py](../../platform/models/division.py),
 [platform/services/division_bootstrap.py](../../platform/services/division_bootstrap.py)
 **Severity**: MEDIUM
@@ -1075,7 +1075,7 @@ unique=True)` to `Division.Settings.indexes` (and to MaterialCategory
 in the same pass). Backfill existing duplicates via a one-off cleanup
 script before applying the index in production.
 
-### 67. `PydanticObjectId(company)` returns 500 on garbage input
+### 67. [LOW] `PydanticObjectId(company)` returns 500 on garbage input
 **File**: [platform/routers/divisions.py:44](../../platform/routers/divisions.py)
 **Severity**: LOW
 
@@ -1087,7 +1087,7 @@ Fix: wrap in try/except → `HTTPException(422, "Invalid company id")`,
 or factor a Pydantic dependency that validates ObjectIds and use it
 across all `?company=` query routers.
 
-### 68. `backfill_divisions.py` uses broad `except Exception`
+### 68. [LOW] `backfill_divisions.py` uses broad `except Exception`
 **File**: [platform/scripts/db/backfill_divisions.py:54](../../platform/scripts/db/backfill_divisions.py)
 **Severity**: LOW (script context, not a service handler)
 
@@ -1097,7 +1097,7 @@ Acceptable for a one-off backfill — flagging only because spec calls
 broad excepts CRITICAL by default. No action expected unless the script
 gets reused for repeated migrations.
 
-### 69. Bootstrap services log nothing on success
+### 69. [LOW] Bootstrap services log nothing on success
 **Files**: [platform/services/division_bootstrap.py](../../platform/services/division_bootstrap.py),
 [platform/services/material_category_bootstrap.py](../../platform/services/material_category_bootstrap.py),
 [platform/services/material_unit_bootstrap.py](../../platform/services/material_unit_bootstrap.py)
@@ -1114,7 +1114,7 @@ templates for company %s", company_id)` from each bootstrap function.
 
 ## 2026-04-25 review (configurable material units session)
 
-### 70. Missing type hints in `backfill_material_units.py` helpers
+### 70. [MEDIUM] Missing type hints in `backfill_material_units.py` helpers
 **File**: [platform/scripts/db/backfill_material_units.py:50, 68](../../platform/scripts/db/backfill_material_units.py)
 **Severity**: MEDIUM (script context, not production code)
 
@@ -1125,7 +1125,7 @@ be more self-documenting as
 `remap_materials_for_unit(company_id: PydanticObjectId, old_unit_id: PydanticObjectId, new_unit_id: PydanticObjectId) -> int`
 and `migrate_company(company: Company) -> dict`.
 
-### 71. Sequential `material.replace()` per remap is slow at scale
+### 71. [MEDIUM] Sequential `material.replace()` per remap is slow at scale
 **File**: [platform/scripts/db/backfill_material_units.py:60](../../platform/scripts/db/backfill_material_units.py)
 **Severity**: MEDIUM (performance, fine for current scale)
 
@@ -1144,7 +1144,7 @@ Material.find_many({"company": company_id, "sizes.unit": old_unit_id}).update_ma
 ```
 Skips the `before_event` hook, so set `updated_at` explicitly.
 
-### 72. `getCategoryName` / `getUnitName` re-allocated each render
+### 72. [LOW] `getCategoryName` / `getUnitName` re-allocated each render
 **File**: [portal/src/pages/MaterialsPage.tsx:183-193](../../portal/src/pages/MaterialsPage.tsx)
 **Severity**: LOW (pre-existing pattern; not introduced by the
 configurable-units change)
@@ -1165,7 +1165,7 @@ unit Literal, dropdown, Effort Calculator column, JSON-fixture seeding, and
 on-signup bootstrap landed. The HIGH finding from that pass (missing
 `aria-label`s on the rate-card row inputs) was fixed in the same session.
 
-### 73. N+1 `find_one` inside bootstrap loops
+### 73. [MEDIUM] N+1 `find_one` inside bootstrap loops
 **File**: [platform/services/rate_card_bootstrap.py:48-54](../../platform/services/rate_card_bootstrap.py)
 **Severity**: MEDIUM
 **Why it's MEDIUM, not HIGH**: matches the existing pattern in
@@ -1187,7 +1187,7 @@ existing_names = {
 Apply consistently across all `*_bootstrap.py` modules in one pass to keep
 them aligned.
 
-### 74. JSON re-parsed on every `bootstrap_company_rate_cards` call
+### 74. [MEDIUM] JSON re-parsed on every `bootstrap_company_rate_cards` call
 **File**: [platform/services/rate_card_bootstrap.py:20](../../platform/services/rate_card_bootstrap.py)
 **Severity**: MEDIUM
 The loader reads + parses `default_rate_cards.json` on every call. Cheap
@@ -1199,7 +1199,7 @@ or assign at module import. Tests already monkey-patch
 `DEFAULT_RATE_CARDS_PATH`, so any cache must be invalidated in those tests
 (via `cache_clear()` in a fixture).
 
-### 75. `CardItem.easy/standard/hard` unbounded
+### 75. [MEDIUM] `CardItem.easy/standard/hard` unbounded
 **File**: [platform/models/rate_card.py:26-28](../../platform/models/rate_card.py)
 **Severity**: MEDIUM
 **Why it's MEDIUM**: pre-existing — predates the unit-Literal change. But
@@ -1214,7 +1214,7 @@ Will require touching test fixtures that pass `0` and updating the frontend
 helper text. Coordinate with whoever owns the Effort Calculator's
 zero-handling so we don't change semantics underneath.
 
-### 76. Backfill swallows per-company exceptions
+### 76. [MEDIUM] Backfill swallows per-company exceptions
 **File**: [documentation/development/migration_scripts/seed_rate_cards_for_existing_companies.py:32](../../documentation/development/migration_scripts/seed_rate_cards_for_existing_companies.py)
 **Severity**: MEDIUM
 The backfill catches every `Exception` per company and prints a one-liner.
@@ -1225,7 +1225,7 @@ Fix: differentiate infrastructure errors (`ServerSelectionTimeoutError`,
 `OperationFailure`) from per-document validation errors and let the former
 propagate. Apply the same shape to other migration scripts in one pass.
 
-### 77. `SEED_COMPANY_ID` is a magic constant tied to live data
+### 77. [MEDIUM] `SEED_COMPANY_ID` is a magic constant tied to live data
 **File**: [documentation/development/migration_scripts/export_default_rate_cards.py:26](../../documentation/development/migration_scripts/export_default_rate_cards.py)
 **Severity**: MEDIUM
 The hard-coded ObjectId is documented in the module docstring but not
@@ -1236,7 +1236,7 @@ Fix: either accept the company id as a CLI arg with no default, or refuse
 to overwrite an existing `default_rate_cards.json` without a `--force`
 flag. Low priority since the script is clearly labeled "one-shot".
 
-### 78. Validation error message doesn't list allowed units
+### 78. [LOW] Validation error message doesn't list allowed units
 **File**: [portal/src/lib/rateCards.ts:28](../../portal/src/lib/rateCards.ts)
 **Severity**: LOW
 `"Item ${i+1}: Unit must be one of the allowed values."` is unactionable
@@ -1248,7 +1248,7 @@ Fix: include the list:
 ` Item ${i + 1}: Unit must be one of: ${RATE_CARD_UNITS.join(", ")}.`
 ```
 
-### 79. `load_default_rate_card_templates` returns loose `list[dict]`
+### 79. [LOW] `load_default_rate_card_templates` returns loose `list[dict]`
 **File**: [platform/services/rate_card_bootstrap.py:13](../../platform/services/rate_card_bootstrap.py)
 **Severity**: LOW
 Returning `list[dict]` loses the schema; callers can't tell what keys
@@ -1273,7 +1273,7 @@ session via the shared `_estimate_load_error_envelope` and
 entry #20. Two MEDIUM (#81, #84) and three LOW (#82, #83, #85) remain
 below.
 
-### 81. ~~`react-hooks/exhaustive-deps` disabled in 3 new settings tab components~~ — RESOLVED 2026-05-07
+### 81. [MEDIUM] ~~`react-hooks/exhaustive-deps` disabled in 3 new settings tab components~~ — RESOLVED 2026-05-07
 
 Wrapped `fetchDivisions` / `fetchUnits` / `fetchCategories` in
 `useCallback(..., [companyId])` and added the callback to the effect's
@@ -1300,7 +1300,7 @@ effect's deps, and drop the eslint-disable comment. ~6 lines per file.
 Mirror the pattern in `portal/src/components/settings/RateCardsTab.tsx`
 (lines 46-61).
 
-### 82. `alert(...)` for save errors in 3 settings tab components
+### 82. [LOW] `alert(...)` for save errors in 3 settings tab components
 **Files**: [portal/src/components/settings/DivisionsTab.tsx](../../portal/src/components/settings/DivisionsTab.tsx) (`handleSaveDivision`),
 [portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx) (`handleSaveUnit`),
 [portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx) (`handleSaveCategory`)
@@ -1315,7 +1315,7 @@ Fix: lift the error into a `formError` state inside the dialog, displayed
 above the action buttons. Consistent with the delete-modal pattern in the
 same files. Theme-adjacent to entry #44.
 
-### 83. Inconsistent ID extraction across settings tab components
+### 83. [LOW] Inconsistent ID extraction across settings tab components
 **Files**: [portal/src/components/settings/DivisionsTab.tsx](../../portal/src/components/settings/DivisionsTab.tsx),
 [portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx),
 [portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx)
@@ -1331,7 +1331,7 @@ during the 2026-04-26 #63 extraction — pre-existing, not introduced.
 Fix: switch to `extractEntityId(...)` for consistency with `RateCardsTab`.
 ~6 call sites across the three files.
 
-### 84. `_coerce_company_oid` returns `Optional[Any]` to keep lazy beanie import
+### 84. [MEDIUM] `_coerce_company_oid` returns `Optional[Any]` to keep lazy beanie import
 **File**: [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) — `_coerce_company_oid` (added 2026-04-26)
 **Severity**: MEDIUM (style / future-proofing)
 
@@ -1354,7 +1354,7 @@ Fix: when entry #3 (mypy baseline) lands, promote
 removed at the same time. Don't fix in isolation — bundle with the mypy
 work since it's the easiest place to verify nothing breaks.
 
-### 85. No direct unit tests for `_estimate_load_error_envelope` and `_coerce_company_oid`
+### 85. [LOW] No direct unit tests for `_estimate_load_error_envelope` and `_coerce_company_oid`
 **File**: [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) — both helpers added 2026-04-26 in the #80 refactor
 **Severity**: LOW (TDD policy, private helpers)
 
@@ -1380,7 +1380,7 @@ near-pure.
 The themed split of the 271-error mypy baseline. See entry #3 for the run
 command and the rationale for not gating CI yet.
 
-### 86. `union-attr` on `dict.get(...)` chains (92 errors)
+### 86. [MEDIUM] `union-attr` on `dict.get(...)` chains (92 errors)
 **Files**: `agents/property/service.py`, `agents/contact/service.py`,
 `agents/material/service.py`, `agents/labour/service.py`,
 `agents/equipment/service.py` — typically `context.get("...")` followed by
@@ -1399,7 +1399,7 @@ Fix (per-agent): early in each `process()`, normalize the context with
 sees the narrowed type and the 92 false positives collapse. Apply
 opportunistically when next refactoring each agent.
 
-### 87. `arg-type` on `PydanticObjectId | None` → required (~25 errors)
+### 87. [MEDIUM] `arg-type` on `PydanticObjectId | None` → required (~25 errors)
 **Files**: `routers/companies.py`, `routers/estimates.py`,
 `routers/materials.py`, `routers/properties.py`,
 `services/company_service.py`, `scripts/db/backfill_divisions.py`
@@ -1417,7 +1417,7 @@ that returns `PydanticObjectId` or raises `HTTPException(401, "User has
 no company")`. Use it at the top of every handler that currently passes
 `current_user.company` to a function expecting required ObjectId.
 
-### 88. `assignment` — implicit-Optional defaults (~50 errors)
+### 88. [MEDIUM] `assignment` — implicit-Optional defaults (~50 errors)
 **Files**: `agents/estimate/service.py` (~20 sites including 7 `tokens:
 TokenUsageAccumulator = None`), `agents/orchestrator/service.py`,
 `prompts/estimate_react.py`, `prompts/estimate_architect.py`,
@@ -1434,7 +1434,7 @@ Pattern is `def f(x: T = None)` where T is non-Optional. Two fixes:
 
 Do NOT apply to FastAPI `Request = None` params (see entry #3 fix notes).
 
-### 89. `arg-type` on `agents/*/service.py` — `Material | None` → `Material` (~30 errors)
+### 89. [MEDIUM] `arg-type` on `agents/*/service.py` — `Material | None` → `Material` (~30 errors)
 **Files**: `agents/material/service.py`, `agents/labour/service.py`,
 `agents/equipment/service.py`, `agents/property/service.py`,
 `agents/contact/service.py`
@@ -1452,7 +1452,7 @@ accept `Optional[Material]` and return an empty-dict envelope on None.
 Callers no longer need to guard. Same shape for Labour, Equipment,
 Property, Contact.
 
-### 90. `models/estimate.py` arithmetic on `Optional[int]` fields (16 errors)
+### 90. [MEDIUM] `models/estimate.py` arithmetic on `Optional[int]` fields (16 errors)
 **File**: [models/estimate.py:157, 206-215](../../platform/models/estimate.py)
 **Severity**: MEDIUM (latent bug if any nullable field is actually null)
 
@@ -1466,7 +1466,7 @@ invariant is), or add `assert version.foo is not None` guards at the
 arithmetic sites. Tightening the model is cleaner — touch a fixture or
 two and the arithmetic just works.
 
-### 91. `call-arg` — `ChatOpenAI(openai_api_key=...)` signature drift (5 errors)
+### 91. [LOW] `call-arg` — `ChatOpenAI(openai_api_key=...)` signature drift (5 errors)
 **Files**: `agents/orchestrator/service.py:148`,
 `agents/material/service.py:167`, `agents/labour/service.py:125`,
 `agents/equipment/service.py:115`, `agents/contact/service.py:112`,
@@ -1481,7 +1481,7 @@ Fix: either upgrade `langchain-openai` to a version with synced stubs
 (`OPENAI_API_KEY`) and drop the kwarg. The env-var path is more
 idiomatic and removes the dependency on stub freshness.
 
-### 92. `call-arg` — agent → router calls missing `http_request` (5 errors)
+### 92. [LOW] `call-arg` — agent → router calls missing `http_request` (5 errors)
 **Files**: `agents/material/service.py:1154-1157`,
 `agents/labour/service.py:719-722`,
 `agents/equipment/service.py:571-586`
@@ -1498,7 +1498,7 @@ call the service. Audit logging would shift into the service or wrap the
 service call. Big refactor — not blocking. In the short term, suppress
 with `# type: ignore[call-arg]` at the agent call sites.
 
-### 93. `BlockingPortal | None` errors in tests (12 errors)
+### 93. [LOW] `BlockingPortal | None` errors in tests (12 errors)
 **Files**: `tests/test_rate_card_bootstrap.py` (9 sites),
 `tests/test_audit_integration.py` (3 sites),
 `tests/test_feedback_api.py` (2 sites),
@@ -1546,7 +1546,7 @@ HIGH, three MEDIUM, two LOW. The HIGH items are all function-size
 inheritances from the original closures — they came over verbatim during
 the extraction and remain as the next iteration's target.
 
-### 94. New material handlers all exceed the 50-line ceiling
+### 94. [HIGH] New material handlers all exceed the 50-line ceiling
 **File**: [platform/agents/material/service.py](../../platform/agents/material/service.py)
 **Severity**: HIGH (continuation of entry #4 — substantial progress 2026-05-09)
 
@@ -1643,7 +1643,7 @@ shrink each handler by 30–40 lines.
 `_handle_list_material_categories` (44 lines, 2026-04-26) is the only
 existing handler under threshold and is the model to mirror.
 
-### 95. ~~New `agent_helpers/` extractions exceed the 50-line ceiling~~ — RESOLVED 2026-05-07
+### 95. [HIGH] ~~New `agent_helpers/` extractions exceed the 50-line ceiling~~ — RESOLVED 2026-05-07
 **Files**: [platform/routers/agent_helpers/estimate_update.py](../../platform/routers/agent_helpers/estimate_update.py),
 [platform/routers/agent_helpers/fuzzy_confirmation.py](../../platform/routers/agent_helpers/fuzzy_confirmation.py)
 **Severity**: HIGH (continuation of entry #4 — resolved)
@@ -1684,7 +1684,7 @@ be over-decomposition. Net win: 286 lines of two methods became 234
 lines across five focused units, with single responsibilities and
 direct test coverage.
 
-### 96. ~~Pre-existing failing tests in `test_agents_api.py`~~ — FIXED 2026-04-26
+### 96. [MEDIUM] ~~Pre-existing failing tests in `test_agents_api.py`~~ — FIXED 2026-04-26
 
 Both tests were stale assertions left over from before the 2026-04-21
 delete-safety hardening (`routers/agents.py:1975-1982`), which unified
@@ -1700,7 +1700,7 @@ exact-code and fuzzy-title delete paths to always require confirmation.
   False`, plus `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY` IS now
   present. Source unchanged.
 
-### 97. `text_helpers` import uses private aliases at the call site
+### 97. [MEDIUM] `text_helpers` import uses private aliases at the call site
 **File**: [platform/routers/agents.py:54-56](../../platform/routers/agents.py)
 **Severity**: MEDIUM (style)
 
@@ -1714,7 +1714,7 @@ call site.
 Fix: rename the call sites to drop the underscore prefix and remove
 the `as` clause. Mechanical, ~10 substitutions.
 
-### 98. No direct unit tests for the four new agent_helpers public functions
+### 98. [LOW] No direct unit tests for the four new agent_helpers public functions
 **Files**: [platform/routers/agent_helpers/text_helpers.py](../../platform/routers/agent_helpers/text_helpers.py),
 [platform/routers/agent_helpers/estimate_update.py](../../platform/routers/agent_helpers/estimate_update.py),
 [platform/routers/agent_helpers/fuzzy_confirmation.py](../../platform/routers/agent_helpers/fuzzy_confirmation.py)
@@ -1742,7 +1742,7 @@ direct tests until #94/#95 are split — easier to test smaller units.
 
 ## 2026-04-27 review (US address parsing + estimate navigation session)
 
-### 99. ~~`_extract_fields_from_message` length growing past 200 lines~~ — RESOLVED 2026-05-09
+### 99. [HIGH] ~~`_extract_fields_from_message` length growing past 200 lines~~ — RESOLVED 2026-05-09
 File: `platform/agents/property/service.py:597`
 **Severity**: HIGH (resolved)
 
@@ -1770,7 +1770,7 @@ Verified: 71 property tests pass (`test_property_agent.py`,
 `test_property_api.py`, `test_address_service.py`). Coordinator
 dropped from ~207 → 26 lines.
 
-### 100. Defensive `|| canEdit` clause in estimate-page row visibility is dead today
+### 100. [LOW] Defensive `|| canEdit` clause in estimate-page row visibility is dead today
 File: `portal/src/pages/NewEstimateWithActivityPage.tsx:879`
 **Severity**: LOW
 
@@ -1792,7 +1792,7 @@ is the kind of thing that surfaces only via a runtime regression.
 Fix: either drop `|| canEdit` or add a one-line comment noting the
 defensive intent. No runtime impact today.
 
-### 101. US-address regex could match noisy mid-message text
+### 101. [LOW] US-address regex could match noisy mid-message text
 File: `platform/agents/property/service.py:457-480`
 **Severity**: LOW
 
@@ -1819,7 +1819,7 @@ and MEDIUMs (missing `role="alert"` on the dialog error banner; race between
 page mount and "New Template" click before company defaults loaded) were
 fixed in the same change. The four LOW findings below remain.
 
-### 102. `duplicate` insert lacks 409 fallback
+### 102. [LOW] `duplicate` insert lacks 409 fallback
 File: `platform/routers/templates.py:120-136`
 **Severity**: LOW
 
@@ -1833,7 +1833,7 @@ once with the next `(copy N)` suffix or raise 409. Low likelihood — the
 window is sub-millisecond and same-user duplicate spam is the only realistic
 trigger.
 
-### 103. `delete_template` returns 200 on non-existent id
+### 103. [MEDIUM] `delete_template` returns 200 on non-existent id
 File: `platform/routers/templates.py:158-160`
 **Severity**: MEDIUM
 
@@ -1850,7 +1850,7 @@ together.
 Fix: change to `raise HTTPException(404, "Template not found")` and update
 the parallel routers in the same PR.
 
-### 104. `TemplateDialog` captures `initialName` only on mount
+### 104. [LOW] `TemplateDialog` captures `initialName` only on mount
 File: `portal/src/components/estimates/TemplateDialog.tsx:36`
 **Severity**: LOW
 
@@ -1863,7 +1863,7 @@ mount each time.
 Fix: only required if either the key or the gate is removed. If so, sync
 `name` via a `useEffect` on `initialName` change.
 
-### 105. Templates page re-fetches `/companies/{id}` on every mount
+### 105. [LOW] Templates page re-fetches `/companies/{id}` on every mount
 File: `portal/src/pages/TemplatesPage.tsx:60-74`
 **Severity**: LOW
 
@@ -1885,7 +1885,7 @@ page. Two MEDIUMs (search input missing `aria-label`; `setExpandedWorkItemIndex`
 read stale closure of `workItems.length`) were fixed in the same change.
 The deferred MEDIUM and two LOWs remain.
 
-### 106. `autoFocus` on dialog open may interrupt screen-reader announcements
+### 106. [MEDIUM] `autoFocus` on dialog open may interrupt screen-reader announcements
 File: `portal/src/components/estimates/UseTemplateDialog.tsx:84`
 **Severity**: MEDIUM
 
@@ -1904,7 +1904,7 @@ focus management as a single change.
 Fix: address as part of a future Modal a11y refactor; do not patch
 per-dialog.
 
-### 107. Inventory-gaps panel does not reflect template-inserted work items until save
+### 107. [LOW] Inventory-gaps panel does not reflect template-inserted work items until save
 File: `portal/src/pages/NewEstimateWithActivityPage.tsx:418-424`
 **Severity**: LOW
 
@@ -1920,7 +1920,7 @@ Fix: rebuild gaps from `workItems` rather than `estimate.job_items` so
 in-progress edits surface immediately. Out of scope for the Templates
 feature; revisit if the gaps panel becomes a primary editing surface.
 
-### 108. `templates.find()` could return undefined on stale state
+### 108. [LOW] `templates.find()` could return undefined on stale state
 **Severity**: LOW
 File: `portal/src/components/estimates/UseTemplateDialog.tsx:51`
 
@@ -1944,7 +1944,7 @@ Items consolidated from `documentation/development/improvements.md`. The
 already covered by #45 (which explicitly notes the `*-key.json` sibling
 pattern is functionally fine).
 
-### 110. `FeedbackPanel` error message has no live-region announcement
+### 110. [LOW] `FeedbackPanel` error message has no live-region announcement
 **File**: [portal/src/components/common/FeedbackPanel.tsx:169](../../portal/src/components/common/FeedbackPanel.tsx)
 **Severity**: LOW (accessibility)
 
@@ -1957,7 +1957,7 @@ Fix: add `role="alert"` (or `aria-live="polite"`) to the error div. The
 same applies to `ChangeLogPanel.tsx:166`, which uses the identical
 pattern.
 
-### 111. Missing test: anonymous Firebase token → "Unknown User <unknown>" fallback
+### 111. [LOW] Missing test: anonymous Firebase token → "Unknown User <unknown>" fallback
 **File**: [platform/tests/test_feedback_api.py](../../platform/tests/test_feedback_api.py), [platform/routers/feedback.py:87-89](../../platform/routers/feedback.py)
 **Severity**: LOW (test gap)
 
@@ -1971,7 +1971,7 @@ ship undetected.
 Fix: add a test that posts with a token that has `uid` but no `email`,
 and assert the Trello card payload is built with `Unknown User <unknown>`.
 
-### 112. Replace `isMountedRef`/`fetchTokenRef` race-guards with `AbortController`
+### 112. [LOW] Replace `isMountedRef`/`fetchTokenRef` race-guards with `AbortController`
 **Files**: [portal/src/components/common/ChangeLogPanel.tsx](../../portal/src/components/common/ChangeLogPanel.tsx), [portal/src/components/common/FeedbackPanel.tsx](../../portal/src/components/common/FeedbackPanel.tsx), [portal/src/api/client.ts](../../portal/src/api/client.ts)
 **Severity**: LOW (refactor)
 
@@ -1989,7 +1989,7 @@ Fix:
 
 Migrate both call sites in the same PR so the pattern is consistent.
 
-### 113. Test bypass `FIREBASE_AUTH_DISABLED=true` hides unauthenticated paths
+### 113. [LOW] Test bypass `FIREBASE_AUTH_DISABLED=true` hides unauthenticated paths
 **File**: [platform/tests/conftest.py:7](../../platform/tests/conftest.py)
 **Severity**: LOW (testing infra)
 
@@ -2013,7 +2013,7 @@ Hygiene findings from the post-implementation review of the public Maple
 Q&A widget (marketing site). HIGH `/code-review` items #3, #5, and #6
 landed in the same session; these are the residual MEDIUM/LOW items.
 
-### 114. Unused `Optional` import in `refusal.py`
+### 114. [LOW] Unused `Optional` import in `refusal.py`
 **File**: [platform/agents/maple_public/refusal.py:21](../../platform/agents/maple_public/refusal.py)
 **Severity**: LOW (hygiene)
 
@@ -2023,7 +2023,7 @@ landed and the function signature changed.)
 
 Fix: drop the line.
 
-### 115. Mixed string-vs-regex tuples in `refusal.py`
+### 115. [MEDIUM] Mixed string-vs-regex tuples in `refusal.py`
 **File**: [platform/agents/maple_public/refusal.py:27-55](../../platform/agents/maple_public/refusal.py)
 **Severity**: MEDIUM (maintainability)
 
@@ -2038,7 +2038,7 @@ Fix: either (a) add a one-line comment near the tuples saying "values
 are raw regex fragments — do NOT pre-escape", or (b) split into two
 tuples (literal vs regex), `re.escape` the literal one before joining.
 
-### 116. Duplicated "I'm not sure" fallback copy in `service.py`
+### 116. [LOW] Duplicated "I'm not sure" fallback copy in `service.py`
 **File**: [platform/agents/maple_public/service.py:90-91, 194-198](../../platform/agents/maple_public/service.py)
 **Severity**: LOW (maintainability)
 
@@ -2050,7 +2050,7 @@ fallback when the LLM returns empty content. They will drift over time.
 Fix: extract a small helper or module constant that produces the
 phrasing; reuse from both sites.
 
-### 117. `_LLMHolder` class is more scaffolding than the use needs
+### 117. [LOW] `_LLMHolder` class is more scaffolding than the use needs
 **File**: [platform/agents/maple_public/service.py:99-127](../../platform/agents/maple_public/service.py)
 **Severity**: LOW (style)
 
@@ -2062,7 +2062,7 @@ setter would be flatter.
 Fix: optional refactor; not blocking. Keeps the test injection path
 clean either way.
 
-### 118. Hand-rolled `import.meta` cast in widget API client
+### 118. [MEDIUM] Hand-rolled `import.meta` cast in widget API client
 **File**: [website/widget/api.ts:25-27](../../website/widget/api.ts)
 **Severity**: MEDIUM (DX)
 
@@ -2074,7 +2074,7 @@ Fix: add a one-line `website/widget/vite-env.d.ts` containing
 `/// <reference types="vite/client" />`. Drop the cast and read
 `import.meta.env.VITE_PUBLIC_API_URL` directly.
 
-### 119. URL build via string concatenation in widget API client
+### 119. [LOW] URL build via string concatenation in widget API client
 **File**: [website/widget/api.ts:36](../../website/widget/api.ts)
 **Severity**: LOW (robustness)
 
@@ -2085,7 +2085,7 @@ scheme, accidental query string) builds a broken URL silently.
 Fix: use `new URL("/public/maple/ask", base)`. Surface a clear error
 if the base is malformed.
 
-### 120. Unused CSS variable in widget palette
+### 120. [LOW] Unused CSS variable in widget palette
 **File**: [website/widget/widget.css:6](../../website/widget/widget.css)
 **Severity**: LOW (hygiene)
 
@@ -2093,7 +2093,7 @@ if the base is malformed.
 
 Fix: remove the line.
 
-### 121. Implicit "welcome bubble has id 0" coupling
+### 121. [LOW] Implicit "welcome bubble has id 0" coupling
 **Files**: [website/widget/MapleWidget.tsx:31, 69, 108](../../website/widget/MapleWidget.tsx)
 **Severity**: LOW (style)
 
@@ -2119,7 +2119,7 @@ Scope: shared `agents.maple_guide` responder, `HelpHandler` rewrite,
 public-widget refactor, orchestrator interrogative→guide fallback,
 extracted `formatOrchestratorReply` portal utility.
 
-### 122. ~~`_apply_low_confidence_fallback` is now ~84 lines~~ — RESOLVED 2026-05-07
+### 122. [HIGH] ~~`_apply_low_confidence_fallback` is now ~84 lines~~ — RESOLVED 2026-05-07
 **File**: [platform/agents/orchestrator/service.py:1424](../../platform/agents/orchestrator/service.py)
 **Severity**: HIGH (function size — resolved)
 
@@ -2139,7 +2139,7 @@ empty-guide passthrough) added in `tests/test_orchestrator_intents.py`.
 All 185 orchestrator-intent tests + 124 related help/endpoint tests
 green.
 
-### 123. `formatOrchestratorReply` mutates input parameter
+### 123. [MEDIUM] `formatOrchestratorReply` mutates input parameter
 **File**: [portal/src/lib/orchestratorReply.ts:54](../../portal/src/lib/orchestratorReply.ts)
 **Severity**: MEDIUM (mutation)
 
@@ -2152,7 +2152,7 @@ Fix: return `{ text, outOfScope }` (or a tuple). Caller assigns
 `result._outOfScope = outOfScope` explicitly. Cleaner contract; easier
 to test side effects independently.
 
-### 124. `openai_api_key=` keyword on ChatOpenAI flags mypy
+### 124. [MEDIUM] `openai_api_key=` keyword on ChatOpenAI flags mypy
 **Files**:
 - [platform/agents/maple_guide/service.py:111](../../platform/agents/maple_guide/service.py)
 - [platform/agents/maple_public/service.py](../../platform/agents/maple_public/service.py) (pre-existing — pattern was copied into the new shared module)
@@ -2167,14 +2167,14 @@ the new shared service.
 Fix: rename to `api_key=settings.openai_api_key` everywhere. Functional
 behavior identical; mypy clean.
 
-### 125. `platform/agents/orchestrator/service.py` at 1358 lines
+### 125. [LOW] `platform/agents/orchestrator/service.py` at 1358 lines
 **File**: [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py)
 **Severity**: LOW (file size)
 
 Pre-existing breach of the 800-line threshold; this PR added ~70 net
 lines. Tracked under existing item [#4](#4-file-and-function-size).
 
-### 126. `portal/src/components/Layout/PortalLayout.tsx` at 2105 lines
+### 126. [LOW] `portal/src/components/Layout/PortalLayout.tsx` at 2105 lines
 **File**: [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx)
 **Severity**: LOW (file size)
 
@@ -2201,7 +2201,7 @@ The two HIGH items addressed in-session:
   to remount `WorkItemInlineContent` so the change is visible. The Save
   Work Item button is now the persistence path for those edits.
 
-### 127. New-estimate flow has no save mechanism
+### 127. [HIGH] New-estimate flow has no save mechanism
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: HIGH
 
@@ -2217,7 +2217,7 @@ Fix options:
 - Auto-create the estimate on first interaction (e.g., title blur)
   then fall through to the auto-save path for subsequent edits.
 
-### 128. ~~Title and notes have no auto-save path~~ — RESOLVED 2026-05-01
+### 128. [HIGH] ~~Title and notes have no auto-save path~~ — RESOLVED 2026-05-01
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: HIGH (resolved)
 
@@ -2230,7 +2230,7 @@ Both fields now auto-save:
   Cancel and backdrop close are blocked while saving. Mirrors the work
   item dialog pattern.
 
-### 129. Missing tests for auto-save + dialog flows (partial)
+### 129. [HIGH] Missing tests for auto-save + dialog flows (partial)
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: HIGH
 
@@ -2256,7 +2256,7 @@ Still TODO (require deeper page-level mocking):
   `lastSavedDescriptionRef` invariant; the helper-equivalent test
   for sequence guards is the closest existing coverage).
 
-### 131. `saveError` displayed far from origin
+### 131. [MEDIUM] `saveError` displayed far from origin
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: MEDIUM
 
@@ -2270,7 +2270,7 @@ Fix: render `saveError` adjacent to the field that failed, or use a
 toast. Simplest: append a small inline error under the description /
 property when their auto-save fails.
 
-### 132. Description read-only color is dead CSS
+### 132. [MEDIUM] Description read-only color is dead CSS
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: MEDIUM
 
@@ -2283,7 +2283,7 @@ visually identical to editable.
 Fix: collapse to one expression:
 `canEdit ? (description ? "text-gray-900" : "text-gray-400") : "text-gray-500"`.
 
-### 135. Description "button" wraps multi-line content
+### 135. [MEDIUM] Description "button" wraps multi-line content
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: MEDIUM (accessibility)
 
@@ -2294,7 +2294,7 @@ accessible name. Fine for short text, awkward for long ones.
 Fix: add `aria-label="Edit description"` so the announced label is
 concise; the visible text remains content.
 
-### 136. Docs menu items missing `role="menuitem"`
+### 136. [MEDIUM] Docs menu items missing `role="menuitem"`
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: MEDIUM (accessibility)
 
@@ -2304,7 +2304,7 @@ ARIA.
 
 Fix: add `role="menuitem"` to each item inside the docs `<li>`.
 
-### 137. `NewEstimateWithActivityPage.tsx` extractions (partial)
+### 137. [MEDIUM] `NewEstimateWithActivityPage.tsx` extractions (partial)
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: MEDIUM (file size)
 
@@ -2321,7 +2321,7 @@ Further reductions need additional extractions:
 Tracked under existing item [#4](#4-file-and-function-size). Next
 single extraction round should target the work-items table.
 
-### 139. Pre-existing `printWindow.document.write` deprecation hint
+### 139. [LOW] Pre-existing `printWindow.document.write` deprecation hint
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: LOW
 
@@ -2333,7 +2333,7 @@ or build the document via DOM APIs.
 
 ## 2026-05-01 `/code-review` pass (Green table headings + auto-create estimate)
 
-### 142. Table heading weight drift (`font-medium` → `font-semibold`)
+### 142. [LOW] Table heading weight drift (`font-medium` → `font-semibold`)
 **Files**:
 - [portal/src/components/common/EstimatesTable.tsx](../../portal/src/components/common/EstimatesTable.tsx)
 - [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx)
@@ -2357,7 +2357,7 @@ The two HIGH items from this pass (file size of `WorkItemInlineContent.tsx`,
 fragile modal stacking) were addressed in the same change set; the items
 below are MEDIUM / LOW and were logged for later.
 
-### 144. Alternating row color computed inline twice
+### 144. [MEDIUM] Alternating row color computed inline twice
 **Files**:
 - [portal/src/components/estimates/MaterialsTable.tsx](../../portal/src/components/estimates/MaterialsTable.tsx)
 - [portal/src/components/estimates/WorkItemInlineContent.tsx](../../portal/src/components/estimates/WorkItemInlineContent.tsx) (Activities table)
@@ -2372,7 +2372,7 @@ parity) but the rule is in two places.
 Fix: extract a shared `getRowBg(idx: number)` helper into a small
 utility module or co-locate it where both tables can import it.
 
-### 146. EffortCalculator mobile dropdown initial-render flicker
+### 146. [MEDIUM] EffortCalculator mobile dropdown initial-render flicker
 **File**: [portal/src/components/estimates/EffortCalculatorDialog.tsx](../../portal/src/components/estimates/EffortCalculatorDialog.tsx)
 
 **Severity**: MEDIUM
@@ -2386,7 +2386,7 @@ Fix: initialise `selectedCardId` synchronously via `useState(() => …)`
 reading the first rate card so there's no null window. Keep the
 existing useEffect for the open/close transitions.
 
-### 147. `MaterialsPage` mobile card popup-clip fix is scoped
+### 147. [LOW] `MaterialsPage` mobile card popup-clip fix is scoped
 **File**: [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx)
 
 **Severity**: LOW
@@ -2400,7 +2400,7 @@ section it'll be clipped again.
 Fix: if/when that case appears, switch popups to render via React
 portal so they aren't subject to ancestor clipping.
 
-### 148. Three near-identical settings tabs
+### 148. [LOW] Three near-identical settings tabs
 **Files**:
 - [portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx)
 - [portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx)
@@ -2424,7 +2424,7 @@ extras.
 
 ## 2026-05-02 `/code-review` pass (post-#143/#130/#133/#138 batch)
 
-### 149. `lastSavedDescriptionRef` / `lastSavedTitleRef` initial-value window
+### 149. [LOW] `lastSavedDescriptionRef` / `lastSavedTitleRef` initial-value window
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: LOW
 
@@ -2445,7 +2445,7 @@ comment near the ref declarations.
 
 ## 2026-05-02 `/code-review` pass (post-#12/#109/#150/#151/#152 batch)
 
-### 153. `_PolicyShortCircuit.response` field name overloaded
+### 153. [LOW] `_PolicyShortCircuit.response` field name overloaded
 **File**: [platform/agents/orchestrator/service.py:188](../../platform/agents/orchestrator/service.py)
 **Severity**: LOW (naming clarity)
 
@@ -2462,7 +2462,7 @@ last-position semantics in `_classify_with_rules`, or add a one-line
 note in the docstring: "None for positive routings; refusal copy for
 negative routings." Cosmetic only — behavior is correct and tested.
 
-### 154. `_TopicFlags.property` field name shadows Python builtin
+### 154. [LOW] `_TopicFlags.property` field name shadows Python builtin
 **File**: [platform/agents/orchestrator/help_handler.py:38](../../platform/agents/orchestrator/help_handler.py)
 **Severity**: LOW (naming clarity)
 
@@ -2480,7 +2480,7 @@ keeps symmetry with the other domain flags), or rename every flag to
 
 ## 2026-05-02 `/code-review` pass (xfail-wave-2 Phase 2)
 
-### 155. ~~`_list_properties_by_cross_resource` is 124 lines~~ — FIXED 2026-05-03
+### 155. [HIGH] ~~`_list_properties_by_cross_resource` is 124 lines~~ — FIXED 2026-05-03
 **File**: [platform/agents/property/service.py](../../platform/agents/property/service.py)
 
 Resolved by extracting three helpers:
@@ -2498,7 +2498,7 @@ Parent function dropped from 248 → 88 lines. Tests
 `tests/test_cross_resource_joins.py` and `tests/test_property_agent.py`
 both green (67/67).
 
-### 156. ~~`_list_contacts_at_property` is 108 lines~~ — FIXED 2026-05-03
+### 156. [HIGH] ~~`_list_contacts_at_property` is 108 lines~~ — FIXED 2026-05-03
 **File**: [platform/agents/contact/service.py](../../platform/agents/contact/service.py)
 
 Resolved by extracting two helpers:
@@ -2514,7 +2514,7 @@ since both call sites now share the envelope helper. Tests
 `tests/test_cross_resource_joins.py` and `tests/test_contact_agent.py`
 green (88/88).
 
-### 157. Cross-resource transitive join uses two round-trips instead of $lookup
+### 157. [MEDIUM] Cross-resource transitive join uses two round-trips instead of $lookup
 **File**: [platform/agents/property/service.py:1071](../../platform/agents/property/service.py)
 **Severity**: MEDIUM (perf hook)
 
@@ -2536,7 +2536,7 @@ Estimate.aggregate([
 Defer until perf measurements demand it; current shape is correct
 and clear. Worth coupling with a fixture-based perf test.
 
-### 158. ~~Property cross-resource type=contact loads full catalog~~ — FIXED 2026-05-03
+### 158. [HIGH] ~~Property cross-resource type=contact loads full catalog~~ — FIXED 2026-05-03
 **File**: [platform/agents/property/service.py](../../platform/agents/property/service.py)
 
 Resolved by introducing a `_properties_linked_to_contacts(company_id,
@@ -2556,7 +2556,7 @@ The pre-existing in-memory pattern in `_find_properties_by_owner_name`
 and `_find_properties_by_name_or_address` is a separate refactor —
 flagged in #159.
 
-### 159. `agents/cross_resource.py` filters in-Python on full collections
+### 159. [LOW] `agents/cross_resource.py` filters in-Python on full collections
 **File**: [platform/agents/cross_resource.py](../../platform/agents/cross_resource.py)
 **Severity**: LOW (scaling)
 
@@ -2580,7 +2580,7 @@ follow-ups below. The `_OPEN_ESTIMATE_STATUSES` hardcoded-strings
 fragility was caught and fixed inline during the review (now derived
 from `EstimateStatus.{DRAFT,APPROVED,REVIEW,WON}.value`).
 
-### 160. ~~`_handle_list_materials_for_estimate` is 98 lines~~ — FIXED 2026-05-03
+### 160. [HIGH] ~~`_handle_list_materials_for_estimate` is 98 lines~~ — FIXED 2026-05-03
 **File**: [platform/agents/material/service.py](../../platform/agents/material/service.py)
 
 Resolved by:
@@ -2599,7 +2599,7 @@ The followup's "agent-wide envelope helper across `_handle_list_estimates`,
 `_handle_create_material`, etc." is a separate, larger pass — out of
 scope for this fix.
 
-### 161. ~~`_handle_list_labours_for_estimate` is 91 lines~~ — FIXED 2026-05-03
+### 161. [HIGH] ~~`_handle_list_labours_for_estimate` is 91 lines~~ — FIXED 2026-05-03
 **File**: [platform/agents/labour/service.py](../../platform/agents/labour/service.py)
 
 Same shape as #160; same fix:
@@ -2610,7 +2610,7 @@ Handler dropped from 91 → 73 lines. Tests
 `tests/test_cross_resource_joins.py`, `tests/test_material_agent.py`,
 and `tests/test_labour_agent.py` green (101/101).
 
-### 162. `_parse_estimate_date_filter` uses fixed day counts
+### 162. [LOW] `_parse_estimate_date_filter` uses fixed day counts
 **File**: [platform/agents/estimate/service.py:354](../../platform/agents/estimate/service.py#L354)
 **Severity**: LOW
 
@@ -2624,7 +2624,7 @@ Fix: swap to `dateutil.relativedelta` (already a transitive dep of
 `langchain` so no new requirement) for strict calendar-aligned windows
 when a user complaint surfaces. Defer until then.
 
-### 163. Wave 3 file growth — three large agent files grew further
+### 163. [MEDIUM] Wave 3 file growth — three large agent files grew further
 **Files**:
 - [platform/agents/material/service.py](../../platform/agents/material/service.py) — 2,560 → 2,659 lines
 - [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) — 5,719 → 5,873 lines
@@ -2644,7 +2644,7 @@ Fix: one of three options for each file —
 
 Out of scope for any single feature commit; would warrant its own refactor PR.
 
-### 164. `find_estimate_by_code` loads full estimate collection
+### 164. [LOW] `find_estimate_by_code` loads full estimate collection
 **File**: [platform/agents/cross_resource.py:97](../../platform/agents/cross_resource.py#L97)
 **Severity**: LOW (scaling)
 
@@ -2672,7 +2672,7 @@ findings; the four notes below are accepted trade-offs from the batch
 itself, logged for visibility so future refactors don't re-discover
 the same questions.
 
-### 165. `_list_properties_by_cross_resource` still 88 lines
+### 165. [MEDIUM] `_list_properties_by_cross_resource` still 88 lines
 **File**: [platform/agents/property/service.py:1078](../../platform/agents/property/service.py#L1078)
 **Severity**: MEDIUM (function-length policy)
 
@@ -2685,7 +2685,7 @@ Accepted as-is. Splitting further pushes one-line dispatch into helpers
 without DRY payoff. Re-flag only if a future change makes the function
 harder to read.
 
-### 166. `_list_contacts_for_estimate` still 91 lines
+### 166. [MEDIUM] `_list_contacts_for_estimate` still 91 lines
 **File**: [platform/agents/contact/service.py:1092](../../platform/agents/contact/service.py#L1092)
 **Severity**: MEDIUM (function-length policy)
 
@@ -2699,7 +2699,7 @@ only on the property agent) into `agents/cross_resource.py` so both
 agents share a single estimate→property resolver. Drops the contact
 helper to ~50 lines and removes the parallel implementation.
 
-### 167. `_resolve_cross_resource_properties` at 62 lines
+### 167. [LOW] `_resolve_cross_resource_properties` at 62 lines
 **File**: [platform/agents/property/service.py:1015](../../platform/agents/property/service.py#L1015)
 **Severity**: LOW (function-length policy)
 
@@ -2711,7 +2711,7 @@ helpers would add indirection without DRY payoff."
 Accepted as-is. Re-evaluate only if a fourth cross-resource type joins
 the dispatch.
 
-### 168. New helpers from #155/#156/#158/#160/#161 lack direct unit tests
+### 168. [LOW] New helpers from #155/#156/#158/#160/#161 lack direct unit tests
 **Files**: property / contact / material / labour `service.py`
 **Severity**: LOW (test coverage)
 
@@ -2744,7 +2744,7 @@ floating Sparkles button. The actionable items (decoupling divisions
 fetch, FAB ARIA, removing the unused `coverAiPanel` prop) were fixed in
 the same change. The items below were deferred.
 
-### 169. `PortalLayout.tsx` is ~1500 lines — duplicate of #58
+### 169. [HIGH] `PortalLayout.tsx` is ~1500 lines — duplicate of #58
 **Severity**: HIGH (consolidated into #58 on 2026-05-09)
 Same finding as #58. Both flag `PortalLayout.tsx` over the 800-line
 HIGH threshold; track the refactor under #58 going forward. Notes
@@ -2756,7 +2756,7 @@ candidates: the AI panel composer + message renderer, the settings/
 account modal, and the feedback/changelog panel wiring — each ~200-300
 lines and largely self-contained.
 
-### 170. No component tests for `Modal` or `DashboardPage` division-seeding behavior
+### 170. [MEDIUM] No component tests for `Modal` or `DashboardPage` division-seeding behavior
 **Severity**: MEDIUM
 CLAUDE.md mandates tests for behavior changes; the portal currently has
 no component-test infrastructure under `src/` (vitest is configured at
@@ -2769,7 +2769,7 @@ First component test added will need to pull in
 landing once another test-worthy frontend change comes along so the
 scaffolding pays for itself.
 
-### 171. `lg:right-[26rem]` in `Modal.tsx` duplicates `AI_PANEL_WIDTH`
+### 171. [MEDIUM] `lg:right-[26rem]` in `Modal.tsx` duplicates `AI_PANEL_WIDTH`
 **Severity**: MEDIUM
 `Modal.tsx:32` hard-codes `lg:right-[26rem]` to match the desktop Maple
 rail width, which is also declared in `PortalLayout.tsx:129` as
@@ -2795,7 +2795,7 @@ preserving blur. The lint error caught during review
 the same change by remounting the dialog via a `key` prop on open. All
 items below were deferred.
 
-### 172. ~~`WorkItemInlineContent.tsx` now 834 lines (over the 800-line HIGH threshold)~~ — RESOLVED 2026-05-09
+### 172. [HIGH] ~~`WorkItemInlineContent.tsx` now 834 lines (over the 800-line HIGH threshold)~~ — RESOLVED 2026-05-09
 **Severity**: HIGH (resolved)
 
 Extracted the Activities table into `components/estimates/ActivitiesTable.tsx`
@@ -2821,7 +2821,7 @@ a `WorkItemPricingBreakdown` component would restore this file to under
 800 lines and isolate the back-calc / Original-line logic with the rest
 of the pricing UI.
 
-### 173. `<input>` in `AdjustTotalDialog` uses `aria-label`, not a real `<label>`
+### 173. [LOW] `<input>` in `AdjustTotalDialog` uses `aria-label`, not a real `<label>`
 **Severity**: LOW
 `AdjustTotalDialog.tsx:65–73` — the visible "Adjust Amount" text comes
 from the modal title (`<h3>`), not from a `<label htmlFor=…>` on the
@@ -2833,7 +2833,7 @@ Fix: render an explicit `<label htmlFor="adjust-amount-input">Adjust
 Amount</label>` inside the modal body and drop the `aria-label`. Keep
 the modal's `<h3>` title as-is for the dialog heading. Minor a11y polish.
 
-### 174. Reset button doesn't refocus the input
+### 174. [LOW] Reset button doesn't refocus the input
 **Severity**: LOW
 `AdjustTotalDialog.tsx:77` — clicking Reset replaces the input value but
 leaves keyboard focus on the Reset button. Users frequently want to
@@ -2842,7 +2842,7 @@ glance at or tweak the field before clicking Set.
 Fix: hold a `useRef` on the input and call `inputRef.current?.focus()`
 inside the Reset handler. Tiny UX polish.
 
-### 175. `JobItemCreate` margin/tax fields accept unbounded floats
+### 175. [MEDIUM] `JobItemCreate` margin/tax fields accept unbounded floats
 **Severity**: MEDIUM
 `platform/routers/estimates.py:609–614` — `original_profit_margin`,
 `profit_margin`, `overhead_allocation`, `labor_burden`, and `tax` are all
@@ -2861,7 +2861,7 @@ parsing on legacy docs).
 
 ## 2026-05-05 `/code-review` pass (header recolor + Maple FAB realignment + NumericInput blur-format)
 
-### 176. `PortalLayout.tsx` is ~1500 lines (pre-existing) — duplicate of #58
+### 176. [HIGH] `PortalLayout.tsx` is ~1500 lines (pre-existing) — duplicate of #58
 **Severity**: HIGH (consolidated into #58 on 2026-05-09)
 Same finding as #58 / #169. Track the refactor under #58. Notes
 preserved below for context.
@@ -2875,7 +2875,7 @@ Fix: split into siblings — at minimum `MapleFloatingButton`, `AiPanel`,
 and `AccountModal`. Out of scope for the recolor work; track for the next
 time someone touches this file substantially.
 
-### 177. Grand Total contrast borderline at small text sizes
+### 177. [LOW] Grand Total contrast borderline at small text sizes
 **Severity**: LOW
 `portal/src/pages/NewEstimateWithActivityPage.tsx:1273` — the new
 `bg-total-bg` (`#38A776`) with `text-white` measures ~3.03:1. Passes WCAG
@@ -2891,14 +2891,14 @@ token in `theme.css` that it's only safe for large-bold copy.
 
 ## 2026-05-06 `/code-review` pass (People pricing — Standard Unbillable %)
 
-### 178. ~~`WorkItemInlineContent.tsx` over the 800-line HIGH threshold~~ — RESOLVED 2026-05-09 (duplicate of #172)
+### 178. [HIGH] ~~`WorkItemInlineContent.tsx` over the 800-line HIGH threshold~~ — RESOLVED 2026-05-09 (duplicate of #172)
 **Severity**: HIGH (resolved)
 Resolved together with #172 on 2026-05-09. The activities `<table>`
 block was extracted into `components/estimates/ActivitiesTable.tsx`
 (mirror of `MaterialsTable.tsx`), exactly as the fix recommendation
 proposed. File now 724 lines.
 
-### 179. Inline `reduce` on `activityRows` recomputed every render
+### 179. [LOW] Inline `reduce` on `activityRows` recomputed every render
 **Severity**: LOW
 `portal/src/components/estimates/WorkItemInlineContent.tsx:701` —
 the "N.NN hours total" pill walks `activityRows` on every render via
@@ -2918,7 +2918,7 @@ Findings from the post-implementation review of the ten-item follow-up
 batch that closed #28/#37/#40/#43/#44/#65/#67/#136 in code and resolved
 #54/#56 by documentation. No CRITICAL / HIGH; three MEDIUM, one LOW.
 
-### 180. ~~`raise HTTPException` inside `except` lacks `from None`~~ — RESOLVED 2026-05-07
+### 180. [MEDIUM] ~~`raise HTTPException` inside `except` lacks `from None`~~ — RESOLVED 2026-05-07
 
 Appended `from None` to all three `raise HTTPException(status_code=422,
 detail="Invalid company id")` lines in `divisions.py`,
@@ -2942,7 +2942,7 @@ when we deliberately want to suppress the inner cause from the response.
 Fix: append `from None` to all three `raise HTTPException(422)` lines.
 Mechanical, three-line sweep.
 
-### 181. ~~Duplicate `PydanticObjectId` coercion pattern in estimate agent~~ — RESOLVED 2026-05-07
+### 181. [MEDIUM] ~~Duplicate `PydanticObjectId` coercion pattern in estimate agent~~ — RESOLVED 2026-05-07
 
 Replaced the inline `try / PydanticObjectId(company_id) if company_id
 else None` casts in both `_handle_list_estimates` and
@@ -2970,7 +2970,7 @@ done in the same pass as [#84](#84-_coerce_company_oid-returns-optionalany-to-ke
 (promoting `from beanie import PydanticObjectId` to module level and
 tightening the helper's return annotation).
 
-### 182. ~~Two near-duplicate trash-button blocks in `EquipmentsPage`~~ — RESOLVED 2026-05-07
+### 182. [MEDIUM] ~~Two near-duplicate trash-button blocks in `EquipmentsPage`~~ — RESOLVED 2026-05-07
 
 Extracted a small `<DeleteEquipmentButton onClick={...} />` component
 inside `EquipmentsPage.tsx`. Both the desktop-row (line ~354) and
@@ -2992,7 +2992,7 @@ Fix: extract a small `<DeleteEquipmentButton equipment={…} />` shared
 between the two layouts. Out of scope for the a11y fix itself; flag
 only so it isn't rediscovered on the next pass.
 
-### 183. `change_logs.py` `.sort()` tuple type mismatch (pre-existing)
+### 183. [LOW] `change_logs.py` `.sort()` tuple type mismatch (pre-existing)
 **File**: [platform/routers/change_logs.py:28](../../platform/routers/change_logs.py)
 **Severity**: LOW (mypy / pre-existing)
 
@@ -3014,7 +3014,7 @@ Findings from the post-implementation review of the second eight-item
 follow-up batch. No CRITICAL / HIGH; one MEDIUM behaviour-change to
 consider, two LOW style nits.
 
-### 184. `response.json()` decode errors no longer caught in `address_service.py`
+### 184. [MEDIUM] `response.json()` decode errors no longer caught in `address_service.py`
 **File**: [platform/services/address_service.py:366, :409, :468](../../platform/services/address_service.py)
 **Severity**: MEDIUM (behaviour change)
 
@@ -3035,7 +3035,7 @@ Fix: if you want the previous soft-fail on malformed payloads, expand
 to `except (httpx.HTTPError, httpx.TimeoutException, ValueError):`.
 Otherwise leave as-is and accept the loud-fail behaviour.
 
-### 185. Redundant `httpx.TimeoutException` in narrowed except tuple
+### 185. [LOW] Redundant `httpx.TimeoutException` in narrowed except tuple
 **File**: [platform/services/address_service.py:366, :409, :468](../../platform/services/address_service.py)
 **Severity**: LOW (style)
 
@@ -3049,7 +3049,7 @@ Fix: optional simplification to `except httpx.HTTPError:`. Keeping the
 explicit tuple is documentary, so this is style-only. Don't fix in
 isolation; roll into any future address-service edit.
 
-### 186. Non-null assertion on `call.payload` in `handleStatusChange`
+### 186. [LOW] Non-null assertion on `call.payload` in `handleStatusChange`
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx:478](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: LOW (type safety)
 
@@ -3085,7 +3085,7 @@ title bar. Zero CRITICAL / HIGH; two LOW polish items in
 `NewEstimateWithActivityPage.tsx`. The pre-existing 1,783-line size of
 that file is already covered by the file-size refactor item further up.
 
-### 187. Redundant `&& property` truthy check in property-info card
+### 187. [LOW] Redundant `&& property` truthy check in property-info card
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx:1080](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: LOW (dead code)
 
@@ -3098,7 +3098,7 @@ Harmless, but it implies a guard that doesn't exist.
 Fix: simplify to `selectedPropertyData?.street ? (...) : (...)`. One-line
 edit — roll into any future Property card edit.
 
-### 188. Contact deep-link still renders when contact name is empty
+### 188. [LOW] Contact deep-link still renders when contact name is empty
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx:1094-1101](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: LOW (UX)
 
@@ -3126,7 +3126,7 @@ Review of the `run_update_estimate` / `handle_estimate_fuzzy_confirmation`
 split. No CRITICAL / HIGH beyond the function-size residuals already
 acknowledged in #95's resolution; one LOW symmetry nit.
 
-### 189. `estimate_update.py` could mirror `fuzzy_confirmation._envelope`
+### 189. [LOW] `estimate_update.py` could mirror `fuzzy_confirmation._envelope`
 **File**: [platform/routers/agent_helpers/estimate_update.py](../../platform/routers/agent_helpers/estimate_update.py)
 **Severity**: LOW (DRY / symmetry)
 
@@ -3160,7 +3160,7 @@ WelcomeStep list extension, CompletionStep green-accent sparkle, and the
 SettingsPage Company-tab cleanup (estimate count/allowance moved to
 Billing). No CRITICAL / HIGH; two MEDIUMs and two LOWs below.
 
-### 190. Typo "iintegrations" in Pro plan feature copy
+### 190. [MEDIUM] Typo "iintegrations" in Pro plan feature copy
 **File**: [portal/src/lib/billing-plans.ts](../../portal/src/lib/billing-plans.ts) line 111
 **Severity**: MEDIUM (user-visible copy)
 
@@ -3172,7 +3172,7 @@ flagged so it gets fixed before the next plan-cards commit lands.
 Fix: `"All systems integrations"` (or revisit phrasing entirely — the
 prior copy was `"Integrate with top accounting packages"`).
 
-### 191. Decorative Sparkles icons missing `aria-hidden`
+### 191. [MEDIUM] Decorative Sparkles icons missing `aria-hidden`
 **File**: [portal/src/components/onboarding/CompletionStep.tsx](../../portal/src/components/onboarding/CompletionStep.tsx) lines 16-17
 **Severity**: MEDIUM (a11y)
 
@@ -3185,7 +3185,7 @@ gap; doubling it makes the noise more noticeable.
 Fix: add `aria-hidden="true"` to both `<Sparkles>` here, and apply the
 same to `WelcomeStep.tsx:20` for consistency while in the area.
 
-### 192. Plan-name `<h3>` visually outsizes the dialog `<h2>`
+### 192. [LOW] Plan-name `<h3>` visually outsizes the dialog `<h2>`
 **File**: [portal/src/components/billing/PlanPickerGrid.tsx](../../portal/src/components/billing/PlanPickerGrid.tsx) line 219
 **Severity**: LOW (visual hierarchy)
 
@@ -3199,7 +3199,7 @@ Fix (pick one): bump dialog `<h2>` to `text-3xl`, drop card `<h3>` to
 `text-2xl`, or accept as-is if the design intentionally hero's the
 plan name.
 
-### 193. Trailing whitespace in `ENTERPRISE_DISPLAY.features`
+### 193. [LOW] Trailing whitespace in `ENTERPRISE_DISPLAY.features`
 **File**: [portal/src/lib/billing-plans.ts](../../portal/src/lib/billing-plans.ts) line 128
 **Severity**: LOW (cosmetic)
 
@@ -3222,7 +3222,7 @@ Review of the Stripe billing integration shipped May 2026. The five HIGH-severit
 
 The items below are deferred housekeeping. Pick them up in order of severity, repo-by-repo.
 
-### 194. Hoist the `1_000_000` "effectively unlimited estimates" magic number
+### 194. [MEDIUM] Hoist the `1_000_000` "effectively unlimited estimates" magic number
 **File**: `platform/routers/billing.py:417`, `platform/services/billing/webhook_handlers.py:132`, `platform/services/billing/plan_config.py:68`
 **Severity**: MEDIUM
 
@@ -3230,7 +3230,7 @@ Three call sites use the same literal to disable the local quota cap once a paym
 
 Fix: define `EFFECTIVE_UNLIMITED_ESTIMATES = 1_000_000` (or similar) as a module-level constant in `services/billing/plan_config.py` and import from the other two locations.
 
-### 195. Reconciliation cron for "soft-failed" plan selection
+### 195. [MEDIUM] Reconciliation cron for "soft-failed" plan selection
 **File**: `platform/routers/billing.py:186` (select-plan), `platform/routers/billing.py:492` (enterprise-contact)
 **Severity**: MEDIUM
 
@@ -3238,7 +3238,7 @@ Both endpoints catch `Exception` broadly with the comment "reconciliation cron r
 
 Fix: either (a) build the planned reconciliation job that scans companies with a non-Free local plan but no `stripe_subscription_id` and replays the missing call, or (b) persist a `BillingReconciliationQueue` row at the catch site so the future cron has explicit work to find. At minimum, fire a Sentry capture inside the except block and surface a soft-warning flag in the response so the FE can show "Your plan is saved; we'll finish setup shortly."
 
-### 196. Implement `payment_failed` user notification
+### 196. [MEDIUM] Implement `payment_failed` user notification
 **File**: `platform/services/billing/webhook_handlers.py:114` (TODO)
 **Severity**: MEDIUM
 
@@ -3246,7 +3246,7 @@ Customers in `past_due` after a card decline are not notified by the platform. S
 
 Fix: send via `services/brevo_email.send_brevo_plain_email` from the `invoice.payment_failed` handler. Subject: "Payment failed — update your card." Link target: customer-portal session URL.
 
-### 197. ~~Customer-portal `return_url` should not hardcode prod~~ — RESOLVED 2026-05-09
+### 197. [MEDIUM] ~~Customer-portal `return_url` should not hardcode prod~~ — RESOLVED 2026-05-09
 
 Added `app_base_url: str` to `Settings` in `platform/config.py`, default
 `http://localhost:5173`, validation alias `APP_BASE_URL`. The Customer
@@ -3268,7 +3268,7 @@ The fallback `"https://app.3maples.ai/settings"` kicks dev/staging users into pr
 
 Fix: add `app_base_url: str` to `Settings` in `config.py` and use `f"{settings.app_base_url}/settings"` as the fallback. Default to `http://localhost:5173` in `.env.example`.
 
-### 198. ~~Add `idempotency_key` to SetupIntent creation~~ — RESOLVED 2026-05-09
+### 198. [MEDIUM] ~~Add `idempotency_key` to SetupIntent creation~~ — RESOLVED 2026-05-09
 
 `stripe.SetupIntent.create` in `platform/routers/billing.py` now passes
 `idempotency_key=f"setup_intent:{company.id}:{int(time.time() // 60)}"`.
@@ -3287,7 +3287,7 @@ Other Stripe calls in this codebase pass an `idempotency_key` (e.g. `services/bi
 
 Fix: `idempotency_key=f"setup_intent:{company.id}:{int(time.time() // 60)}"` (1-minute window) or accept a client-supplied key from the request body.
 
-### 199. ~~Narrow the `except` in `customer.py:67`~~ — RESOLVED 2026-05-09
+### 199. [MEDIUM] ~~Narrow the `except` in `customer.py:67`~~ — RESOLVED 2026-05-09
 
 Replaced `except Exception` on the Customer-retrieve path with
 `except stripe.error.InvalidRequestError`. `resource_missing` (the
@@ -3317,7 +3317,7 @@ Bare `except Exception` on the Customer-retrieve path falls through to "create f
 
 Fix: catch only `stripe.error.InvalidRequestError` (which is what `resource_missing` raises). Re-raise `APIConnectionError` / `RateLimitError` so the request returns 5xx and the FE retries cleanly.
 
-### 200. ~~Atomic high-water update in `meter_events.py`~~ — RESOLVED 2026-05-09
+### 200. [MEDIUM] ~~Atomic high-water update in `meter_events.py`~~ — RESOLVED 2026-05-09
 
 Replaced the `company.seat_count_period_high_water = seat_count;
 await company.save()` last-writer-wins pattern with an atomic
@@ -3345,13 +3345,13 @@ await Company.find_one(
 ).update({"$set": {"seat_count_period_high_water": seat_count}})
 ```
 
-### 201. Use `Query(..., ge=1, le=50)` for `list_invoices` limit
+### 201. [LOW] Use `Query(..., ge=1, le=50)` for `list_invoices` limit
 **File**: `platform/routers/billing.py:282`
 **Severity**: LOW
 
 Inline `max(1, min(limit, 50))` clamping silently coerces bad input. `Query(12, ge=1, le=50)` returns a clean 422 instead.
 
-### 202. Validate Stripe `brand` against an allow-list before persisting
+### 202. [LOW] Validate Stripe `brand` against an allow-list before persisting
 **File**: `platform/services/billing/webhook_handlers.handle_payment_method_attached`, `platform/routers/billing.py:111`
 **Severity**: LOW
 
@@ -3359,7 +3359,7 @@ The brand string flows from Stripe → DB → FE rendering. Not a security issue
 
 Fix: lowercase and check membership in `{"visa", "mastercard", "amex", "discover", "diners", "jcb", "unionpay", "unknown"}` before persisting.
 
-### 203. Drop the `event_type or "unknown"` defensive branch
+### 203. [LOW] Drop the `event_type or "unknown"` defensive branch
 **File**: `platform/routers/stripe_webhooks.py:65`
 **Severity**: LOW
 
@@ -3367,7 +3367,7 @@ Signature verification has already passed, so the event is well-formed. A missin
 
 Fix: `event_type = event_dict["type"]` and let the KeyError bubble.
 
-### 204. Don't write Stripe webhook signing secret to repo working tree
+### 204. [LOW] Don't write Stripe webhook signing secret to repo working tree
 **File**: `platform/scripts/setup_stripe_webhook.py:140-157`
 **Severity**: LOW
 
@@ -3375,7 +3375,7 @@ The script writes the signing secret to `secrets/webhook_signing_secret.<id>.txt
 
 Fix: use `tempfile.NamedTemporaryFile(delete=False, dir="/tmp")` outside the repo, or print the secret to stderr and have the operator pipe to `.env` directly. Alternatively, register an `atexit` handler that clears the file unless `--keep-secret` was passed.
 
-### 205. ~~Persist `selectedPlan` to localStorage during onboarding~~ — RESOLVED 2026-05-09
+### 205. [MEDIUM] ~~Persist `selectedPlan` to localStorage during onboarding~~ — RESOLVED 2026-05-09
 
 `OnboardingPage` now persists the user's plan pick under
 `portal.onboardingSelectedPlan` alongside the step counter:
@@ -3400,7 +3400,7 @@ string rejection).
 
 Fix: persist `selectedPlan` alongside the step counter, OR call `billingApi.getSubscription(companyId)` in CompletionStep when `planLookupKey` is null and use the live plan.
 
-### 206. Generalize `PlanPickerGrid` button label
+### 206. [MEDIUM] Generalize `PlanPickerGrid` button label
 **File**: `portal/src/components/billing/PlanPickerGrid.tsx:140-145`
 **Severity**: MEDIUM
 
@@ -3408,7 +3408,7 @@ Fix: persist `selectedPlan` alongside the step counter, OR call `billingApi.getS
 
 Fix: ``Select ${plan.displayLabel} Plan`` — or just "Select plan" if displayLabel feels redundant.
 
-### 207. ~~Re-fetch SetupIntent on `companyId` change in AddPaymentMethodModal~~ — RESOLVED 2026-05-09
+### 207. [MEDIUM] ~~Re-fetch SetupIntent on `companyId` change in AddPaymentMethodModal~~ — RESOLVED 2026-05-09
 
 Verified the shipped effect already does the right thing:
 `useEffect(..., [open, companyId, stripeConfigured])` re-runs on every
@@ -3440,7 +3440,7 @@ The effect early-returns on `!open` and only re-fetches when `open` toggles. If 
 
 Fix: don't early-return on `!open`. Use `let cancelled = false` and only short-circuit the network fetch on `!open`, but let the effect re-run on `companyId` change. Or, if companyId is documented to be stable per session, accept that and add a comment.
 
-### 208. ~~Drive `billing-plans` constants from the BE `listPlans()` API~~ — RESOLVED 2026-05-09 (stopgap)
+### 208. [MEDIUM] ~~Drive `billing-plans` constants from the BE `listPlans()` API~~ — RESOLVED 2026-05-09 (stopgap)
 
 Stopgap shipped per the followup's recommendation. New
 `TestFrontendBackendPlanDriftGuard` class in
@@ -3464,7 +3464,7 @@ The file's docstring acknowledges this is a hand-maintained mirror of `plan_conf
 
 Fix: `billingApi.listPlans()` already exists. Drive the card grid from BE data. Keep only the **display-only** fields (tagline, features, supportLines, bottomInfoLines) hardcoded in the frontend. As a stopgap: add a unit test that compares the BE `listPlans` response shape against the FE constants and fails on drift.
 
-### 209. ~~Don't silently warn on `syncPaymentMethod` failure~~ — RESOLVED 2026-05-09
+### 209. [MEDIUM] ~~Don't silently warn on `syncPaymentMethod` failure~~ — RESOLVED 2026-05-09
 
 `AddPaymentMethodModal` now fires `Sentry.captureException(e, { tags:
 { feature: "billing", action: "sync_payment_method" }, extra: {
@@ -3485,7 +3485,7 @@ If `syncPaymentMethod` fails post-attach, only `console.warn` runs. The user see
 
 Fix: fire a Sentry capture (Sentry is already in deps). Optionally surface a non-blocking toast like "Card saved — refreshing details…" and trigger a BillingTab reload regardless of whether sync succeeded.
 
-### 210. `PlanStep` should disable the grid when `companyId` is null
+### 210. [MEDIUM] `PlanStep` should disable the grid when `companyId` is null
 **File**: `portal/src/components/onboarding/PlanStep.tsx:18-33`
 **Severity**: MEDIUM
 
@@ -3493,7 +3493,7 @@ If `companyId` is null when the user clicks Select, they see "Missing company co
 
 Fix: pass a `disabled` prop down to `PlanPickerGrid` when `!companyId`. Render an inline "Initializing your account…" notice instead of letting the user click and fail.
 
-### 211. Remove or use `publishable_key_hint`
+### 211. [LOW] Remove or use `publishable_key_hint`
 **File**: `portal/src/api/billing.ts:38-41`
 **Severity**: LOW
 
@@ -3501,7 +3501,7 @@ Fix: pass a `disabled` prop down to `PlanPickerGrid` when `!companyId`. Render a
 
 Fix: either remove from the type, or use it as a runtime sanity check ("BE hint disagrees with FE env" → log warning) inside `getStripePromise`.
 
-### 212. Drop `opacity-95` on coming-soon plans
+### 212. [LOW] Drop `opacity-95` on coming-soon plans
 **File**: `portal/src/components/billing/PlanPickerGrid.tsx:152`
 **Severity**: LOW
 
@@ -3509,7 +3509,7 @@ A 5% reduction is visually indistinguishable from full opacity. The intent is cl
 
 Fix: `opacity-70` or remove `dimWhenComingSoon` if the "Coming Soon" badge is enough.
 
-### 213. Pluralize plan summary copy
+### 213. [LOW] Pluralize plan summary copy
 **File**: `portal/src/components/onboarding/CompletionStep.tsx:23`
 **Severity**: LOW
 
@@ -3517,7 +3517,7 @@ Fix: `opacity-70` or remove `dimWhenComingSoon` if the "Coming Soon" badge is en
 
 Fix: `${n === 1 ? "team member" : "team members"}` — same for estimates.
 
-### 214. Map raw Stripe `subscription_status` to friendly labels in BillingTab
+### 214. [LOW] Map raw Stripe `subscription_status` to friendly labels in BillingTab
 **File**: `portal/src/components/settings/BillingTab.tsx:104-107`
 **Severity**: LOW
 
@@ -3525,7 +3525,7 @@ Fix: `${n === 1 ? "team member" : "team members"}` — same for estimates.
 
 Fix: small `STATUS_LABELS` map: `active → "Active"`, `past_due → "Past Due"`, `trialing → "Trialing"`, `incomplete → "Incomplete"`, `incomplete_expired → "Setup Expired"`, `canceled → "Canceled"`, `unpaid → "Unpaid"`.
 
-### 215. Drop redundant 5000-char client check in EnterpriseContactModal
+### 215. [LOW] Drop redundant 5000-char client check in EnterpriseContactModal
 **File**: `portal/src/components/billing/EnterpriseContactModal.tsx:56-58`
 **Severity**: LOW
 
@@ -3533,7 +3533,7 @@ Fix: small `STATUS_LABELS` map: `active → "Active"`, `past_due → "Past Due"`
 
 Fix: remove the duplicate check, or add a comment confirming it matches the BE `enterprise-contact` endpoint validation.
 
-### 216. Extract `<PlanSummaryBlock>` component
+### 216. [LOW] Extract `<PlanSummaryBlock>` component
 **File**: `portal/src/components/onboarding/CompletionStep.tsx:36-58`, `portal/src/components/settings/BillingTab.tsx`, `portal/src/components/billing/PlanPickerGrid.tsx`
 **Severity**: LOW
 
@@ -3547,7 +3547,7 @@ Fix: optional refactor — extract `<PlanSummaryBlock plan={plan} variant="onboa
 
 Visual pass on `PlanPickerGrid` — reordered the card sections (tagline → title → price → action → features → support → limits), bumped tagline / shrunk title, hid non-monetary price labels, fixed outline-button contrast on dark cards, swapped the Enterprise "Contact Sales" CTA for a disabled "Coming Soon" button, and updated the modal subtitle. Two findings logged below; the orphaned `EnterpriseContactModal` and the `priceLabel.startsWith("$")` heuristic were both flagged but explicitly marked TEMP-only by the user and not tracked here.
 
-### 217. Cover the new PlanPickerGrid behaviors with tests
+### 217. [MEDIUM] Cover the new PlanPickerGrid behaviors with tests
 **File**: `portal/tests/PlanPickerGrid.test.tsx`
 **Severity**: MEDIUM
 
@@ -3560,7 +3560,7 @@ Per the CLAUDE.md TDD policy, behavior changes need test updates. Existing tests
 
 Fix: add at least one assertion that a non-Free card does **not** render the literal string "Coming Soon" inside a `<p>` price element (only inside its disabled button). Optionally assert the action button precedes the features list in document order via `compareDocumentPosition`, and that outline buttons render with the `text-foreground` class.
 
-### 218. Mark the price placeholder div for testability and clarity
+### 218. [LOW] Mark the price placeholder div for testability and clarity
 **File**: `portal/src/components/billing/PlanPickerGrid.tsx:209`
 **Severity**: LOW
 
@@ -3575,7 +3575,7 @@ Fix: optional — add `data-testid="price-placeholder"` (also lets #217's tests 
 Findings from the post-implementation review of the twelve-followup
 batch. No CRITICAL / HIGH; four MEDIUMs and three LOWs.
 
-### 219. `VALID_PLAN_KEYS` duplicates `PLAN_LOOKUP_KEYS` from `billing-plans.ts`
+### 219. [MEDIUM] `VALID_PLAN_KEYS` duplicates `PLAN_LOOKUP_KEYS` from `billing-plans.ts`
 **File**: [portal/src/pages/OnboardingPage.tsx:21-25](../../portal/src/pages/OnboardingPage.tsx)
 **Severity**: MEDIUM
 
@@ -3591,7 +3591,7 @@ Fix: `import { PLAN_LOOKUP_KEYS } from "../lib/billing-plans"` and
 derive `const VALID_PLAN_KEYS: ReadonlySet<string> = new Set(PLAN_LOOKUP_KEYS)`.
 Roll into the next OnboardingPage edit.
 
-### 220. Onboarding plan-persistence test reimplements `readPersistedPlanKey`
+### 220. [MEDIUM] Onboarding plan-persistence test reimplements `readPersistedPlanKey`
 **File**: [portal/tests/onboardingPlanPersistence.test.tsx:11-17](../../portal/tests/onboardingPlanPersistence.test.tsx)
 **Severity**: MEDIUM
 
@@ -3607,7 +3607,7 @@ small `portal/src/lib/onboardingPlanStorage.ts` helper, export it, and
 have both `OnboardingPage.tsx` and the test import from there. Drives
 both sides from one source.
 
-### 221. `meter_events.report_seat_count` atomic update inside broad `except` swallows DB errors
+### 221. [MEDIUM] `meter_events.report_seat_count` atomic update inside broad `except` swallows DB errors
 **File**: [platform/services/billing/meter_events.py:99-122](../../platform/services/billing/meter_events.py)
 **Severity**: MEDIUM
 
@@ -3626,7 +3626,7 @@ or log via a distinct error path), OR tighten the except to
 `(stripe_sdk.error.StripeError,)` so DB errors surface, matching the
 narrow-except pattern landed in `customer.py` ([#199](#199-narrow-the-except-in-customerpy67)).
 
-### 222. `ESTIMATE_STATUS_TRANSITIONS` two-step construction in `models/estimate.py`
+### 222. [MEDIUM] `ESTIMATE_STATUS_TRANSITIONS` two-step construction in `models/estimate.py`
 **File**: [platform/models/estimate.py:36-92](../../platform/models/estimate.py)
 **Severity**: MEDIUM
 
@@ -3641,7 +3641,7 @@ annotations (no string forward refs), placed once before
 `validate_estimate_status_transition`. Identical behavior, cleaner
 ordering, easier to read.
 
-### 223. SetupIntent idempotency window not configurable
+### 223. [LOW] SetupIntent idempotency window not configurable
 **File**: [platform/routers/billing.py:271](../../platform/routers/billing.py)
 **Severity**: LOW
 
@@ -3655,7 +3655,7 @@ the request body, or expose the bucket size as a `Settings` field
 (`stripe_idempotency_window_seconds: int = 60`). Don't fix in
 isolation; roll into the next billing router touch.
 
-### 224. Sentry extras include Stripe PaymentMethod ID
+### 224. [LOW] Sentry extras include Stripe PaymentMethod ID
 **File**: [portal/src/components/billing/AddPaymentMethodModal.tsx:194-197](../../portal/src/components/billing/AddPaymentMethodModal.tsx)
 **Severity**: LOW
 
@@ -3671,7 +3671,7 @@ comment to document the stance, or move `paymentMethodId` from
 `extra` (indexed) to `contexts` (free-form attached metadata, less
 prominent in alert UIs).
 
-### 225. `APP_BASE_URL` has a localhost default that ships to production
+### 225. [LOW] `APP_BASE_URL` has a localhost default that ships to production
 **File**: [platform/config.py:80](../../platform/config.py)
 **Severity**: LOW
 
@@ -3700,7 +3700,7 @@ support email. Touches `website/public/contact-modal.js` (UI + payload)
 and `website/functions/index.js` (Cloud Function — accept the new
 boolean field, render it in the email body).
 
-### 226. `cm-waitlist` is used as both a CSS class and an element id
+### 226. [MEDIUM] `cm-waitlist` is used as both a CSS class and an element id
 **File**: [website/public/contact-modal.js:138, 252](../../website/public/contact-modal.js)
 **Severity**: MEDIUM
 
@@ -3717,7 +3717,7 @@ id to `cm-join-waitlist`), update the matching CSS selectors, and
 update the `<label for=…>` accordingly. ~5 line change. Roll into the
 next contact-modal touch.
 
-### 227. No automated tests for the new `joinWaitlist` field
+### 227. [LOW] No automated tests for the new `joinWaitlist` field
 **File**: [website/public/contact-modal.js:331](../../website/public/contact-modal.js), [website/functions/index.js:46-69, 166](../../website/functions/index.js)
 **Severity**: LOW
 
@@ -3735,7 +3735,7 @@ truthy values).
 Not blocking — there's no existing test surface to extend, and the
 change is self-contained.
 
-### 228. `form.joinWaitlist.checked` relies on the named-elements collection
+### 228. [LOW] `form.joinWaitlist.checked` relies on the named-elements collection
 **File**: [website/public/contact-modal.js:331](../../website/public/contact-modal.js)
 **Severity**: LOW
 
@@ -3751,7 +3751,7 @@ Fix: optional. Switch to
 reference like the other inputs at module scope) for clarity. Skip if
 you prefer to stay consistent with the existing style.
 
-### 229. Submit handler is ~60 lines after this change
+### 229. [LOW] Submit handler is ~60 lines after this change
 **File**: [website/public/contact-modal.js:316-386](../../website/public/contact-modal.js)
 **Severity**: LOW
 
@@ -3772,7 +3772,7 @@ batch that closed #99 / #172 / #178, partially closed #58 / #94, and
 consolidated #169 / #176 into #58. No CRITICAL; one HIGH (precedent-
 matched), two MEDIUM, two LOW.
 
-### 230. ~~`ActivitiesTable` default-export body exceeds 50-line ceiling~~ — RESOLVED 2026-05-09
+### 230. [HIGH] ~~`ActivitiesTable` default-export body exceeds 50-line ceiling~~ — RESOLVED 2026-05-09
 **File**: [portal/src/components/estimates/ActivitiesTable.tsx](../../portal/src/components/estimates/ActivitiesTable.tsx)
 **Severity**: HIGH (resolved)
 
@@ -3797,7 +3797,7 @@ are acceptable above it.
 Verified: 11/11 `WorkItemInlineContent.test.tsx` tests still pass,
 `tsc --noEmit` clean, `npm run lint` clean.
 
-### 231. No direct test for `ActivitiesTable`
+### 231. [MEDIUM] No direct test for `ActivitiesTable`
 **File**: [portal/src/components/estimates/ActivitiesTable.tsx](../../portal/src/components/estimates/ActivitiesTable.tsx)
 **Severity**: MEDIUM
 
@@ -3815,7 +3815,7 @@ vs. disabled by `rateCards.length`, the rate-card detail-row
 visibility on `effortCardItems.length > 0`, and `readOnly` mode
 hiding the trash and add buttons.
 
-### 232. `_build_response_envelope` lacks a direct shape test
+### 232. [MEDIUM] `_build_response_envelope` lacks a direct shape test
 **File**: [platform/agents/material/service.py](../../platform/agents/material/service.py)
 **Severity**: MEDIUM
 
@@ -3831,7 +3831,7 @@ Fix: add `test_build_response_envelope_shape` in
 parametrised cases (clarification path, success path) and asserting
 the 15-key set + the `matches` echo. ~15-line parametrized test.
 
-### 233. `_LABEL_PATTERNS` is a mutable class-level dict
+### 233. [LOW] `_LABEL_PATTERNS` is a mutable class-level dict
 **File**: [platform/agents/property/service.py:375](../../platform/agents/property/service.py)
 **Severity**: LOW
 
@@ -3845,7 +3845,7 @@ Fix: either annotate as
 `Final` and `Mapping` / `Sequence` from `typing`) or convert the
 inner `List[str]` values to tuples. Cosmetic; safe today.
 
-### 234. ~~`portalLayoutHelpers.tsx` mixes type-only and runtime exports~~ — RESOLVED 2026-05-09
+### 234. [LOW] ~~`portalLayoutHelpers.tsx` mixes type-only and runtime exports~~ — RESOLVED 2026-05-09
 **Severity**: LOW (resolved)
 
 Split during the same code-review pass that flagged it: the helpers
@@ -3865,7 +3865,7 @@ within each tier; severities are HIGH per the file-size guideline,
 but resolution will likely require multiple sessions per file. These
 are tracked under the broader #4 file/function-size theme.
 
-### 235. `platform/agents/estimate/service.py` is **6,066 lines** — the largest file in the repo, partial 2026-05-11
+### 235. [HIGH] `platform/agents/estimate/service.py` is **6,066 lines** — the largest file in the repo, partial 2026-05-11
 **File**: [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py)
 **Severity**: HIGH (in progress)
 
@@ -3993,7 +3993,7 @@ shell pattern in `routers/agent_helpers/`. Round 3 — extract the
 LangChain prompt + entity-extraction wiring into
 `agents/estimate/llm.py`. Each round individually testable.
 
-### 236. `portal/src/pages/SettingsPage.tsx` is **2,496 lines**
+### 236. [HIGH] `portal/src/pages/SettingsPage.tsx` is **2,496 lines**
 **File**: [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx)
 **Severity**: HIGH
 
@@ -4011,7 +4011,7 @@ time, keeping `SettingsPage.tsx` as a router/state shell. Risk:
 shared state between tabs (the company form, the active-tab
 indicator) needs threading via props or a small zustand-style hook.
 
-### 237. `platform/agents/material/service.py` is **2,745 lines** (file-level)
+### 237. [HIGH] `platform/agents/material/service.py` is **2,745 lines** (file-level)
 **File**: [platform/agents/material/service.py](../../platform/agents/material/service.py)
 **Severity**: HIGH (companion to #94)
 
@@ -4022,7 +4022,7 @@ phased split into `agents/material/helpers.py` (free functions,
 constants), `agents/material/handlers/<intent>.py` (per-intent
 handlers), `agents/material/llm.py` (LangChain entity extraction).
 
-### 238. `platform/routers/agents.py` is **2,640 lines**
+### 238. [HIGH] `platform/routers/agents.py` is **2,640 lines**
 **File**: [platform/routers/agents.py](../../platform/routers/agents.py)
 **Severity**: HIGH
 
@@ -4037,7 +4037,7 @@ to its own helper module, leaving the router as a dispatcher. The
 existing `text_helpers.py` / `estimate_update.py` /
 `fuzzy_confirmation.py` modules are the precedent.
 
-### 239. ~~`platform/routers/estimates.py` is **2,572 lines**~~ — RESOLVED 2026-05-11
+### 239. [HIGH] ~~`platform/routers/estimates.py` is **2,572 lines**~~ — RESOLVED 2026-05-11
 **File**: [platform/routers/estimates.py](../../platform/routers/estimates.py)
 **Severity**: HIGH
 
@@ -4141,20 +4141,20 @@ File size: 2,572 → 2,254 → 1,961 → 1,595 → 1,249 → **1,110** lines
 snapshot / quota / docs / versioning / job-item / agent-helpers
 suites.
 
-### 240. `platform/agents/property/service.py` is **2,386 lines**
+### 240. [HIGH] `platform/agents/property/service.py` is **2,386 lines**
 **File**: [platform/agents/property/service.py](../../platform/agents/property/service.py)
 **Severity**: HIGH (companion to #99)
 
 #99 closed the function-size half (the address-shape parsers).
 File size remains. Same fix-shape as #235/#237.
 
-### 241. `platform/agents/contact/service.py` is **2,378 lines**
+### 241. [HIGH] `platform/agents/contact/service.py` is **2,378 lines**
 **File**: [platform/agents/contact/service.py](../../platform/agents/contact/service.py)
 **Severity**: HIGH
 
 Mirror of the property/material agent files — same fix-shape.
 
-### 242. `portal/src/pages/NewEstimateWithActivityPage.tsx` is **1,814 lines**
+### 242. [HIGH] `portal/src/pages/NewEstimateWithActivityPage.tsx` is **1,814 lines**
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: HIGH
 
@@ -4166,7 +4166,7 @@ Fix: extract sub-components into `components/estimates/` siblings
 using the same pattern as the recent `WorkItemInlineContent.tsx` →
 `MaterialsTable.tsx` / `ActivitiesTable.tsx` split.
 
-### 243. `platform/agents/orchestrator/service.py` is **1,970 lines**
+### 243. [HIGH] `platform/agents/orchestrator/service.py` is **1,970 lines**
 **File**: [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py)
 **Severity**: HIGH
 
@@ -4179,13 +4179,13 @@ Fix: extract LLM-classifier path + delegation/parallel-fan-out
 helper into `agents/orchestrator/llm.py` and
 `agents/orchestrator/delegation.py`.
 
-### 244. `platform/agents/labour/service.py` is **1,732 lines**
-### 245. `portal/src/pages/MaterialsPage.tsx` is **1,421 lines**
-### 246. `platform/agents/equipment/service.py` is **1,343 lines**
-### 247. `portal/src/pages/ContactsPage.tsx` is **1,324 lines**
-### 248. `portal/src/pages/PeoplePage.tsx` is **1,024 lines**
-### 249. `portal/src/pages/PropertiesPage.tsx` is **878 lines**
-### 250. `platform/routers/auth.py` is **892 lines**
+### 244. [HIGH] `platform/agents/labour/service.py` is **1,732 lines**
+### 245. [HIGH] `portal/src/pages/MaterialsPage.tsx` is **1,421 lines**
+### 246. [HIGH] `platform/agents/equipment/service.py` is **1,343 lines**
+### 247. [HIGH] `portal/src/pages/ContactsPage.tsx` is **1,324 lines**
+### 248. [HIGH] `portal/src/pages/PeoplePage.tsx` is **1,024 lines**
+### 249. [HIGH] `portal/src/pages/PropertiesPage.tsx` is **878 lines**
+### 250. [HIGH] `platform/routers/auth.py` is **892 lines**
 
 Each of these is over the 800-line HIGH guideline. Same fix-shape
 as the corresponding agent / page entries above. Logged here so they
@@ -4200,7 +4200,7 @@ HIGH and MEDIUM findings from that pass were fixed in the same PR; these
 four are the remainder. See [`plans/llm-token-usage-metering.md`](./plans/llm-token-usage-metering.md)
 for the design context.
 
-### 251. Consolidate `ensure_*_price` helpers in `scripts/seed_stripe_products.py`
+### 251. [LOW] Consolidate `ensure_*_price` helpers in `scripts/seed_stripe_products.py`
 `ensure_flat_price`, `ensure_metered_overage_price`, and
 `ensure_metered_token_overage_price` share ~70% of their logic
 (lookup-key search, tier-drift comparator, archive-and-recreate flow).
@@ -4209,7 +4209,7 @@ Fix: refactor to a single `ensure_price(...)` driver that takes the
 Price-create kwargs plus a per-shape `drift_check(existing_full)` callable.
 Low risk, but defer until we add a fourth Price shape — premature otherwise.
 
-### 252. In-function imports in `services/billing/webhook_handlers.py`
+### 252. [LOW] In-function imports in `services/billing/webhook_handlers.py`
 `handle_invoice_paid` does `from models import User` inside the function
 for the per-user token-counter reset path. The rest of the module imports
 models at the top. Mixed style.
@@ -4217,7 +4217,7 @@ models at the top. Mixed style.
 Fix: move to module-top imports for consistency. Trivial cleanup; bundle
 with the next functional change to this file.
 
-### 253. Remove `TokenUsageAccumulator` from `agents/estimate/service.py`
+### 253. [LOW] Remove `TokenUsageAccumulator` from `agents/estimate/service.py`
 Class is deprecated (banner comment in place) but still ships so v1
 clients don't see a payload regression on the estimate-agent HTTP response
 shape. Its data now flows through the callback-driven
@@ -4228,7 +4228,7 @@ on the new path (so we have confidence the callback flow is the source of
 truth before dropping the legacy in-flight accumulator). Open a calendar
 reminder once production starts emitting `LLMUsageEvent` rows.
 
-### 254. Wire `request_id` if/when middleware exists
+### 254. [LOW] Wire `request_id` if/when middleware exists
 The optional `request_id` audit-log field on `LLMUsageEvent` was dropped
 this round because no caller passed it.
 
@@ -4241,7 +4241,7 @@ field back speculatively.
 
 ## 2026-05-10 `/code-review` pass (Properties/Contacts name column + current-plan button)
 
-### 255. Redundant `hover:bg-emerald-600` on current-plan button
+### 255. [LOW] Redundant `hover:bg-emerald-600` on current-plan button
 `portal/src/components/billing/PlanPickerGrid.tsx:134` — the
 `buttonClass` for the current plan includes both `bg-emerald-600` and
 `hover:bg-emerald-600`. The hover variant matches the base, and the
@@ -4266,7 +4266,7 @@ and calling it from the `blocked` branch in
 and the overage bills at cycle close. The MEDIUM/LOW items below are
 deferred.
 
-### 256. `detail` lacks an explicit type annotation in the orchestrate credits-gate try/except
+### 256. [MEDIUM] `detail` lacks an explicit type annotation in the orchestrate credits-gate try/except
 `platform/routers/agents.py:633` — `mypy . --ignore-missing-imports`
 reports `Need type annotation for "detail" (hint: "detail: dict[<type>, <type>] = ...")`
 on:
@@ -4285,7 +4285,7 @@ detail: Dict[str, Any] = exc.detail if isinstance(exc.detail, dict) else {}
 
 Small, mechanical. Apply next time `routers/agents.py` is touched.
 
-### 257. `routers/agents.py` is now 2810 lines (was 2631 pre-PR)
+### 257. [MEDIUM] `routers/agents.py` is now 2810 lines (was 2631 pre-PR)
 This PR added ~120 lines (3 gate helpers + 2 refactored call sites,
 all small and focused). Builds on the existing file-size HIGH in
 [#4](#4-file-and-function-size). The next round of extractions could
@@ -4296,7 +4296,7 @@ into `routers/agent_helpers/plan_gates.py`. The other
 standalone `/agents/estimate` endpoint) could reuse the same primitives
 if you want the same chat-style refusal there too.
 
-### 258. "Yes" button on the estimate-limit dialog needs an `aria-label` for screen readers
+### 258. [LOW] "Yes" button on the estimate-limit dialog needs an `aria-label` for screen readers
 `portal/src/pages/EstimatesPage.tsx:425` — the confirm button reads only
 "Yes". Sighted users see the modal body for context; assistive tech
 announces "Yes button" with nothing tying it to the action. Spec
@@ -4326,7 +4326,7 @@ The two HIGHs from this pass were fixed in-PR
 (`duplicate_estimate` quota rollback + PortalLayout refusal-sentence
 restructure). MEDIUMs and LOW captured here.
 
-### 259. Migration script uses Beanie field descriptors as `.set()` keys
+### 259. [MEDIUM] Migration script uses Beanie field descriptors as `.set()` keys
 `platform/scripts/db/migrate_approved_to_sent.py:60` calls
 `estimate.set({Estimate.status: ..., Estimate.updated_at: ...})`. The
 rest of `routers/estimates.py` (3 call sites at 910, 993, 1071) uses
@@ -4334,7 +4334,7 @@ string keys: `estimate.set({"status": ..., "updated_at": ...})`. Beanie
 tolerates both forms but the inconsistency is surprising. Low-effort
 fix — swap the keys to string literals to match the codebase.
 
-### 260. `routers/estimates.py` over the 800-line soft cap (1294 lines)
+### 260. [MEDIUM] `routers/estimates.py` over the 800-line soft cap (1294 lines)
 Pre-existing under the file-size theme
 ([#4](#4-file-and-function-size) and
 [#239](#239-platformroutersestimatespy-is-2572-lines--resolved-2026-05-11)).
@@ -4346,7 +4346,7 @@ modules (`snapshots.py`, `job_item_builders.py`, etc.). The quota-claim
 + release pattern is the same as `create_estimate`, so a small shared
 helper would also DRY both paths.
 
-### 261. Session-stored estimate filter can be the now-removed "Approved" value (LOW)
+### 261. [LOW] Session-stored estimate filter can be the now-removed "Approved" value
 `portal/src/pages/EstimatesPage.tsx:96` —
 `sessionStorage.getItem("estimatesStatusFilter") ?? "Draft"` is read
 verbatim. Users who had `Approved` selected before the swap will see
@@ -4368,7 +4368,7 @@ Pipeline Status switched to a vertical histogram, status colors
 recolored across the app. Three MEDIUMs and the `<$1k` LOW were fixed
 in-PR. One LOW remains.
 
-### 262. `Math.max(heightPct, 4)` uses an unnamed minimum bar floor (LOW)
+### 262. [LOW] `Math.max(heightPct, 4)` uses an unnamed minimum bar floor
 `portal/src/pages/DashboardPage.tsx:367` — the `4` is the minimum
 bar-height percentage so a non-zero count is always visible above the
 2px empty-state line. Pull to a named constant
@@ -4387,7 +4387,7 @@ moderate, all in dev-only `vite` / `vitest` / `esbuild` chains that
 require a semver-major upgrade — tracked as #263 below). Three LOWs
 remain.
 
-### 263. Remaining `vite` / `vitest` / `esbuild` advisories require a semver-major bump (LOW)
+### 263. [LOW] Remaining `vite` / `vitest` / `esbuild` advisories require a semver-major bump
 `portal/package.json` — 5 moderate-severity advisories left after
 `npm audit fix`: vite path-traversal in optimized-deps `.map` handling,
 vite `server.fs` HTML-bypass, `@vitest/mocker`, `vite-node`, `vitest`.
@@ -4397,7 +4397,7 @@ broader tooling refresh — don't tack it onto a feature branch, since
 the Vite 8 / Vitest 4 migrations may surface config and plugin changes
 across the portal.
 
-### 264. Description label not programmatically associated with the editor (LOW)
+### 264. [LOW] Description label not programmatically associated with the editor
 `portal/src/pages/NewEstimateWithActivityPage.tsx:1036` and
 `portal/src/components/estimates/WorkItemInlineContent.tsx:371` — the
 "Description" label renders as a plain `<span>` / `<h3>` with no `id`
@@ -4409,7 +4409,7 @@ and pass `aria-labelledby="..."` through `MarkdownDescriptionEditor`
 to the underlying `MDXEditor` (props pass-through prop, or accept it
 on the wrapper).
 
-### 265. Generic `data-toolbar-visible` attribute could collide (LOW)
+### 265. [LOW] Generic `data-toolbar-visible` attribute could collide
 `portal/src/styles/index.css:6` and
 `portal/src/components/common/MarkdownDescriptionEditor.tsx:124` —
 the CSS rule keys off a non-namespaced `data-toolbar-visible`
@@ -4418,7 +4418,7 @@ that another component could reuse it. Rename to
 `data-mdx-toolbar-visible` in both the CSS rule and the wrapper so
 the contract is explicit.
 
-### 266. `onBlur` prop fires on every contenteditable blur, not just true wrapper-exit (LOW)
+### 266. [LOW] `onBlur` prop fires on every contenteditable blur, not just true wrapper-exit
 `portal/src/components/common/MarkdownDescriptionEditor.tsx:132` —
 mdxeditor's `onBlur` is forwarded raw, so the parent's `onBlur` runs
 whenever focus leaves the contenteditable (e.g. when the user clicks
@@ -4432,7 +4432,7 @@ dedupe.
 
 ## MEDIUM
 
-### 267. Mobile-vs-desktop breakpoint hardcoded inside MapleMarkdown click handler
+### 267. [MEDIUM] Mobile-vs-desktop breakpoint hardcoded inside MapleMarkdown click handler
 `portal/src/components/Layout/MapleMarkdown.tsx:75-82` — the new
 "close Maple panel after internal link click on mobile" behavior
 reads `window.matchMedia("(max-width: 1023px)")` inline. The 1023px
@@ -4445,14 +4445,14 @@ constant) and use it in both places.
 
 ## LOW
 
-### 268. `<AiPanelProvider>` top-level wrap not re-indented in PortalLayout
+### 268. [LOW] `<AiPanelProvider>` top-level wrap not re-indented in PortalLayout
 `portal/src/components/Layout/PortalLayout.tsx:966` and `:1925` —
 when `AiPanelProvider` was hoisted to wrap the whole layout return,
 the inner `<div className="flex h-screen …">` was left at the same
 indentation as the new provider tag. Functionally fine, just
 inconsistent. Fix: Prettier pass over the file.
 
-### 269. `React.ReactNode` referenced without explicit React import in MapleMarkdown.test.tsx
+### 269. [LOW] `React.ReactNode` referenced without explicit React import in MapleMarkdown.test.tsx
 `portal/tests/MapleMarkdown.test.tsx:13` — `renderInRouter` types
 its `node` param as `React.ReactNode` but the file doesn't
 `import React` or `import type { ReactNode } from "react"`. Resolves
@@ -4460,6 +4460,57 @@ today via the global `React` namespace from `@types/react`, but
 breaks if the project ever tightens `tsconfig.compilerOptions.types`
 or removes the global declaration. Fix: `import type { ReactNode }
 from "react"` and reference `ReactNode` directly.
+
+### 270. [MEDIUM] `EstimatesTable.tsx` layout comment references `min-w-0` but cells use `min-w-[8rem]`
+`portal/src/components/common/EstimatesTable.tsx:137-140` — the
+new layout-rationale comment claims Title/Property "can shrink to
+a small floor (`min-w-0` lets a long word break instead of forcing
+the column wide)", but the `<th>` cells actually use
+`min-w-[8rem]` (128px). `min-w-0` is nowhere on either cell. A
+reader trusting the comment will misjudge how narrow the columns
+can get. Fix: update the comment to match the 8rem floor, or add
+`min-w-0` to the inner content div if word-break behavior is
+actually wanted alongside the cell floor.
+
+### 271. [LOW] Clear-all toolbar button bypasses `handleMarkdownChange`
+`portal/src/components/common/MarkdownDescriptionEditor.tsx:97` —
+the toolbar Clear button calls `onChangeRef.current("")`
+directly, skipping `handleMarkdownChange`, so `lastEmittedRef`
+isn't updated. The visible behavior is correct (sync effect
+re-runs and calls `setMarkdown("")`), but the asymmetry breaks
+the invariant "lastEmittedRef equals the most recent value we
+emitted" that the sync guard relies on. Fix: route Clear through
+`handleMarkdownChange("")` so every emit path updates the ref.
+
+### 272. [LOW] `lastEmittedRef` is never re-synced from external updates
+`portal/src/components/common/MarkdownDescriptionEditor.tsx:57` —
+when the sync effect calls `setMarkdown(value)` for an external
+update, it doesn't write `lastEmittedRef.current = value`. We get
+away with it today because mdxeditor fires `onChange` after
+`setMarkdown` and the ref catches up via that path, but the
+invariant is implicit. If a future mdxeditor version stops
+emitting onChange on setMarkdown, the next external sync could
+falsely short-circuit. Fix: set `lastEmittedRef.current = value`
+inside the sync effect right after the `setMarkdown` call.
+
+### 273. [LOW] NBSP literal in `markdownBlankParagraphs.ts` is invisible in source, no test imports the constant
+`portal/src/components/common/markdownBlankParagraphs.ts:7` —
+`NBSP_PARAGRAPH = " "` contains a literal U+00A0 byte-different
+from regular space but visually identical. The test file
+reconstructs its own `NBSP = " "` constant rather than importing
+this one, so a slip on either side passes silently. Fix: either
+export `NBSP_PARAGRAPH` and import it in the test for a single
+source of truth, or write the constant as
+`String.fromCharCode(0xA0)` so it's unambiguous in source.
+
+### 274. [LOW] `encodeBlankParagraphs` runs on every keystroke
+`portal/src/components/common/MarkdownDescriptionEditor.tsx:90-96` —
+`handleMarkdownChange` runs the regex scan on every onChange,
+which scales linearly with description length. Not a real perf
+concern at human typing speed, but worth profiling if estimate
+descriptions ever grow into the multi-thousand-character range
+(e.g. AI-generated long-form descriptions). Fix: only revisit if
+profiling surfaces it.
 
 ---
 
