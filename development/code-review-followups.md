@@ -5342,6 +5342,25 @@ constant) and use it in both places.
 
 </details>
 
+---
+
+### 268. [MEDIUM] `website/functions/index.js` `contact` handler is ~190 lines
+**Folded into #4.** Specific instance of the "file and function size" theme; tracked at the parent.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+Surfaced 2026-05-15 during the Brevo contact-sync review. The handler
+already exceeded the 50-line guideline before this change; adding the
+Brevo sync call pushed it further. Validation, captcha, email body
+construction, send, and the Brevo sync are all inlined. Candidate
+extractions: `validateContactInput()`, `verifyCaptcha()`,
+`sendNotificationEmail()` (the Brevo sync is already extracted to
+`syncContactToBrevo()`). Out of scope for the Brevo change — the
+sync addition itself is small and self-contained.
+
+</details>
+
 
 ## How to work through this
 
