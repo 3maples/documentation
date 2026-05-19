@@ -637,67 +637,6 @@ Fix: widen `handleSaveEstimate` to return
 `Promise<EstimateWithExtras | null>` and use the resolved value instead
 of the closure reference.
 
-### 58. [HIGH] `PortalLayout.tsx` over the 800-line HIGH threshold (canonical)
-**Severity**: HIGH (in progress — partial 2026-05-09)
-Canonical entry; #169 and #176 are duplicate flags from later review
-passes — consolidated here on 2026-05-09.
-
-Progress 2026-05-09: extracted pure-data and pure-helper layers out of
-the file:
-- `components/Layout/portalLayoutData.ts` — `countryOptions`,
-  `canadaProvinceOptions`, `usStateOptions`, `ProvinceStateOption`
-- `components/Layout/portalLayoutHelpers.tsx` — `getCompanyFormState`,
-  `getAccountFormState`, `createConversationId`,
-  `isAuthenticatedMember`, `ThinkingIndicator`, plus the
-  `CompanyFormState` / `AccountFormState` / `CompanyDetails` /
-  `PortalUser` / `TeamMember` interfaces.
-
-Result: 2,094 → 1,917 lines. Still over the 800 HIGH threshold; full
-suite (477 portal tests) and `tsc --noEmit` both clean.
-
-Progress 2026-05-19: extracted the Company settings dialog into
-`components/Layout/CompanyDialog.tsx` (~364 lines moved). The new
-component takes 14 props (open, onClose, isLoading, isEditing,
-isSaving, companyDetails, companyForm, companyFormError,
-provinceStateOptions, provinceStateLabel, onEdit, onCancelEdit, onSave,
-onFieldChange). PortalLayout.tsx now at 1,559 lines. Lint + build
-clean; no PortalLayout component tests exist yet so verification is
-build-level only.
-
-Progress 2026-05-19 (session 2): extracted the Account/Settings modal
-into `components/Layout/SettingsDialog.tsx` (~119 lines moved, 174-line
-new file). The new component takes 11 props (open, onClose,
-currentUser, accountForm, accountFormError, isAccountEditing,
-isAccountSaving, onAccountFieldChange, onAccountEdit,
-onAccountCancelEdit, onAccountSave). PortalLayout.tsx now at 1,440
-lines. Also removed now-unused `PhoneInput` and `formatPhone` imports
-from PortalLayout.tsx. Lint, `tsc --noEmit`, and build all clean.
-
-Progress 2026-05-19 (session 3): extracted the Team Members modal into
-`components/Layout/TeamMembersDialog.tsx` (~68 lines moved, 107-line
-new file). The new component takes 6 props (open, onClose, teamMembers,
-isTeamMembersLoading, teamMembersError, currentUser). PortalLayout.tsx
-now at 1,372 lines. Also removed now-unused `Modal` and
-`isAuthenticatedMember` imports from PortalLayout.tsx. Lint,
-`tsc --noEmit`, and build all clean. The right-side Maple AI panel
-state extraction was considered but deferred: `aiContext`,
-`currentViewedEstimate`, and several effects cross panel/route/company
-boundaries (e.g. `aiContext` is rewritten on company-change events and
-route changes, not just by panel handlers), so a clean hook boundary
-requires more tracing than fits a single bounded session.
-
-Next steps (left for a planned session — risky without component
-tests for `PortalLayout`): extract the three big in-file modals
-(Settings ~130 lines, Company ~378 lines, TeamMembers ~74 lines), the
-mobile + desktop AI panel branches, and the `MapleFloatingButton`.
-The Maple panel (header + messages + composer + footer +
-Feedback/ChangeLog overlays) is a natural `components/maple/MaplePanel.tsx`
-with a `variant="mobile" | "desktop"` prop since both branches render
-nearly-identical markup. Until component tests exist for PortalLayout,
-each modal extraction needs a manual UI smoke test.
-
-**Absorbed:** #126, #169, #176 — duplicate findings on the same file from later review passes. See `## Closed` for their original bodies.
-
 ### 59. [LOW] Drive-filename filename-collision policy still implicit
 **Severity**: LOW
 The 2026-04-23 fix put the estimate_id back into the Drive filename
@@ -3090,6 +3029,101 @@ shows ✅ Tier 1 for every `what's <name>'s <field>?` case across all
 four resources.
 
 ---
+
+### 58. [HIGH] `PortalLayout.tsx` over the 800-line HIGH threshold (canonical)
+**Closed as resolved 2026-05-13.** Multi-session refactor reduced PortalLayout.tsx from 1,923 to under 800 lines across 5 sessions. Final state: 598 lines. Extractions: CompanyDialog, SettingsDialog, TeamMembersDialog, AiPanel, and hooks (useMapleAgent / useCompanyDetails / useAccountForm). All session diffs are byte-preserving refactors; user smoke-tested at each step.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+**Severity**: HIGH (in progress — partial 2026-05-09)
+Canonical entry; #169 and #176 are duplicate flags from later review
+passes — consolidated here on 2026-05-09.
+
+Progress 2026-05-09: extracted pure-data and pure-helper layers out of
+the file:
+- `components/Layout/portalLayoutData.ts` — `countryOptions`,
+  `canadaProvinceOptions`, `usStateOptions`, `ProvinceStateOption`
+- `components/Layout/portalLayoutHelpers.tsx` — `getCompanyFormState`,
+  `getAccountFormState`, `createConversationId`,
+  `isAuthenticatedMember`, `ThinkingIndicator`, plus the
+  `CompanyFormState` / `AccountFormState` / `CompanyDetails` /
+  `PortalUser` / `TeamMember` interfaces.
+
+Result: 2,094 → 1,917 lines. Still over the 800 HIGH threshold; full
+suite (477 portal tests) and `tsc --noEmit` both clean.
+
+Progress 2026-05-19: extracted the Company settings dialog into
+`components/Layout/CompanyDialog.tsx` (~364 lines moved). The new
+component takes 14 props (open, onClose, isLoading, isEditing,
+isSaving, companyDetails, companyForm, companyFormError,
+provinceStateOptions, provinceStateLabel, onEdit, onCancelEdit, onSave,
+onFieldChange). PortalLayout.tsx now at 1,559 lines. Lint + build
+clean; no PortalLayout component tests exist yet so verification is
+build-level only.
+
+Progress 2026-05-19 (session 2): extracted the Account/Settings modal
+into `components/Layout/SettingsDialog.tsx` (~119 lines moved, 174-line
+new file). The new component takes 11 props (open, onClose,
+currentUser, accountForm, accountFormError, isAccountEditing,
+isAccountSaving, onAccountFieldChange, onAccountEdit,
+onAccountCancelEdit, onAccountSave). PortalLayout.tsx now at 1,440
+lines. Also removed now-unused `PhoneInput` and `formatPhone` imports
+from PortalLayout.tsx. Lint, `tsc --noEmit`, and build all clean.
+
+Progress 2026-05-19 (session 3): extracted the Team Members modal into
+`components/Layout/TeamMembersDialog.tsx` (~68 lines moved, 107-line
+new file). The new component takes 6 props (open, onClose, teamMembers,
+isTeamMembersLoading, teamMembersError, currentUser). PortalLayout.tsx
+now at 1,372 lines. Also removed now-unused `Modal` and
+`isAuthenticatedMember` imports from PortalLayout.tsx. Lint,
+`tsc --noEmit`, and build all clean. The right-side Maple AI panel
+state extraction was considered but deferred: `aiContext`,
+`currentViewedEstimate`, and several effects cross panel/route/company
+boundaries (e.g. `aiContext` is rewritten on company-change events and
+route changes, not just by panel handlers), so a clean hook boundary
+requires more tracing than fits a single bounded session.
+
+Progress 2026-05-19 (session 4): extracted the Maple AI panel
+(desktop right-side aside + mobile bottom-sheet aside + floating
+toggle button + message/composer render helpers) into
+`components/Layout/AiPanel.tsx` (~216 lines moved, 308-line new
+file). State stays in PortalLayout; AiPanel is purely presentational
+with 18 props across 5 categories: open state (2), conversation
+state (4), composer callbacks (5), refs (2), side-panel state (4),
+nav-footer JSX (1). The `HELP_CHIPS` constant and `AiMessage`
+interface moved with the component (AiMessage re-exported and
+re-imported by PortalLayout for its useState typing). Also removed
+now-unused `Send`/`Trash2`/`Loader2` lucide imports and
+`MapleMarkdown`/`ThinkingIndicator`/`FeedbackPanel`/`ChangeLogPanel`
+imports from PortalLayout.tsx. PortalLayout.tsx now at 1,156 lines
+(cumulative 1,923 -> 1,156 across sessions 1-4 = 767 lines reduced).
+AiPanelProvider boundary stays in PortalLayout wrapping the whole
+tree, untouched. Lint, `tsc --noEmit`, and build all clean.
+
+Progress 2026-05-13 (session 5): extracted `useMapleAgent` /
+`useCompanyDetails` / `useAccountForm` hooks (~558 lines moved across
+three new files: useMapleAgent.ts 398 lines, useCompanyDetails.ts 233
+lines, useAccountForm.ts 135 lines). PortalLayout.tsx now at 598
+lines — under the 800-line threshold. The combined company-changed
++ estimate-loaded `useEffect` was split into two independent effects
+(one per hook); both register listeners on mount with `[]` deps and
+have no shared state, so behavior is identical. Lint, `tsc --noEmit`,
+and build all clean.
+
+Next steps (left for a planned session — risky without component
+tests for `PortalLayout`): extract the three big in-file modals
+(Settings ~130 lines, Company ~378 lines, TeamMembers ~74 lines), the
+mobile + desktop AI panel branches, and the `MapleFloatingButton`.
+The Maple panel (header + messages + composer + footer +
+Feedback/ChangeLog overlays) is a natural `components/maple/MaplePanel.tsx`
+with a `variant="mobile" | "desktop"` prop since both branches render
+nearly-identical markup. Until component tests exist for PortalLayout,
+each modal extraction needs a manual UI smoke test.
+
+**Absorbed:** #126, #169, #176 — duplicate findings on the same file from later review passes. See `## Closed` for their original bodies.
+
+</details>
 
 ---
 
