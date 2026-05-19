@@ -2524,19 +2524,6 @@ Review of the 211-test backfill that closed item #7 ("Missing tests for new
 public functions"). Production code unchanged; findings below all apply to
 the new test files themselves.
 
-### 275. [HIGH] `platform/tests/test_cross_resource_envelope_helpers.py` exceeds 800-line threshold
-File is 1,175 lines holding 40 tests across 10 cross-resource envelope
-helpers. Shared fake-model scaffolding lives inline to avoid the cost of
-spinning up real Beanie models. The 800-line guideline from CLAUDE.md
-applies in principle; in practice this is the trade-off of inline-explicit
-test setup over hidden fixtures.
-
-Fix: optional. If splitting, the natural boundary is by agent —
-`test_cross_resource_envelope_contact.py` (4 helpers) vs
-`test_cross_resource_envelope_property.py` (6 helpers) — with the shared
-fake-model classes moved into a small `conftest_cross_resource.py` helper
-imported by both. Could also fold under #4 as another file-size instance.
-
 ### 276. [MEDIUM] Long test functions in #7 backfill tests
 Five test functions across two files exceed the 50-line guideline:
 
@@ -5413,6 +5400,28 @@ and easier to localize later.
 
 Fix: define `CARD_MESSAGE` and `NO_CARD_MESSAGE` as two complete
 constants and pick between them.
+
+---
+
+### 275. [HIGH] `platform/tests/test_cross_resource_envelope_helpers.py` exceeds 800-line threshold
+**Closed as resolved 2026-05-13.** Split into `test_cross_resource_envelope_contact.py` (475 lines, 16 tests) and `test_cross_resource_envelope_property.py` (648 lines, 24 tests), with shared fake-model scaffolding extracted into `_cross_resource_fakes.py`. All 40 tests still pass.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+File is 1,175 lines holding 40 tests across 10 cross-resource envelope
+helpers. Shared fake-model scaffolding lives inline to avoid the cost of
+spinning up real Beanie models. The 800-line guideline from CLAUDE.md
+applies in principle; in practice this is the trade-off of inline-explicit
+test setup over hidden fixtures.
+
+Fix: optional. If splitting, the natural boundary is by agent —
+`test_cross_resource_envelope_contact.py` (4 helpers) vs
+`test_cross_resource_envelope_property.py` (6 helpers) — with the shared
+fake-model classes moved into a small `conftest_cross_resource.py` helper
+imported by both. Could also fold under #4 as another file-size instance.
+
+</details>
 
 
 ## How to work through this
