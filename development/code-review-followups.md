@@ -2571,6 +2571,38 @@ Fix: bump `lazy_model` when an upstream release addresses the deprecation,
 or pin Pydantic to <2.11 until then. Track upstream
 [BAMR-team/lazy-model](https://github.com/roman-right/lazy-model).
 
+### 269. [MEDIUM] Overage-dialog audit-event failures swallowed without Sentry capture
+Surfaced 2026-05-19 in the overage-acknowledgment-dialog review.
+
+`portal/src/pages/EstimatesPage.tsx` (the `handleOverageConfirm` and
+`handleOverageAddCard` paths) and `portal/src/pages/SettingsPage.tsx`
+(`handleConfirmSeatsOverage`, `handleOpenAddCardFromWarning`) wrap
+`usersApi.recordOverageEvent(...)` in bare `try { ... } catch {}`.
+Failures are silent, so a regression in the `/users/me/overage-event`
+endpoint or the audit-log pipeline would go unnoticed.
+
+`portal/src/components/billing/AddPaymentMethodModal.tsx:197` already
+establishes the pattern of `Sentry.captureException(e, { tags: ... })`
+for non-blocking failures. Apply the same pattern to all four sites so
+silent regressions surface in Sentry.
+
+Fix: replace each `catch {}` with
+`catch (e) { Sentry.captureException(e, { tags: { feature: "overage_dialog", action: "<acknowledged|add_card_clicked|pref_persist>" } }); }`.
+
+### 270. [MEDIUM] `OverageWarningDialog` `aria-labelledby` points at a `<span>` inside the heading
+Surfaced 2026-05-19 in the overage-acknowledgment-dialog review.
+
+`portal/src/components/billing/OverageWarningDialog.tsx:60-62` —
+`DialogContent ariaLabelledBy="overage-warning-title"` resolves to an
+`id` placed on a `<span>` inside the `<h2>` rendered by `DialogTitle`.
+Screen readers still find the label text, but the convention is for
+`aria-labelledby` to point at the heading element itself, not a child
+of it.
+
+Fix: either drop the inner `<span id>` and let `DialogContent` derive a
+default label, or extend `DialogTitle` to accept an `id` prop that lands
+on the underlying `<h2>` (preferred — minor `ui/dialog.tsx` change).
+
 ## LOW
 
 ### 268. [LOW] `<AiPanelProvider>` top-level wrap not re-indented in PortalLayout
@@ -5360,6 +5392,27 @@ extractions: `validateContactInput()`, `verifyCaptcha()`,
 sync addition itself is small and self-contained.
 
 </details>
+
+### 271. [LOW] `OverageWarningDialog` redundant open-state guard
+Surfaced 2026-05-19 in the overage-acknowledgment-dialog review.
+
+`portal/src/components/billing/OverageWarningDialog.tsx:54` has
+`if (!open) return null;` immediately before returning `<Dialog>`,
+which itself already returns `null` when `open=false`
+(`portal/src/components/ui/dialog.tsx:11`). Dead code.
+
+Fix: drop the component-level guard; let `Dialog` handle it.
+
+### 272. [LOW] `OverageWarningDialog` body copy assembled via string concatenation
+Surfaced 2026-05-19 in the overage-acknowledgment-dialog review.
+
+`portal/src/components/billing/OverageWarningDialog.tsx:64` —
+`{hasPaymentMethod ? BASE_MESSAGE : BASE_MESSAGE + NO_CARD_SUFFIX}`
+works but reads oddly. Two explicit, complete strings would be clearer
+and easier to localize later.
+
+Fix: define `CARD_MESSAGE` and `NO_CARD_MESSAGE` as two complete
+constants and pick between them.
 
 
 ## How to work through this
