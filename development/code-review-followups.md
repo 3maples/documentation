@@ -664,6 +664,15 @@ onFieldChange). PortalLayout.tsx now at 1,559 lines. Lint + build
 clean; no PortalLayout component tests exist yet so verification is
 build-level only.
 
+Progress 2026-05-19 (session 2): extracted the Account/Settings modal
+into `components/Layout/SettingsDialog.tsx` (~119 lines moved, 174-line
+new file). The new component takes 11 props (open, onClose,
+currentUser, accountForm, accountFormError, isAccountEditing,
+isAccountSaving, onAccountFieldChange, onAccountEdit,
+onAccountCancelEdit, onAccountSave). PortalLayout.tsx now at 1,440
+lines. Also removed now-unused `PhoneInput` and `formatPhone` imports
+from PortalLayout.tsx. Lint, `tsc --noEmit`, and build all clean.
+
 Next steps (left for a planned session — risky without component
 tests for `PortalLayout`): extract the three big in-file modals
 (Settings ~130 lines, Company ~378 lines, TeamMembers ~74 lines), the
