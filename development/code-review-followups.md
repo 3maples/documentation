@@ -655,6 +655,15 @@ the file:
 Result: 2,094 → 1,917 lines. Still over the 800 HIGH threshold; full
 suite (477 portal tests) and `tsc --noEmit` both clean.
 
+Progress 2026-05-19: extracted the Company settings dialog into
+`components/Layout/CompanyDialog.tsx` (~364 lines moved). The new
+component takes 14 props (open, onClose, isLoading, isEditing,
+isSaving, companyDetails, companyForm, companyFormError,
+provinceStateOptions, provinceStateLabel, onEdit, onCancelEdit, onSave,
+onFieldChange). PortalLayout.tsx now at 1,559 lines. Lint + build
+clean; no PortalLayout component tests exist yet so verification is
+build-level only.
+
 Next steps (left for a planned session — risky without component
 tests for `PortalLayout`): extract the three big in-file modals
 (Settings ~130 lines, Company ~378 lines, TeamMembers ~74 lines), the
