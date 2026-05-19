@@ -673,6 +673,19 @@ onAccountCancelEdit, onAccountSave). PortalLayout.tsx now at 1,440
 lines. Also removed now-unused `PhoneInput` and `formatPhone` imports
 from PortalLayout.tsx. Lint, `tsc --noEmit`, and build all clean.
 
+Progress 2026-05-19 (session 3): extracted the Team Members modal into
+`components/Layout/TeamMembersDialog.tsx` (~68 lines moved, 107-line
+new file). The new component takes 6 props (open, onClose, teamMembers,
+isTeamMembersLoading, teamMembersError, currentUser). PortalLayout.tsx
+now at 1,372 lines. Also removed now-unused `Modal` and
+`isAuthenticatedMember` imports from PortalLayout.tsx. Lint,
+`tsc --noEmit`, and build all clean. The right-side Maple AI panel
+state extraction was considered but deferred: `aiContext`,
+`currentViewedEstimate`, and several effects cross panel/route/company
+boundaries (e.g. `aiContext` is rewritten on company-change events and
+route changes, not just by panel handlers), so a clean hook boundary
+requires more tracing than fits a single bounded session.
+
 Next steps (left for a planned session — risky without component
 tests for `PortalLayout`): extract the three big in-file modals
 (Settings ~130 lines, Company ~378 lines, TeamMembers ~74 lines), the
