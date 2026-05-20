@@ -5489,6 +5489,97 @@ imported by both. Could also fold under #4 as another file-size instance.
 </details>
 
 
+## 2026-05-19 review (overage acknowledgment dialog)
+
+Captured after the per-resource overage acknowledgment dialog change. Three
+MEDIUM findings; one was fixed in the same PR (subscription refresh on
+sentinel-link open), one was extracted into a hook + unit-tested, and one is
+deferred here as it requires a chat-retry mechanism that's out of spec for the
+current change.
+
+### 276. [LOW] Unused `_showNextTime` parameter in `handleConfirmSeatsOverage`
+
+`portal/src/pages/SettingsPage.tsx:handleConfirmSeatsOverage` accepts a
+`_showNextTime: boolean` parameter that's intentionally unused — the
+user-invite dialog has no "Show this next time" checkbox, so the value is
+always `true` and irrelevant. The underscore prefix signals intent but the
+`OverageWarningDialog.onConfirm` interface forces the awkward signature.
+
+Fix: narrow `OverageWarningDialog`'s `onConfirm` to `() => void` when
+`resource !== "estimates"`. Two cleanest options: (a) make `onConfirm`'s
+arg optional, (b) split into two prop callbacks (`onConfirm` for non-checkbox
+variants, `onConfirmWithPref` for estimates). Either path touches all three
+call sites — defer until the dialog API is touched for another reason.
+
+### 277. [LOW] Plan file line references drift after implementation
+
+`documentation/development/plans/overage-acknowledgment-dialog.md` references
+specific line numbers (e.g. "SettingsPage.tsx:1042-1062") that shifted during
+implementation. Plan files are point-in-time snapshots, so post-merge readers
+will hit off-by-a-few-lines mismatches when navigating to the cited code.
+
+Fix: optional housekeeping. Either refresh the line refs once after merge or
+add a "post-implementation: line refs may be stale, search by function name"
+disclaimer to the plan template. Low priority since plans aren't authoritative
+documentation.
+
+### 278. [LOW] `assert_token_quota` legacy "no-user" branch silently allows overage
+
+`platform/services/llm/quota.py:assert_token_quota(company, user=None)` keeps
+a backward-compat path: when `user is None` AND has-card AND over-quota, it
+silently passes (metered overage, no acknowledgment required). This is
+intentional and documented in the docstring — protects batch jobs, webhooks,
+and other server-side callers that can't thread a user context.
+
+Risk: any future LLM endpoint that forgets to pass `user` will silently meter
+overage without acknowledgment, bypassing the new dialog flow.
+
+Fix: not actionable now. Periodically audit `assert_token_quota(...)` call
+sites (today: `routers/agents.py` orchestrate + estimate endpoints, both
+correctly pass `current_user`). Consider a `logger.warning` in the no-user
+branch if telemetry shows unintended callers hitting it.
+
+---
+
+### 279. [MEDIUM] Maple-chat estimate-creation refusal still uses the legacy direct add-card link
+
+`ESTIMATE_LIMIT_REFUSAL_MESSAGE` in `platform/agents/text_utils.py:237-240` still embeds
+`ADD_CARD_LINK` (`/settings?tab=billing&openAddCard=1`) when the orchestrator's
+estimate-creation path is over quota with no card. The new acknowledgment
+dialog flow is wired into `EstimatesPage` and `NewEstimateWithActivityPage`,
+but the Maple-chat estimate-creation path bypasses the dialog and routes
+directly to the billing tab.
+
+Same-resource UX divergence:
+- **EstimatesPage / NewEstimateWithActivityPage**: over-quota → sentinel-style
+  dialog → OK acknowledges (has-card) or opens AddCard (no-card).
+- **Maple chat → orchestrator → estimate creation**: over-quota + no-card →
+  refusal bubble with direct add-card link; has-card silently passes
+  through with metered overage (no acknowledgment required).
+
+Fix: route the orchestrator estimate-refusal through a sentinel link that
+opens the `OverageWarningDialog` with `resource="estimates"`. Two additional
+pieces of work are needed:
+
+1. Add a per-user `estimates_overage_acknowledged_at` enforcement in
+   `services/estimate_quota.py` (parallel to the Maple-credits gate change),
+   so has-card + over-quota also requires acknowledgment in the Maple chat
+   path. Today `claim_estimate_slot_with_status` silently allows the overage
+   when a card is on file; the spec implies acknowledgment should always
+   precede billed overage.
+2. Implement a chat-retry mechanism so OK in the dialog re-submits the user's
+   last estimate-creation message. Without this, the user has to manually
+   re-type their request after acknowledging. This is the bigger lift and is
+   the reason the divergence is acceptable as an interim state.
+
+Why deferred: implementing #2 cleanly requires hooking into `useMapleAgent`'s
+last-message buffer + adding a "re-send after dialog confirm" callback path,
+which is non-trivial and would expand the scope of the current PR beyond the
+spec the user signed off on. Track until product asks for the consistent UX
+across all three resources or a customer reports the dual-flow inconsistency.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
