@@ -46,6 +46,8 @@ Specific instances:
 
 **Absorbed:** #84, #86, #87, #88, #89, #90, #91, #92, #93, #124, #183, #256 — themed mypy gaps surfaced in later review passes. See `## Closed` for original bodies.
 
+Progress 2026-05-20: cleared all `union-attr` errors from `agents/property/service.py` (15 → 0 in file; total mypy errors 384 → 365 globally — the assert-on-`target_property` added for union-attr coverage also collapsed three `arg-type` errors on `_property_to_dict` calls). Closes the `union-attr` portion of #86 for this file; the `Property | None` → `Property` arg-type slice of #89 also drops 3 errors. Fixes were pure type narrowing via `assert` (LLM guarded by callers, `target_property` guaranteed non-None after `if resolve_error: return`, `active_pending_intent` guaranteed non-None inside `should_fallback_to_pending`) plus tightening two `if active_pending_intent_id and ...` conditions to also check `active_pending_intent is not None`. No real null-deref bugs surfaced — all 15 were narrowing gaps.
+
 ### 4. [HIGH] File and function size
 Files over the 800-line HIGH threshold (line counts refreshed 2026-04-26):
 - `routers/agents.py` — 2631 lines (was 2917 before 2026-04-26).
