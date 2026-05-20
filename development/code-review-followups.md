@@ -5578,6 +5578,41 @@ which is non-trivial and would expand the scope of the current PR beyond the
 spec the user signed off on. Track until product asks for the consistent UX
 across all three resources or a customer reports the dual-flow inconsistency.
 
+### 281. [MEDIUM] `assert_token_quota` is ~77 lines (4 sequential 402 gates)
+
+`platform/services/llm/quota.py:assert_token_quota` crossed the 50-line HIGH
+threshold after the hard-cap branch landed. The function is still cohesive — a
+flat top-to-bottom policy of hard-cap → over-quota+no-card → over-quota+no-ack
+→ pass — and splitting now would fragment a policy that benefits from being
+read in one place.
+
+Fix when it grows another gate: extract a `_raise_quota_402(code, message)`
+helper to collapse the four near-identical `raise HTTPException(...)` blocks.
+Not worth doing today.
+
+### 282. [LOW] `"hard_cap_reached"` string literal repeated in `routers/agents.py`
+
+The literal appears at two sites in `orchestrate_agent_endpoint` — once in
+the `code == "hard_cap_reached"` guard and once as the `intent=` kwarg passed
+to `_maple_credits_refusal_payload`. A typo on one side silently breaks the
+wiring.
+
+Fix: promote to a module-level constant near the existing refusal helpers
+(`HARD_CAP_INTENT = "hard_cap_reached"`). The existing `needs_payment_method`
+/ `needs_acknowledgment` codes have the same duplication so apply the same
+treatment if you ever pull this thread.
+
+### 283. [LOW] `MAPLE_TOKEN_HARD_CAP` not configurable per plan
+
+`platform/services/llm/quota.py` defines `MAPLE_TOKEN_HARD_CAP = 40_000_000`
+as a single global. A future Pro/Enterprise tier might legitimately need a
+higher ceiling.
+
+Fix when the first higher-tier customer asks: add a `hard_cap_tokens` field
+to each plan in `services/billing/plan_config.py`, then mirror the existing
+`_included_tokens_for(company)` helper with `_hard_cap_for(company)`. Not
+needed now — the spec called for one safety net, not per-tier tuning.
+
 ### 280. [LOW] Redundant `readOnly` on disabled overage-notification checkbox
 
 `portal/src/pages/SettingsPage.tsx` (~line 1452, inside the Account-tab
