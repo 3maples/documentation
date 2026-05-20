@@ -5578,6 +5578,18 @@ which is non-trivial and would expand the scope of the current PR beyond the
 spec the user signed off on. Track until product asks for the consistent UX
 across all three resources or a customer reports the dual-flow inconsistency.
 
+### 280. [LOW] Redundant `readOnly` on disabled overage-notification checkbox
+
+`portal/src/pages/SettingsPage.tsx` (~line 1452, inside the Account-tab
+read-only view) renders the "Show estimate overage notification" checkbox
+with both `disabled` and `readOnly`. `disabled` already prevents interaction
+and excludes the input from form submission; `readOnly` has no defined effect
+on `<input type="checkbox">` per the HTML spec — it's a no-op there.
+
+Fix: drop `readOnly`. Cosmetic only; the rendered behavior is identical
+either way. Worth doing the next time anyone touches this block to keep
+the JSX honest about what the attributes actually do.
+
 ---
 
 ## How to work through this
