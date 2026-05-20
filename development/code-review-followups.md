@@ -5651,6 +5651,22 @@ the JSX honest about what the attributes actually do.
 
 ---
 
+## 2026-05-20 review (dashboard analytics window change)
+
+### 284. [LOW] `compute_analytics` is ~115 lines
+
+`platform/routers/estimates.py:507` — pre-existing length, not introduced by
+the 2026-05-20 pipeline-window/updated_at change. The four-way
+`asyncio.gather` plus per-bucket reshape (headline → by_division → by_status)
+keeps everything in one function. The `/code-review` HIGH rule flags >50
+lines, so worth splitting next time the function grows further.
+
+Fix: extract `_compute_headline`, `_compute_by_division`, `_compute_by_status`
+helpers. Defer until the next behavioural change in this function — splitting
+purely for length without a behavioural driver is churn.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
