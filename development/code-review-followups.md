@@ -68,6 +68,22 @@ Progress 2026-05-20: cleared 2 errors in `prompts/estimate_react.py` and `prompt
 
 Progress 2026-05-20: cleared the 17 errors in `routers/estimates.py` (17 → 0 in file; total mypy errors 254 → 237 globally). Seven edits: (1) `assert company_obj_id is not None` after `parse_object_id(company, ...)` at the top of `create_estimate` (line 295) — the `if not company: raise` check above guarantees the parse returns a real OID; cascades to clear errors at L296 (`assert_company_access`) and L324 (`get_company_defaults`); (2) `# type: ignore[operator]  # Beanie descriptor unary-minus sort idiom.` on `query.sort(-Estimate.created_at).limit(limit)` at L426 — Beanie's negate-field syntax is correct at runtime but unmodellable in mypy stubs; (3) annotated `update_data: Dict[str, Any] = {}` in `update_estimate` (L801) — was being inferred as `dict[str, str]` from the first `update_data["title"] = payload.title` assignment, breaking subsequent assigns of `description`/`property`/`status`/`job_items`/`grand_total`/`updated_at` (clears 7 errors at L809–1020); (4) `effort_card_items=[EffortCardItem(**ci.model_dump()) for ci in a.effort_card_items]` at L962 — explicit `EffortCardItemCreate → EffortCardItem` conversion via Pydantic constructor instead of relying on auto-coercion of `dict` payloads (mypy can't see Pydantic's runtime coercion); (5–7) four `assert <reload> is not None` after `await Estimate.get(estimate_id)` re-reads following a `.set(...)` mutation — archive (L1207), unarchive (L1285), generate-doc (L1362), delete-doc-version (L1410). Each reload is on the same estimate_id that was just mutated, so a None return would indicate a concurrent delete race or DB outage — `assert` is correct since the route has already authenticated and the prior mutation succeeded. Closes the bulk of `#87` for this file. Tests verified: 107 passing in `tests/test_estimate_api.py` + `test_estimate_docs_api.py` + `test_estimate_quota.py`. 3 pre-existing test-isolation flakes (`test_archive_estimate_as_non_creator_member_fails`, `test_docs_versions_sorted_by_version_desc`, `test_docs_versions_empty`) all pass in isolation and exercise code paths untouched by these edits (403 auth path and GET routes); flagged but not introduced by this change.
 
+Progress 2026-05-21: closed the **`agents/estimate/*` cluster** — the single largest remaining batch flagged in the 2026-05-20 "next candidates" line (133 errors across 6 files in the original estimate; the actual surface was 180 errors across 6 files at the start of this work). Total mypy errors 217 → 77 globally (-140). All 12 source files under `agents/estimate/` now show `Success: no issues found in 12 source files`.
+
+The work split into three patterns matching the file shapes:
+
+1. **Mixin attr-defined cluster (#88-adjacent)** — `crud_handlers.py` (64 errors) and `work_item_handlers.py` (32 errors) were both 100% `attr-defined` from the mixin pattern: methods called via MRO from sibling mixins (`CrudParsingMixin`, `WorkItemHandlersMixin`, etc.) but invisible to mypy at the call site. Fix: added a `if TYPE_CHECKING:` stub block at the top of each mixin class declaring the sibling-resolved methods (`_crud_envelope`, `_resolve_estimate_code`, `_estimate_status_from_text`, `_estimate_summary_payload`, `_load_estimate_for_*`, the work-item handler quintet, etc.). 19 stub declarations in `crud_handlers.py`, 4 in `work_item_handlers.py` — all signatures lifted verbatim from the real implementations in `crud_helpers.py` and `work_item_handlers.py`. The `if TYPE_CHECKING:` guard means zero runtime cost — these stubs only exist during mypy's pass. Also added one `assert code is not None` after `_load_estimate_for_read` in `work_item_handlers.py:_handle_get_work_item` (resolver contract: code is non-None when error is None).
+
+2. **`#88` implicit-Optional defaults in `service.py`** — 23 errors, all `param: X = None` where `X` was non-Optional. Canonical fix: widened each to `Optional[X] = None`. Touched signatures: `_merge_duplicate_line_items` (carry_fields), `_step1_architect` / `_step2_and_3_for_scope` / `_step3_research_single_scope` (industry, tokens), `_run_pipeline` / `_run_react_loop` (company_id, industry, max_iterations, tokens), `_generate_estimate` / `_score_with_inventory_check` (tokens), `process` / `analyze_project` / `answer_question` (company, property, context, estimate_data), `generate_estimate` (job_items). Also propagated the Optional widening down to `_step2_vector_retrieval(company_id)` and the `create_estimate_tools(company_id)` factory in `tools.py`. None of these required runtime guards added — the function bodies already handle the None case.
+
+3. **Inference fixes** — handful of one-off shape issues: (a) split three sites where `payload.get("X") if isinstance(payload.get("X"), list) else []` was tripping `Any | list[Any] | None` (the same `.get()` called twice can't narrow); bound the value to a local first then narrowed (`_base_raw = base.get(...); base_items: List[Any] = _base_raw if isinstance(_base_raw, list) else []`); same pattern applied to three `dict(working_context.get(KEY))` sites; (b) `messages: List[Any] = [SystemMessage(...)]` to allow `HumanMessage` appends (langchain doesn't expose a `BaseMessage` union convenient for the local annotation); (c) `final_summary = str(msg.content)` to coerce langchain's `str | list[str | dict]` content union to a flat string for log use; (d) `context: Dict[str, Any] = {"project_description": ...}` in `generate_estimate` to allow the later `context["job_items"] = job_items` assignment; (e) widened `_score_catalog_match(requested_value: Any, candidate_values: List[Any])` + `_canonicalize_text(text: Any)` + `_find_best_catalog_match(requested_value: Any, ...)` in `catalog_matching.py` — the functions already coerce via `_normalize_catalog_text(value: Any)` so the strict `str` annotations were over-specified; (f) `ESTIMATE_DETAILS: List[Dict[str, Any]] = [...]` in `conversation_guide.py` to stop mypy inferring `object` for the heterogeneous dict values; (g) removed the dead `try/except ImportError → fallback to ()` block in `llm_helpers.py:format_llm_error` — both `openai` and `httpx` are hard deps in `requirements.txt` so the import fallback never fires, and the `if AuthenticationError and isinstance(...)` truthy guards became always-True after the cleanup.
+
+Verified with `tests/test_estimate_agent.py` (112 passing) + `test_estimate_tools.py` + `test_estimate_crud_handler_helpers.py` (137 passing across those + `test_estimate_agent.py` re-run) + recurrence/analytics tests already covered in earlier #90 work. **This-session running totals**: 276 → 77 mypy errors (-199), closing #90, #93, and the `agents/estimate/*` cluster — the three remaining named batches from the 2026-05-20 candidate line are now done.
+
+Progress 2026-05-21: closed **#93** (`BlockingPortal | None` errors in tests). Cleared all 29 errors across 10 test files (note: original entry estimated 12 errors across 5 files; the actual surface grew to 29 sites across 10 files as more API tests adopted the `client.portal.call(...)` pattern). Total mypy errors 263 → 234 globally. Pattern: 17 added `assert client.portal is not None  # TestClient context manager guarantees a portal (mypy hygiene)` calls — one per function/helper that invokes `.portal.call(...)`; mypy's flow analysis narrows the union for the rest of the function scope so a single assert covers multiple `.portal.call` sites in the same function. Files touched: `test_rate_card_bootstrap.py` (5 asserts for 9 sites: 2 helpers + 3 tests), `test_change_logs_api.py` (2: 1 fixture + 1 helper), `test_audit_integration.py` (2: 2 tests), `test_feedback_anonymous.py` (2: 2 tests), and one assert each in `test_template_api.py`, `test_resources_rbac.py`, `test_property_api.py`, `test_divisions_api.py`, `test_feedback_api.py`, `test_company_api.py`. Rejected the alternative "thin `_get_portal()` helper" suggested in the original entry — would have required touching every `.call` site in 10 files plus changes to test function signatures; the per-function `assert` matches the playbook used in earlier #3 progress notes (`assert self.llm is not None`, `assert target_<resource> is not None`) and is the minimum-touch fix. Verified by re-running mypy: 0 BlockingPortal-related errors remain.
+
+Progress 2026-05-21: closed **#90** (`models/estimate.py` arithmetic on `Optional[int]` fields). Cleared all 13 errors in this file (13 → 0; total mypy errors 276 → 263 globally). Two edits in `RecurrenceSchedule`: (1) added `assert month_val is not None` inside the `for month_val in [self.start_month, self.end_month]:` loop in `validate_end_type_fields` — guaranteed non-None by the preceding `if any(v is None ...)` guard inside the `DATE_RANGE` branch; (2) added per-branch `assert <field> is not None` block at the top of each `if/elif` in `calculate_occurrences()` — `end_year`/`start_year`/`end_month`/`start_month` for `DATE_RANGE`, `total_occurrences` for `TOTAL_OCCURRENCES`, `end_year`/`start_year`/`specific_months` for `SPECIFIC_MONTHS`. All asserts reference the `@model_validator(mode="after")` contract that fires on construction (covered by `tests/test_recurrence_model.py` with explicit `pytest.raises(ValidationError)` cases for each branch's required-field shape). Tightening the model declarations to `int = 0` was rejected — the fields are conditionally required *based on `end_type`*, so the Optional typing is correct at the field level; narrowing belongs in the methods. Verified with `tests/test_recurrence_model.py` + `test_estimate_api.py` + `test_estimates_analytics.py` (133 passing). No behavior change.
+
 Progress 2026-05-20: closed the audit-log channel-provenance gap surfaced during the `/code-review` of the `#92` fix. The implicit-Optional widening of `http_request: Request` on 7 router signatures means agent → router calls now succeed silently with `request=None`, dropping `ip_address` / `user_agent` / `method` / `path` from those audit log rows. Without a channel marker, downstream consumers can't distinguish Maple-initiated mutations from a misconfigured Portal request that lost its Request context. **Fix**: added `_audit_source_ctx: ContextVar[Optional[str]]` + `audit_source(source: str)` context manager in `services/audit_service.py`, and modified `create_audit_log` to merge `{"source": ctx_source}` into `metadata` when the var is set (caller-supplied `metadata["source"]` wins). Then wrapped the 7 previously-untagged agent → router callsites with `with audit_source("<resource>_agent"):` — `_update_material_via_api` + `_delete_material_via_api` (material), `_update_labour_via_api` + `_delete_labour_via_api` (labour), and `_create_equipment_via_api` + `_update_equipment_via_api` + `_delete_equipment_via_api` (equipment). The existing `_create_material_via_api` / `_create_labour_via_api` already tagged `metadata={"source": "<resource>_agent"}` directly (they bypass the router) — now the entire CRUD-via-Maple surface is consistently provenance-tagged. **Tests**: added 6 new tests in `tests/test_audit_service.py` — 3 unit tests for the ContextVar (set/reset/nesting/exception-safety), and 3 integration tests that mock the router call and assert the context var resolves to the expected source mid-call (`material_agent` / `labour_agent` / `equipment_agent`). All 132 tests pass across `test_audit_service.py` + `test_material_*` + `test_labour_*` + `test_equipment_*` + `test_audit_integration.py`. Closed independently of `#3` — this was a side-effect of the `#92` resolution, not a pre-existing mypy gap.
 
 ### 4. [HIGH] File and function size
@@ -781,9 +797,16 @@ A malformed `?company=xyz` query raises `bson.errors.InvalidId` →
 unhandled → 500 instead of a clean 422. Mirrors `material_categories`
 and `material_units`. Pre-existing pattern; defer.
 
+Also surfaced 2026-05-13 in the hodgepodge `/code-review` pass against
+`platform/routers/estimates.py` — the new `get_analytics` route and the
+adjacent list endpoint both call `PydanticObjectId(company)` and share
+the same 500-on-garbage-input gap. Fold both into the cross-router fix
+below.
+
 Fix: wrap in try/except → `HTTPException(422, "Invalid company id")`,
 or factor a Pydantic dependency that validates ObjectIds and use it
-across all `?company=` query routers.
+across all `?company=` query routers (divisions, material_categories,
+material_units, estimates list, estimates analytics).
 
 ### 68. [LOW] `backfill_divisions.py` uses broad `except Exception`
 **File**: [platform/scripts/db/backfill_divisions.py:54](../../platform/scripts/db/backfill_divisions.py)
@@ -5467,6 +5490,44 @@ extractions: `validateContactInput()`, `verifyCaptcha()`,
 `syncContactToBrevo()`). Out of scope for the Brevo change — the
 sync addition itself is small and self-contained.
 
+Re-surfaced May 2026 in the `/code-review` of the contact-form expansion
++ reCAPTCHA v3 integration. The handler is now ~160 lines and does
+payload parsing, four separate validation guards, revenue allowlist,
+captcha verification, transporter setup, email composition, and error
+handling all inline. Testing each branch in isolation requires the
+whole HTTP shell.
+
+Suggested shape:
+- `validateContactPayload(body)` → returns `{ ok: true, payload }` or
+  `{ ok: false, status, error }`. Pure function, easy to unit-test.
+- `runRecaptchaCheck(req, secret, isEmulator)` → already partly
+  extracted via `lib/recaptcha.js`; pull the request-shaped wrapper
+  (token reading, response decision) into a helper that returns the
+  same `{ ok, status, error }` shape.
+- `buildEmail({ details, message, fullName, supportEmail })` → returns
+  the nodemailer `sendMail` payload. No I/O.
+- `sendContactEmail(payload, smtpAuth)` → wraps
+  `nodemailer.createTransport` + `sendMail`. The only I/O helper.
+
+The handler then becomes:
+
+```js
+const validated = validateContactPayload(req.body);
+if (!validated.ok) return res.status(validated.status).json({ error: validated.error });
+
+const captcha = await runRecaptchaCheck(req, RECAPTCHA_V3_SECRET.value(), !!process.env.FUNCTIONS_EMULATOR);
+if (!captcha.ok) return res.status(captcha.status).json({ error: captcha.error });
+
+try {
+  await sendContactEmail(buildEmail(validated.payload), { user: BREVO_SMTP_USER.value(), pass: BREVO_SMTP_PASS.value() });
+  res.status(200).json({ ok: true });
+} catch (err) { ... }
+```
+
+Once these helpers exist, write integration-style tests for the handler
+with a fetch mock (or `supertest` against the exported function —
+Cloud Functions v2 onRequest is a plain Express handler).
+
 </details>
 
 ### 271. [LOW] `OverageWarningDialog` redundant open-state guard
@@ -5711,6 +5772,150 @@ rotated visual labels are decorative for assistive tech. Worth a one-time
 VoiceOver pass to confirm no regression.
 
 Fix: manual check, no code change unless something reads wrong.
+
+---
+
+## 2026-05-13 `/code-review` pass (hodgepodge change — deferred follow-ups)
+
+Carried over from the hodgepodge `/code-review` (2026-05-13). The two HIGHs from that pass (sequential analytics awaits, unescaped markdown labels) shipped with the original change; these are the deferred MEDIUMs/LOWs. The `compute_analytics` company-id validation finding from this batch was folded into #67.
+
+### 289. [MEDIUM] `useEffect` references function declared later in the same component
+**Where:** `portal/src/pages/MaterialsPage.tsx` and `portal/src/pages/PeoplePage.tsx` — the `?open=<id>` effect calls `openEditMaterial` / `openEditLabour` declared further down. (Note: this was originally flagged when those effects opened the edit modal; the modal logic has since been removed, so the *symptom* is gone — but the pattern of effect-before-declaration may still apply if either page picks up a similar handler later.)
+
+**Issue:** Works at runtime because effects fire after the component body finishes evaluating, but it's brittle, future-hostile, and would silently fail eslint's `react-hooks/exhaustive-deps` rule.
+
+**Fix:** When adding any new effect in those files, declare its dependencies above the effect, or wrap helpers in `useCallback`.
+
+### 290. [MEDIUM] Dashboard analytics fetch error is silent
+**Where:** `portal/src/pages/DashboardPage.tsx` — the `estimatesApi.analytics(...).catch(() => setAnalytics(null))` branch.
+
+**Issue:** Network/server errors are swallowed and the page silently shows `$0` cards. A user can't distinguish "no estimates yet" from "the API is down".
+
+**Fix:** Track an `analyticsError` state and render a small inline note ("Couldn't load analytics — retry") when set.
+
+### 291. [MEDIUM] `test_estimates_analytics.py` exclusion assertion is brittle
+**Where:** `platform/tests/test_estimates_analytics.py:163-164` (`test_analytics_excludes_lost_and_archived_from_pipeline`)
+
+**Issue:** The assertion is `777.0 not in (pipeline, pipeline - 4000.0, pipeline - 3500.0)` against hand-computed offsets. A subtle inclusion-bug could pass the assertion. The test also relies on the test runner's wall-clock to align with the seeded `now`, which has caused at least one false alarm during development.
+
+**Fix:** Either (a) plumb `now` through `compute_analytics` as a hook for testing and pin it via the route, then assert exact totals, or (b) use `freezegun` to pin time. Simplest near-term: rebuild the assertion as `assert pipeline == <explicit_in_window_sum>` with no clock dependency.
+
+### 292. [LOW] `RowActionsMenu` has two near-identical menu-item buttons
+**Where:** `portal/src/components/common/RowActionsMenu.tsx` — the Move up and Move down `<button>` blocks differ only in icon, label, and onClick.
+
+**Issue:** Minor duplication. Refactor only worthwhile if a fourth/fifth menu item lands.
+
+**Fix:** Extract a small `<MenuItem icon={…} label={…} disabled={…} onClick={…} />` helper if the menu grows.
+
+---
+
+## 2026-05 `/code-review` pass (contact form + reCAPTCHA v3 — deferred follow-ups)
+
+Carried over from the `/code-review` of the contact-form expansion + reCAPTCHA v3 integration on the marketing site (May 2026). The two security-flavored fixes (emulator gate, structured email addresses) and a vitest unit suite for `verifyRecaptcha` shipped with the original change. The HIGH refactor of the `contact` request handler from this batch was folded into #268 (with the proposed extraction shape preserved there).
+
+### 293. [HIGH] Frontend test for `resolveRecaptchaSiteKey` blocked by current architecture
+**Where:** `website/public/contact-modal.js`.
+
+**Why blocked:** `contact-modal.js` lives in `public/` and is served verbatim by Vite/Hosting. It's wrapped in an IIFE (no exports), so its helpers can't be imported by vitest. To test `resolveRecaptchaSiteKey` (the Vite-substitution-detection logic), the file needs to become a proper Vite/Rollup entry — same pattern as `widget/index.tsx` / `maple-widget.js`.
+
+**Suggested move:**
+1. Create `website/contact-modal/index.ts` (or `.js`) with the modal logic, exporting helpers like `resolveRecaptchaSiteKey` for tests.
+2. Add the entry to `vite.config.ts` `rollupOptions.input` and `entryFileNames` rules so the build emits `dist/contact-modal.js` at the same path.
+3. Drop `website/public/contact-modal.js`.
+4. Add `website/contact-modal/__tests__/resolveSiteKey.test.ts` covering: real key → returned, empty → empty string, raw `%VITE_RECAPTCHA_V3_SITE_KEY%` placeholder → empty string.
+
+This refactor also unlocks unit-testing the submit handler, the captcha load promise, and the form validation helper.
+
+### 294. [MEDIUM] Make `RECAPTCHA_MIN_SCORE` configurable
+**Where:** `website/functions/index.js:13`.
+
+**Why:** The 0.5 threshold is hardcoded. Fresh keys with no traffic history routinely score below it (we hit this in dev). Tuning currently requires a code change + redeploy.
+
+**Suggested fix:** Use `defineString('RECAPTCHA_V3_MIN_SCORE', { default: '0.5' })` from `firebase-functions/params`, parse to float at handler start, fall back to 0.5 on `NaN`. Set per-environment via `firebase functions:config` or a runtime param.
+
+### 295. [MEDIUM] Tighten CORS
+**Where:** `website/functions/index.js:26` — currently `cors: true` (wildcard).
+
+**Why:** The contact form is served via Hosting rewrite, so traffic to `/api/contact` is same-origin and doesn't need CORS at all. Wildcard CORS lets any origin POST to the endpoint; reCAPTCHA mitigates abuse but tightening costs nothing.
+
+**Suggested fix:**
+
+```js
+cors: [
+  'https://3maples.ai',
+  'https://www.3maples.ai',
+  'https://maples-website-dev.web.app',
+  'https://maples-website-dev.firebaseapp.com',
+  'http://localhost:5050', // hosting emulator
+],
+```
+
+Or drop `cors` entirely and rely on same-origin Hosting rewrites for prod traffic; only add CORS when explicit cross-origin support is needed.
+
+### 296. [MEDIUM] `install()` in `contact-modal.js` is ~120 lines
+**Where:** `website/public/contact-modal.js:240-360`.
+
+**Why:** Mixes DOM creation, ref binding, captcha setup, open/close handlers, and submit logic. Hard to follow at a glance.
+
+**Suggested fix:** Split into `renderModal()`, `bindOpenClose(refs)`, `bindSubmit(refs, captcha)`. Cleanest after the file is moved out of `public/` (see #293), since the helpers can then be unit-tested with injected refs.
+
+### 297. [LOW] Hoist `optionalString` to module scope
+**Where:** `website/functions/index.js:77`.
+
+**Why:** Pure helper recreated on every request. Negligible perf cost but belongs at module scope alongside `escapeHtml`.
+
+### 298. [LOW] Replace placeholder heuristic with explicit equality
+**Where:** `website/public/contact-modal.js:5-11` — `resolveRecaptchaSiteKey`.
+
+**Why:** Current check rejects values containing `%` or starting with `VITE_`. Functional but heuristic. An explicit check on the literal placeholder is clearer:
+
+```js
+if (!trimmed || trimmed === '%VITE_RECAPTCHA_V3_SITE_KEY%') return '';
+return trimmed;
+```
+
+### 299. [LOW] Drop `escapeHtml(label)` on hardcoded labels
+**Where:** `website/functions/index.js:183`.
+
+**Why:** `htmlDetails` escapes label values that are all string literals defined two lines above. Defensive but unnecessary; misleads a reader into thinking labels could be untrusted.
+
+**Suggested fix:** Drop the `escapeHtml(label)` call (keep `escapeHtml(value)`). Or move labels to a top-level constant to make their hardcoded nature explicit.
+
+---
+
+## 2026-05-21 `/code-review` pass (post-#3 mypy batch — agents/estimate cluster + #90 + #93)
+
+Carried over from the `/code-review` of the 2026-05-21 mypy session that closed #90, #93, and the entire `agents/estimate/*` cluster (276 → 77 mypy errors). The two HIGH file-size flags from that review (crud_handlers.py at 1,449 lines and work_item_handlers.py just crossed 800) fold into #4. The MEDIUMs below are deferred housekeeping.
+
+### 300. [MEDIUM] 17 near-identical `assert client.portal is not None` lines across 10 test files
+**Where:** `tests/test_audit_integration.py`, `test_change_logs_api.py`, `test_company_api.py`, `test_divisions_api.py`, `test_feedback_anonymous.py`, `test_feedback_api.py`, `test_property_api.py`, `test_rate_card_bootstrap.py`, `test_resources_rbac.py`, `test_template_api.py`.
+
+**Issue:** The #93 fix added 17 sites of `assert client.portal is not None  # TestClient context manager guarantees a portal (mypy hygiene)`. Comment string is identical at each site. DRY violation flagged in the code review of that batch — the original #93 entry mentioned "a thin `_get_portal()` helper" as the alternative but it was rejected as larger touch (touching every `.call` site in 10 files).
+
+**Fix:** add a session-scoped `portal` fixture in `tests/conftest.py`:
+
+```python
+@pytest.fixture(scope="session")
+def portal(client: TestClient):
+    assert client.portal is not None  # TestClient context manager guarantees a portal
+    return client.portal
+```
+
+Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of `client.portal.call(_fn)`. Defer until another test-suite touch in any of the 10 files — refactoring purely for DRY is churn.
+
+### 301. [MEDIUM] `messages: List[Any]` in `agents/estimate/service.py:1811` weakens type info
+**Where:** `agents/estimate/service.py:1811` — `messages: List[Any] = [SystemMessage(content=formatted_prompt)]`.
+
+**Issue:** Annotated as `List[Any]` to allow appending `HumanMessage` to a list initialized with `SystemMessage`. Loses type safety on all subsequent `.append()` calls (4 sites in this function plus several elsewhere).
+
+**Fix:** use `List[BaseMessage]` from `langchain_core.messages` (or `langchain.schema.BaseMessage`) — that's the actual base class for `SystemMessage` / `HumanMessage` / `AIMessage`. Tighter and more honest. Same pattern likely needed at other langchain message-list sites in `service.py` that escaped this pass.
+
+### 302. [MEDIUM] TYPE_CHECKING stub blocks duplicate signatures from sibling mixins
+**Where:** `agents/estimate/crud_handlers.py:95-179` (19 stubs) and `agents/estimate/work_item_handlers.py:65-91` (4 stubs).
+
+**Issue:** Each stub block lifts method signatures from sibling mixins (`CrudParsingMixin`, `WorkItemHandlersMixin`, etc.) and re-declares them inside `if TYPE_CHECKING:` so mypy stops flagging attr-defined on the cross-mixin calls. If a signature in the real implementation drifts (e.g. `_crud_envelope` adds a new keyword param), the stub won't catch it — mypy silently uses the stub.
+
+**Fix:** define an `EstimateAgentHostProtocol(Protocol)` in `agents/estimate/host_protocol.py` (or a shared types module) that captures the cross-mixin contract once. Each mixin can reference the Protocol via `Self` bound or via inheritance from a shared base. Short-term mitigation: per-method docstring pointers (`# See agents/estimate/crud_helpers.py:381 — keep in sync`). Worth doing if the stubs grow further; for now the 23 stubs are stable enough.
 
 ---
 
