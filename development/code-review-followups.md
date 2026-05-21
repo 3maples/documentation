@@ -5667,6 +5667,53 @@ purely for length without a behavioural driver is churn.
 
 ---
 
+## 2026-05-20 review (mobile responsiveness — dashboard cards/charts/table)
+
+### 285. [MEDIUM] Proliferating `@[Xrem]` container-query thresholds in DashboardPage
+
+`portal/src/pages/DashboardPage.tsx` — the responsive pass introduced
+breakpoints at 14rem, 18rem, 20rem, 24rem, 26rem, 32rem, and 48rem with no
+shared rationale. Future tuning means hunting through the file. Surfaced
+during `/code-review` on the responsive-dashboard change; not a regression,
+just a maintainability watch-item.
+
+Fix: when the next container-query pass lands, introduce a tiny
+`dashboardBreakpoints.ts` (or a one-line comment at each call site
+documenting *why* that threshold — icon-fit, table-row, etc.). Don't refactor
+purely for this — wait for the next responsive change in this area.
+
+### 286. [MEDIUM] `overflow-x-hidden` on the root PortalLayout flex container
+
+`portal/src/components/Layout/PortalLayout.tsx:262` — added as a belt-and-
+braces guard against any future child blowing out the viewport on mobile.
+Acceptable today (every wide table in the portal already uses its own
+`overflow-x-auto` scroll container), but worth noting so a contributor adding
+e.g. a fluid horizontal-scroll admin view doesn't fight the parent.
+
+Fix: no action. Drop a comment at the class site if it ever causes
+confusion.
+
+### 287. [LOW] `min-h-[60px]` on vertical status labels may clip long words
+
+`portal/src/components/dashboard/PipelineStatusChart.tsx:140` — `Completed`
+rotated to `writing-mode: vertical-rl` is ~54-58px tall, so 60px is tight.
+A future status name like `Cancelled` (~60px) could touch the limit.
+
+Fix: bump to `min-h-[72px]`, or drop the `min-h` entirely and rely on
+`flex-row items-start` to size itself naturally. Defer until a new status
+label is added.
+
+### 288. [LOW] Spot-check rotated chart labels with a screen reader
+
+`portal/src/components/dashboard/PipelineStatusChart.tsx` — the bar chart
+already wraps the data inside `role="img" aria-label={ariaLabel}`, so the
+rotated visual labels are decorative for assistive tech. Worth a one-time
+VoiceOver pass to confirm no regression.
+
+Fix: manual check, no code change unless something reads wrong.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
