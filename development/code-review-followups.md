@@ -110,35 +110,178 @@ Progress 2026-05-20: closed the audit-log channel-provenance gap surfaced during
 
 ### 4. [HIGH] File and function size
 Files over the 800-line HIGH threshold (line counts refreshed 2026-04-26):
-- `routers/agents.py` — 2631 lines (was 2917 before 2026-04-26).
-  Orchestrate/estimate endpoints are ~300 lines each. Recent extractions
-  landed under `routers/agent_helpers/`:
+- `routers/agents.py` — 1360 lines (2026-05-22 refresh; was 1407
+  before the delegate-generic extraction this session, 1642 before the
+  delegate-get/update/delete-estimate extractions, 1821 before the
+  delegate-create-estimate extraction, 1905 before the estimate-resolver
+  extraction, 1977 before the finalize-result extraction, 2203 before
+  the estimate-gathering extraction, 2478 before the optional-follow-up
+  extraction, 2772 before the pending-estimate-follow-up extraction,
+  2917 before 2026-04-26). **53% reduction from the 2026-04-26
+  baseline.** Recent extractions landed under `routers/agent_helpers/`:
   - `text_helpers.py` — `is_affirmative_text` / `is_negative_text` (50 lines).
   - `estimate_update.py` — `run_update_estimate` add-items flow (175 lines).
   - `fuzzy_confirmation.py` — `handle_estimate_fuzzy_confirmation` +
     `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY` (180 lines).
+  - `pending_estimate_follow_up.py` — landed 2026-05-22 (377 lines).
+    Lifted the `_handle_pending_estimate_follow_up` closure (294 lines)
+    plus its five property-lookup helpers (`_property_name_of`,
+    `_property_address_of`, `_property_label_of`, `_property_full_address_of`,
+    `_find_property_by_name_or_address`) out of `orchestrate_agent_endpoint`
+    into a module-level helper. Owns `PENDING_ESTIMATE_FOLLOW_UP_KEY` and
+    the `ESTIMATE_FOLLOW_UP_STAGE_CONFIRM` / `_SELECT_PROPERTY` constants
+    (re-exported from `routers/agents.py` for the existing test imports).
+    All 9 return paths now go through a small `_envelope()` helper instead
+    of inline 11-key dicts; signature reduced to
+    `handle_pending_estimate_follow_up(message, context_payload)`. Tests:
+    52 passing in `test_orchestrator_endpoint.py`; `properties_api_get_properties`
+    mocks moved from `agents_router` to the helper module via string-form
+    `monkeypatch.setattr(...)` (4 sites + 1 contract assertion). The now-dead
+    `from routers.properties import fetch_properties as properties_api_get_properties`
+    alias was removed from `routers/agents.py`.
+  - `optional_follow_up.py` — landed 2026-05-22 (356 lines). Lifted the
+    `_handle_pending_optional_follow_up` closure (~195 lines) plus its
+    three builders (`_build_optional_follow_up_prompt`,
+    `_build_optional_follow_up_update_message`, `_get_optional_follow_up_spec`)
+    and the three closure-level constants (`PENDING_OPTIONAL_FOLLOW_UP_KEY`,
+    `OPTIONAL_FOLLOW_UP_STAGE_CONFIRM`, `OPTIONAL_FOLLOW_UP_STAGE_COLLECT_VALUE`)
+    out of `orchestrate_agent_endpoint`. The closure-level `_get_processor`
+    factory (used in 4 sites — only one of which moves into the helper)
+    was lifted to module-level in `routers/agents.py` and passed in as a
+    `processor_factory: ProcessorFactory` parameter. Five return paths in
+    the handler now go through a single `_envelope()` helper. Re-exported
+    from `routers/agents.py` so the existing test imports
+    (`OPTIONAL_FOLLOW_UP_STAGE_CONFIRM`, etc.) still resolve unchanged.
+    Tests: 52 passing in `test_orchestrator_endpoint.py`; no mock-target
+    changes needed because no FastAPI-helper aliases were moved.
+  - `delegate_generic.py` — landed 2026-05-22 (100 lines). Lifted the
+    generic non-Estimate-Agent delegate-and-shape tail (~54 lines) used
+    by every agent that isn't routed through one of the Estimate-Agent
+    specialized branches (Contact / Property / Labour / Material, plus
+    intents Estimate-Agent doesn't claim). Calls
+    `processor.process(message, context=...)`, merges the agent-surfaced
+    `optional_follow_up` question and stashes a pending follow-up record
+    (reusing `get_optional_follow_up_spec` from the existing optional-
+    follow-up module), then backfills `completion_ready` /
+    `missing_fields` / `accuracy_suggestions` and re-packages as the
+    standard 11-key orchestrator envelope. Companion to
+    `optional_follow_up.handle_pending_optional_follow_up`, which uses
+    the same shape but with slightly different fallback behavior — kept
+    separate to avoid parameter explosion. Tests: 52 passing; no mock
+    changes needed (`processor.process` is mocked at the agent-instance
+    level via `get_<agent>_agent` factory replacements).
+  - `delegate_get_estimate.py` — landed 2026-05-22 (145 lines). Lifted
+    the `get_estimate` sub-branch (~93 lines) of `_delegate_to_agent`'s
+    Estimate Agent block. Pure read path — no Beanie mutations, no
+    quota gate, no audit log. The stop-word regex and ObjectId-extraction
+    regex moved to module-level constants. Three tests
+    (`test_orchestrate_get_estimate_*`) updated with string-form
+    `monkeypatch.setattr` on the helper's `estimates_api_get_estimates`.
+  - `delegate_estimate_ops.py` — landed 2026-05-22 (226 lines).
+    Bundled `delegate_update_estimate` + `delegate_delete_estimate`
+    (~82 + ~91 lines of the closure body) since they share the
+    `find_estimate_from_context_or_message` resolver, the
+    `fuzzy_disclaimer` copy, and the `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY`
+    stash record. Closure-only predicates
+    (`_should_delegate_update_estimate_to_agent`,
+    `_is_work_item_op_message`) are passed in as callables to avoid a
+    circular import on `routers/agents.py`. SAFETY GUARDS preserved
+    verbatim: update_estimate routes property-link / status-transition
+    phrasings straight to the agent BEFORE the fuzzy-resolver; delete
+    always requires confirmation regardless of exact vs fuzzy match, and
+    refuses the most-recent fallback (destructive callers can't guess).
+    All existing delete tests continue to pass via the already-redirected
+    resolver mocks from the earlier `estimate_resolver` extraction.
+  - `delegate_create_estimate.py` — landed 2026-05-22 (275 lines).
+    Lifted the create_estimate sub-branch (~192 lines) of the
+    `_delegate_to_agent` closure's Estimate Agent block into a
+    module-level helper. Same shape as `estimate_gathering._finalize_gathering`
+    — sufficiency check → either enter gathering OR proceed with quota
+    gate + estimate generation + audit log + optional follow-up record.
+    Closure dependencies passed in: `processor`, `current_user_name`,
+    `decoded_token`, and the `_check_estimate_limit_or_refuse` callable
+    (latter would be a circular import). Three return paths go through
+    a small `_envelope()` helper. Tests: 52 passing; one test
+    (`test_orchestrate_endpoint_delegates_to_estimate_agent`) updated to
+    also patch `routers.agent_helpers.delegate_create_estimate.prepare_generated_estimate`
+    and `save_generated_estimate` via string-form `monkeypatch.setattr`
+    (the existing `agents_router` patches stay because the aliases are
+    still used in the remaining `_delegate_to_agent` branches).
+  - `estimate_resolver.py` — landed 2026-05-22 (119 lines). Lifted the
+    `_find_estimate_from_context_or_message` closure (~85 lines) into a
+    module-level helper. Resolves the user's target estimate via the
+    five-step ladder: active-context → estimate_id code → MongoDB _id
+    → fuzzy title match → most-recent fallback. The two regex constants
+    are now module-level (`_ESTIMATE_SEARCH_STOP_WORDS`, `_MONGO_OBJECT_ID`).
+    Tests: 52 passing; two delete-estimate tests updated to also patch
+    `routers.agent_helpers.estimate_resolver.estimates_api_get_estimate{s}`
+    via string-form `monkeypatch.setattr` (the existing `agents_router`
+    patches stay because the aliases are still used in two other call
+    sites inside `_delegate_to_agent`).
+  - `finalize_result.py` — landed 2026-05-22 (119 lines). Lifted the
+    82-line `_finalize_result` closure body (chat-history append + active-
+    entity coreference + suggestions enrichment + conversation persistence)
+    into a module-level `finalize_orchestrate_result(...)` helper.
+    `_finalize_result` closure remains in `routers/agents.py` as a 9-line
+    thin wrapper that calls the helper and wraps the resulting dict in
+    `OrchestratorAgentResponse` (the Pydantic response model stays in
+    `routers/agents.py` to avoid a circular import). The 5-way entity-key
+    scan was extracted into a small `_resolve_entity_reference()`
+    private helper inside the new module. All 6 existing call sites are
+    untouched — they still call the closure wrapper. Dependencies passed
+    in: `delegate_context`, `merged_context`, `user_id`, and the
+    `_save_conversation_context` callable. Tests: 52 passing in
+    `test_orchestrator_endpoint.py`.
+  - `estimate_gathering.py` — landed 2026-05-22 (315 lines). Lifted the
+    `_handle_pending_estimate_gathering` closure (236 lines) plus the
+    three state-key constants (`ESTIMATE_GATHERING_STATE_KEY`,
+    `ESTIMATE_GATHERED_DETAILS_KEY`, `ESTIMATE_NEXT_QUESTION_KEY`) out of
+    `orchestrate_agent_endpoint`. The closure captured `message`,
+    `decoded_token`, and `current_user_name` from request scope and
+    called the module-level `_check_estimate_limit_or_refuse` (a
+    circular import if pulled into the helper); these now flow through
+    keyword parameters (`decoded_token`, `current_user_name`,
+    `estimate_agent`, `check_estimate_limit_or_refuse`). Internal split:
+    the per-turn step is the public `handle_pending_estimate_gathering`,
+    and the all-details-collected path lives in a private
+    `_finalize_gathering` so the main entry stays well under the 50-line
+    ceiling. Five return paths go through a single `_envelope()` helper.
+    Tests: 75 passing across `test_orchestrator_endpoint.py` +
+    `test_estimate_gathering.py`. No mock surgery — no test directly
+    exercises the closure-level call path.
 
   Candidates for the next extraction round:
-  - The follow-up-stage machinery (property-select, confirm, optional value)
-    → separate from the top-level dispatch. Largest remaining inline closure
-    is `_handle_pending_estimate_follow_up` (~530 lines).
-  - `_handle_pending_optional_follow_up` and the small builders around it
-    (`_build_optional_follow_up_prompt` / `_build_optional_follow_up_update_message`
-    / `_get_optional_follow_up_spec`) — natural cluster for an
-    `optional_follow_up.py` helper.
-- `agents/material/service.py` — 2560 lines. `process()` is a mega-switch
-  that inserts a new 50-line inline handler per intent. ~~Easiest extraction
-  target: the `list_material_categories` block~~ landed 2026-04-26 as
+  - `_finalize_result` and the orchestrate-endpoint epilogue (chat-history
+    persistence + suggestion enrichment + response shaping). Still inline
+    in `orchestrate_agent_endpoint`.
+  - The orchestrate-endpoint's main classification + delegate loop
+    (~700 lines after this extraction round). Largest remaining inline
+    block in `routers/agents.py`.
+- `agents/material/service.py` — 2874 lines (2026-05-22 refresh; was 2875
+  pre-extraction this session; doc's earlier "2560" baseline preceded the
+  cost/size-guard helpers and accuracy-suggestion code that landed in the
+  intervening weeks). `process()` is a mega-switch that inserts a new
+  50-line inline handler per intent. ~~Easiest extraction target: the
+  `list_material_categories` block~~ landed 2026-04-26 as
   `_handle_list_material_categories()` (44 lines) plus a static
   `_format_material_categories_response()` helper. Follow-up extractions
   landed 2026-04-26: `_handle_create_material`, `_handle_get_material`
   (incl. size-scoped lookup), `_handle_delete_material` (post-resolve
   confirmation flow), and `_handle_list_materials` (count + category-filter
-  + name-hint dispatch). `process()` is now ~680 lines, down from ~1072.
-  Remaining inline blocks: the `update_material` branch (~250 lines,
-  tangled with multi-turn field-then-value state + size_op resolution +
-  unit-OID lookup) and the `delete_material` early-confirm shortcut that
-  fires before `_resolve_target_material`.
+  + name-hint dispatch). `_handle_update_material` landed 2026-05-22:
+  the ~246-line inline `update_material` block (multi-turn field-then-value
+  state, add-size cost+unit guard, remove-last-size refusal, per-size
+  unit-OID resolution, and the final merge/update via
+  `_update_material_via_api`) was lifted into a dedicated method that
+  reuses `_build_response_envelope` for all 5 return shapes. `process()`
+  call site collapses from 246 inline lines to a 14-line kwargs call
+  mirroring the `_handle_create_material` / `_handle_delete_material`
+  pattern. Verified: 78 tests pass across `test_material_agent.py` +
+  `test_material_api.py` + `test_maple_material_size_operations.py`;
+  full-project mypy stays at `Success: no issues found in 265 source files`.
+  Remaining inline block: the `delete_material` early-confirm shortcut
+  that fires before `_resolve_target_material` (small; pre-resolve so it
+  can't easily share the post-resolve `_handle_delete_material` signature).
 - `agents/estimate/service.py` — 5685 lines after the 2026-04-26 #80
   refactor. Similar split: prompt-building / inventory fetch / LLM
   extraction / totals calc / CRUD read handlers are each their own concern.
@@ -5962,6 +6105,20 @@ Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of 
 **Issue:** Each stub block lifts method signatures from sibling mixins (`CrudParsingMixin`, `WorkItemHandlersMixin`, etc.) and re-declares them inside `if TYPE_CHECKING:` so mypy stops flagging attr-defined on the cross-mixin calls. If a signature in the real implementation drifts (e.g. `_crud_envelope` adds a new keyword param), the stub won't catch it — mypy silently uses the stub.
 
 **Fix:** define an `EstimateAgentHostProtocol(Protocol)` in `agents/estimate/host_protocol.py` (or a shared types module) that captures the cross-mixin contract once. Each mixin can reference the Protocol via `Self` bound or via inheritance from a shared base. Short-term mitigation: per-method docstring pointers (`# See agents/estimate/crud_helpers.py:381 — keep in sync`). Worth doing if the stubs grow further; for now the 23 stubs are stable enough.
+
+### 303. [HIGH] Unit tests missing for the 9 new `routers/agent_helpers/` modules
+**Where:** `routers/agent_helpers/pending_estimate_follow_up.py`, `optional_follow_up.py`, `estimate_gathering.py`, `delegate_create_estimate.py`, `delegate_estimate_ops.py`, `delegate_get_estimate.py`, `delegate_generic.py`, `finalize_result.py`, `estimate_resolver.py` (all landed 2026-05-22).
+
+**Issue:** All 9 helper modules extracted from `orchestrate_agent_endpoint` lack module-level unit tests. Behavior is exercised through `tests/test_orchestrator_endpoint.py` integration tests (52 passing), so no regression risk today — but each helper is a state machine with multiple return paths (`handle_pending_estimate_follow_up` has 9 envelope returns spanning `confirm`/`select_property`/`negative`/`list-properties`/`no-properties`/`escape-hatch`/`resolve-error`/`success` shapes) and the integration tests don't necessarily cover every branch. Per `CLAUDE.md` "tests are mandatory after any code change" — extraction without unit-test backfill leaves the per-branch behavior implicit in the endpoint tests.
+
+**Fix:** Add per-helper unit-test files (`tests/test_pending_estimate_follow_up.py`, etc.) with one test per return path. Each test constructs a `context_payload` matching the entry state, asserts the returned envelope's `intent` / `response` / `result.operation` / `needs_clarification` flags. Use the existing fixtures (`monkeypatch` for `Estimate.get`, `properties_api_get_properties`, etc.) — same shape as the integration tests but scoped to one helper. Estimated 6-9 tests per module = ~60-80 new tests total.
+
+### 304. [MEDIUM] Dual-mock pattern in `test_orchestrator_endpoint.py` after helper extractions
+**Where:** `tests/test_orchestrator_endpoint.py` — 4 sites for `properties_api_get_properties`, 4 sites for `estimates_api_get_estimates`, 2 sites for `estimates_api_get_estimate`, 2 sites for `prepare_generated_estimate` / `save_generated_estimate`.
+
+**Issue:** After the 2026-05-22 helper extractions, several `monkeypatch.setattr(agents_router, "X", ...)` calls now have a parallel `monkeypatch.setattr("routers.agent_helpers.<helper>.X", ...)`. The `agents_router.X` patches are NOT yet dead because two callsites of `estimates_api_get_estimate{s}` still live inside `_delegate_to_agent` (Estimate Agent fallback for unhandled intents — lines ~880-911 in `routers/agents.py`). Functionally correct but cluttered, and easy to forget which patches are load-bearing.
+
+**Fix:** When the remaining `_delegate_to_agent` Estimate Agent fallback is extracted (would naturally consolidate into a `delegate_estimate_misc.py` module or merge into `delegate_estimate_ops.py`), the `agents_router.estimates_api_get_estimate{s}` aliases become fully dead. At that point: drop the `agents_router`-targeted patches at lines 1835, 1886, 1953, 2028, 2853-2854, 2933-2934; keep only the helper-module patches. Also update `test_orchestrate_imports_plain_helpers_not_endpoints` contract test (line 3083) — its assertion that `agents_router.estimates_api_get_estimates is fetch_estimates` would need to drop both `estimates_api_*` aliases (the test already moved `properties_api_get_properties` to the helper module's binding).
 
 ---
 
