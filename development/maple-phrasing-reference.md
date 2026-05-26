@@ -2,7 +2,32 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-05-13 (CRUD response strings now embed a markdown link to the object so users can jump from chat to the record. New `object_link()` helper in `agents/text_utils.py` renders `[Name](/properties?open=<id>)` for Property/Contact/Material/Labour Get/Create/Update/List responses (label changes from plain text to a clickable link inside the existing template) and `[Name](/estimates/<id>)` for Estimate Get/List. Delete responses unchanged (object is gone). Frontend list pages (`PropertiesPage`, `ContactsPage`, `MaterialsPage`, `PeoplePage`) read `?open=<id>` on mount, open the edit modal for the matching record, and strip the query param. No phrasing-status flips — only the response copy is decorated. — Earlier, on 2026-05-02 (Wave 4.1 follow-up #2 — broadened EST-code regex in all 5 estimate-anchored cross-resource patterns and the `get_estimate` total-query short-circuit to accept alphanumeric codes. Previous form `est[-_]\d+` only matched digit-only codes (`EST-0042`); platform routers actually emit alphanumeric codes (`EST-4E73F7BB`, `EST-2026-001`) per the existing `_ESTIMATE_CODE_PATTERN` in `agents/estimate/service.py`. New form `est[-_][a-z0-9][a-z0-9\-_]*` (case-insensitive) brings the cross-resource matcher into sync with the rest of the codebase. Lowercase hex codes still canonicalize to upper-case via the existing normalizer. Token convention table updated to show the broader code shape. Earlier in the day, Wave 4.1 follow-up — `show me estimates for {property} property` suffix form added to `_CROSS_RESOURCE_QUERY_PATTERNS` so phrasings like `Bob Residential property` route as `cross_type=property` (the trailing `property`/`properties` is stripped from the captured name). Contact-anchored gate tightened: replaced `_looks_like_person_name(original_message)` with a `fullmatch` on the captured slice in original case + leading-word stopword check. Phrasings that previously slipped through to the contact handler (`Bob Residential property`, `John Doe house`, `John Doe at 123 Main St`, `Sarah Lee site`) now fail the gate and fall through. Earlier in the day, xfail-wave-4.1 shipped — contact-anchored estimate list closed. New `_CONTACT_ANCHORED_ESTIMATE_PATTERN` (broad shape `estimates? for X`) lives outside the regex tuple so it can apply a person-name shape gate (`_looks_like_person_name`) against the original-case message; phrasings like `estimates for approval` / `estimates for concrete blocks` / lowercase `estimates for bob jones` fail the gate and fall through. Property-anchored pattern still wins for `estimates for property X` (more-specific match runs first inside `_match_cross_resource_query`). Estimate agent's `_handle_list_estimates` extends the cross-resource branch to handle `type=contact`: resolves via `find_contacts_by_full_name`, walks `Property.contacts` to a property-id set, then constrains `Estimate.property` to that set ($in for multi-match, equality for single). New `_format_contact_constraint_label` helper renders the contact display name in the response lead-in. Empty-result copy added: contact-not-found and contact-with-no-properties variants. Coverage matrix `estimate_outbound` category extended to 5 phrasings; Tier 1 now 127/127. Earlier the same day, xfail-wave-4 shipped — estimate ↔ property/contact outbound drilldowns closed. Workstream A: three new patterns in `_CROSS_RESOURCE_QUERY_PATTERNS` route `which property is this estimate {EST} linked to?` → `list_properties` and `which contact is this estimate {EST} for?` / `who is this estimate {EST} for?` → `list_contacts`, both with `filter_by={type=estimate, name=…}`. Property agent's `_list_properties_by_cross_resource` and Contact agent's new `_list_contacts_for_estimate` resolve the EST code via `find_estimate_by_code`, follow `Estimate.property` → load the linked Property, and (for contact target) intersect with `Property.contacts`. Contact responses lead with the property name as the join lead-in. Workstream B: a single combined pattern routes `(show me)? estimates? (for property|linked to (property)?) X` → `list_estimates` with `filter_by={type=property, name=…}`, anchored on the literal "property" or "linked to" so status phrasings like `estimates for approval` don't get claimed. Estimate agent's `_handle_list_estimates` extends the existing labour cross-resource branch to handle `type=property`: resolves via `find_properties_by_name_or_address`, then either pins `Estimate.property == X` (single match) or `{$in: [...]}` (multi-match). Coverage matrix gained `estimate_outbound` category (4 phrasings); Tier 1 now 126/126. §1.8 ⚠️ rows flipped to ✅. Earlier the same day: §1.8 cleanup — removed four stale ⚠️ duplicates that already shipped as ✅ in §1.1 via Workstream C; remaining ⚠️ rows are the four genuine estimate→property/contact outbound drilldowns now tracked by `plans/maple-xfail-wave-4-estimate-outbound.md`. — Earlier the same day, Wave 3 Workstream C shipped — Estimate filters and drilldowns closed: aggregated-value queries (`what is the total value of the open estimates`) compute a single `sum(grand_total)` across `DRAFT/APPROVED/REVIEW/WON`; date-range qualifiers (`from last week`, `this month`) constrain `created_at`; amount-range qualifiers (`over $10k`, `under $5000`) constrain `grand_total` with `k`/`m` suffix support. Estimate-anchored cross-resource drilldowns: `what materials does EST-… use?` and `what roles are on EST-…?` route via `_CROSS_RESOURCE_QUERY_PATTERNS` with `filter_by={type=estimate, name=…}`; Material and Labour agents resolve the estimate via the new `find_estimate_by_code` helper in `agents/cross_resource.py` and project the embedded `materials`/`labours` snapshots. Verbless `{status} {plural-domain}` phrasings now infer `action=list` when paired with a status/date/amount qualifier (`_has_list_qualifier` helper) so phrasings like `approved quotes over $10k` no longer fall through to clarification. — Earlier the same day, Wave 3 Workstream B shipped — Material query variants closed: orchestrator `_match_size_scoped_material_op` extended for `rename size A to B for X` (size_op=rename routing), new top-level rule for `how much does X cost?` (non-possessive cost query → `get_material`), and `_parse_price_range_filter` in `agents/material/service.py` actually filters `_handle_list_materials` results by `under/over $N`. Count-modifier phrasings (`how many different/types of materials`) confirmed already routing via the standard hint flow. Coverage matrix gained `material_query_variants` category (5 phrasings), Tier 1 now 122/122. — Earlier the same day, Wave 3 Workstream A shipped — `_BULK_DELETE_PATTERNS` extended in `agents/text_utils.py` to refuse partial-bulk phrasings (`delete the last/first/next/previous N <plural>`); §7.4 entries flipped ⚠️ → 🛑. — Earlier the same day: Stale-entry sweep — flipped three entries that were tagged ⚠️ but already covered by tests: §4.4 `how many materials do I have?` and `count my materials` exercised by `test_maple_crud_coverage.py` count category, §9.3 `guide to setting up a property` covered by `test_maple_help_coverage.py:445`. Removed a duplicate `How much does {material} cost?` row from §4.3 — canonical entry stays in §4.9. — Earlier the same day, Wave 2 Phase 2 of xfail backlog closed — cross-resource list responses are now actually filtered by the cross-resource constraint. The orchestrator emits a `filter_by` payload on classification; the router threads it into the agent's context dict; Contact, Property, and Estimate agents read it in their list handlers and run the join. Direct lookups (Property.contacts) and transitive joins via Estimate (`materials.material` / `labours.labour`) both supported. Backed by `agents/cross_resource.py` for shared name resolution. — Same day, Wave 2 Phase 1 closed routing for cross-resource phrasings ("who lives at X?", "what properties does X own?", "where is X used?", "what estimates use the X role?") as ✅ rule on Tier 1 across all four CRUD resources via `_match_cross_resource_query`. Tier 1 coverage now 117/117. — Wave 1 Phase 2 closed possessive (`X's <field>`) and field-targeted-update (`set X's <field> to Y`, `change/update the <field> of/on X to Y`) phrasings as ✅ rule across Property, Contact, Material, and Labour via `_match_possessive_or_field_targeted` + `FIELD_TO_DOMAIN`. Wave 1 Phase 1 closed §9.5 help gaps for onboarding synonyms, capability variants, implicit help phrasings, limitation queries, unit enums, work-item how-to, cross-domain link, and the property-pluralization defect. Consolidated §"Coverage blind spots" + §"Highest-value extensions" from the now-deleted `maple-input-coverage-audit.md` into new §11; deleted `maple-coverage-gaps-estimate-material-size.md` as its work shipped in Phase A + Phase B and the locked decisions are captured under §1.1, §1.2, §4.8).
+**Last updated:** 2026-05-26
+
+### Change log
+
+**2026-05-26 — May expansion**
+- Dashboard analytics intent (`analytics_estimates`) with pipeline value, backlog, won value, and breakdown-by-status/division phrasings (§1.9). Custom time windows respected — "pipeline value in the last 30 days" queries the DB with the user's window, not the default 90-day headline.
+- Title-based estimate lookup — `_handle_get_estimate` now resolves estimates by quoted title or `title/called/named X` phrases when no EST-code is present (§1.2)
+- "win" added as a verb-form alias for EstimateStatus.WON so "how many estimates did I win this month?" routes correctly
+- "older than X days" age-based date filter via `_AGE_FILTER_PATTERN`
+- "at property" cross-resource variant for estimate→property queries
+- Contact→property "linked to" cross-resource patterns (§6.1)
+- Material size "of" form (`how much does 12x12 of concrete blocks cost?`) and category query (`what category is material X?`) (§4.9)
+- Role field queries via "what's the X for role Y?" routing to `get_labour` (§5.8)
+- "clear" removed from bulk-delete verb patterns — ambiguous in this domain (§7.1)
+- US English: user-facing "labour" → "labor" in response strings, accuracy suggestions, and guide content
+- User guide updated: contacts can be linked to multiple properties (no limit)
+
+**2026-05-13 — Object links in CRUD responses**
+- `object_link()` helper in `agents/text_utils.py` renders `[Name](/properties?open=<id>)` for Property/Contact/Material/Labor Get/Create/Update/List responses and `[Name](/estimates/<id>)` for Estimate Get/List. Frontend list pages read `?open=<id>` on mount and auto-open the edit modal.
+
+**2026-05-02 — Waves 1-4.1**
+- Wave 4.1: Contact-anchored estimate list, EST-code regex broadened to alphanumeric, suffix "property" form
+- Wave 4: Estimate ↔ property/contact outbound drilldowns (§1.8)
+- Wave 3: Estimate filters (status + date + amount), cross-resource drilldowns (materials/roles on EST-code), material query variants, partial-bulk delete refusal
+- Wave 2: Cross-resource routing + agent-side join for all four CRUD resources (§6)
+- Wave 1: Possessive/field-targeted phrasings, help gaps (§9.5), coverage blind spots consolidated into §11
 
 ## How to read this doc
 
@@ -67,6 +92,10 @@ Estimate is not in the CRUD coverage matrix — its generation is multi-turn and
 | `approved quotes over $10k`                          | `list_estimates` with status + `grand_total` range             | ✅ rule *(closed in xfail-wave-3 Workstream C — verbless plural-domain inference + `_parse_estimate_amount_filter` adds a `$gt`/`$lt` constraint on `grand_total`; `k`/`m` suffixes supported)*                                                                      |
 | `what materials does {EST} use?`                     | `list_materials` filtered to one estimate's snapshot           | ✅ rule *(closed in xfail-wave-3 Workstream C — orchestrator routes via `_CROSS_RESOURCE_QUERY_PATTERNS` with `filter_by={type=estimate, name=EST-…}`; Material agent's `_handle_list_materials_for_estimate` resolves and projects the embedded `materials` array)* |
 | `what roles are on {EST}?`                           | `list_labours` filtered to one estimate's snapshot             | ✅ rule *(closed in xfail-wave-3 Workstream C — symmetric Labour-agent drilldown via `_handle_list_labours_for_estimate`)*                                                                                                                                           |
+| `how many estimates did I win this month?`           | `list_estimates` with status=WON + date filter                 | ✅ rule *(May expansion — "win" added as a verb-form alias for EstimateStatus.WON in `_estimate_status_from_text`)*                                                                                                                                                  |
+| `show only estimates with Won status this month`     | `list_estimates` with status=WON + date filter                 | ✅ rule *(status + date qualifiers already compose; no new code needed)*                                                                                                                                                                                              |
+| `show me all estimates older than 60 days`           | `list_estimates` with `created_at <= cutoff`                   | ✅ rule *(May expansion — `_AGE_FILTER_PATTERN` + age branch in `_parse_estimate_date_filter` returns `(None, cutoff)` window)*                                                                                                                                      |
+| `show me Draft estimates at property {property}`     | `list_estimates` with status + property cross-resource filter  | ✅ rule *(May expansion — "at\s+property" added to the property→estimate cross-resource pattern)*                                                                                                                                                                    |
 
 ## 1.2 Value / total queries for a specific estimate
 
@@ -79,6 +108,14 @@ Estimate is not in the CRUD coverage matrix — its generation is multi-turn and
 | `worth of {EST}`                       | `get_estimate` → Estimate Agent | ✅ rule                        |
 
 Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads the response with the dollar amount.
+
+**Title-based lookup** *(May expansion)*: when no EST-code is found in the query, `_resolve_estimate_by_title` extracts a title from quoted text (`"Untitled Estimate"`) or `title/called/named X` phrasings and searches by substring match. Single match → returns the estimate. Multiple matches → lists them and asks the user to pick by code.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `tell me about estimate with title "Untitled Estimate"` | `get_estimate` → Estimate Agent | ✅ rule |
+| `show me the estimate called "Driveway Replacement"` | `get_estimate` → Estimate Agent | ✅ rule |
+| `pull up estimate named "Foundation Work"` | `get_estimate` → Estimate Agent | ✅ rule |
 
 ## 1.3 Generation (multi-turn, LLM-driven)
 
@@ -168,6 +205,21 @@ Closed in xfail-wave-4 + 4.1 (plan: [maple-xfail-wave-4-estimate-outbound.md](pl
 **Anchoring rules:**
 - Property-anchored Workstream B fires on either the prefix form (`for property X` / `linked to (property)? X`) OR the suffix form (`for X property` / `for X properties`). Status phrasings like `estimates for approval` / `estimates for review` don't match (no `property` or `linked to` token).
 - Contact-anchored Wave 4.1 uses a broad `estimates? for X` shape gated by a `fullmatch` on the captured slice in original case: it must be exactly a 2+ word capitalized name. `Bob Residential property` (trailing noun), `John Doe at 123 Main St` (locator suffix), and `bob jones` (lowercase) all fail the gate and fall through. Property-anchored patterns are checked first inside the same matcher, so `estimates for property Bob Jones` and `estimates for Bob Residential property` both win as `cross_type=property` before the contact gate runs.
+
+## 1.9 Dashboard / analytics queries
+
+Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orchestrator to a new `analytics_estimates` intent handled by the Estimate Agent. Runs before `is_help_query` so question-word phrasings aren't swallowed by the help classifier.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `what's the value in the pipeline?` | `analytics_estimates` → Estimate Agent | ✅ rule |
+| `what's my pipeline value in the last 30 days?` | `analytics_estimates` → Estimate Agent (custom window) | ✅ rule |
+| `what's the backlog value?` | `analytics_estimates` → Estimate Agent | ✅ rule |
+| `how much value was won?` | `analytics_estimates` → Estimate Agent | ✅ rule |
+| `what's the breakdown of estimates by statuses this month?` | `analytics_estimates` → Estimate Agent | ✅ rule |
+| `what's the breakdown of estimates by divisions?` | `analytics_estimates` → Estimate Agent | ✅ rule |
+
+**Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows (pipeline=90 days, backlog/won=30 days). Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
 
 ---
 
@@ -358,12 +410,16 @@ All size-scoped phrasings require an explicit `size <X>` token to fire. Material
 | `list materials under $10` | `list_materials` with price range | ✅ rule *(closed in xfail-wave-3 Workstream B — `_parse_price_range_filter` in `agents/material/service.py` filters the list response by `under/over/below/above $N`)* |
 | `rename size {old} to {new} for {material}` | `update_material` (size_op=rename) | ✅ rule *(closed in xfail-wave-3 Workstream B — orchestrator `_match_size_scoped_material_op` rule routes the rename verb)* |
 | `show all sizes for {material}` | `get_material` | 🤖 LLM |
+| `how much does {size} of {material} cost?` | `get_material` (size-scoped) | ✅ rule *(May expansion — "of" form cost query pattern)* |
+| `what is the price of {size} of {material}?` | `get_material` (size-scoped) | ✅ rule *(May expansion)* |
+| `what category is material {material}?` | `get_material` (category focus) | ✅ rule *(May expansion — `_match_field_specific_query` before help classifier)* |
+| `what category is {material}?` | `get_material` (category focus) | ✅ rule *(May expansion)* |
 
 ---
 
-# 5. People (roles) — a.k.a. Labour
+# 5. People (roles) — a.k.a. Labor
 
-Labour = catalog of **role definitions** (Landscaper, Foreman, Operator). Individuals go under Contact.
+Labor = catalog of **role definitions** (Landscaper, Foreman, Operator). Individuals go under Contact.
 
 ## 5.1 Direct imperatives (all ✅ rule)
 
@@ -401,7 +457,20 @@ Labour = catalog of **role definitions** (Landscaper, Foreman, Operator). Indivi
 
 `{role}` · `I want the details for {role}` · `tell me about {role}`
 
-## 5.8 People gaps
+## 5.8 Role field queries (all ✅ rule — May expansion)
+
+"What's the X for role Y?" phrasings route to `get_labour` via `_match_field_specific_query` in the orchestrator (runs before `is_help_query`).
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `what's the average wage for the role {role}?` | `get_labour` → Labour Agent | ✅ rule |
+| `what's the rate for the role {role}?` | `get_labour` → Labour Agent | ✅ rule |
+| `what's the labor burden for the role {role}?` | `get_labour` → Labour Agent | ✅ rule |
+| `what's the unbillable rate for the role {role}?` | `get_labour` → Labour Agent | ✅ rule |
+
+Note: "labor burden" and "unbillable rate" are company-level settings, not per-role fields. The Labour Agent's get response shows the role's Avg. Wage and computed Rate. The explanation of how rate is computed (wage + unbillable% + labor burden%) is provided when users attempt to edit rate directly.
+
+## 5.9 People gaps
 
 No outstanding people-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `which properties need a {role}?`) are tracked under §6.
 
@@ -421,6 +490,8 @@ Questions users ask when they think about the domain rather than the database. R
 | `what properties does {contact} own?` | `list_properties` filtered by contact | ✅ rule |
 | `where does {contact} live?` | `list_properties` filtered by contact | ✅ rule |
 | `show me {contact}'s properties` | `list_properties` filtered by contact | ✅ rule (possessive flow) |
+| `which properties does contact {contact} linked to?` | `list_properties` filtered by contact | ✅ rule *(May expansion — new "linked to" cross-resource pattern)* |
+| `show me (all) properties contact {contact} linked to` | `list_properties` filtered by contact | ✅ rule *(May expansion)* |
 
 ## 6.2 Material → Property / Estimate
 
@@ -444,7 +515,7 @@ Questions users ask when they think about the domain rather than the database. R
 
 ## 7.1 Bulk delete — 🛑 refused
 
-Phrasings with quantifier + delete verb. Enforced at the orchestrator layer AND defensively at each domain agent's `process()`.
+Phrasings with quantifier + delete verb. Enforced at the orchestrator layer AND defensively at each domain agent's `process()`. Verbs: `delete`, `remove`, `drop`, `wipe`. **Note:** `clear` was removed from the delete-verb list in the May 2026 expansion — it's ambiguous in this domain ("clear filters", "clear status") and shouldn't trigger the refusal guard.
 
 | Phrasing | Behavior |
 |---|---|
@@ -662,6 +733,7 @@ Phase 1 of the xfail backlog (plan: `documentation/development/plans/maple-xfail
 | `platform/tests/test_material_agent.py` | Material Agent handler integration |
 | `platform/tests/test_estimate_agent.py` | Estimate Agent handler integration |
 | `platform/tests/test_orchestrator_intents.py` | Orchestrator intent resolution |
+| `platform/tests/test_maple_new_phrasings.py` | May 2026 expansion — clear bug, win alias, age filter, analytics, material/role field queries, cross-resource "linked to" |
 | `platform/tests/reports/maple_crud_gap_report.md` | Auto-generated gap report (regenerates each test run) |
 
 ## 10.2 How to run
@@ -672,6 +744,7 @@ cd platform
 ./run_tests.sh tests/test_maple_crud_coverage.py -m ""               # Tier 1 + Tier 2 (~3min, ~$0.05, needs OPENAI_API_KEY)
 ./run_tests.sh tests/test_maple_estimate_status_queries.py tests/test_maple_material_size_operations.py
 ./run_tests.sh tests/test_maple_help_coverage.py                     # HELP intent (74 passing, 0 xfail after Phase 1)
+./run_tests.sh tests/test_maple_new_phrasings.py                     # May 2026 expansion (31 tests)
 ```
 
 ## 10.3 Current matrix score (Tier 1 / Tier 2)
