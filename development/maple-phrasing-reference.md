@@ -2,9 +2,24 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-05-26
+**Last updated:** 2026-05-27
 
 ### Change log
+
+**2026-05-27 — Work-item field operations (implemented)**
+- Expanded §1.5 from a flat table into eight sub-sections (§1.5.1–§1.5.8) covering all CRUD operations on work items inside an estimate.
+- Added `{WI}` placeholder convention for work-item references (positional, by description, contextual).
+- §1.5.1 Work-item CRUD: added list/count/show work items (3 → ✅ rule).
+- §1.5.2 Division: assign/move/put/query phrasings (6 → ✅ rule, 1 bulk ⚠️ gap).
+- §1.5.3 Description: "set description"/"update description"/"what's description" (3 → ✅ rule, 1 "describe as" ⚠️ gap).
+- §1.5.4 Recurring schedule: all 13 phrasings implemented (✅ rule). `recurring`/`recurrence` removed from `_WORK_ITEM_REFUSED_FIELDS`. Handlers parse 3 schedule shapes: total occurrences, date range, specific months.
+- §1.5.5 Materials in work item: all 11 phrasings implemented (✅ rule). Add material from catalog, remove by name, list/count. Sub-total auto-recalculated.
+- §1.5.6 Activities in work item: 9/13 implemented (✅ rule). Add with optional role/effort, remove by name, list/count. 4 update-in-place phrasings (change role/effort/rate, assign rate card) remain ⚠️ gap.
+- §1.5.7 Cost adjustments: subtotal/total read queries (2 → ✅ rule, 1 "how much" ⚠️ gap). Percentage fields remain 🛑 refused.
+- §1.5.8 Total amount adjustment: all 9 phrasings implemented (✅ rule). Direct sub_total override with grand_total recalculation.
+- New file: `agents/estimate/work_item_field_handlers.py` (WorkItemFieldHandlersMixin).
+- New test file: `tests/test_maple_work_item_ops.py` (79 tests — routing, op detection, regression, param parsing).
+- Orchestrator routing: extended verb list with make/assign/move/put/adjust/round/bump/reduce/turn/stop/disable; added sub-resource, list, query, and recurring patterns; work-item field queries bypass `is_help_query` (excludes definitional "what is a work item?").
 
 **2026-05-26 — Template CRUD phrasings**
 - Template resource added to terminology table and phrasing catalog (§6). All phrasings are ⚠️ gap — no Template Agent or orchestrator routing exists yet.
@@ -153,7 +168,19 @@ EstimateStatus values: `DRAFT`, `APPROVED`, `WON`, `LOST`, `ONHOLD`, `SCHEDULED`
 
 ## 1.5 Work-item / line-item management
 
-Regex rules live at `agents/orchestrator/service.py:230-248`.
+All work-item operations route to `update_estimate` → Estimate Agent. Orchestrator regex rules at `agents/orchestrator/service.py:230-248` detect the work-item / job-item / scope / line-item token and route accordingly; the Estimate Agent's `WorkItemHandlersMixin` dispatches to the specific sub-operation.
+
+**Work-item reference conventions** — users can identify a work item by:
+
+| Placeholder | Examples |
+|---|---|
+| `{WI}` (positional) | `work item 1`, `work item #2`, `the first scope`, `the last line item` |
+| `{WI}` (by description) | `the Driveway work item`, `the Foundation scope` |
+| `{WI}` (contextual) | `this work item`, `the work item` (when only one, or most recently discussed) |
+
+Synonyms: `work item`, `job item`, `scope`, `line item` are interchangeable in all phrasings below.
+
+### 1.5.1 Work-item CRUD (add / remove / rename)
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
@@ -162,9 +189,141 @@ Regex rules live at `agents/orchestrator/service.py:230-248`.
 | `add a scope to the last estimate` | `update_estimate` → Estimate Agent | ✅ rule |
 | `add a line item to this estimate` | `update_estimate` → Estimate Agent | ✅ rule |
 | `create another scope on {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `add a work item called "Foundation Prep" to {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `change work item #1 in {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `remove work item 2 from this estimate` | `update_estimate` → Estimate Agent | ✅ rule |
+| `delete the Driveway scope from {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `rename the scope to Foundation` | `update_estimate` → Estimate Agent | ✅ rule |
+| `how many work items does {EST} have?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `list the work items in {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `show me the scopes on this estimate` | `update_estimate` → Estimate Agent | ✅ rule |
+
+### 1.5.2 Division assignment
+
+Division and description are editable via chat. Values come from `EstimateDivision` enum: Design/Build, Irrigation & Lighting, Maintenance, Snow & Ice, Tree Care, Turf & Plant Care, Unassigned — plus custom `Division` documents per company.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `set the division of {WI} to Maintenance` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the division on {WI} to Snow & Ice` | `update_estimate` → Estimate Agent | ✅ rule |
+| `assign {WI} to the Design/Build division` | `update_estimate` → Estimate Agent | ✅ rule |
+| `move {WI} to Tree Care` | `update_estimate` → Estimate Agent | ✅ rule |
+| `put {WI} under Irrigation & Lighting` | `update_estimate` → Estimate Agent | ✅ rule |
+| `what division is {WI} in?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `which division does {WI} belong to?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set all work items in {EST} to Maintenance` | `update_estimate` → Estimate Agent | 🤖 LLM |
+
+### 1.5.3 Description
+
+The rename handler already covers description updates. These phrasings extend the surface with "description"-keyword variants.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `rename {WI} to "Foundation Prep"` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the name of {WI} to "Driveway Installation"` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set the description of {WI} to "Excavation and grading"` | `update_estimate` → Estimate Agent | ✅ rule |
+| `update the description on {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `describe {WI} as "Remove existing pavers and re-lay"` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `what's the description of {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
+
+### 1.5.4 Recurring schedule
+
+`JobItem.recurring` (bool) + `JobItem.recurrence` (`RecurrenceSchedule`) control repeat billing. `RecurrenceSchedule` supports three end types: `DATE_RANGE` (start/end month+year), `TOTAL_OCCURRENCES` (fixed count), and `SPECIFIC_MONTHS` (named months across years). Currently only `month` period is supported.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `make {WI} recurring` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set {WI} to recur monthly` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set {WI} to repeat every month` | `update_estimate` → Estimate Agent | ✅ rule |
+| `make {WI} recurring from April to October` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set {WI} to 6 occurrences` | `update_estimate` → Estimate Agent | ✅ rule |
+| `make {WI} recurring in April, May, June, July, August` | `update_estimate` → Estimate Agent | ✅ rule |
+| `turn off recurring on {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `remove the recurring schedule from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `stop {WI} from recurring` | `update_estimate` → Estimate Agent | ✅ rule |
+| `is {WI} recurring?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `how many occurrences does {WI} have?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `what's the recurring schedule on {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the recurrence on {WI} to 12 occurrences` | `update_estimate` → Estimate Agent | ✅ rule |
+
+`recurring` and `recurrence` removed from `_WORK_ITEM_REFUSED_FIELDS` in `text_helpers.py`. Handlers parse three `RecurrenceSchedule` shapes: total occurrences, date range (month-to-month), and specific months.
+
+### 1.5.5 Materials within a work item
+
+`JobItem.materials` is a `List[MaterialItem]` — each entry snapshots a catalog material with quantity and price. These phrasings manage the embedded material list on a specific work item, distinct from the top-level Material catalog CRUD in §4.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `add concrete blocks to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `add material {material} to {WI} in {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `add 50 concrete blocks to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `add {material} with quantity 20 and size 12x12 to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `remove concrete blocks from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `remove all materials from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the quantity of concrete blocks in {WI} to 100` | `update_estimate` → Estimate Agent | ✅ rule |
+| `update the price of {material} in {WI} to $12` | `update_estimate` → Estimate Agent | ✅ rule |
+| `how many materials are in {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `what materials does {WI} have?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `list the materials in {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+
+**Disambiguation note:** `what materials does {EST} use?` (§1.1) queries all materials across all work items via the cross-resource drilldown. The phrasings above scope to a *single* work item within the estimate.
+
+### 1.5.6 Activities within a work item
+
+`JobItem.activities` is a `List[ActivityItem]` — each entry describes a labor task with an optional role (from the Labor catalog), rate, effort hours, and an optional effort-rate-card breakdown. Activities represent the labor component of a work item.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `add an activity to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `add activity "Excavation" to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `add an activity called "Grading" with role Landscaper to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `add activity "Planting" with 8 hours of effort to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `remove the Excavation activity from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `remove all activities from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the role on the Excavation activity to Foreman` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `set the effort on the Grading activity in {WI} to 12 hours` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `update the rate for the Planting activity to $45/hr` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `assign an effort rate card to the Excavation activity in {WI}` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `what activities are in {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `list the activities on {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `how many activities does {WI} have?` | `update_estimate` → Estimate Agent | ✅ rule |
+
+### 1.5.7 Cost adjustments (profit margin, overhead, labor burden, tax)
+
+`JobItem` carries four cost parameters: `profit_margin` (default 15%), `overhead_allocation` (default 0%), `labor_burden` (default 0%), and `tax` (default 0%). These multiplicatively affect the work item's `sub_total` and roll up into `Estimate.grand_total`.
+
+**Current policy:** these fields are in `_WORK_ITEM_REFUSED_FIELDS` — the agent directs users to the UI because financial changes have dollar-impact visibility concerns. The phrasings below are defined for review; implementation would require lifting the refusal.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `set the profit margin on {WI} to 20%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `change the margin on {WI} to 25%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `set overhead allocation on {WI} to 10%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `change the overhead on {WI} to 15%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `set the labor burden on {WI} to 12%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `change the labor burden on the Foundation scope to 18%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `set tax on {WI} to 13%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `change the tax rate on {WI} to 8.25%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `what's the profit margin on {WI}?` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `what's the subtotal of {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `how much is {WI}?` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `what's the total for {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
+
+### 1.5.8 Total amount adjustment
+
+Direct override of a work item's `sub_total`. Unlike the percentage-based cost parameters in §1.5.7, this sets an absolute dollar amount on the work item, which then rolls up into `Estimate.grand_total`. Useful for rounding, flat-rate pricing, or manual corrections.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `adjust the total on {WI} to $1600` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set the total for {WI} to $2500` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the amount on {WI} to $3000` | `update_estimate` → Estimate Agent | ✅ rule |
+| `round up {WI} to $2000` | `update_estimate` → Estimate Agent | ✅ rule |
+| `round the total on {WI} to $1500` | `update_estimate` → Estimate Agent | ✅ rule |
+| `make {WI} an even $5000` | `update_estimate` → Estimate Agent | ✅ rule |
+| `bump {WI} up to $1800` | `update_estimate` → Estimate Agent | ✅ rule |
+| `reduce {WI} to $1200` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set a flat rate of $750 on {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 
 ## 1.6 Linking
 
@@ -826,6 +985,7 @@ Phase 1 of the xfail backlog (plan: `documentation/development/plans/maple-xfail
 | `platform/tests/test_estimate_agent.py` | Estimate Agent handler integration |
 | `platform/tests/test_orchestrator_intents.py` | Orchestrator intent resolution |
 | `platform/tests/test_maple_template_crud.py` | Template CRUD — routing, refusals, apply-to-estimate (§6) |
+| `platform/tests/test_maple_work_item_ops.py` | Work-item field operations — routing, op detection, regression, recurring param parsing (§1.5) |
 | `platform/tests/test_maple_new_phrasings.py` | May 2026 expansion — clear bug, win alias, age filter, analytics, material/role field queries, cross-resource "linked to" |
 | `platform/tests/reports/maple_crud_gap_report.md` | Auto-generated gap report (regenerates each test run) |
 

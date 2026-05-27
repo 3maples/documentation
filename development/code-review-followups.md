@@ -6203,6 +6203,48 @@ Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of 
 
 **Fix:** When the remaining `_delegate_to_agent` Estimate Agent fallback is extracted (would naturally consolidate into a `delegate_estimate_misc.py` module or merge into `delegate_estimate_ops.py`), the `agents_router.estimates_api_get_estimate{s}` aliases become fully dead. At that point: drop the `agents_router`-targeted patches at lines 1835, 1886, 1953, 2028, 2853-2854, 2933-2934; keep only the helper-module patches. Also update `test_orchestrate_imports_plain_helpers_not_endpoints` contract test (line 3083) — its assertion that `agents_router.estimates_api_get_estimates is fetch_estimates` would need to drop both `estimates_api_*` aliases (the test already moved `properties_api_get_properties` to the helper module's binding).
 
+### 305. [HIGH] Long handler functions in `work_item_field_handlers.py`
+**Where:** `agents/estimate/work_item_field_handlers.py` — `_handle_work_item_add_material()` (132 lines), `_handle_work_item_add_activity()` (114 lines), `_handle_work_item_remove_material()` (101 lines), `_handle_work_item_set_total()` (94 lines), `_handle_work_item_recurring_enable()` (93 lines).
+
+**Issue:** Five handlers exceed the 50-line threshold. Each mixes estimate resolution, work-item matching, sub-resource lookup, mutation, sub_total recalculation, and save into one method.
+
+**Fix:** Extract shared boilerplate (resolve estimate → find work item → clarify on miss) into a `_resolve_work_item_for_update()` helper returning `(target, job_items, idx, matched, err_response)`. Extract catalog lookup + item construction into `_resolve_and_build_material_item()` / `_resolve_and_build_activity_item()`. Each handler shrinks to ~30 lines of domain logic.
+
+### 306. [HIGH] `_detect_work_item_op()` is 202 lines
+**Where:** `agents/estimate/work_item_handlers.py:110`
+
+**Issue:** Grew from ~75 lines to 202 with the new sub-resource ops. Readable as a cascading if-chain but past the length threshold.
+
+**Fix:** Extract the `has_wi` block (lines 140–212) into `_detect_sub_resource_op()` that `_detect_work_item_op` calls first. Keeps the legacy patterns untouched.
+
+### 307. [HIGH] Full-catalog fetch for material/role lookup
+**Where:** `agents/estimate/work_item_field_handlers.py:531` and `:889`
+
+**Issue:** `Material.find(company==X).to_list()` and `Labour.find(company==X).to_list()` load the full company catalog into memory for Python-side substring matching. Acceptable at current scale (<1000 items) but degrades on larger catalogs.
+
+**Fix:** Replace with a `$regex` query or text-search index. Low urgency — chat-tier latency tolerance is higher.
+
+### 308. [MEDIUM] Duplicated work-item/help bypass in orchestrator
+**Where:** `agents/orchestrator/service.py:578` and `:2173`
+
+**Issue:** The `what + work item (excluding definitional)` pre-help guard appears in both `_classify_with_rules` and `process()` with the same 3-regex check. If one is updated the other can drift.
+
+**Fix:** Extract into a `_is_work_item_field_query(text: str) -> bool` predicate called from both sites.
+
+### 309. [MEDIUM] Hardcoded `start_year=2026` in recurring param parser
+**Where:** `agents/estimate/work_item_field_handlers.py` — `_parse_recurring_params()` at 3 sites
+
+**Issue:** `RecurrenceSchedule` objects default to `start_year=2026`. After December 2026 this produces stale schedules.
+
+**Fix:** Use `datetime.now(timezone.utc).year` instead of the literal.
+
+### 310. [MEDIUM] `work_item_field_handlers.py` is 1286 lines
+**Where:** `agents/estimate/work_item_field_handlers.py`
+
+**Issue:** Above the 800-line threshold. Single mixin with 12 handlers following the same pattern.
+
+**Fix:** Addressed naturally when #305 extracts shared boilerplate — the file should drop below 800 lines after the helper extraction.
+
 ---
 
 ## How to work through this
