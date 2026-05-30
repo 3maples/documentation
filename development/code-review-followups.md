@@ -6267,6 +6267,27 @@ Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of 
 
 **Fix:** Addressed naturally when #305 extracts shared boilerplate — the file should drop below 800 lines after the helper extraction.
 
+### 311. [HIGH] `SettingsPage.tsx` is 2,541 lines
+**Where:** `portal/src/pages/SettingsPage.tsx`
+
+**Issue:** Well above the 800-line threshold. The team-invitation flow, seat-count display, billing gate logic, and numerous unrelated settings panels all live in one component.
+
+**Fix:** Extract the seat overage gate logic into a `useSeatsOverageGate` hook, the invitation form into an `InviteTeamSection` sub-component, and the billing display rows into `BillingUsageSection`. This PR touched this file — the debt is growing.
+
+### 312. [LOW] `try_claim_estimate_slot` override path doesn't warn on missing document
+**Where:** `platform/services/estimate_quota.py:76`
+
+**Issue:** When `company.overage_billing_disabled` is true, `find_one_and_update` returning `None` (document gone mid-request) is silently ignored — the in-memory counter is stale but `True` is returned. No log entry makes this invisible in operational monitoring.
+
+**Fix:** Add `logger.warning("overage_billing_disabled slot claimed but company %s not found in DB", company.id)` inside the `if result is None` branch.
+
+### 313. [LOW] Inconsistent null-check style across overage sentinel (`=== null` vs `!= null`)
+**Where:** `portal/src/utils/overage.ts:58` vs `portal/src/components/settings/BillingTab.tsx`
+
+**Issue:** `overage.ts` uses loose `!= null` (catches `undefined` too); `BillingTab.tsx` uses strict `=== null`. Both are correct for their context, but the inconsistency across files sharing the same sentinel contract is a readability trap.
+
+**Fix:** Standardise on `=== null` / `!== null` across both files when the intent is to test for the unlimited sentinel specifically.
+
 ---
 
 ## How to work through this
