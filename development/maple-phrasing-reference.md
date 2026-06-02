@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-05-27
+**Last updated:** 2026-06-02
 
 ### Change log
 
@@ -833,6 +833,41 @@ Maple: I need a unit for size '24x24' on concrete blocks. Try again with cost an
 ```
 
 Currently refuses and requests a retry with complete info (pending-intent persistence is a future UX refinement).
+
+## 9.3 Calculation continuation flow (Calculator Agent) ✅
+
+When the Calculator Agent asks for a missing parameter (area, depth, etc.), it
+stores a `pending_calculation` record in the conversation context. On the next
+turn the router pre-handler `handle_pending_calculation`
+(`routers/agent_helpers/pending_calculation.py`) merges the user's reply into
+the pending calculation **before** orchestrator classification — so a bare or
+units-only answer is no longer misrouted to the Property Agent.
+
+```
+User: how many square feet, at 3-inches, will a yard of mulch cover
+Maple: I can help with mulch coverage calculation! I just need a couple more details:
+       - the area (in square feet)?
+User: 750 square feet          ← absorbed as area_sqft, no longer "I couldn't find any matching properties"
+Maple: Here's your mulch calculation: … Total needed: 6.94 cubic yards
+```
+
+- A bare number ("750") fills the single outstanding field.
+- A reply that supplies only some of the missing fields re-asks for the rest,
+  keeping the pending state.
+- **Pivot drops silently:** a value-less reply that clearly matches a different
+  intent (a CRUD command, or a fresh full calculation query) abandons the
+  pending calculation and falls through to normal routing.
+
+Pending-state slot: `pending_calculation`. Continuation logic:
+`CalculatorAgent.continue_pending()` +
+`text_helpers.extract_continuation_values()`. Tests:
+`tests/test_agent_helpers_pending_calculation.py`,
+`tests/test_calculator_agent.py::TestContinuePending`,
+`tests/test_calculator_text_helpers.py::TestExtractContinuationValues`.
+
+> Note: re-engagement phrasings ("can you help with mulch coverage?") and
+> inverse-coverage math ("how many sq ft will a yard cover" → solve for area)
+> remain unsupported by design (out of scope for the continuation fix).
 
 ---
 
