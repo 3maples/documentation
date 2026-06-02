@@ -6,6 +6,11 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Change log
 
+**2026-06-02 — `clear` restored as a bulk-delete verb (with estimate-creation exemption)**
+- Reverted the May 2026 removal of `clear` from the bulk-delete verb list: `clear all {resource}` ("clear all estimates", "clear every material") is again refused as a bulk delete, matching the `delete`/`remove`/`drop`/`wipe` policy (§8.1).
+- Added `is_estimate_creation_request()` in `agents/text_utils.py`, applied at the **orchestrator routing layer** (`_detect_policy_short_circuit`) so estimate/quote creation requests whose job description mentions clearing/removing work ("create an estimate to clear out all the weeds in my backyard") route to `create_estimate` instead of being refused. The exemption is deliberately NOT inside `is_bulk_delete_request()` — that guard stays strict so each domain agent's defensive delete-path check keeps full force. A `_ESTIMATE_AS_DELETE_TARGET` veto ensures "delete every estimate" (estimate as the delete target) is never read as creation.
+- Reconciled contradictory tests: `test_text_utils.py` and `test_maple_new_phrasings.py` now agree that `clear all {resource}` is bulk delete and estimate-creation-with-clearing is allowed (verified end-to-end through the orchestrator).
+
 **2026-05-27 — Work-item field operations (implemented)**
 - Expanded §1.5 from a flat table into eight sub-sections (§1.5.1–§1.5.8) covering all CRUD operations on work items inside an estimate.
 - Added `{WI}` placeholder convention for work-item references (positional, by description, contextual).
@@ -752,13 +757,15 @@ Questions users ask when they think about the domain rather than the database. R
 
 ## 8.1 Bulk delete — 🛑 refused
 
-Phrasings with quantifier + delete verb. Enforced at the orchestrator layer AND defensively at each domain agent's `process()`. Verbs: `delete`, `remove`, `drop`, `wipe`. **Note:** `clear` was removed from the delete-verb list in the May 2026 expansion — it's ambiguous in this domain ("clear filters", "clear status") and shouldn't trigger the refusal guard.
+Phrasings with quantifier + delete verb. Enforced at the orchestrator layer AND defensively at each domain agent's `process()`. Verbs: `delete`, `remove`, `drop`, `wipe`, `clear`. **Note:** `clear all {resource}` (e.g. "clear all estimates") **is** treated as a bulk delete and refused — the May 2026 "remove clear" change was reverted (2026-06-02). The one exemption is estimate/quote **creation** requests whose job description mentions clearing/removing work ("create an estimate to clear out all the weeds in my backyard") — these are detected by `is_estimate_creation_request()` and pass through to `create_estimate`, never the refusal guard.
 
 | Phrasing | Behavior |
 |---|---|
 | `delete all {plural}` | 🛑 refusal message, `needs_clarification=True` |
 | `remove every {singular}` | 🛑 refusal |
 | `wipe my {plural}` | 🛑 refusal |
+| `clear all {plural}` | 🛑 refusal |
+| `create an estimate to clear out all the {stuff}` | ✅ `create_estimate` (not refused) |
 
 Applies to all 4 CRUD resources. Maple-only policy — HTTP routers may still expose bulk delete for UI workflows.
 
