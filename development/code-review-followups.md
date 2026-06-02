@@ -6290,6 +6290,31 @@ Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of 
 
 ---
 
+## 2026-06-02 `/code-review` pass (Estimates multi-select status filter)
+
+Findings from the Estimates page status-filter change (single `<select>` →
+multi-select checkbox dropdown: new `src/lib/estimateStatusFilter.ts` +
+`src/components/common/EstimateStatusFilter.tsx`, wired into
+`src/pages/EstimatesPage.tsx`). The one MEDIUM finding (`role="listbox"` on a
+container of checkboxes) was fixed in-session by switching to `role="group"`.
+The two LOW items below were deferred.
+
+### 314. [LOW] Filter-driven estimate refetch swallows errors silently
+**Where:** `portal/src/pages/EstimatesPage.tsx` — `loadData` (~line 180) + the initial-load effect (~line 305)
+
+**Issue:** Toggling the Archived / All Status filter changes `includeArchived`, which re-runs the load effect via `loadData({ showLoading: false })` (the deliberate fix so the page doesn't unmount the open dropdown). But `loadData`'s `catch` only sets `error` when `showLoading` is true, so a failed archived refetch shows no error and no archived rows — a silent partial failure. This matches the existing `loadData({ showLoading: false })` background-refresh convention (polling, `performDuplicate`), so it's intentional, not a regression.
+
+**Fix:** If feedback on filter-refetch failures is wanted, surface a non-blocking inline toast/banner rather than the full-page `ErrorState` (which would re-introduce the unmount-the-dropdown bug this change fixed).
+
+### 315. [LOW] Duplicate `normalizeEstimateStatus` definition (pre-existing)
+**Where:** `portal/src/pages/EstimatesPage.tsx:33` vs `portal/src/lib/estimateStatus.ts`
+
+**Issue:** The local `normalizeEstimateStatus` in `EstimatesPage.tsx` (still used by `getSortableValue`) is byte-identical to the exported one in `lib/estimateStatus.ts`. The new `estimateStatusFilter.ts` already imports the canonical version, so the page now has both in play. Pre-existing duplication — not introduced by this change.
+
+**Fix:** Import `normalizeEstimateStatus` from `../lib/estimateStatus` and delete the local copy so there's a single definition.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
