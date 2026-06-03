@@ -6,6 +6,19 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Change log
 
+**2026-06-02 — Template-driven estimate creation (skips AI generation) + gathering decline fix**
+- A **create-estimate request that names a template** now skips AI generation entirely and instantiates from the template (§1.3, §6.7). No-baseline → template applied as one work item verbatim; baseline (`size`+`unit`) → linear scaling to the job size (`factor = job_size ÷ baseline_size`), taking the size from the request or asking once (`pending_template_size`). Convertible units (sq yd↔sq ft, lin yd↔lin ft) are converted; incompatible (area vs length) re-asks. Property context is linked.
+- New: `agents/estimate/template_scaling.py` (`convert_size`, `parse_job_size`, `scale_job_item`), `agents/estimate/text_helpers.detect_template_in_create_request`, `routers/agent_helpers/template_estimate.py` (`begin_template_estimate`, `handle_pending_template_size`).
+- **Gathering decline no longer cancels** (§1.3): "No"/"skip" to a gathering question (e.g. "Any material preferences?") records an assumption and continues; only explicit cancel phrases abort. New `is_cancellation_text`, `get_assumption_value`.
+- Tests: `test_template_scaling.py`, `test_template_create_routing.py`, plus gathering/predicate additions.
+
+**2026-06-02 — Phrasing expansion: ratios, age/staleness, status-`in`, material qualifiers**
+- **Status comparisons / ratios** (§1.9) — "what's my won-lost ratio?", "won vs lost", generic "draft vs approved", "win rate", "how am I doing on bids?". New `parse_status_comparison()` + `format_status_comparison()` in `agents/estimate/text_helpers.py`; counts via `compute_status_comparison()` in `routers/estimates.py`; handled by `_analytics_comparison` in `crud_handlers.py`. Routed through the existing `analytics_estimates` path (`_match_analytics_query` now also calls `parse_status_comparison`). A win-loss family cue defaults to WON-vs-LOST; an explicit "X vs Y" names both statuses in order. Count-based, with a win-rate % for the WON/LOST pair.
+- **Age / staleness filter** (§1.1) — "estimates that are 30 days old", "not touched in a month", "haven't been updated in 30 days" via new `_AGE_DAYS_OLD_PATTERN`. **Both** age phrasings (`older than X days` and `X days old`/stale) now constrain **`updated_at`** (was `created_at` for older-than) via `_estimate_date_filter_field()`; relative date-range phrasings ("from last week") keep `created_at`. Verbless age phrasings route to `list_estimates` via the orchestrator `_match_estimate_list_filter` fast-path.
+- **Status filter via `in`** (§1.1) — "find estimates in draft", "estimates in review" already resolved via the existing `in` connector in `_estimate_status_from_text`; coverage rows added.
+- **Material qualifier list** (§4.5/§4.9) — "what {X} materials do I have?" matches {X} as a substring against material **name OR category** (`_find_materials_by_name_or_category` + `_extract_list_qualifier`). Count-by-category ("how many hardscape materials do I have?") now resolves the category for count queries too.
+- New tests: `tests/test_maple_phrasing_expansion.py` (routing + pure parsers/formatter), plus additions to `test_material_agent.py` and `test_estimates_analytics.py`.
+
 **2026-06-02 — `clear` restored as a bulk-delete verb (with estimate-creation exemption)**
 - Reverted the May 2026 removal of `clear` from the bulk-delete verb list: `clear all {resource}` ("clear all estimates", "clear every material") is again refused as a bulk delete, matching the `delete`/`remove`/`drop`/`wipe` policy (§8.1).
 - Added `is_estimate_creation_request()` in `agents/text_utils.py`, applied at the **orchestrator routing layer** (`_detect_policy_short_circuit`) so estimate/quote creation requests whose job description mentions clearing/removing work ("create an estimate to clear out all the weeds in my backyard") route to `create_estimate` instead of being refused. The exemption is deliberately NOT inside `is_bulk_delete_request()` — that guard stays strict so each domain agent's defensive delete-path check keeps full force. A `_ESTIMATE_AS_DELETE_TARGET` veto ensures "delete every estimate" (estimate as the delete target) is never read as creation.
@@ -122,7 +135,10 @@ Estimate is not in the CRUD coverage matrix — its generation is multi-turn and
 | `what roles are on {EST}?`                           | `list_labours` filtered to one estimate's snapshot             | ✅ rule *(closed in xfail-wave-3 Workstream C — symmetric Labour-agent drilldown via `_handle_list_labours_for_estimate`)*                                                                                                                                           |
 | `how many estimates did I win this month?`           | `list_estimates` with status=WON + date filter                 | ✅ rule *(May expansion — "win" added as a verb-form alias for EstimateStatus.WON in `_estimate_status_from_text`)*                                                                                                                                                  |
 | `show only estimates with Won status this month`     | `list_estimates` with status=WON + date filter                 | ✅ rule *(status + date qualifiers already compose; no new code needed)*                                                                                                                                                                                              |
-| `show me all estimates older than 60 days`           | `list_estimates` with `created_at <= cutoff`                   | ✅ rule *(May expansion — `_AGE_FILTER_PATTERN` + age branch in `_parse_estimate_date_filter` returns `(None, cutoff)` window)*                                                                                                                                      |
+| `show me all estimates older than 60 days`           | `list_estimates` with `updated_at <= cutoff`                   | ✅ rule *(`_AGE_FILTER_PATTERN` + age branch in `_parse_estimate_date_filter` returns `(None, cutoff)`; field is `updated_at` as of the 2026-06-02 expansion)*                                                                                                       |
+| `show me estimates that are 30 days old`             | `list_estimates` with `updated_at <= cutoff`                   | ✅ rule *(2026-06-02 — `_AGE_DAYS_OLD_PATTERN`; "X days/weeks/months old" → at-least-X-old)*                                                                                                                                                                          |
+| `which estimates haven't been updated in 30 days?` / `estimates not touched in a month` | `list_estimates` with `updated_at <= cutoff` | ✅ rule *(2026-06-02 — staleness alternation in `_AGE_DAYS_OLD_PATTERN`; verbless forms routed via `_match_estimate_list_filter`)*                                                                                                                                   |
+| `find estimates in draft` / `estimates in review`    | `list_estimates` with status filter                            | ✅ rule *(`in` connector in `_estimate_status_from_text`; only fires when the token after `in` is a known status — "estimates in Toronto" stays a property query)*                                                                                                   |
 | `show me Draft estimates at property {property}`     | `list_estimates` with status + property cross-resource filter  | ✅ rule *(May expansion — "at\s+property" added to the property→estimate cross-resource pattern)*                                                                                                                                                                    |
 
 ## 1.2 Value / total queries for a specific estimate
@@ -156,6 +172,10 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `new commercial quote` | `create_estimate` → Estimate Agent | 🤖 LLM |
 
 Handled by `agents/estimate/conversation_guide.py`. The EstimateAgent walks the user through job description → material/equipment/labour recommendations → estimate creation.
+
+**Two important branches before generation runs** (`routers/agent_helpers/delegate_create_estimate.py`):
+- **Template named → AI generation is skipped entirely** and the estimate is instantiated from the template (§6.7) — no material/activity questions.
+- **Gathering decline → assumption, not cancel.** A "No"/"skip" to a gathering question (e.g. "Any material preferences?") records an assumption and continues; only an explicit cancellation ("cancel", "never mind") aborts. See `routers/agent_helpers/estimate_gathering.py` (`is_cancellation_text`, `get_assumption_value`).
 
 ## 1.4 Status transitions
 
@@ -390,6 +410,13 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `how much value was won?` | `analytics_estimates` → Estimate Agent | ✅ rule |
 | `what's the breakdown of estimates by statuses this month?` | `analytics_estimates` → Estimate Agent | ✅ rule |
 | `what's the breakdown of estimates by divisions?` | `analytics_estimates` → Estimate Agent | ✅ rule |
+| `what is my won-lost ratio?` / `win-loss ratio` / `win/loss ratio` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02 — `parse_status_comparison`; count ratio + win-rate %)* |
+| `won vs lost` / `how many estimates did I win vs lose?` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02)* |
+| `draft vs approved estimates` / `compare won and lost estimates` | `analytics_estimates` → Estimate Agent (generic pair) | ✅ rule *(2026-06-02 — explicit "X vs Y" / "compare X and Y"; no win-rate framing for non-WON/LOST pairs)* |
+| `what's my win rate?` / `what's my win rate this month?` | `analytics_estimates` → Estimate Agent (WON vs LOST, window-aware) | ✅ rule *(2026-06-02)* |
+| `how am I doing on bids?` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02 — landscaper-friendly win-rate cue)* |
+
+**Status comparisons / ratios:** `compute_status_comparison` counts each status (all-time unless a date window is given, in which case it constrains `updated_at`). `format_status_comparison` renders a reduced `A:B` ratio; the WON-vs-LOST pair additionally reports a win-rate percentage (`won / (won + lost)`). Generic pairs ("draft vs approved") report counts + ratio only.
 
 **Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows (pipeline=90 days, backlog/won=30 days). Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
 
@@ -587,6 +614,27 @@ All size-scoped phrasings require an explicit `size <X>` token to fire. Material
 | `what category is material {material}?` | `get_material` (category focus) | ✅ rule *(May expansion — `_match_field_specific_query` before help classifier)* |
 | `what category is {material}?` | `get_material` (category focus) | ✅ rule *(May expansion)* |
 
+## 4.10 Qualifier list — "what {X} materials do I have?" *(2026-06-02)*
+
+A qualifier `{X}` between the lead-in and the `materials` noun is matched as a
+**substring against the material name OR its category name** (case-insensitive).
+`_extract_list_qualifier` lifts `{X}` out of the phrasing (rule tier) and
+`_find_materials_by_name_or_category` does the OR-match. A bare list with no
+qualifier (`what materials do I have?`, §4.2) still lists everything — the
+generic-word guard drops a non-qualifier capture.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `what {X} materials do I have?` | `list_materials` (name ∪ category substring) | ✅ rule |
+| `show me my {X} materials` | `list_materials` | ✅ rule |
+| `list my {X} materials` | `list_materials` | ✅ rule |
+| `do I have any {X} materials?` | `list_materials` | ✅ rule |
+| `which {X} materials do I have?` | `list_materials` | ✅ rule |
+| `how about {X} materials?` / `what about {X} materials?` / `and {X} materials?` | `list_materials` | ✅ rule *(follow-up phrasings — the "how about" lead-in would otherwise trip `is_help_query`, so the orchestrator `_match_material_list_filter` fast-path routes these before the help classifier. It reuses the agent's `_LIST_QUALIFIER_PATTERN` so routing and qualifier extraction never drift.)* |
+| `how many {X} materials do I have?` | `list_materials` (count of category {X}) | ✅ rule *(count-by-category — resolves a whole-word category for count queries; falls back to all when {X} isn't a category)* |
+
+**Disambiguation:** `material units` / `material categories` / `material types` are NOT treated as "{X} materials" lists — a negative lookahead on `_LIST_QUALIFIER_PATTERN` keeps those routing to their help/enum or category handlers.
+
 ---
 
 # 5. People (roles) — a.k.a. Labor
@@ -709,6 +757,22 @@ Template **update** and **duplicate** are refused — see §8.5. Users must edit
 | `apply {template} to the estimate` | `update_estimate` → Estimate Agent | ✅ rule |
 | `use the {template} template for {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `create an estimate from template {template}` | `update_estimate` → Estimate Agent | ✅ rule *(creates a new draft estimate and applies the template as a work item)* |
+
+### Template-driven create (2026-06-02) — skips AI generation
+
+When a **create-estimate** request names a template, `delegate_create_estimate` detects it (`detect_template_in_create_request`) and routes to template instantiation instead of AI generation — no material/activity questions. Linear scaling by job size when the template has a **baseline** (`size` + `unit`).
+
+| Phrasing | Behavior | Status |
+|---|---|---|
+| `create an estimate ... use the {template} template` (no baseline) | Create a draft, template applied as one work item, verbatim (1×). Property context linked. | ✅ rule |
+| `create an estimate, 600 sq ft, using the {template} template` (baseline + size in request) | Scale the template linearly (`factor = job_size ÷ baseline_size`); size taken from the request, not re-asked. | ✅ rule |
+| `create an estimate using the {template} template` (baseline, no size) | Ask "What's the size of this job (in {baseline unit})?" (`pending_template_size`), then scale on reply. | ✅ rule |
+| reply with size in a **convertible** unit (sq yd↔sq ft, lin yd↔lin ft) | Converted to the baseline unit, then scaled. | ✅ rule |
+| reply with an **incompatible** unit (area vs length) | Re-asks for the size in the baseline's unit. | ✅ rule |
+| `No` / `skip` to the size question | Instantiate at the baseline (1×) and proceed (no cancel). | ✅ rule |
+| `cancel` / `never mind` to the size question | Cancels the estimate request. | 🛑 cancel |
+
+**Scaling** (`agents/estimate/template_scaling.py`): multiplies material/labour/equipment quantities, activity effort, and the work-item `sub_total` by the factor; prices/rates unchanged. Linear across all line items — no per-item fixed-fee exemption. Pre-handler: `handle_pending_template_size` in `routers/agent_helpers/template_estimate.py`.
 
 ## 6.8 Template gaps
 
@@ -1029,6 +1093,7 @@ Phase 1 of the xfail backlog (plan: `documentation/development/plans/maple-xfail
 | `platform/tests/test_maple_template_crud.py` | Template CRUD — routing, refusals, apply-to-estimate (§6) |
 | `platform/tests/test_maple_work_item_ops.py` | Work-item field operations — routing, op detection, regression, recurring param parsing (§1.5) |
 | `platform/tests/test_maple_new_phrasings.py` | May 2026 expansion — clear bug, win alias, age filter, analytics, material/role field queries, cross-resource "linked to" |
+| `platform/tests/test_maple_phrasing_expansion.py` | June 2026 expansion — status ratios/comparisons, age/staleness (`updated_at`), status-`in`, material name∪category qualifier (routing + pure parsers/formatter) |
 | `platform/tests/reports/maple_crud_gap_report.md` | Auto-generated gap report (regenerates each test run) |
 
 ## 11.2 How to run

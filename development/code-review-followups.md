@@ -6315,6 +6315,61 @@ The two LOW items below were deferred.
 
 ---
 
+## 2026-06-02 `/code-review` pass (Template instantiation + estimate age/staleness + Maple phrasing expansion)
+
+Findings from the template-driven estimate instantiation feature
+(`agents/estimate/template_scaling.py`, `routers/agent_helpers/template_estimate.py`),
+the `created_at`→`updated_at` age/staleness refactor, and the Maple
+phrasing/routing expansion. The one HIGH item (a `parse_job_size` ordering bug
+that under-scaled `NxN <area-unit>` dimensions, e.g. `"20x20 sq ft"` → 20 instead
+of 400) plus its missing test coverage were **fixed in-session** (reordered
+`_DIMENSIONS_RE` ahead of `_VALUE_UNIT_RE`; added
+`test_dimensions_with_explicit_area_unit`). The items below were deferred.
+
+### 316. [MEDIUM] `_finalize_template_estimate` is ~100 lines with duplicated company-context resolution
+**Where:** `platform/routers/agent_helpers/template_estimate.py:94-197` (and the near-identical block in `begin_template_estimate:215-225`)
+
+**Issue:** Exceeds the 50-line guideline and mixes company-context validation, the quota gate, create/scale/save, audit logging, and three envelope constructions. The company-context resolution (lines 106-126) is duplicated almost verbatim in `begin_template_estimate`.
+
+**Fix:** Extract a shared `_resolve_company_or_refuse(...)` used by both entry points, and lift the audit-log + success-envelope tail into a helper. Reduces both length and duplication.
+
+### 317. [MEDIUM] `recentEstimates.ts` reinvents archived-status normalization
+**Where:** `portal/src/lib/recentEstimates.ts:18`
+
+**Issue:** `(e.status ?? "").trim().toLowerCase() !== "archived"` open-codes a partial status normalization when the canonical `normalizeEstimateStatus` in `lib/estimateStatus.ts` is already used in ~6 other modules. Risks drift if status values gain spacing/casing variants.
+
+**Fix:** `import { normalizeEstimateStatus } from "./estimateStatus"` and compare `normalizeEstimateStatus(e.status) !== "archived"`. (Same single-source-of-truth concern as #315.)
+
+### 318. [MEDIUM] Broad `except Exception` in template instantiation swallows the real failure
+**Where:** `platform/routers/agent_helpers/template_estimate.py:156`
+
+**Issue:** The create/scale/save block catches bare `Exception`, releases the quota slot, and returns a generic "try again" with no logging. A genuine bug (scaling math, model validation) is invisible in logs and indistinguishable from a transient DB blip.
+
+**Fix:** `logger.exception("template instantiation failed for company %s", company_ctx)` before returning the friendly message, matching the pattern in `material/service.py:_load_categories`.
+
+### 319. [MEDIUM] Orchestrator/material routing keeps growing already-oversized files
+**Where:** `platform/agents/orchestrator/service.py` (2402 lines), `platform/agents/material/service.py` (2710 lines)
+
+**Issue:** This change correctly adds net-new logic as separate modules, but the new routing fast-paths (`_match_estimate_list_filter`, `_match_material_list_filter`) were added to files already well over the 800-line guideline. Pre-existing structural debt, not introduced here.
+
+**Fix:** Next time these files are touched, consider extracting the orchestrator routing fast-paths into a `routing/` submodule.
+
+### 320. [LOW] f-string with no placeholders
+**Where:** `platform/routers/agent_helpers/template_estimate.py:354`
+
+**Issue:** `prefix=f"That unit doesn't match this template. "` has an `f` prefix but no interpolation (`ruff` F541).
+
+**Fix:** Drop the `f`.
+
+### 321. [LOW] `begin_template_estimate` divides by `template.size` without the zero-guard its sibling has
+**Where:** `platform/routers/agent_helpers/template_estimate.py:200-201,258-261`
+
+**Issue:** `_has_baseline` accepts `size == 0.0` (`is not None`), then `begin_template_estimate` computes `converted / template.size` → `ZeroDivisionError`. The pending-turn handler guards this (`not baseline_size`), so the two paths are inconsistent. A zero-size template is nonsensical/unlikely but the asymmetry is a latent trap.
+
+**Fix:** Make `_has_baseline` require `template.size` truthy, or guard the division and fall through to `_ask_size_envelope`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
