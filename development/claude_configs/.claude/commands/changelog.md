@@ -39,18 +39,44 @@ Read the most recent changelog file to match its exact structure. The format is 
 
 ## Step 4: Summarize the Session
 
-Review what was accomplished in the **current conversation** and write a **non-technical, high-level** summary aimed at end users — not developers.
+Review what was accomplished in the **current conversation** and write a **non-technical, concise, high-level** summary aimed at end users — not developers. The reader is a customer scanning what's new; they should be able to understand every line without engineering context.
 
-Guidelines:
-- Use plain language — no file paths, function names, test names, or code references
-- Group items under headers like `## Improvements`, `## Safety`, `## Fixes`, `## New Features` — use only the headers that apply
-- Each bullet: `- **Short Title** — one-sentence user-facing description.`
-- Focus on what the user can now do, or what is safer/faster/clearer for them
-- Use US English spellings (labor, color, behavior)
-- Keep it brief — 3–5 bullets total is typical
-- Keep it non-technical and easy to understand
+### Style rules
 
-If the session did not produce user-visible changes (e.g. only docs, internal refactors, or config tweaks), tell the user and ask whether to still create an entry.
+- **Concise.** Aim for **2–4 bullets total** across the whole entry. If you have more than four, you're listing implementation steps instead of user-visible changes — collapse related items into one bullet.
+- **High-level.** Group related work under one bullet. Five UI polish tweaks become one "smoother layout in X" bullet. A new feature plus its tests, docs, and supporting refactors is one bullet.
+- **Non-technical.** No file paths, function names, endpoint names, component names, framework names, test names, or code references. Speak about *what the user sees or can do*, not how it was built.
+- **Plain language.** Prefer short, direct sentences. Avoid jargon ("payload", "endpoint", "schema", "state", "props"). Avoid hedges ("various", "several", "some").
+- **US English spellings** (labor, color, behavior, organize).
+- **Format.** Group under headers — `## New Features`, `## Improvements`, `## Fixes`, `## Safety` — using only those that apply. Each bullet: `- **Short Title** — one-sentence user-facing description.`
+
+### What to write about
+
+Focus on what a user would notice or care about:
+- A new capability they didn't have before → `## New Features`
+- An existing capability that's now faster / clearer / easier → `## Improvements`
+- A bug that's now fixed → `## Fixes`
+- A guardrail that protects their data or money → `## Safety`
+
+Skip:
+- Internal refactors, code reorganization, dependency bumps
+- Test additions, lint fixes, type fixes
+- Docs and changelog entries themselves
+- Behavior changes that don't affect what the user sees
+
+### Examples
+
+**Too technical (rewrite):**
+- `- **Analytics Endpoint** — added /estimates/analytics with $facet aggregation for headline + by_division + by_status payloads.`
+- `- **RowActionsMenu Component** — extracted reusable three-dot menu using portal-rendered dropdown.`
+- `- **Maple object_link helper** — agents now embed markdown links to portal routes in their response strings.`
+
+**Right (concise, user-facing):**
+- `- **Dashboard Time Filters** — choose This Month, This Quarter, or This Year to scope your division and status charts.`
+- `- **Reorder Line Items** — move materials, activities, and rate card rows up or down from a new three-dot menu.`
+- `- **Clickable Records in Chat** — when Maple mentions a property, contact, material, person, or estimate, click it to jump straight to that record.`
+
+If the session produced no user-visible changes (only docs, internal refactors, or config tweaks), tell the user and ask whether to still create an entry.
 
 ## Step 5: Write the File
 

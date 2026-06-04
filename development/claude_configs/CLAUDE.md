@@ -23,7 +23,7 @@ This is a field service management web app with two main components:
 
 **Estimate Workflow**:
 1. User provides job description
-2. Estimate agent (GPT-4o-mini via LangChain) analyzes description
+2. Estimate agent (LangChain ChatOpenAI; models configured via `config.py` — `architect_model` / `researcher_model` / `worker_model`) analyzes description
 3. Agent recommends materials, equipment, and labour with quantities/costs
 4. Estimate created with status (draft/review/approved/rejected/on_hold)
 5. Estimate stored with MaterialItem, EquipmentItem, LabourItem lists
@@ -74,6 +74,17 @@ pytest
 
 # Run tests with verbose output
 ./run_tests.sh -v -s
+
+# Type-check (RECOMMENDED — keeps the project at zero mypy errors)
+./run_mypy.sh                          # full project (default)
+./run_mypy.sh agents/material          # scope to a subtree (faster)
+./run_mypy.sh routers/materials.py     # one file
+
+# Lint (RECOMMENDED — keeps the project at zero ruff errors)
+./run_ruff.sh                          # full project (default)
+./run_ruff.sh agents/material          # scope to a subtree (faster)
+./run_ruff.sh routers/materials.py     # one file
+./run_ruff.sh --fix                    # apply safe auto-fixes, then report
 ```
 
 ### Portal (Frontend)
@@ -124,6 +135,45 @@ npm test -- <relevant_test_file>
 
 **Do NOT auto-run the full test suite.** The user will manually trigger the complete test suite when ready. Only run the tests that directly cover the code you changed or added.
 
+### mypy is a Gate, Not a Suggestion
+
+The `platform/` project sits at **zero mypy errors** as of 2026-05-22 (#3 in `documentation/development/code-review-followups.md`). Keep it there — letting errors accumulate re-creates the 200+-error backlog that took an entire session to clear.
+
+**Rule**: after any `.py` change in `platform/`, run `./run_mypy.sh` *before* considering the work complete. Scope to the touched subtree (`./run_mypy.sh agents/material`) for a fast loop, then re-run the full project (`./run_mypy.sh`) before commit-prep to catch cross-file regressions.
+
+If new errors appear:
+- Fix them in the same change. Don't ship a Python edit that adds a mypy error.
+- The playbook in #3's body covers every recurring pattern: `assert <x> is not None` for Beanie `.id`, `Dict[str, Any]` annotations on inferred-too-narrow locals, `Optional[X]` widening for honest signatures, `# type: ignore[<code>]` only when a third-party stub is genuinely wrong (always include a one-line justification comment).
+- If a batch grows past ~10 errors, treat it like a sub-task — fix and commit separately rather than bundling.
+
+`./run_mypy.sh` uses the pinned config in `platform/mypy.ini`. Don't pass mypy flags ad-hoc — update `mypy.ini` instead, so every session uses the same baseline.
+
+### ruff is a Gate, Not a Suggestion
+
+`platform/` adopted **ruff** as a hard lint gate on 2026-06-03 (same model as mypy). The pinned config lives in `platform/ruff.toml`; run it via `./run_ruff.sh`.
+
+**Ruleset** (deliberately conservative — signal, not style noise):
+- `E, F` — pyflakes + pycodestyle (dead imports/vars, real defects)
+- `I` — import sorting (replaces isort)
+- `B` — flake8-bugbear (real bug patterns, e.g. missing exception chaining)
+- `C4` — flake8-comprehensions; `SIM` — flake8-simplify
+- **`E501` (line-too-long) is OFF** by choice — pure style, not a defect.
+- **`UP` (pyupgrade) is intentionally NOT enabled.** Its annotation rewrites (`Dict`→`dict`, `Optional[X]`→`X | None`) collide with the mypy.ini playbook above and would be one giant diff. Don't add `UP` without a deliberate decision + a coordinated mypy-playbook update.
+
+**Rule**: after any `.py` change in `platform/`, run `./run_ruff.sh` *before* considering the work complete. Scope to the touched subtree (`./run_ruff.sh agents/material`) for a fast loop, then re-run the full project before commit-prep. New errors are fixed in the same change — don't let them accumulate.
+
+Recurring playbook:
+- `./run_ruff.sh --fix` clears the **safe** auto-fixable ones (unused imports, import order, simple simplifications). Never pass `--unsafe-fixes` without reviewing each change — those can alter behavior.
+- **B904** (raise-without-`from` inside `except`): add `raise ... from err` (preserve cause) or `raise ... from None` (suppress) — matches the "don't leak/garble tracebacks" rule.
+- **F841** unused vars: usually safe to delete; in tests, confirm the assignment isn't documenting an intentional call before removing.
+- **E402** import-not-at-top: reorder when possible; for genuine circular-import / ordering needs, keep the import where it is and add `# noqa: E402` with a one-line reason.
+- **Re-export hubs**: a module that imports a symbol only to re-expose it (e.g. `routers/estimates.py`, `routers/agents.py`, `agents/estimate/service.py`) must list those names in a module-level `__all__`, or F401 will delete the import and break downstream importers. `__all__` marks them as intentional re-exports. **Never blanket-`--fix` F401 without checking for re-export hubs first.**
+- `# noqa: <CODE>` only when ruff is genuinely wrong — always with a one-line justification.
+
+`./run_ruff.sh` uses the pinned config in `platform/ruff.toml`. Don't pass rule flags ad-hoc — update `ruff.toml` instead, so every session uses the same baseline.
+
+> **Baseline status (2026-06-03):** the safe auto-fixable backlog (import sorting + trivial simplifications, ~287 fixes) has been applied. A manual backlog of ~474 remains (tracked as **#323 in `documentation/development/code-review-followups.md`**): the bulk is **F401** (~284, report-only by config — triage each per the playbook above), plus E402 (~56), F841 (~52), B904 (~32, the only correctness slice — do first), E741 (~23), and a few SIM/C4. Work it down (or relax rules consciously) before the project is fully green. Until then, scope `./run_ruff.sh` to the files you touched so you gate *your* change without tripping over the legacy backlog.
+
 ### Backend Testing
 - **Environment**: All tests MUST be run within the activated Python virtual environment (`source .venv/bin/activate`).
 - Backend tests use FastAPI TestClient
@@ -139,11 +189,58 @@ npm test -- <relevant_test_file>
 ## Key Implementation Notes
 
 ### AI Agent Pattern
-The EstimateAgent uses LangChain's ChatOpenAI with:
-- System prompts from `prompts/` module
-- Temperature 0.7 for balanced creativity/consistency
+All Maple agents use LangChain's ChatOpenAI with:
+- System prompts from `prompts/` and per-agent service modules
+- **Models** configured in `config.py`: `architect_model` (gpt-5.5, complex
+  decomposition), `researcher_model` (gpt-5.4, web search / pricing),
+  `worker_model` (gpt-5.4-mini, CRUD / extraction / Maple-help answering).
+  All overridable via the corresponding `OPENAI_MODEL_*` env vars.
+- **Temperature 0** everywhere — every agent service constructs its
+  `ChatOpenAI` with `temperature=0` for deterministic-as-possible output.
+  Don't introduce non-zero temperatures without a documented reason; higher
+  values increase cross-lingual token bleed and other sampling drift.
 - Async methods (`ainvoke`) for non-blocking API calls
 - Singleton pattern in router for agent instance reuse
+
+### Maple (Orchestrator) — CRUD assistant policies
+
+**Maple** is the user-facing brand for the Orchestrator agent at `agents/orchestrator/service.py`. It's a hybrid rule-based + LLM intent classifier that routes user messages to specialized agents (Property, Contact, Material, Labour). The four supported resources are:
+
+| User-facing label | Code domain | What it represents |
+|---|---|---|
+| Property | `property` | Job sites / addresses |
+| Contact | `contact` | **Individuals** at a property (homeowner, manager, etc.) |
+| Material | `material` | Catalog of physical products with sizes/prices |
+| **People** | `labour` | Catalog of **role definitions** (Landscaper, Foreman, Operator). NOT individuals — that's Contact. |
+
+**Equipment is explicitly blocked** — see `is_equipment_request()` in `agents/text_utils.py`. Any equipment phrasing returns `EQUIPMENT_REFUSAL_MESSAGE` rather than silently falling through to "unknown".
+
+**Bulk delete is forbidden via Maple** (Maple-only policy; HTTP routers may still expose bulk-delete for UI workflows). The `is_bulk_delete_request()` guard runs in both the rule path and the `process()` path of the orchestrator AND defensively at the top of each domain agent's `process()` (belt-and-braces). Phrasings like "delete all contacts" / "wipe my materials" return `BULK_DELETE_REFUSAL_MESSAGE`.
+
+**Shared text-utility helpers** in `agents/text_utils.py`:
+- `is_bulk_delete_request(text)` — quantifier + delete verb detector
+- `is_equipment_request(text)` — equipment domain detector
+- `is_count_query(text)` — "how many" / "count" / "total number" / "number of"
+- `format_count_response(count, singular, plural)` — friendly count phrasing with N=0 / N=1 / N=many grammar
+- `BULK_DELETE_REFUSAL_MESSAGE`, `EQUIPMENT_REFUSAL_MESSAGE` — canonical refusal copy
+- `humanize_field_name(field)` — snake_case → user-friendly label
+
+When extending Maple's CRUD surface to a new field or phrasing pattern, **don't write inline regex** for these — use the helpers so the count-query / bulk-delete / equipment policies stay consistent across all four agents.
+
+**Friendly first-person tone** — all CRUD response strings in Property/Contact/Material/Labour agents follow this template:
+- Create: `"I've created the {resource} for you. Here are the details:\n{details}"`
+- Update: `"I've updated the {resource} for you. Here are the updated details:\n{details}"`
+- Delete: `"I've deleted the {resource} '{name}' for you."`
+- Get:    `"Here are the details for that {resource}:\n{details}"`
+- List:   `"Here are your {plurals}: {labels}"`
+- Empty:  `"I couldn't find any matching {plurals}."`
+- Count:  `format_count_response(N, singular, plural)`
+
+**Multi-turn field-then-value flow** — every CRUD agent has a `_match_bare_field_name()` helper + `awaiting_value_for` pending-intent state. When a user replies to "What fields should I update?" with a bare field name (e.g. "phone"), the agent stores the selection and asks for the value, instead of looping the same question. See [agents/property/service.py](platform/agents/property/service.py) for the canonical implementation.
+
+**Coverage matrix** — `tests/test_maple_crud_coverage.py` exercises 117 phrasings (10 categories × resources + equipment refusal). Run with `./run_tests.sh tests/test_maple_crud_coverage.py` for Tier 1 (rules only, default) or `./run_tests.sh tests/test_maple_crud_coverage.py -m ""` for both tiers (Tier 2 hits the live LLM, requires `OPENAI_API_KEY`, ~3 min, ~$0.05). The auto-generated dual-column gap report is written to `tests/reports/maple_crud_gap_report.md`.
+
+**Phrasing reference (human-curated)** — [`documentation/development/maple-phrasing-reference.md`](documentation/development/maple-phrasing-reference.md) is the canonical catalog of supported and gap phrasings across all 5 Maple resources (Estimates, Properties, Contacts, Materials, People/Labour). It is the single source of truth that users extend with new use cases. **Whenever you add, close, or reclassify a Maple phrasing — whether via a new classifier rule, a handler change, or a refusal policy — update this doc in the same change.** Flip ✅ / 🤖 / ⚠️ / 🛑 status tags, update the snapshot counts in §9.3, and bump the "Last updated" date at the top. The auto-generated `tests/reports/maple_crud_gap_report.md` is the live runtime truth; the reference doc is the human-readable truth that survives test runs.
 
 ### Database Initialization
 - MongoDB connection established in `lifespan` context manager
@@ -177,6 +274,8 @@ When writing code or proposing changes in this repository, you **must** adhere s
   ```
 - **Use the Virtual Environment**: Always ensure backend tests are run within the Python virtual environment (`source .venv/bin/activate`).
 - **Full suite is manual**: Do not run the complete backend + frontend test suites automatically. The user will decide when to run the full suite.
+- **mypy is mandatory for backend changes**: After any `.py` edit under `platform/`, run `./run_mypy.sh` (scoped to the touched subtree for speed, full project before commit-prep). Project sits at zero mypy errors — fix new errors in the same change, don't let them accumulate. See "mypy is a Gate, Not a Suggestion" above for the recurring playbook.
+- **ruff is mandatory for backend changes**: After any `.py` edit under `platform/`, also run `./run_ruff.sh` (scope to the touched files while the legacy backlog is worked down). Fix new lint errors in the same change. See "ruff is a Gate, Not a Suggestion" above — note the re-export-hub caveat before ever running `--fix` broadly.
 
 ### 2. Code Quality & Maintainability
 - **Minimize redundant code**: Follow DRY (Don't Repeat Yourself) principles. Refactor reusable logic into helper functions, hooks, or shared components.
