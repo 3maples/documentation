@@ -6440,16 +6440,17 @@ gate your change without tripping over the legacy backlog.
 > F401 by hand: genuinely dead → delete; re-export → add to `__all__`;
 > monkeypatch target → keep with `# noqa: F401` + reason.
 
-### 323. [MEDIUM] ruff manual backlog — 281 findings remaining (all F401) across the conservative ruleset
+### 323. [RESOLVED 2026-06-04] ruff manual backlog — fully cleared; `platform/` is at zero ruff errors
 Snapshot 2026-06-03 (`./run_ruff.sh`); **B904 slice closed 2026-06-03** (32 → 0);
 **style/simplify slice (E741/E712/SIM/C4/B007) closed 2026-06-04** (52 → 0);
-**E402 + F841 slices closed 2026-06-04** (56 + 52 → 0).
-Remaining `ruff check .` (2026-06-04): **F401 281 — the only category left.**
+**E402 + F841 slices closed 2026-06-04** (56 + 52 → 0);
+**F401 slice closed 2026-06-04** (281 → 0). `./run_ruff.sh` is now clean
+project-wide — ruff is a fully-enforced zero-error gate, same as mypy.
 
 | Rule | Count | Category | Notes |
 |---|---|---|---|
 | ~~**B904** raise-without-`from`~~ | ~~32~~ → **0** | correctness | **RESOLVED 2026-06-03** — see progress note below |
-| F401 unused-import | 281 | dead code | report-only; triage per the hazard note above |
+| ~~F401 unused-import~~ | ~~281~~ → **0** | dead code | **RESOLVED 2026-06-04** — see progress note below |
 | ~~E402 import-not-at-top~~ | ~~56~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
 | ~~F841 unused-variable~~ | ~~52~~ → **0** | dead code | **RESOLVED 2026-06-04** — see progress note below |
 | ~~E741 ambiguous-name (`l`/`I`/`O`)~~ | ~~24~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
@@ -6568,6 +6569,45 @@ Verified: `./run_mypy.sh` clean on the 6 touched production files; full-project
 `test_contact_agent`, `test_property_agent`, `test_labour_agent`, `test_equipment_agent`,
 `test_template_create_routing`, `test_agent_helpers_text_predicates`,
 `test_google_drive_service`. Next and final slice: F401 (281) — the per-import triage.
+
+**Progress 2026-06-04 — F401 slice closed (281 → 0). Backlog fully cleared.**
+`./run_ruff.sh` is now clean project-wide across all 317 files. The per-import
+triage was done with a classifier (built ad-hoc) that scans the whole repo for
+each unused name and labels it **DEAD** (referenced nowhere outside its own
+module), **REEXPORT** (another module does `from <mod> import <name>` or
+`<alias>.<name>`), or **MONKEYPATCH** (a test does `setattr(<mod-alias>, "<name>", …)`).
+
+- **Mechanized the safe deletion.** Protected every REEXPORT/MONKEYPATCH name
+  with an inline `# noqa: F401  # <reason>`, then ran
+  `ruff check --select F401 --fix --extend-fixable F401` (the `--extend-fixable`
+  overrides `ruff.toml`'s `unfixable = ["F401"]` *for that one run*). ruff then
+  removed only the genuinely-unused imports — including the multi-line paren-block
+  surgery — and left the noqa-protected names untouched. Followed by
+  `--select I --fix` to re-sort the import blocks. **174 dead imports removed.**
+- **Biggest hubs:** `agents/estimate/service.py` (90: 87 dead leftovers from the
+  service-split, +`ChatOpenAI` monkeypatch, +`ArchitectScope`/`DecomposedRequirement`
+  re-exports kept), `routers/agents.py` (42), `routers/estimates.py` (27 — a
+  documented re-export facade; kept the 8 consumed re-exports/monkeypatch targets,
+  deleted the 19 nothing consumes). `__init__.py` files were already F401-exempt,
+  so package re-exports were never at risk.
+- **Caught a classifier gap with the test suite.** Two monkeypatch targets on
+  `routers.agents` (`estimates_api_get_estimate`, `estimates_api_get_estimates`,
+  aliased imports patched via `setattr(agents_router, …)`) were mis-labeled DEAD and
+  removed; the orchestrator endpoint tests failed with `AttributeError: module
+  routers.agents has no attribute …`. Restored both with `# noqa: F401`. An
+  AST-based re-scan of every modified module then confirmed **0** remaining
+  test-accessed attributes were missing.
+
+Verified: full-project `./run_ruff.sh` clean (0 findings); `./run_mypy.sh` clean
+(317 files); `pytest --collect-only` clean (no import errors across 2874 tests);
+**full suite 2874 passed, 0 failures**.
+
+> **#323 is RESOLVED.** With B904 + style/simplify + E402 + F841 + F401 all closed,
+> `platform/` sits at zero ruff errors. ruff is now a fully-enforced gate (like
+> mypy): any new `./run_ruff.sh` finding in a PR is a regression to fix in-place,
+> not backlog. The legacy-backlog scoping caveat in CLAUDE.md's baseline note is no
+> longer needed — `./run_ruff.sh` can be run project-wide without tripping over
+> pre-existing findings.
 
 ---
 
