@@ -6211,7 +6211,32 @@ Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of 
 
 **Fix:** define an `EstimateAgentHostProtocol(Protocol)` in `agents/estimate/host_protocol.py` (or a shared types module) that captures the cross-mixin contract once. Each mixin can reference the Protocol via `Self` bound or via inheritance from a shared base. Short-term mitigation: per-method docstring pointers (`# See agents/estimate/crud_helpers.py:381 — keep in sync`). Worth doing if the stubs grow further; for now the 23 stubs are stable enough.
 
-### 303. [HIGH] Unit tests missing for the 9 new `routers/agent_helpers/` modules
+### 303. [HIGH] ~~Unit tests missing for the 9 new `routers/agent_helpers/` modules~~ — RESOLVED 2026-06-03
+**Severity**: HIGH (resolved)
+
+**Resolved 2026-06-03**: 8 module-level unit-test files added (103 tests), one
+per untested helper — `estimate_gathering.py` already had
+`tests/test_estimate_gathering.py`, so the original "9" was 8 in practice:
+
+| Module | Test file | Tests |
+|---|---|---|
+| `finalize_result.py` | `tests/test_agent_helpers_finalize_result.py` | 17 |
+| `estimate_resolver.py` | `tests/test_agent_helpers_estimate_resolver.py` | 9 |
+| `delegate_generic.py` | `tests/test_agent_helpers_delegate_generic.py` | 7 |
+| `pending_estimate_follow_up.py` | `tests/test_agent_helpers_pending_estimate_follow_up.py` | 24 |
+| `optional_follow_up.py` | `tests/test_agent_helpers_optional_follow_up.py` | 21 |
+| `delegate_get_estimate.py` | `tests/test_agent_helpers_delegate_get_estimate.py` | 11 |
+| `delegate_estimate_ops.py` | `tests/test_agent_helpers_delegate_estimate_ops.py` | 14 |
+| `delegate_create_estimate.py` | `tests/test_agent_helpers_delegate_create_estimate.py` | 7 |
+
+Each file covers every envelope return path / state-machine branch via
+injected fakes + `monkeypatch` (no DB or LLM). All 103 pass; mypy clean.
+A latent matcher quirk surfaced and was characterized (not fixed —
+tracked as a new LOW below): `find_property_by_name_or_address` treats a
+property with a **blank `street`** as a contains-match for *any* query
+(`"" in query` is always true), so such a property auto-links. See
+`test_find_property_blank_street_contains_matches_any_query`.
+
 **Where:** `routers/agent_helpers/pending_estimate_follow_up.py`, `optional_follow_up.py`, `estimate_gathering.py`, `delegate_create_estimate.py`, `delegate_estimate_ops.py`, `delegate_get_estimate.py`, `delegate_generic.py`, `finalize_result.py`, `estimate_resolver.py` (all landed 2026-05-22).
 
 **Issue:** All 9 helper modules extracted from `orchestrate_agent_endpoint` lack module-level unit tests. Behavior is exercised through `tests/test_orchestrator_endpoint.py` integration tests (52 passing), so no regression risk today — but each helper is a state machine with multiple return paths (`handle_pending_estimate_follow_up` has 9 envelope returns spanning `confirm`/`select_property`/`negative`/`list-properties`/`no-properties`/`escape-hatch`/`resolve-error`/`success` shapes) and the integration tests don't necessarily cover every branch. Per `CLAUDE.md` "tests are mandatory after any code change" — extraction without unit-test backfill leaves the per-branch behavior implicit in the endpoint tests.
@@ -6239,12 +6264,24 @@ Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of 
 
 **Fix:** Extract the `has_wi` block (lines 140–212) into `_detect_sub_resource_op()` that `_detect_work_item_op` calls first. Keeps the legacy patterns untouched.
 
-### 307. [HIGH] Full-catalog fetch for material/role lookup
+### 307. [HIGH] ~~Full-catalog fetch for material/role lookup~~ — RESOLVED 2026-06-03
+**Severity**: HIGH (resolved)
 **Where:** `agents/estimate/work_item_field_handlers.py:531` and `:889`
 
 **Issue:** `Material.find(company==X).to_list()` and `Labour.find(company==X).to_list()` load the full company catalog into memory for Python-side substring matching. Acceptable at current scale (<1000 items) but degrades on larger catalogs.
 
-**Fix:** Replace with a `$regex` query or text-search index. Low urgency — chat-tier latency tolerance is higher.
+**Resolved 2026-06-03**: extracted two helpers — `_find_catalog_materials()`
+and `_find_catalog_roles()` — that push the name substring match into MongoDB
+via a case-insensitive `{"name": {"$regex": re.escape(hint), "$options": "i"}}`
+filter (alongside the existing `company ==` clause). The handlers now receive
+only matching documents instead of the whole catalog; the exact-match /
+ambiguity disambiguation logic stays in the handler on the (now-smaller) list.
+`re.escape` preserves literal-substring semantics for hints containing regex
+metacharacters. Dead inline `from models import Material/Labour` imports in the
+two handlers removed. New `tests/test_work_item_catalog_lookup.py`: 6 unit tests
+(query-shape + escaping + empty-hint short-circuit, `find` stubbed) plus 1 live
+test that exercises the real `$regex` against the test DB (match returns only
+the matching doc; non-match returns nothing). mypy clean; 102 related tests pass.
 
 ### 308. [MEDIUM] Duplicated work-item/help bypass in orchestrator
 **Where:** `agents/orchestrator/service.py:578` and `:2173`
@@ -6367,6 +6404,13 @@ of 400) plus its missing test coverage were **fixed in-session** (reordered
 **Issue:** `_has_baseline` accepts `size == 0.0` (`is not None`), then `begin_template_estimate` computes `converted / template.size` → `ZeroDivisionError`. The pending-turn handler guards this (`not baseline_size`), so the two paths are inconsistent. A zero-size template is nonsensical/unlikely but the asymmetry is a latent trap.
 
 **Fix:** Make `_has_baseline` require `template.size` truthy, or guard the division and fall through to `_ask_size_envelope`.
+
+### 322. [LOW] `find_property_by_name_or_address` auto-matches a blank-street property to any query
+**Where:** `platform/routers/agent_helpers/pending_estimate_follow_up.py:101-110`
+
+**Issue:** The contains-match block tests `_property_address_of(item).lower() in query`. When a property's `street` is blank, `"" in query` is always true, so a property with no street is treated as a substring-match candidate for *every* property query. With a single such property in the company, the estimate-link follow-up will silently link the new estimate to it even for an unrelated reply. Surfaced and characterized while backfilling #303 (`test_find_property_blank_street_contains_matches_any_query`).
+
+**Fix:** Guard the empty-string clauses — only test `address in query` / `name in query` when the field is non-empty. Flip the characterization test's assertion in the same change.
 
 ---
 
