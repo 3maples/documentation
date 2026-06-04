@@ -6440,17 +6440,18 @@ gate your change without tripping over the legacy backlog.
 > F401 by hand: genuinely dead → delete; re-export → add to `__all__`;
 > monkeypatch target → keep with `# noqa: F401` + reason.
 
-### 323. [MEDIUM] ruff manual backlog — 390 findings remaining across the conservative ruleset
+### 323. [MEDIUM] ruff manual backlog — 281 findings remaining (all F401) across the conservative ruleset
 Snapshot 2026-06-03 (`./run_ruff.sh`); **B904 slice closed 2026-06-03** (32 → 0);
-**style/simplify slice (E741/E712/SIM/C4/B007) closed 2026-06-04** (52 → 0).
-Remaining `ruff check . --statistics` (2026-06-04): F401 282, E402 56, F841 52.
+**style/simplify slice (E741/E712/SIM/C4/B007) closed 2026-06-04** (52 → 0);
+**E402 + F841 slices closed 2026-06-04** (56 + 52 → 0).
+Remaining `ruff check .` (2026-06-04): **F401 281 — the only category left.**
 
 | Rule | Count | Category | Notes |
 |---|---|---|---|
 | ~~**B904** raise-without-`from`~~ | ~~32~~ → **0** | correctness | **RESOLVED 2026-06-03** — see progress note below |
-| F401 unused-import | 282 | dead code | report-only; triage per the hazard note above |
-| E402 import-not-at-top | 56 | style | reorder, or `# noqa: E402` + reason for circular-import cases |
-| F841 unused-variable | 52 | dead code | ~49 in tests; confirm assignment isn't a documented call before deleting |
+| F401 unused-import | 281 | dead code | report-only; triage per the hazard note above |
+| ~~E402 import-not-at-top~~ | ~~56~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
+| ~~F841 unused-variable~~ | ~~52~~ → **0** | dead code | **RESOLVED 2026-06-04** — see progress note below |
 | ~~E741 ambiguous-name (`l`/`I`/`O`)~~ | ~~24~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
 | ~~E712 `== True/False`~~ | ~~5~~ → **0** | style | **RESOLVED 2026-06-04** |
 | ~~SIM103/102/108/105~~ | ~~16~~ → **0** | simplify | **RESOLVED 2026-06-04** |
@@ -6466,7 +6467,7 @@ CLAUDE.md's "don't leak/garble tracebacks" rule. Add `raise ... from err`
 (2), `routers/materials.py` (1), `routers/billing.py` (1). (2) the mechanical
 style/simplify slices (E741/E712/SIM/C4/B007) — low risk. (3) E402 + F841 —
 case-by-case judgment. (4) F401 last — largest and needs the per-import triage
-above.
+above. **Slices (1)–(3) are now closed; only F401 (4) remains.**
 
 Work each slice as its own commit (`./run_ruff.sh --select B904` to scope a
 run). Update this entry's counts as slices close; mark RESOLVED when
@@ -6531,6 +6532,42 @@ Verified: `./run_mypy.sh agents routers services` clean (140 files); `compileall
 `test_job_item_original_profit_margin`, `test_maple_work_item_ops`. Remaining backlog
 (390): F401 (282, needs per-import triage), E402 (56), F841 (52) — the case-by-case
 slices per the recommended order.
+
+**Progress 2026-06-04 — E402 + F841 slices closed (56 + 52 → 0).**
+`./run_ruff.sh --select E402,F841` is clean project-wide; the whole remaining
+backlog is now F401 only.
+
+*F841 (52)* — 3 production dead assignments deleted (`services/google_drive_service.py`
+unused `table`, `agents/property/service.py` unused `intent`,
+`agents/estimate/crud_handlers.py` unused `has_custom_window`). In tests: 43
+`agent = XAgent(use_llm=False)` constructions removed (the tests exercise module-level
+helpers, not the instance — construction is side-effect-free with `use_llm=False`); 3
+`result = asyncio.run(...)` cases kept the call but dropped the unused binding (asserts
+read `captured`, not `result`); `fake_est` (immediately reassigned before use) deleted;
+`second_owner = create_company_user(...)` kept the side-effecting call, dropped the
+binding; `audit_logs_query` (a never-executed lazy Beanie `.find()` for deferred audit
+verification) removed along with its now-orphaned `from models import ...` line.
+
+*E402 (56)* — split between config and reorder:
+- **`ruff.toml` per-file-ignores** for the two *structural* cases that cannot be
+  reordered: `scripts/**/*.py` (operational scripts must `sys.path.insert(project_root)`
+  before importing `database`/`models`/`config`) and `models/__init__.py` (interleaves
+  `model_rebuild()` between import groups so Beanie/Pydantic forward refs resolve in
+  dependency order). Cleared 33 findings.
+- **Reorders** for the rest: moved the `logger = logging.getLogger(__name__)` assignment
+  below the import block in `agents/orchestrator/service.py` (11); hoisted `import logging`
+  + `from pymongo.errors import DuplicateKeyError` to the top of `routers/agents.py` (2);
+  lifted co-located imports to the top in `tests/test_agents_api.py` (2),
+  `tests/test_template_create_routing.py` (1), `tests/test_agent_helpers_text_predicates.py` (1).
+- **Misplaced-noqa fix** in `agents/estimate/service.py` — the `# noqa: E402` sat on the
+  continuation line; moved it to the `from ... import (` statement line so ruff honors it.
+
+Verified: `./run_mypy.sh` clean on the 6 touched production files; full-project
+`./run_ruff.sh` reports **281 F401 and nothing else**; 436 related tests pass across
+`test_agents_api`, `test_audit_integration`, `test_user_api`, `test_estimate_agent`,
+`test_contact_agent`, `test_property_agent`, `test_labour_agent`, `test_equipment_agent`,
+`test_template_create_routing`, `test_agent_helpers_text_predicates`,
+`test_google_drive_service`. Next and final slice: F401 (281) — the per-import triage.
 
 ---
 
