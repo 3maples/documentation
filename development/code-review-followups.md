@@ -6414,6 +6414,64 @@ of 400) plus its missing test coverage were **fixed in-session** (reordered
 
 ---
 
+## 2026-06-03 (ruff lint gate adoption)
+
+`ruff` was adopted as a hard lint gate for `platform/` on 2026-06-03, the same
+model as the mypy gate (#3). Config is pinned in `platform/ruff.toml`; run via
+`./run_ruff.sh`. Ruleset: `E, F, I, B, C4, SIM` — `E501` (line length) off, `UP`
+(pyupgrade) intentionally excluded (its annotation rewrites collide with the
+mypy.ini playbook). See CLAUDE.md "ruff is a Gate, Not a Suggestion" for the
+full policy + recurring playbook.
+
+On adoption the safe auto-fixable backlog (~287 fixes: import sorting + trivial
+simplifications, **no import deletions**) was applied across 186 files. The
+manual backlog below remains and must be worked down before the project is
+fully green. **Until then, scope `./run_ruff.sh` to the files you touch** so you
+gate your change without tripping over the legacy backlog.
+
+> **F401 is report-only by config** (`unfixable = ["F401"]`). Blanket
+> `ruff --fix` is **unsafe** in this codebase: it deletes (a) re-export-hub
+> imports — modules that import a symbol only to re-expose it (`routers/estimates.py`,
+> `routers/agents.py`, `agents/estimate/service.py`) — and (b) module-level
+> imports that tests monkeypatch via `setattr(module, "Name", ...)` (e.g.
+> `estimate_service.ChatOpenAI`). Both break imports/tests; the second isn't
+> caught by an `import main` smoke test. This was learned the hard way during
+> adoption (140 test failures from the first sweep, fully reverted). Triage each
+> F401 by hand: genuinely dead → delete; re-export → add to `__all__`;
+> monkeypatch target → keep with `# noqa: F401` + reason.
+
+### 323. [MEDIUM] ruff manual backlog — 474 findings across the conservative ruleset
+Snapshot 2026-06-03 (`./run_ruff.sh`):
+
+| Rule | Count | Category | Notes |
+|---|---|---|---|
+| **B904** raise-without-`from` | 32 | **correctness** | Broken exception chaining — do this slice first |
+| F401 unused-import | 284 | dead code | report-only; triage per the hazard note above |
+| E402 import-not-at-top | 56 | style | reorder, or `# noqa: E402` + reason for circular-import cases |
+| F841 unused-variable | 52 | dead code | ~49 in tests; confirm assignment isn't a documented call before deleting |
+| E741 ambiguous-name (`l`/`I`/`O`) | 23 | style | mechanical renames |
+| E712 `== True/False` | 4 | style | all in tests → `is` / truthiness |
+| SIM103/102/108/105/118 | 16 | simplify | collapsible/redundant logic |
+| C408/C401/C416 | 5 | simplify | comprehension/collection-call cleanups |
+| B007 unused-loop-var | 1 | style | rename to `_` |
+
+**Recommended order:** (1) **B904** — the only correctness category; it matches
+CLAUDE.md's "don't leak/garble tracebacks" rule. Add `raise ... from err`
+(preserve cause) or `raise ... from None` (suppress). B904 sites by file:
+`services/google_drive_service.py` (12), `routers/agents.py` (6),
+`routers/estimate_helpers/doc_versions.py` (3), `routers/audit_logs.py` (3),
+`routers/templates.py` (2), `routers/stripe_webhooks.py` (2), `routers/auth.py`
+(2), `routers/materials.py` (1), `routers/billing.py` (1). (2) the mechanical
+style/simplify slices (E741/E712/SIM/C4/B007) — low risk. (3) E402 + F841 —
+case-by-case judgment. (4) F401 last — largest and needs the per-import triage
+above.
+
+Work each slice as its own commit (`./run_ruff.sh --select B904` to scope a
+run). Update this entry's counts as slices close; mark RESOLVED when
+`./run_ruff.sh` is clean project-wide.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
