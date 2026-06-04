@@ -6440,20 +6440,22 @@ gate your change without tripping over the legacy backlog.
 > F401 by hand: genuinely dead → delete; re-export → add to `__all__`;
 > monkeypatch target → keep with `# noqa: F401` + reason.
 
-### 323. [MEDIUM] ruff manual backlog — 474 findings across the conservative ruleset
-Snapshot 2026-06-03 (`./run_ruff.sh`):
+### 323. [MEDIUM] ruff manual backlog — 390 findings remaining across the conservative ruleset
+Snapshot 2026-06-03 (`./run_ruff.sh`); **B904 slice closed 2026-06-03** (32 → 0);
+**style/simplify slice (E741/E712/SIM/C4/B007) closed 2026-06-04** (52 → 0).
+Remaining `ruff check . --statistics` (2026-06-04): F401 282, E402 56, F841 52.
 
 | Rule | Count | Category | Notes |
 |---|---|---|---|
-| **B904** raise-without-`from` | 32 | **correctness** | Broken exception chaining — do this slice first |
-| F401 unused-import | 284 | dead code | report-only; triage per the hazard note above |
+| ~~**B904** raise-without-`from`~~ | ~~32~~ → **0** | correctness | **RESOLVED 2026-06-03** — see progress note below |
+| F401 unused-import | 282 | dead code | report-only; triage per the hazard note above |
 | E402 import-not-at-top | 56 | style | reorder, or `# noqa: E402` + reason for circular-import cases |
 | F841 unused-variable | 52 | dead code | ~49 in tests; confirm assignment isn't a documented call before deleting |
-| E741 ambiguous-name (`l`/`I`/`O`) | 23 | style | mechanical renames |
-| E712 `== True/False` | 4 | style | all in tests → `is` / truthiness |
-| SIM103/102/108/105/118 | 16 | simplify | collapsible/redundant logic |
-| C408/C401/C416 | 5 | simplify | comprehension/collection-call cleanups |
-| B007 unused-loop-var | 1 | style | rename to `_` |
+| ~~E741 ambiguous-name (`l`/`I`/`O`)~~ | ~~24~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
+| ~~E712 `== True/False`~~ | ~~5~~ → **0** | style | **RESOLVED 2026-06-04** |
+| ~~SIM103/102/108/105~~ | ~~16~~ → **0** | simplify | **RESOLVED 2026-06-04** |
+| ~~C408/C401/C416~~ | ~~5~~ → **0** | simplify | **RESOLVED 2026-06-04** |
+| ~~B007 unused-loop-var~~ | ~~2~~ → **0** | style | **RESOLVED 2026-06-04** |
 
 **Recommended order:** (1) **B904** — the only correctness category; it matches
 CLAUDE.md's "don't leak/garble tracebacks" rule. Add `raise ... from err`
@@ -6469,6 +6471,66 @@ above.
 Work each slice as its own commit (`./run_ruff.sh --select B904` to scope a
 run). Update this entry's counts as slices close; mark RESOLVED when
 `./run_ruff.sh` is clean project-wide.
+
+**Progress 2026-06-03 — B904 slice closed (32 → 0).** All 32 raise-without-`from`
+sites now chain explicitly; `./run_ruff.sh --select B904` is clean project-wide.
+Cause-preservation split followed the playbook:
+- **`from e`** (preserve cause) where the exception was already bound *and* is a
+  genuine unexpected/internal failure worth chaining: `routers/stripe_webhooks.py`
+  (signature-verify 400, handler 500) and all 12 `services/google_drive_service.py`
+  sites (RuntimeError on credential/build failure + HTTPException 500s on Drive
+  HttpError — each `except ... as e`).
+- **`from None`** (suppress) where the re-raise is a deliberate boundary over
+  expected input or an already-logged error: input-validation conversions
+  (`routers/audit_logs.py` ×3 invalid enum 400, `routers/auth.py` ×2 invalid
+  role/industry 400, `routers/agents.py` ×2 invalid ObjectId 422), 409 conflict
+  conversions (`routers/templates.py` ×2 DuplicateKey), and 500/502 handlers that
+  already `logger.exception(...)` the full traceback (`routers/agents.py` ×4,
+  `routers/billing.py`, `routers/materials.py`, `routers/estimate_helpers/doc_versions.py` ×3).
+
+Verified: full-project `./run_mypy.sh` slice clean (`routers`, `services`); 155
+related tests pass (`test_stripe_webhooks`, `test_template_api`,
+`test_audit_logs_api`, `test_billing_enterprise_contact`, `test_google_drive_service`,
+`test_estimate_docs_api`, `test_orchestrator_endpoint`, `test_auth_api`). Next
+slice per the recommended order: the mechanical style/simplify batch
+(E741/E712/SIM/C4/B007).
+
+**Progress 2026-06-04 — style/simplify slice closed (52 → 0).**
+`./run_ruff.sh --select E741,E712,SIM,C4,B007` is clean project-wide. Breakdown:
+- **E741** (24) — every `l` ambiguous-name was the same idiom: a labour item in a
+  loop/comprehension. Renamed `l` → `lab` throughout each enclosing scope (renaming
+  *all* uses, not just the binding). Sites: `agents/cross_resource.py`,
+  `agents/estimate/{crud_handlers,llm_pipeline,service ×3,tools,work_item_field_handlers}.py`,
+  `agents/property/service.py`, `routers/estimate_helpers/{job_item_builders ×5,snapshots ×2}.py`,
+  `routers/estimates.py` ×3, `routers/labours.py`, and tests
+  (`test_cross_resource_joins.py`, `test_labour_api.py` ×2).
+- **E712** (5, all tests) — `== True/False` → truthiness / `not` in `test_google_drive_service.py`.
+- **SIM103** (6) — `if cond: return True / return False` → `return cond`; the regex
+  `.search()` cases wrapped in `bool(...)` to keep the `-> bool` return type honest
+  (`routers/agents.py` ×4, `routers/agent_helpers/pending_calculation.py`,
+  `routers/estimate_helpers/ai_generation.py`).
+- **SIM102** (5) — collapsed nested `if`s into a single `and` condition, verified each
+  outer `if` contained only the inner one (`routers/agents.py`, `routers/auth.py`,
+  `routers/agent_helpers/finalize_result.py`, `services/google_drive_service.py`,
+  `agents/estimate/crud_handlers.py`).
+- **SIM108** (3) — if/else assignment → ternary (`delegate_create_estimate.py`,
+  `services/address_service.py`, `tests/conftest.py`).
+- **SIM105** (2) — `try/except: pass` → `contextlib.suppress(...)`, adding a top-level
+  `import contextlib` to each (`routers/agent_helpers/delegate_get_estimate.py`,
+  `scripts/setup_stripe_webhook.py`).
+- **C416** (1) — redundant list comp → `list(_STATUS_ALIASES.items())` (`crud_helpers.py`).
+- **C401** (1) — `set(gen)` → set comprehension (`work_item_field_handlers.py`).
+- **C408** (3) — `dict(...)` → literal (`template_estimate.py` ×2, `tests/_cross_resource_fakes.py`).
+- **B007** (2) — unused loop var `i` → `_` (`services/google_drive_service.py`).
+
+Verified: `./run_mypy.sh agents routers services` clean (140 files); `compileall` clean;
+458 related tests pass across `test_estimate_agent`, `test_estimate_api`,
+`test_orchestrator_endpoint`, `test_labour_api`, `test_google_drive_service`,
+`test_auth_api`, `test_cross_resource_joins`, `test_address_service`,
+`test_agent_helpers_pending_calculation`, `test_estimate_snapshot_helpers`,
+`test_job_item_original_profit_margin`, `test_maple_work_item_ops`. Remaining backlog
+(390): F401 (282, needs per-import triage), E402 (56), F841 (52) — the case-by-case
+slices per the recommended order.
 
 ---
 
