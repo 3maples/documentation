@@ -6611,6 +6611,35 @@ Verified: full-project `./run_ruff.sh` clean (0 findings); `./run_mypy.sh` clean
 
 ---
 
+## 2026-06-05 `/code-review` pass (Maple Spanish translation sandwich)
+
+Backend-only change: input→English / output→Spanish translation boundary
+(`services/translation.py`), dialect-aware prompts, and defense-in-depth Spanish
+keywords in the guards/helpers. HIGH (`_estimate_status_from_text` length) and
+all MEDIUMs were fixed in the same change. These two LOWs were deferred.
+
+### 324. [LOW] Language codes `"en"` / `"es"` are bare string literals
+`services/translation.py` and the two endpoint handlers (`routers/agents.py`,
+`routers/public_maple.py`) compare against `"en"` / `"es"` inline in several
+branches. `SUPPORTED_TARGET_LANGS` already centralizes the supported set; a
+small `LANG_EN = "en"` constant (or an enum) would remove the remaining magic
+strings and make adding a language a touch safer. Cosmetic — no behavior change.
+
+### 325. [LOW] `sacá …todos` can false-positive the fail-open bulk-delete net
+`_BULK_DELETE_PATTERNS` in `agents/text_utils.py` now matches `saca/sacá`
+(remove/take-out) + an all/every quantifier, so a phrasing like "sacá una foto
+de todos" (take a photo of everyone) would trip the bulk-delete refusal. Only
+reachable on the rare translation-fail-open path (the happy path translates to
+English first), and the guard is conservative (quantifier required), so impact
+is minimal. Drop `saca/sacá` if real-world noise appears, or tighten to require
+a record-noun nearby.
+
+> Not logged (duplicate): the `orchestrate_agent_endpoint` / `routers/agents.py`
+> God-handler + file-size concern is already tracked by #238, #257, and the #4
+> file-size cluster. This change added ~20 lines to that pre-existing handler.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
