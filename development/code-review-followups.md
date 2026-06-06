@@ -6640,6 +6640,97 @@ a record-noun nearby.
 
 ---
 
+## 2026-06-06 `/code-review` pass (Maple estimate field edits + router-path fix)
+
+Reviewed the session range `11b22ef..5bace30` (8 commits, 13 files): estimate-level
+description/notes/link sub-ops, shared title-or-code resolver, enriched details
+(agent + `delegate_get_estimate`), the generic optional-follow-up one-turn
+shortcut, and the router delegation predicate fix. Gates were zero (ruff, mypy)
+and ~700 related tests green at review time; both HIGHs are structural, not
+correctness/security. CRITICAL: 0.
+
+### 326. [HIGH] `handle_pending_optional_follow_up` is 259 lines with a duplicated delegation block
+`routers/agent_helpers/optional_follow_up.py` — the new one-turn confirm+value
+shortcut hand-rolls a ~40-line processor-delegation + envelope that near-copies
+the two-turn path at the bottom of the same function. The shortcut deliberately
+omits `accuracy_suggestions` / `missing_fields` propagation (commented), but two
+envelope assemblies in one 259-line function WILL drift, and this is the shared
+state machine for ALL agents' follow-ups. Fix: extract a
+`_delegate_synthetic(pending, synthetic_message, processor_factory, context, *,
+propagate_extras)` helper used by both paths; behavior is pinned by the existing
+`test_agent_helpers_optional_follow_up.py` + `TestEstimateFollowUpConfirmStage`
+tests, so this is a pure refactor. Fold #335 into the same pass.
+
+### 327. [HIGH] `agents/estimate/crud_handlers.py` grew ~250 lines to 2,309
+Pre-existing giant (under the #4 file-size theme) but this change materially
+worsened it: the mixin now holds link/notes/description detectors + handlers,
+bare-title extraction, the shared resolver, and the get/update dispatchers.
+Next touch, split the estimate-level field-edit sub-ops (description / notes /
+property-link detectors + handlers) into an `estimate_field_handlers.py` mixin,
+mirroring the existing `work_item_field_handlers.py` precedent from §1.5.
+
+### 328. [MEDIUM] `_resolve_estimate_by_title` full-collection scan now on three more paths
+The (pre-existing) resolver does `Estimate.find(company == oid).to_list()` and
+substring-matches titles in Python. The new `_resolve_estimate_code_or_title`
+wires it into notes/description/link updates, so every code-less update turn
+loads ALL of a tenant's estimates. Single company-scoped query (not N+1) and
+fine at typical tenant sizes, but unbounded. Fix: add a `.limit(...)` bound or
+a server-side case-insensitive regex match on `title`; `company` is already the
+indexed filter per the `Settings.indexes` convention.
+
+### 329. [MEDIUM] "Please don't" is consumed as a property value by the one-turn shortcut
+`optional_follow_up.py` — `please` is in `_AFFIRMATION_PREFIX` and `don't` is
+not in the exact-match `_NEGATIVE_VALUES`, so a "Please don't" reply at the
+confirm stage delegates a property lookup for the literal value "don't" (fails
+gracefully → re-prompt, but reads badly). Same family as the §9.4-documented
+soft-negative gap (`not right now`, `I'll do it from the portal`, `nah, leave
+it`). Fix once for both: check the post-affirmation residual against a
+soft-negative list (`don't`, `do not`, `never mind`, `not right now`, …) before
+treating it as a value, or extend `_NEGATIVE_VALUES` prefix-matching.
+
+### 330. [MEDIUM] `target.save()` unwrapped in `_handle_update_estimate_description`
+The new description handler follows the notes handler's bare-save precedent,
+but the property-link handler in the same file wraps its save in try/except
+with a friendly "couldn't reach the database" envelope — the file has two
+precedents and the new code picked the weaker one. A Mongo hiccup surfaces as a
+generic 500 instead of the retry prompt. Fix: wrap like the link path, or
+extract a `_save_or_error` helper and use it in all three field-edit handlers.
+
+### 331. [MEDIUM] Twin datetime formatters duplicate the label format
+`_fmt_dt` (`agents/estimate/crud_helpers.py`, datetime objects) and
+`_fmt_iso_dt` (`routers/agent_helpers/delegate_get_estimate.py`, ISO strings)
+are deliberate and cross-referenced in comments, but the format string
+`"%Y-%m-%d %H:%M UTC"` is duplicated and will drift. Fix: share the constant
+(or one helper accepting both input types) from a neutral module.
+
+### 332. [MEDIUM] Router delegation predicate constructs the EstimateAgent singleton
+`routers/agents.py::_should_delegate_update_estimate_to_agent` now calls
+`get_estimate_agent().owns_update_sub_op(text)` — first call lazily builds
+`ChatOpenAI` (sync constructor, no network; fine in practice). The predicate is
+also reached from `_message_breaks_pending_confirmation`, so agent construction
+can happen earlier in the request lifecycle than before. No action required;
+logged for awareness — if it ever matters, pass the agent in the way
+`delegate_update_estimate` already receives it.
+
+### 333. [LOW] `_residual_is_field_restatement` filler-word heuristic is undocumented at the call site
+The filler list (`add|set|update|link|the|a|an|it|to|with|please|me|my`) is a
+heuristic; values that reduce oddly (a property literally named "My Place"
+reduces to "place" and still passes — correct today) deserve a pointer to the
+§9.4 soft-negative follow-up so the two heuristics evolve together.
+
+### 334. [LOW] `_TITLE_TAIL_STOP` excludes mid-title connector words
+A real title like "Edge of the Garden" won't bare-extract (the tail stops at
+"of"); quoted and `called X` forms still work, and the failure mode is the
+standard ask-for-code clarification. Documented tradeoff in the phrasing
+reference — revisit only if real titles hit it.
+
+### 335. [LOW] One-turn shortcut envelope omits `accuracy_suggestions` / `missing_fields`
+Intentional and commented, but it makes the one-turn and two-turn paths return
+structurally different envelopes. Resolved automatically by the #326 refactor —
+tracked separately so it isn't forgotten if #326 is deferred.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
