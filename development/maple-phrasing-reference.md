@@ -2,9 +2,29 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-02
+**Last updated:** 2026-06-06
 
 ### Change log
+
+**2026-06-06 — Estimate field edits & follow-up SHIPPED (plan: [plans/maple-estimate-field-edits.md](plans/maple-estimate-field-edits.md))**
+- All five 2026-06-05 user-reported items implemented and the corresponding rows flipped ✅ (each remaining ⚠️ was re-verified against the live rule tier on 2026-06-06):
+  - **§1.10 description** — new `_detect_estimate_description_update` + `_handle_update_estimate_description` (estimate-level `description`; quoted/colon/unquoted forms; `write-up`/`overview` synonyms). Dispatcher order: work-item → status → description → notes → link → template.
+  - **§1.10 notes** — title/anaphora resolution; informal cues `jot`/`FYI`/`remember`/`write down` detected AND routed (orchestrator `_informal_note` value-bearing arm).
+  - **§1.6 linking** — relationship phrasings (`tie`/`connect`/`associate`, "is for", "property for this quote"), bare-property-name targets, `link {EST} to {property}` now rule-tier (was 🤖 LLM).
+  - **§1.2 details** — `_build_estimate_details_text` renders Created / Last updated / Description / Notes / ID; "show me everything on the {title} quote" works (linked-property NAME still pending an async lookup).
+  - **§9.4 follow-up** — Estimate registered in the generic `optional_follow_up` machine; **one-turn** "Yes, link it to Bob Residential"; bare-property answers; legacy `pending_estimate_follow_up` no longer dual-writes and defers to the generic key (the legacy handler swallowing the reply was the root cause of the original report).
+- **Cross-cutting:** shared `_resolve_estimate_code_or_title` (code → anaphora → latest → title) used by all update sub-handlers; bare-title extraction `_TITLE_PRE/POST_NOUN_RE` (case-sensitive, 2+ capitalized words, ordered before the any-quoted fallback so note bodies aren't mistaken for titles); orchestrator estimate field-edit fast-path in `_classify_specific_phrasings`.
+- Tests: `tests/test_maple_estimate_field_edits.py` (57) + additions to `tests/test_agent_helpers_delegate_create_estimate.py`; ~500-test regression sweep green; mypy + ruff project-wide zero.
+- Still ⚠️ after this wave (verified, with misroute notes where found): casual detail forms ("rundown", "full info" → misroutes to `get_contact`, "open up"), "when was X created/updated" (the created form misroutes to `create_estimate`), value-before-cue description ("put X as the overview"), `describe … as`, note verbs `make`/`leave`/`tack`, generalized `note … that` tail, "job site" link cue, soft negatives ("not right now", "I'll do it from the portal"), `bid`/`proposal` as title-extraction nouns, and job-name → estimate resolution (Task-8 stretch).
+
+**2026-06-05 — Estimate-level field-edit & details gaps logged (⚠️ for implementation)**
+- Five user-reported estimate phrasings reviewed against the live code; new ⚠️ gap rows added for the ones not correctly handled. Root cause shared by three of them: **title-based estimate reference (`_resolve_estimate_by_title`) is wired only into the `get_estimate` path** (`crud_handlers.py:1535`); every *update* sub-handler (`notes` @1891, property `link` @1943, and the not-yet-built description handler) resolves the estimate by **EST-code only** (`_resolve_estimate_code`), so a title like "Spring Cleaning" prompts for a code on the update path.
+- **§1.10 (new)** — estimate-level `description` edit is unhandled (model field exists, no dispatcher sub-op → falls through to the `_handle_update_estimate` refusal); estimate-level `notes` append **is** handled rule-side (newly documented) but code-only.
+- **§1.2** — title-based details response is too thin: `_build_estimate_details_text` (`crud_helpers.py:446`) emits only Code/Title/Status/Grand total. Missing `created_at`, `updated_at`, linked property, description, notes (all present on the model and in the full result payload, just not rendered).
+- **§1.6** — title-referenced property linking ("set the property of estimate {Name} to {property}") is a gap; the link handler fires but can't resolve a titled estimate.
+- **§9.4 (new)** — the post-creation "link this to a property now?" follow-up (`extraction_helpers.build_optional_follow_up`) has no pending-intent state, so an affirmative reply ("Yes, link it to Bob Residential") isn't carried back into the linking handler.
+- Each of the five sections now carries **landscaper-style variant rows** in its catalog table (informal verbs, customer/job-name references, bare-address properties, value-only notes, confirmation-word-plus-property replies) plus a concise **Implementation note**, so coverage targets the real input distribution, not just the canonical phrasing. Recurring sub-gaps surfaced by the variants: estimate synonyms `bid`/`proposal`, job-name → estimate resolution, possessive property nicknames ("Bob's place"), informal note cues (`jot down`/`FYI`/`remember`), and bare-property affirmatives in the link follow-up.
+- Implementation plan written: [`plans/maple-estimate-field-edits.md`](plans/maple-estimate-field-edits.md).
 
 **2026-06-02 — Template-driven estimate creation (skips AI generation) + gathering decline fix**
 - A **create-estimate request that names a template** now skips AI generation entirely and instantiates from the template (§1.3, §6.7). No-baseline → template applied as one work item verbatim; baseline (`size`+`unit`) → linear scaling to the job size (`factor = job_size ÷ baseline_size`), taking the size from the request or asking once (`pending_template_size`). Convertible units (sq yd↔sq ft, lin yd↔lin ft) are converted; incompatible (area vs length) re-asks. Property context is linked.
@@ -160,6 +180,15 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `tell me about estimate with title "Untitled Estimate"` | `get_estimate` → Estimate Agent | ✅ rule |
 | `show me the estimate called "Driveway Replacement"` | `get_estimate` → Estimate Agent | ✅ rule |
 | `pull up estimate named "Foundation Work"` | `get_estimate` → Estimate Agent | ✅ rule |
+| `show me estimate details for {EST or title}` (e.g. `Spring Cleaning`) — response includes `created_at`, `updated_at`, the estimate ID/code, description, and notes | `get_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `_build_estimate_details_text` now renders Created / Last updated / Description / Notes / ID lines (blank optionals omitted; core fields keep the `—` placeholder). Bare titles resolve via `_TITLE_PRE/POST_NOUN_RE`. **Caveat:** the linked property NAME is still not rendered — it needs an async lookup from `Estimate.property`; follow-on.)* |
+| `show me everything on the {title} quote` | `get_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — verified routing; pre-noun bare-title extraction)* |
+| `give me the rundown on the {title} estimate` / `full breakdown on the {title} job` | `get_estimate` → Estimate Agent | ⚠️ gap *(verified 2026-06-06: routes to `unknown` — "rundown"/"breakdown" aren't get-action cues)* |
+| `what's the full info on {title}?` / `open up the {title} estimate` | `get_estimate` → Estimate Agent | ⚠️ gap *(verified 2026-06-06: "full info on Spring Cleaning" **misroutes to `get_contact`** via the person-name heuristic; "open up" routes to `unknown`)* |
+| `when was the {title} estimate created?` | `get_estimate` → Estimate Agent (lead with `created_at`) | ⚠️ gap *(verified 2026-06-06: **misroutes to `create_estimate`** — the word "created" trips the create-action hint. Needs a when-was/question-form guard before the create hint, then a `created_at` lead in the get handler.)* |
+| `when was {EST} last updated?` / `when did I last touch the {title} quote?` | `get_estimate` → Estimate Agent (lead with `updated_at`) | ⚠️ gap *(verified 2026-06-06: routes to `help`. Note the timestamps DO now appear when the user asks for the estimate's details.)* |
+| `what's the ID for the {title} estimate?` | `get_estimate` → Estimate Agent (lead with `estimate_id`) | ⚠️ gap *(verified 2026-06-06: routes to `help`)* |
+
+**Implementation note (updated 2026-06-06):** the response-detail half of this section shipped — `_build_estimate_details_text` carries timestamps/ID/description/notes, and bare-title resolution works wherever `_resolve_estimate_by_title` is consulted. What remains is **routing** for the casual/single-field forms above (rundown / full info / open up / when-was-X / what's-the-ID): they need get-cues or a question-form guard before the create/help classifiers, plus a focused-field lead (mirroring `_GRAND_TOTAL_QUERY_PATTERN`). Separately, **estimate synonyms** `bid`/`proposal` route (they're in the orchestrator's `_estimate_ref`) but are NOT yet title-extraction nouns (`_TITLE_PRE/POST_NOUN_RE` accept only `estimate|quote`), and **job-name reference** ("the Smith job") remains open — both are Task-8 stretch items in [plans/maple-estimate-field-edits.md](plans/maple-estimate-field-edits.md).
 
 ## 1.3 Generation (multi-turn, LLM-driven)
 
@@ -354,9 +383,19 @@ Direct override of a work item's `sub_total`. Unlike the percentage-based cost p
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `link {EST} to {property}` | `update_estimate` → Estimate Agent | 🤖 LLM |
-| `attach this estimate to {property}` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `link {EST} to {property}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — orchestrator `_link_relationship` arm + `_LINK_VERB_TO_ESTIMATE_PATTERN`; was 🤖 LLM)* |
+| `attach this estimate to {property}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — "this estimate" resolves via `active_estimate_code` anaphora)* |
 | `which property is this estimate for?` | `get_estimate` → Estimate Agent | 🤖 LLM |
+| `set the property of estimate {EST} to {property}` | `update_estimate` → Estimate Agent | ✅ rule *(the link branch `_is_property_link_request` matches `set ... property`; `_handle_update_estimate_property_link` resolves the property by name/address)* |
+| `set the property of estimate {Estimate Name} to {property}` (estimate referenced by **title**) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — all update sub-handlers resolve via the shared `_resolve_estimate_code_or_title` (code → anaphora → latest → title); bare titles are extracted by the case-sensitive `_TITLE_PRE_NOUN_RE`/`_TITLE_POST_NOUN_RE` patterns — **2+ capitalized words** adjacent to "estimate"/"quote")* |
+| `this quote is for the {property} property` / `the property for this quote is {property}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `_LINK_RELATIONSHIP_PATTERN`)* |
+| `tie / connect / associate the {title} quote to/with {property}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — broadened verb set in `_LINK_PROPERTY_PATTERN` + `_LINK_VERB_TO_ESTIMATE_PATTERN` for bare property names)* |
+| `assign {EST} to the {property} property` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `assign` in `_LINK_PROPERTY_PATTERN`; deliberately NOT in the bare-name pattern, so "assign" only links when "property" or an address is present)* |
+| `change the property on the {title} quote to {property}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06)* |
+| `set the job site for this estimate to {address}` | `update_estimate` → Estimate Agent | ⚠️ gap *(routes to `update_estimate` ("job site" is a routing field token), but `_is_property_link_request` has no "job site" cue, so it falls to the generic clarification. Implementation: add a `job\s*site` alternation to `_LINK_PROPERTY_PATTERN`.)* |
+| `the {title} job is at {address}` / `this estimate goes with {address}` | `update_estimate` → Estimate Agent | ⚠️ gap *("the {X} job" isn't an estimate reference (job-name resolution is the Task-8 stretch) and "goes with"/"is at" aren't link cues yet)* |
+
+**Implementation note (shipped 2026-06-06):** estimate resolution on the linking path is code → `active_estimate_code` anaphora → "latest" → bare/quoted title (shared `_resolve_estimate_code_or_title`). Property resolution is name or bare address (`_extract_property_name` / `_extract_property_address`); possessive nicknames ("Bob's place") remain a softer follow-on gap. Routing note: the orchestrator's bare link-verb arm is deliberately broad — the `_estimate_ref` gate (estimate/quote/bid/proposal/EST-code) is the load-bearing guard, and the contact↔property link rules earlier in `_classify_specific_phrasings` still win for contact links.
 
 ## 1.7 Anaphora / active estimate
 
@@ -419,6 +458,31 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 **Status comparisons / ratios:** `compute_status_comparison` counts each status (all-time unless a date window is given, in which case it constrains `updated_at`). `format_status_comparison` renders a reduced `A:B` ratio; the WON-vs-LOST pair additionally reports a win-rate percentage (`won / (won + lost)`). Generic pairs ("draft vs approved") report counts + ratio only.
 
 **Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows (pipeline=90 days, backlog/won=30 days). Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
+
+## 1.10 Estimate-level field edits (description & notes)
+
+These edit **top-level `Estimate` fields** — distinct from the work-item (`JobItem`) description edits in §1.5.3. Both `description` and `notes` exist on the `Estimate` model (`models/estimate.py`). Routing is `update_estimate` → Estimate Agent; the dispatcher is `_handle_update_estimate` (`crud_handlers.py:1632`).
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `for estimate {EST}, add to the notes the following: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(`_detect_note_update` → `_handle_update_estimate_notes`, append-mode; preserves existing notes)* |
+| `set the notes on {EST} to "..."` / `update notes: ...` | `update_estimate` → Estimate Agent | ✅ rule *(same handler; set-mode vs append-mode chosen by verb)* |
+| `for estimate {Estimate Name}, add to the notes the following: "..."` (estimate referenced by **title**) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — notes handler resolves via the shared `_resolve_estimate_code_or_title`; bare titles extracted by `_TITLE_PRE/POST_NOUN_RE`, 2+ capitalized words near "estimate"/"quote". The bare-title patterns run **before** the any-quoted fallback so a quoted note body is never mistaken for the title.)* |
+| `add a note to the {title} quote: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06)* |
+| `update the description of estimate {EST} with the following: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `_detect_estimate_description_update` + `_handle_update_estimate_description` set the top-level `Estimate.description`; quoted, colon, and unquoted `to ...` value forms supported, incl. an EST-code sitting between the keyword and the connector)* |
+| `set the description of estimate {EST} to "..."` / `change the estimate description to "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06)* |
+| `change the description on the {title} quote to "..."` / `reword the description on this estimate to "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — title via bare-title extraction; "this estimate" via anaphora)* |
+| `update the write-up/overview for {EST} to "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `write-up`/`overview` are description-cue synonyms)* |
+| `put "..." as the overview for the estimate` | `update_estimate` → Estimate Agent | ⚠️ gap *(value-**before**-cue word order — the extractors expect the cue before the value; needs a `put "X" as the description/overview` pattern)* |
+| `describe the {title} estimate as "..."` / `the description for the {title} job should be "..."` | `update_estimate` → Estimate Agent | ⚠️ gap *(`describe ... as` and `... should be` shapes have no extractor; "the {X} job" also isn't an estimate reference)* |
+| `make a note on {EST} that ...` / `leave a note on {EST}: "..."` / `tack a note onto the {title} quote: "..."` | `update_estimate` → Estimate Agent | ⚠️ gap *(corrected 2026-06-06: the routing verb list lacks `make`/`leave`/`tack`, so these never reach the agent on a fresh turn; "make a note ... that X" additionally needs a generic `note ... that` tail extractor (only `remember ... that` exists). Reachable today only when the orchestrator already routed to `update_estimate` for another reason.)* |
+| `note on the {title} job: ...` | `update_estimate` → Estimate Agent | ⚠️ gap *(verbless + "the {X} job" isn't an estimate reference — Task-8 stretch)* |
+| `jot down on the {title} estimate: "..."` / `remember on this estimate that ...` / `FYI on the {title} job: "..."` (with an estimate/quote token) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — informal cues `jot`/`fyi`/`remember`/`write down` in `_NOTE_UPDATE_CUES` + value extractors (`_NOTE_WITH_COLON_SEP` broadened, new `_NOTE_REMEMBER_TAIL`); routed end-to-end by the orchestrator's value-bearing `_informal_note` arm. Always **append**-mode. Note: the phrase still needs an estimate/quote/EST token — "the Smith job" alone doesn't reference an estimate.)* |
+| `write down on the {title} estimate that ...` | `update_estimate` → Estimate Agent | ⚠️ gap *(`write down` is a cue, but only `remember` has a `... that ...` tail extractor; needs the tail generalized)* |
+
+**Disambiguation note:** `set the description of {WI} to "..."` (§1.5.3) targets a **work item** and is already ✅ rule. The phrasings here target the **estimate as a whole** — the implementation must detect the absence of a work-item reference (no `work item` / `job item` / `scope` / `line item` token) to route to the estimate-level handler rather than the work-item one.
+
+**Implementation note (shipped 2026-06-06):** all update sub-handlers (description / notes / property-link) resolve the estimate by **code → `active_estimate_code` anaphora → "latest" → quoted-or-bare title** via the shared `_resolve_estimate_code_or_title`. Set-vs-append for notes follows the verb (`set`/`change`/`replace`/`overwrite`/`rewrite` + note → set; everything else, incl. all informal cues, → **append**, the non-destructive default). Dispatcher order in `_handle_update_estimate`: work-item ops → status → **description** → notes → property link → template (description sits above notes so a "description" cue never lands in the notes branch; work-item ops stay first so `description of {WI}` is untouched). **Remaining ⚠️ in this section:** value-before-cue (`put "X" as the overview`), `describe ... as` / `should be`, routing verbs `make`/`leave`/`tack`, a generalized `note ... that` tail, and "the {X} job" as an estimate reference (Task-8 stretch).
 
 ---
 
@@ -939,6 +1003,32 @@ Pending-state slot: `pending_calculation`. Continuation logic:
 > Note: re-engagement phrasings ("can you help with mulch coverage?") and
 > inverse-coverage math ("how many sq ft will a yard cover" → solve for area)
 > remain unsupported by design (out of scope for the continuation fix).
+
+## 9.4 Post-creation "link to a property?" follow-up ✅ implemented *(2026-06-06)*
+
+After an estimate is created **without** a linked property, Maple appends an optional follow-up question to the response: *"Would you like me to link this estimate to a property now?"* (`extraction_helpers.build_optional_follow_up`, surfaced in `agents/estimate/service.py:907`). The reply is now handled by the **generic pending-optional-follow-up state machine** (`routers/agent_helpers/optional_follow_up.py`):
+
+- `("Estimate Agent", "create_estimate", "property")` is registered in the `get_optional_follow_up_spec` allowlist; `delegate_create_estimate.py` persists the pending record and seeds `active_estimate_code` on the create turn.
+- **The legacy `pending_estimate_follow_up` flow is superseded** for this combo: the create path no longer dual-writes the legacy key (it remains only as a fallback when the generic spec isn't registered), and the legacy handler defers (`return None`) whenever the generic key is present. This handler-priority conflict — the legacy handler swallowing the reply — was the root cause of the original "Maple could not handle it" report.
+- **One-turn affirmative+value**: a confirm-stage reply carrying residual content after the affirmation ("Yes, link it to Bob Residential") strips the affirmation + any link-verb preamble and delegates a synthetic `set the property of this estimate to Bob Residential` to the Estimate Agent (resolved via `active_estimate_code` anaphora). This residual shortcut is generic — contact-email/material-size follow-ups also gain one-turn completion.
+
+```
+Maple: I've created the estimate for you. … Would you like me to link this estimate to a property now?
+User:  Yes, link it to Bob Residential
+Maple: I've linked estimate EST-… to Bob Residential for you.   ← one turn (2026-06-06)
+```
+
+| Phrasing (turn 2, after the offer) | Intended behavior | Status |
+|---|---|---|
+| `Yes, link it to {property}` | one-turn: strip affirmation + link-verb preamble → `set the property of this estimate to {property}` → Estimate Agent | ✅ rule *(2026-06-06 — confirm-stage residual shortcut)* |
+| `yeah, it's for {address}` / `sure, the {property} property` / `yep, tie it to the {property} property` / `yes please, link to {property}` / `go ahead — {property}` | one-turn: same residual shortcut (`_AFFIRMATION_PREFIX` covers yeah/yep/yup/sure/ok/please/go ahead/…) | ✅ rule *(2026-06-06 — the residual is re-parsed by the link handler's name/address extraction, so "it's for …" phrasings resolve via the address/name in the text)* |
+| **bare property answer** — `{property}` / `{address}` / `link it to {address}` (no yes/no word) | the answer *is* the value while the slot is open → link | ✅ rule *(2026-06-06 — verified: a non-affirmative, non-negative, non-pivot reply at the confirm stage is treated as the collect-value answer)* |
+| `Yes` (no property named) | re-ask: "Which property should I link estimate '{EST}' to?" | ✅ rule *(2026-06-06)* |
+| `No` / `not now` / `no thanks` / `maybe later` | acknowledge, clear the slot, leave unlinked | ✅ rule *(2026-06-06 — these are in the `_NEGATIVE_VALUES` lexicon)* |
+| `not right now` / `I'll do it from the portal` / `nah, leave it` | acknowledge, clear the slot, leave unlinked | ⚠️ gap *(NOT in the exact-match `_NEGATIVE_VALUES` lexicon (`routers/agent_helpers/text_helpers.py`) — currently treated as a property-name answer; the link lookup fails and re-prompts. Fix: extend the lexicon or add a soft-negative prefix check.)* |
+| **pivot** — next message is clearly a fresh request (a new CRUD command or question) | drop the slot silently, route normally | ✅ rule *(pre-existing escape hatch in `handle_pending_optional_follow_up`; guard now documented inline)* |
+
+**Remaining ⚠️ in this section:** soft-negative phrasings not in the exact-match lexicon (`not right now`, `I'll do it from the portal`, `nah, leave it`) are treated as a property-name answer — extend `_NEGATIVE_VALUES` or add a soft-negative prefix check in `routers/agent_helpers/text_helpers.py`. Tests: `tests/test_maple_estimate_field_edits.py::TestEstimateOptionalFollowUp` + `::TestEstimateFollowUpConfirmStage` (incl. the legacy-defers ordering test) and `tests/test_agent_helpers_delegate_create_estimate.py`.
 
 ---
 
