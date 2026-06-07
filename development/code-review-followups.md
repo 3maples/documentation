@@ -6731,6 +6731,60 @@ tracked separately so it isn't forgotten if #326 is deferred.
 
 ---
 
+## 2026-06-06 `/code-review` pass (Settings materials actions menus + load-standard endpoints)
+
+The HIGH finding from this pass (per-item `count()` loop on unindexed fields in
+`remove_non_standard_material_categories/_units`) was fixed in the same session:
+batched `get_pymongo_collection().distinct()` + `category` / `sizes.unit`
+entries in `models/material.py` `Settings.indexes`. The rest is deferred here.
+
+### 336. [MEDIUM] `load-standard` endpoints duplicate the audit-log loop (~55 lines each)
+`routers/material_categories.py::load_standard_material_categories` and
+`routers/material_units.py::load_standard_material_units` are verbatim twins
+apart from the enum values, and each is marginally over the 50-line guideline
+(complexity is low — linear, max 2-level nesting). Fix: extract the
+removed-states audit-log loop into a small shared helper (e.g. in
+`routers/agent_helpers` or a `routers/_audit_helpers.py`), which also pulls
+both handlers under the line guideline.
+
+### 337. [MEDIUM] Materials Categories/Units tabs are twin files, worsened by this change
+`portal/src/components/settings/MaterialCategoriesTab.tsx` and
+`MaterialUnitsTab.tsx` were already near-identical; the reload state, handler,
+and modal added ~110 more duplicated lines each (differing only in wording and
+API object). Divergence bugs get likelier each time. Fix: extract a shared
+`ResourceCatalogTab` parameterized by labels + API object, the same move that
+extracted `ActionsMenu` from `RowActionsMenu`.
+
+### 338. [MEDIUM] `ActionsMenu` has `role="menu"` but no arrow-key navigation
+`portal/src/components/common/ActionsMenu.tsx` has correct roles,
+`aria-expanded`, and Escape handling, but no ArrowUp/ArrowDown focus movement,
+which the ARIA menu pattern implies. Inherited verbatim from `RowActionsMenu`
+(not a regression), but `ActionsMenu` is now the shared primitive, so the gap
+propagates to every consumer. Fix: one `onKeyDown` handler on the menu div that
+cycles focus across `menuitem` buttons.
+
+### 339. [LOW] `load-standard` POSTs have no `response_model`
+Both routes return plain summary dicts (`{loaded, removed, skipped_in_use}`),
+not documents — no leakage risk, and this matches the `/materials/load-standard`
+precedent. Logged only because the repo convention declares `response_model` on
+most routes. Fix (optional): a small shared `ReloadResult` Pydantic model;
+natural to do together with #336.
+
+### 340. [LOW] `alert()` used for the skipped-in-use report after reload
+`MaterialCategoriesTab.tsx` / `MaterialUnitsTab.tsx` surface skipped in-use
+items via browser `alert()` — consistent with the tabs' existing error
+handling, but the weakest UX in the flow. Fix: inline banner or toast; natural
+to do together with #337.
+
+### 341. [LOW] New reload API tests don't wrap cleanup in `try/finally`
+The reload tests in `tests/test_material_categories_api.py` /
+`test_material_units_api.py` follow the file's existing trailing-`# Cleanup`
+convention, so a mid-test assertion failure skips the API cleanup calls.
+`conftest`'s by-company teardown backstops it, so this is cosmetic. Fix only if
+these files grow: fixture-based cleanup.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
