@@ -2,9 +2,15 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-06
+**Last updated:** 2026-06-07
 
 ### Change log
+
+**2026-06-07 — Note-body quote fix + estimate anaphora persistence (user report: truncated note + "the same estimate" not recognized)**
+- **Quoted note/description bodies no longer truncate at an apostrophe.** `_NOTE_WITH_QUOTED_VALUE` and `_ESTIMATE_DESC_QUOTED` used `[^"']+?`, which treated the `'` in `"Contact me if there's any issues"` as the closing quote and captured only `Contact me if there`. Both now share `_QUOTED_VALUE_GROUP` — a matched-quote capture (straight + curly, double + single) whose close-quote is a negated class, so an apostrophe or the other quote type can appear inside the value. Callers coalesce the four branches via `_first_quoted_group`.
+- **"the same / that / previous estimate" now resolves after a note edit.** Root cause: estimate note/description/work-item updates return a **flat** result (`{"operation": "update_estimate_notes", "estimate_id": ...}`) with no nested `"estimate"` dict, so `finalize_result._resolve_entity_reference` never set `active_estimate_code` — the next turn had no anaphora anchor and asked "Which estimate?". The resolver now recognizes a flat `estimate_id` (skipping delete ops). Resolution itself already supported anaphora via `active_estimate_code`; the gap was purely that it was never persisted.
+- **`previous`/`prior` added to `_LAST_ESTIMATE_PATTERN`** as cold-start fallbacks (mid-conversation they resolve via active context first).
+- Tests: `TestNoteQuoteExtraction` + `TestEstimateAnaphora` (field-edits suite); flat-`estimate_id` cases in `test_agent_helpers_finalize_result.py`.
 
 **2026-06-06 (follow-up) — Production router path fixed (user report: "estimate detail is not shown")**
 - The morning wave landed in the **agent** handlers, but the production endpoint routes through `routers/agents.py` delegation helpers that were bypassing them in three places, now fixed:
@@ -414,6 +420,7 @@ When session context carries `active_estimate_code` (user recently worked on an 
 | `update the estimate` | `update_estimate` → Estimate Agent | 🤖 LLM + context |
 | `show me the estimate` | `get_estimate` → Estimate Agent | 🤖 LLM + context |
 | `this estimate` / `the last estimate` / `that one` | resolves via `active_estimate_code` | 🤖 LLM + context |
+| `the same estimate` / `that estimate` / `the previous estimate` (after a note/description/work-item edit) | resolves via `active_estimate_code` | ✅ rule *(2026-06-07 — flat-result estimate updates now persist `active_estimate_code` in `finalize_result`, so anaphora anchors on the just-edited estimate; previously these asked "Which estimate?")* |
 
 ## 1.8 Estimate ↔ property/contact outbound drilldowns
 
@@ -472,7 +479,7 @@ These edit **top-level `Estimate` fields** — distinct from the work-item (`Job
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `for estimate {EST}, add to the notes the following: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(`_detect_note_update` → `_handle_update_estimate_notes`, append-mode; preserves existing notes)* |
+| `for estimate {EST}, add to the notes the following: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(`_detect_note_update` → `_handle_update_estimate_notes`, append-mode; preserves existing notes. 2026-06-07 — the quoted body is captured in full even with an apostrophe inside (`"Contact me if there's any issues"`); straight + curly, double + single quotes via the shared `_QUOTED_VALUE_GROUP`)* |
 | `set the notes on {EST} to "..."` / `update notes: ...` | `update_estimate` → Estimate Agent | ✅ rule *(same handler; set-mode vs append-mode chosen by verb)* |
 | `for estimate {Estimate Name}, add to the notes the following: "..."` (estimate referenced by **title**) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — notes handler resolves via the shared `_resolve_estimate_code_or_title`; bare titles extracted by `_TITLE_PRE/POST_NOUN_RE` — first word capitalized, 2+ words (sentence-case OK) near "estimate"/"quote". The bare-title patterns run **before** the any-quoted fallback so a quoted note body is never mistaken for the title.)* |
 | `add a note to the {title} quote: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06)* |
