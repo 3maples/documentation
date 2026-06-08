@@ -6783,6 +6783,29 @@ convention, so a mid-test assertion failure skips the API cleanup calls.
 `conftest`'s by-company teardown backstops it, so this is cosmetic. Fix only if
 these files grow: fixture-based cleanup.
 
+### 342. [LOW] Auto-create of missing categories/units has a find-then-insert race
+Added 2026-06-07 with the load-standard auto-create change.
+`services/material_bootstrap.py::_ensure_referenced_categories_and_units`
+checks the pre-loaded name→doc dict, then `await .insert()`s any missing
+`MaterialCategory` / `MaterialUnit`. `MaterialCategory`/`MaterialUnit` have a
+`(company, ASCENDING)` index but it is **not unique** and not on
+`(company, name)`, so two concurrent `load-standard` calls for the same company
+could each create the same category/unit → duplicates. This mirrors the
+identical race in `routers/materials.py::_find_or_create_category` /
+`_find_or_create_unit` (the upload path) — an accepted pattern, and bootstrap is
+effectively single-shot (onboarding / one button click), so practical risk is
+low. Fix (closes both call sites at once if ever wanted): add a unique
+`(company, name)` index to both models and catch `DuplicateKeyError` in the
+create helpers.
+
+### 343. [LOW] `bootstrap_company_materials` body is ~67 lines (over the 50-line heuristic)
+Added 2026-06-07. The 8-line auto-create wiring pushed
+`services/material_bootstrap.py::bootstrap_company_materials` past the 50-line
+guideline, though the bulk is docstring + comments and the new logic was already
+extracted into `_ensure_referenced_categories_and_units`. Cosmetic only. Fix if
+the function grows further: extract the category/unit pre-load and the
+group-and-insert loop into named helpers.
+
 ---
 
 ## How to work through this
