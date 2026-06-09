@@ -6845,6 +6845,21 @@ cost, so negligible, but it duplicates the precedence intent. Fix (optional):
 `names_target` pre-check could be folded into how its `(code, clarify)` return
 is interpreted rather than pre-resolving.
 
+## 2026-06-09 Any-language translation sandwich (note — supersedes earlier Spanish-only references)
+
+Context: Maple's translation sandwich was generalized from Spanish-only to an
+open language set. `services/translation.py` now exposes `prefilter_language`
+(heuristic, any script) + `detect_and_translate_to_english` (one combined
+worker-model call returning `{lang, english}`); `SUPPORTED_TARGET_LANGS`,
+`detect_language`, and `translate_to_english` were removed. **Failure policy
+changed: inbound translation now FAILS CLOSED** (canned
+`translation_unavailable_message` instead of processing raw foreign text);
+outbound still fails open. Any earlier entry describing inbound translation as
+"fails open" is superseded. The Spanish keyword guards in
+`agents/text_utils.py` / `crud_helpers.py` remain as the safety net for
+pre-filter misses. Plan:
+`documentation/development/plans/2026-06-09-maple-any-language-translation.md`.
+
 ---
 
 ## How to work through this
