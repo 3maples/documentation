@@ -6806,6 +6806,45 @@ extracted into `_ensure_referenced_categories_and_units`. Cosmetic only. Fix if
 the function grows further: extract the category/unit pre-load and the
 group-and-insert loop into named helpers.
 
+## 2026-06-09 `/code-review` pass (estimate title-vs-active-context refactor + status phrasing)
+
+Context: the `_resolve_update_estimate_code` seam refactor — all 7 estimate
+UPDATE-path handlers (status, work items, work-item fields, apply-template)
+now route through one title-aware resolver so an explicitly-named title
+overrides `active_estimate_code`, closing the long-standing latent bug. Plus
+expanded status-transition phrasing (`update/transition/switch/put/place` +
+bare "on hold"). Gates clean (ruff + mypy), 13 new tests, phrasing-reference
+doc synced. No CRITICAL/HIGH defects — all findings are maintainability.
+
+### 344. [MEDIUM] `_handle_update_estimate_apply_template` grew to 97 lines
+Added 2026-06-09. `agents/estimate/crud_handlers.py::_handle_update_estimate_apply_template`
+(L598) gained ~30 lines for the named-target-vs-bootstrap branching, pushing it
+to 97 lines (well over the 50-line heuristic). The three-way branch
+(named → resolve-or-refuse / unnamed-no-code → bootstrap from template /
+unnamed-with-code → load) is the kind of logic that reads and tests better
+extracted. Fix: pull the named-target resolution+refuse block into a small
+helper (mirrors the `_resolve_update_estimate_code` seam this change
+introduced), leaving the handler to orchestrate the three branches.
+
+### 345. [MEDIUM] `crud_handlers.py` (2,495) and `work_item_field_handlers.py` (1,270) exceed the 800-line guideline
+Added 2026-06-09. Extends [#327](#327-agentsestimatecrud_handlerspy-grew-250-lines-to-2309)
+— `crud_handlers.py` was 2,309 there and is now 2,495 after this change. The
+estimate CRUD mixin keeps accreting; `work_item_field_handlers.py` is also over
+at 1,270. Pre-existing, not introduced by this refactor (the change is net
+behavior-neutral plumbing), but worsened. Fix (large, defer until the area is
+actively reworked): split the estimate handler mixins by sub-domain —
+list/analytics vs. get/update vs. work-items — into separate modules.
+
+### 346. [LOW] Redundant double resolution in `apply_template`
+Added 2026-06-09. `agents/estimate/crud_handlers.py` (~L631): computing
+`names_target` calls `_resolve_estimate_code(query, None)` and
+`_query_names_estimate_title(query)`, then the subsequent
+`_resolve_estimate_code_or_title(...)` re-runs both internally. Regex-only
+cost, so negligible, but it duplicates the precedence intent. Fix (optional):
+`_resolve_estimate_code_or_title` already encodes the full precedence, so the
+`names_target` pre-check could be folded into how its `(code, clarify)` return
+is interpreted rather than pre-resolving.
+
 ---
 
 ## How to work through this

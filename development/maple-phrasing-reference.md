@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-07
+**Last updated:** 2026-06-09
 
 ### Change log
 
@@ -194,7 +194,7 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `show me the estimate called "Driveway Replacement"` | `get_estimate` → Estimate Agent | ✅ rule |
 | `pull up estimate named "Foundation Work"` | `get_estimate` → Estimate Agent | ✅ rule |
 | `show me estimate details for {EST or title}` (e.g. `Spring Cleaning`) — response includes `created_at`, `updated_at`, the estimate ID/code, description, and notes | `get_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `_build_estimate_details_text` now renders Created / Last updated / Description / Notes / ID lines (blank optionals omitted; core fields keep the `—` placeholder). Bare titles resolve via `_TITLE_PRE/POST_NOUN_RE`. **Caveat:** the linked property NAME is still not rendered — it needs an async lookup from `Estimate.property`; follow-on.)* |
-| `show me everything on the {title} quote` | `get_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — verified routing; pre-noun bare-title extraction)* |
+| `show me everything on the {title} quote` | `get_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — verified routing; pre-noun bare-title extraction. **2026-06-09:** an explicitly-named title now beats `active_estimate_code` — viewing one estimate then asking for another by name returns the NAMED one, not the viewed one.)* |
 | `give me the rundown on the {title} estimate` / `full breakdown on the {title} job` | `get_estimate` → Estimate Agent | ⚠️ gap *(verified 2026-06-06: routes to `unknown` — "rundown"/"breakdown" aren't get-action cues)* |
 | `what's the full info on {title}?` / `open up the {title} estimate` | `get_estimate` → Estimate Agent | ⚠️ gap *(verified 2026-06-06: "full info on Spring Cleaning" **misroutes to `get_contact`** via the person-name heuristic; "open up" routes to `unknown`)* |
 | `when was the {title} estimate created?` | `get_estimate` → Estimate Agent (lead with `created_at`) | ⚠️ gap *(verified 2026-06-06: **misroutes to `create_estimate`** — the word "created" trips the create-action hint. Needs a when-was/question-form guard before the create hint, then a `created_at` lead in the get handler.)* |
@@ -229,8 +229,10 @@ EstimateStatus values: `DRAFT`, `APPROVED`, `WON`, `LOST`, `ONHOLD`, `SCHEDULED`
 | `mark {EST} as approved` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `reject the estimate` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `send {EST} for review` | `update_estimate` → Estimate Agent | 🤖 LLM |
-| `put {EST} on hold` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `put {EST or title} on hold` / `place it on hold` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-09 — `_ON_HOLD_PATTERN` maps bare "on hold" (with a status verb incl. `put`/`place`) to ONHOLD; guarded by `_NOTE_OR_DESC_CUE_PATTERN` so a note/description body mentioning "on hold" isn't hijacked)* |
 | `move this estimate to draft` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `update {EST or title} from {X} to {Y} status` (e.g. `from Sent to Review status`) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-08 — `_detect_status_transition` now recognizes the `update` verb and the `from X to Y status` / `to Y status` phrasings via `_STATUS_TRANSITION_TO_STATUS_PATTERN`, anchored on the trailing `status` word so it captures the target Y. Previously fell through to "What would you like to change?". **Same change** switched the status handler to the title-aware resolver `_resolve_estimate_code_or_title`, and made an explicitly-named title override `active_estimate_code` — fixes a data-integrity bug where naming an estimate by title while viewing another updated the WRONG (viewed) estimate. **2026-06-09:** extended title-awareness to ALL estimate UPDATE + READ sub-ops — work items, work-item fields, status — via the shared `_resolve_update_estimate_code` seam and a title-aware `_load_estimate_for_read`.)* |
+| `update {EST or title} to {Y} status` (e.g. `to Review status`) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-08 — same `to Y status` pattern; works with `update`/`move`/`change`/`transition`/`switch`/`put`/`place` verbs)* |
 | `what's the status of {EST}?` | `get_estimate` → Estimate Agent | 🤖 LLM |
 
 ## 1.5 Work-item / line-item management
@@ -833,8 +835,9 @@ Template **update** and **duplicate** are refused — see §8.5. Users must edit
 | `use template {template} in the estimate {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `apply template {template} to {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `apply {template} to the estimate` | `update_estimate` → Estimate Agent | ✅ rule |
+| `apply template {template} to estimate {title}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-09 — title-aware: targets the named estimate over `active_estimate_code`. A named estimate that **doesn't exist** is REFUSED with a warning — it does NOT silently create a new estimate under that name.)* |
 | `use the {template} template for {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `create an estimate from template {template}` | `update_estimate` → Estimate Agent | ✅ rule *(creates a new draft estimate and applies the template as a work item)* |
+| `create an estimate from template {template}` | `update_estimate` → Estimate Agent | ✅ rule *(creates a new draft estimate and applies the template as a work item — the no-named-target bootstrap path)* |
 
 ### Template-driven create (2026-06-02) — skips AI generation
 
