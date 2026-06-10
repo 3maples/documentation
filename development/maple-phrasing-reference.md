@@ -6,6 +6,13 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Change log
 
+**2026-06-09 — Social & personality handling (greetings + anthropomorphized questions)**
+- **Greetings → new `social` intent (canned, no LLM).** Bare greetings ("hey", "hi maple", "good morning") are caught in the orchestrator (`_detect_policy_short_circuit` via `is_greeting`) and answered instantly from `GREETING_RESPONSES`; suggestion chips come from `_SOCIAL_SUGGESTIONS`. The `social` intent is operation `social`, `read_only` — a separate intent, not a help topic.
+- **Personal questions → new `personal` help topic (persona-answered).** Anthropomorphized questions ("how are you?", "what do you look like?", "are we friends?", "are you married?", "are you an AI?") are detected by `is_personal_question` and routed through the existing help path (`HelpHandler.detect_topic` returns `personal`), then answered by the LLM guide responder from Maple's persona thanks to a rule-1 exemption in the guide prompt.
+- **New detectors** `is_greeting` / `is_personal_question` in `agents/text_utils.py`; **new persona** `agents/maple_persona.py` (playful deflection for flirty messages, no romantic reciprocation, honest about being an AI, short replies that pivot back to work).
+- **Topic-keyed by design** so product-capability phrasings stay in the product lane: "are you able to add contacts?", "can you create an estimate?", "how are you estimating this job?" are explicit negatives → normal help/CRUD, not `personal`.
+- New §10.6 (Social & personality) catalogs the greeting and personal-question phrasings.
+
 **2026-06-07 — Note-body quote fix + estimate anaphora persistence (user report: truncated note + "the same estimate" not recognized)**
 - **Quoted note/description bodies no longer truncate at an apostrophe.** `_NOTE_WITH_QUOTED_VALUE` and `_ESTIMATE_DESC_QUOTED` used `[^"']+?`, which treated the `'` in `"Contact me if there's any issues"` as the closing quote and captured only `Contact me if there`. Both now share `_QUOTED_VALUE_GROUP` — a matched-quote capture (straight + curly, double + single) whose close-quote is a negated class, so an apostrophe or the other quote type can appear inside the value. Callers coalesce the four branches via `_first_quoted_group`.
 - **"the same / that / previous estimate" now resolves after a note edit.** Root cause: estimate note/description/work-item updates return a **flat** result (`{"operation": "update_estimate_notes", "estimate_id": ...}`) with no nested `"estimate"` dict, so `finalize_result._resolve_entity_reference` never set `active_estimate_code` — the next turn had no anaphora anchor and asked "Which estimate?". The resolver now recognizes a flat `estimate_id` (skipping delete ops). Resolution itself already supported anaphora via `active_estimate_code`; the gap was purely that it was never persisted.
@@ -1181,6 +1188,54 @@ Phase 1 of the xfail backlog (plan: `documentation/development/plans/maple-xfail
 
 `HelpHandler.detect_topic` previously returned `f"how_to_manage_{domain_name}s"`, which produced `how_to_manage_propertys` for the property domain. Phase 1 introduced an inline `plural_topic` map (`property → properties`, others append `s`) so the topic key round-trips correctly to `how_to_manage_properties`.
 
+## 10.6 Social & personality
+
+Maple handles greetings and personal/anthropomorphized questions in **two tiers**:
+
+1. **Bare greetings** (`hey`, `hi maple`, `good morning`) are caught in the **orchestrator** (`agents/orchestrator/service.py`, `_detect_policy_short_circuit` via `is_greeting`) and answered with an instant canned reply from `GREETING_RESPONSES` in `agents/text_utils.py`. This is a **new `social` intent** (operation `social`, `read_only`) — **not** a help topic — so there is **no LLM call**. Suggestion chips come from `_SOCIAL_SUGGESTIONS`.
+2. **Personal questions** (`how are you?`, `what do you look like?`, `are we friends?`) are detected by `is_personal_question` in `agents/text_utils.py` and routed through the **existing help path** — `HelpHandler.detect_topic` returns the **new `personal` topic** — and answered by the LLM guide responder (`agents/maple_guide/service.py`) **from Maple's persona** (`agents/maple_persona.py`), via a rule-1 exemption in the guide prompt.
+
+The personal-question detector is deliberately **topic-keyed** so product-capability phrasings stay in the product lane (see the Negatives table below).
+
+### Greetings — `social` intent (canned, no LLM)
+
+| Phrasing | Intent | Status |
+|---|---|---|
+| `hey` | `social` | ✅ rule (canned) |
+| `hi` / `hi maple` | `social` | ✅ rule (canned) |
+| `hello` | `social` | ✅ rule (canned) |
+| `good morning` / `good afternoon` / `good evening` | `social` | ✅ rule (canned) |
+| `howdy` | `social` | ✅ rule (canned) |
+| `hola` / `buenos días` (Spanish, defense-in-depth) | `social` | ✅ rule (canned) |
+
+### Personal questions — `personal` help topic (LLM, persona-answered)
+
+| Phrasing | Topic | Status |
+|---|---|---|
+| `how are you?` / `how's it going?` (feelings) | `personal` | ✅ (LLM/persona) |
+| `what do you look like?` (appearance) | `personal` | ✅ (LLM/persona) |
+| `are you hot?` (appearance) | `personal` | ✅ (LLM/persona — *playful deflect*) |
+| `are we friends?` (friendship) | `personal` | ✅ (LLM/persona) |
+| `are you married?` / `do you have a partner?` (relationships) | `personal` | ✅ (LLM/persona — *playful deflect*) |
+| `i love you` (flirty) | `personal` | ✅ (LLM/persona — *playful deflect, no reciprocation*) |
+| `are you an AI?` (identity) | `personal` | ✅ (LLM/persona — *honest yes*) |
+| `how old are you?` (biography) | `personal` | ✅ (LLM/persona) |
+| `where do you live?` (biography) | `personal` | ✅ (LLM/persona) |
+| `what's your sign?` (biography) | `personal` | ✅ (LLM/persona) |
+
+### Negatives (stay in the product lane)
+
+These read like questions *about* Maple but are really **capability / CRUD** requests — the detector deliberately excludes them so they route to normal help/CRUD, **not** `personal`.
+
+| Phrasing | Routes to | Status |
+|---|---|---|
+| `are you able to add contacts?` | `capabilities` / CRUD (not `personal`) | ✅ (correctly excluded) |
+| `can you create an estimate?` | `capabilities` / `create_estimate` (not `personal`) | ✅ (correctly excluded) |
+| `how are you estimating this job?` | help / estimate flow (not `personal`) | ✅ (correctly excluded) |
+| `how are you able to help me?` | `capabilities` (not `personal`) | ✅ (correctly excluded) |
+
+**Persona boundaries** (`agents/maple_persona.py`): flirty messages get a **playful deflection** with **no romantic reciprocation**; explicit or persistent advances drop the humor and redirect to work; AI-identity questions are answered **honestly** (she is an AI); replies stay short and pivot back to the task; she **never** reveals other users' data.
+
 ---
 
 # 11. Appendix
@@ -1235,6 +1290,8 @@ Snapshot as of 2026-05-02 — regenerate with the coverage test.
 | equipment_blocked | 3/3 | 3/3 | refused correctly |
 
 **Totals: Tier 1 127/127 · Tier 2 95/117** (Tier 2 is unchanged — Wave 4/4.1 hasn't been re-run on the LLM tier; new categories aren't included in the Tier 2 coverage column above). All Tier 1 categories pass and cross-resource list responses are correctly filtered. The `cross_resource` join layer lives in `agents/cross_resource.py`; per-agent join handlers in Contact / Property / Estimate read `context.filter_by` to apply the constraint, including the Wave 4/4.1 `estimate`, `property`, and `contact` cross-types.
+
+*Note (2026-06-09): the new Social & personality surface (§10.6) — greetings via the `social` intent and personal questions via the `personal` help topic — is not yet represented in the auto-generated matrix above; see §10.6 for its phrasing catalog.*
 
 ## 11.4 Related docs
 
