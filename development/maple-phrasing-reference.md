@@ -2,9 +2,15 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-11
+**Last updated:** 2026-06-12
 
 ### Change log
+
+**2026-06-12 — Edit lock tightened to Draft/Review only (§8.7)**
+- The locked-status edit guard now mirrors the portal's `isEditableStatus` (`portal/src/lib/estimateStatus.ts`) instead of the PUT route's narrower lock: estimate contents are editable in chat **only in Draft or Review**. Won / On Hold / Lost / Scheduled / Completed (and internal statuses) now refuse edits too, closing the gap where chat could edit a Won estimate's notes while the UI showed it read-only. Allowlist constant: `_EDITABLE_ESTIMATE_STATUSES` in `agents/estimate/crud_handlers.py`.
+- Refusals stay persona-voiced; when the state machine offers a one-hop path back (On Hold → Review, Lost → Review) the refusal suggests it ("Ask me to move it to Review first"). Archived and Sent/Approved keep their specific copy.
+- Note: the HTTP PUT route still only locks Sent/Approved/Archived — tracked as a follow-up (#349 in code-review-followups.md).
+- Tests: `test_locked_estimate_other_statuses_refuse_notes_edit` (Won/Scheduled/Completed), `..._review_reachable_statuses_suggest_review` (On Hold/Lost), `..._won_refuses_work_item_edit`, `test_editable_estimate_notes_edit_still_works` (Draft + Review).
 
 **2026-06-11 (follow-up 2) — Locked-status edit guard (new §8.7)**
 - Edits to an **Archived** estimate (any sub-op) and to a **Sent**/legacy **Approved** estimate (any sub-op except the unsend status change) are now refused in chat, mirroring the PUT route's locks ("Cannot update an archived estimate" / "Cannot update a sent estimate"). Enforced once in `_load_estimate_for_update` (`agents/estimate/crud_handlers.py`) — the shared loader behind every edit sub-op: notes, description, property linking, template application, and all work-item operations. Reads are unaffected; the status-transition path has its own rules (state machine + role gates) and is not blocked by this guard.
@@ -1006,19 +1012,21 @@ Internal lifecycle states (`Generating`, `Failed`, `Deleted`) were already refus
 
 All refusal copy follows Maple's persona (`agents/maple_persona.py`): first-person, apologetic, plain words, and always a next step — never a bare "permission denied".
 
-## 8.7 Edits to locked-status estimates — 🛑 refused *(2026-06-11)*
+## 8.7 Edits to locked-status estimates — 🛑 refused *(2026-06-11, tightened 2026-06-12)*
 
-Mirrors the PUT route's locks. Enforced once in `_load_estimate_for_update`, the shared loader for every estimate edit sub-op (notes, description, link property, apply template, all work-item operations). Reads (`get_estimate`, work-item queries) are unaffected.
+Mirrors the portal's `isEditableStatus`: estimate contents are editable **only in Draft or Review**. Enforced once in `_load_estimate_for_update` (allowlist `_EDITABLE_ESTIMATE_STATUSES`), the shared loader for every estimate edit sub-op (notes, description, link property, apply template, all work-item operations). Reads (`get_estimate`, work-item queries) are unaffected; status changes go through the §8.6 transition path instead.
 
 | Current status | Edit attempt (any sub-op) | Behavior |
 |---|---|---|
-| Archived | `add a note to {EST}: "…"`, `remove work item 1 from {EST}`, … | 🛑 refusal — "…is archived… ask me to unarchive it first" |
+| Draft / Review | `add a note to {EST}: "…"`, `remove work item 1 from {EST}`, … | ✅ normal flow |
+| Archived | same | 🛑 refusal — "…is archived… ask me to unarchive it first" |
 | Sent / legacy Approved | same | 🛑 refusal — "…locked for edits… move it back to Draft or Review first" |
+| On Hold / Lost | same | 🛑 refusal — Draft-or-Review rule + "ask me to move it to Review first" (one-hop path exists) |
+| Won / Scheduled / Completed (and internal statuses) | same | 🛑 refusal — Draft-or-Review rule, no one-hop path offered |
 | Sent / Approved | unsend status change (e.g. `move {EST} back to Review`) | ✅ allowed via the status-transition path (Owner/Admin only, §8.6) |
 | Archived | `unarchive {EST}` | ✅ allowed via the status-transition path (Owner/Admin or creator, §8.6) |
-| Any other status | any edit | ✅ normal flow |
 
-Legacy/unknown stored statuses fail open so old data isn't stranded.
+Legacy/unknown stored statuses fail open so old data isn't stranded. The HTTP PUT route still locks only Sent/Approved/Archived — the UI/chat-vs-API gap is tracked as follow-up #349.
 
 ---
 

@@ -6897,6 +6897,28 @@ parameter type instead, e.g. split the gate so the unsend branch receives a
 non-Optional `EstimateStatus`. Not worth doing on its own — fold into #347's
 split if that happens.
 
+## 2026-06-12 (UI/Maple edit-lock alignment)
+
+Context: Maple's chat edit guard was tightened from the PUT route's lock
+(Sent/Approved/Archived) to the portal's `isEditableStatus` rule — contents
+editable only in Draft or Review (`_EDITABLE_ESTIMATE_STATUSES` allowlist in
+`agents/estimate/crud_handlers.py`). UI and chat now agree; the API does not:
+
+### 349. [MEDIUM] PUT `/estimates/{id}` allows content edits in statuses the UI and Maple treat as read-only
+Added 2026-06-12. `routers/estimates.py` (PUT handler, ~L820): the route locks
+Archived and Sent/legacy-Approved, but still accepts content updates (notes,
+job_items, property, …) for Won / On Hold / Lost / Scheduled / Completed —
+statuses the portal renders read-only (`isEditableStatus`: Draft/Review only)
+and Maple now refuses to edit. Any direct API caller (integration, script,
+future mobile client) can bypass the editing rule the product presents as
+truth. Fix: add the same Draft/Review allowlist to the PUT route's lock block
+(keeping the existing unsend exception for status-only changes), mirroring the
+`_EDITABLE_ESTIMATE_STATUSES` constant — or, better, move the allowlist next to
+`ESTIMATE_STATUS_TRANSITIONS` in `models/estimate.py` so model, route, and
+agent share one definition. Coordinate with the FE before shipping: confirm no
+portal flow PUTs content for non-Draft/Review estimates (e.g. auto-save firing
+on a just-transitioned estimate).
+
 ---
 
 ## How to work through this
