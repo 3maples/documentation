@@ -2,9 +2,25 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-11
 
 ### Change log
+
+**2026-06-11 (follow-up 2) — Locked-status edit guard (new §8.7)**
+- Edits to an **Archived** estimate (any sub-op) and to a **Sent**/legacy **Approved** estimate (any sub-op except the unsend status change) are now refused in chat, mirroring the PUT route's locks ("Cannot update an archived estimate" / "Cannot update a sent estimate"). Enforced once in `_load_estimate_for_update` (`agents/estimate/crud_handlers.py`) — the shared loader behind every edit sub-op: notes, description, property linking, template application, and all work-item operations. Reads are unaffected; the status-transition path has its own rules (state machine + role gates) and is not blocked by this guard.
+- Refusals are persona-voiced with the next step: "Ask me to unarchive it first…" / "Ask me to move it back to Draft or Review first…".
+- Tests: `test_locked_estimate_archived_refuses_notes_edit`, `..._sent_refuses_notes_edit` (Sent + Approved), `..._sent_refuses_work_item_edit`, `test_draft_estimate_notes_edit_still_works` (`tests/test_estimate_agent.py`).
+
+**2026-06-11 (follow-up) — Status-transition authorization + persona refusals (§1.4, §8.6)**
+- The status handler now also enforces the HTTP layer's **role gates**: any transition touching `Sent`/legacy `Approved` (send or unsend) is **Owner/Admin only** (mirrors the PUT role gate); **archive/unarchive** is **Owner/Admin or the estimate's creator** (mirrors the dedicated endpoints' check against `created_by_email`, case-insensitive).
+- Identity reaches agents via two new context keys set by the authenticated `/agents/orchestrate` endpoint from the verified user (never the client payload): `current_user_email` (normalized lowercase) and `current_user_role`. Gated operations **fail closed** when identity is missing from context.
+- All status-transition refusals (illegal edge, role, creator, missing identity) were rewritten in Maple's persona voice — warm, first-person, apologetic, and always offering the next step ("From Draft I can take it to Archived, On Hold, or Sent — want me to do one of those instead?" / "If you ask an Owner or Admin on your team, they can take care of it for you.").
+- Tests: `test_estimates_status_transition_send_unsend_requires_owner_or_admin`, `..._archive_member_non_creator_refused`, `..._archive_member_creator_allowed`, `..._unarchive_member_non_creator_refused`, `..._gated_op_missing_identity_fails_closed`, `..._ungated_op_member_allowed` (`tests/test_estimate_agent.py`); `test_orchestrate_endpoint_passes_user_identity_to_agents` (`tests/test_orchestrator_endpoint.py`).
+
+**2026-06-11 — Status-transition state machine enforced in chat (§1.4, new §8.6)**
+- Maple's status handler (`_handle_update_estimate_status_transition` in `agents/estimate/crud_handlers.py`) now calls `validate_estimate_status_transition` from `models/estimate.py` — the same single-source-of-truth state machine the PUT route enforces (#46) and the FE renders (`portal/src/lib/estimateStatus.ts`). Previously chat wrote `status` directly to the DB, so e.g. `mark {EST} as won` succeeded on a Draft estimate.
+- Legal edges are unchanged and still save (Draft → Sent/On Hold/Archived; Review → Sent/On Hold/Archived; On Hold → Review; Won → Scheduled/On Hold/Lost; Lost → Review; Scheduled → Completed; Sent/Approved → anything = "unsend"). Illegal edges now refuse with the current status, the rejected target, and the allowed next statuses (🛑 rows in §8.6).
+- Tests: `test_estimates_status_transition_blocked_by_state_machine` / `..._allowed_by_state_machine` in `tests/test_estimate_agent.py`.
 
 **2026-06-09 — Social & personality handling (greetings + anthropomorphized questions)**
 - **Greetings → new `social` intent (canned, no LLM).** Bare greetings ("hey", "hi maple", "good morning") are caught in the orchestrator (`_detect_policy_short_circuit` via `is_greeting`) and answered instantly from `GREETING_RESPONSES`; suggestion chips come from `_SOCIAL_SUGGESTIONS`. The `social` intent is operation `social`, `read_only` — a separate intent, not a help topic.
@@ -229,6 +245,8 @@ Handled by `agents/estimate/conversation_guide.py`. The EstimateAgent walks the 
 ## 1.4 Status transitions
 
 EstimateStatus values: `DRAFT`, `APPROVED`, `WON`, `LOST`, `ONHOLD`, `SCHEDULED`, `COMPLETED`, `SUBMITTED`, `REVIEW`, `ARCHIVED`.
+
+**State machine + authorization enforced (2026-06-11):** every phrasing below is additionally subject to `validate_estimate_status_transition` (`models/estimate.py`, mirrors `portal/src/lib/estimateStatus.ts`) and to the HTTP layer's role gates (send/unsend → Owner/Admin; archive/unarchive → Owner/Admin or creator). A recognized phrasing whose edge is illegal for the estimate's *current* status — e.g. `mark {EST} as won` on a Draft — or that the user isn't authorized for, refuses in Maple's persona voice instead of saving. See §8.6.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
@@ -962,6 +980,45 @@ Templates must be created, edited, and duplicated through the Templates page in 
 | `change the profit margin of {template} to 20` | 🛑 refusal |
 | `duplicate template {template}` | 🛑 refusal |
 | `copy template {template}` | 🛑 refusal |
+
+## 8.6 Illegal status transitions — 🛑 refused *(2026-06-11)*
+
+The estimate status state machine (`ESTIMATE_STATUS_TRANSITIONS` in `models/estimate.py`) is enforced in chat, matching the PUT route and the FE. The refusal names the current status and lists the legal next statuses. Whether a phrasing is refused depends on the estimate's **current** status, not the wording.
+
+| Phrasing (example) | Current status | Behavior |
+|---|---|---|
+| `mark {EST} as won` | Draft | 🛑 refusal — Draft can only go to Sent, On Hold, Archived |
+| `update {EST} to Review status` | Draft | 🛑 refusal — same rule |
+| `archive {EST}` | Won | 🛑 refusal — Won can only go to Scheduled, On Hold, Lost |
+| `mark {EST} as draft` | Scheduled | 🛑 refusal — Scheduled can only go to Completed |
+| `mark {EST} as won` | Sent | ✅ allowed — Sent/Approved → anything (the "unsend" rule), **Owner/Admin only** |
+
+Internal lifecycle states (`Generating`, `Failed`, `Deleted`) were already refused as targets regardless of current status; legacy/unknown stored statuses are not blocked (fail-open so old data isn't stranded).
+
+**Authorization (2026-06-11 follow-up)** — legal edges are additionally role-gated, mirroring the HTTP layer:
+
+| Operation | Who can do it | Refusal behavior |
+|---|---|---|
+| Send (→ Sent) / unsend (Sent/Approved → anything) | Owner or Admin | 🛑 warm refusal pointing the user to an Owner/Admin |
+| Archive / unarchive | Owner, Admin, or the estimate's creator (`created_by_email`, case-insensitive) | 🛑 warm refusal naming who can do it |
+| All other legal edges (e.g. Won → Scheduled) | Any authenticated user | ✅ |
+| Any gated op with no identity in context | — | 🛑 fail closed ("I wasn't able to confirm your permissions…") |
+
+All refusal copy follows Maple's persona (`agents/maple_persona.py`): first-person, apologetic, plain words, and always a next step — never a bare "permission denied".
+
+## 8.7 Edits to locked-status estimates — 🛑 refused *(2026-06-11)*
+
+Mirrors the PUT route's locks. Enforced once in `_load_estimate_for_update`, the shared loader for every estimate edit sub-op (notes, description, link property, apply template, all work-item operations). Reads (`get_estimate`, work-item queries) are unaffected.
+
+| Current status | Edit attempt (any sub-op) | Behavior |
+|---|---|---|
+| Archived | `add a note to {EST}: "…"`, `remove work item 1 from {EST}`, … | 🛑 refusal — "…is archived… ask me to unarchive it first" |
+| Sent / legacy Approved | same | 🛑 refusal — "…locked for edits… move it back to Draft or Review first" |
+| Sent / Approved | unsend status change (e.g. `move {EST} back to Review`) | ✅ allowed via the status-transition path (Owner/Admin only, §8.6) |
+| Archived | `unarchive {EST}` | ✅ allowed via the status-transition path (Owner/Admin or creator, §8.6) |
+| Any other status | any edit | ✅ normal flow |
+
+Legacy/unknown stored statuses fail open so old data isn't stranded.
 
 ---
 

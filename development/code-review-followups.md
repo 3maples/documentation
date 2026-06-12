@@ -6860,6 +6860,43 @@ outbound still fails open. Any earlier entry describing inbound translation as
 pre-filter misses. Plan:
 `documentation/development/plans/2026-06-09-maple-any-language-translation.md`.
 
+## 2026-06-11 `/code-review` pass (Maple status transitions: state machine + authorization + locked-status edits)
+
+Context: chat-side enforcement of the estimate status state machine
+(`validate_estimate_status_transition`), the HTTP layer's role gates
+(send/unsend → Owner/Admin; archive/unarchive → Owner/Admin or creator,
+identity via `current_user_email`/`current_user_role` context keys set by the
+orchestrate endpoint, fail-closed), and the locked-status edit guard in
+`_load_estimate_for_update` (Archived / Sent / legacy Approved). Gates clean
+(ruff + mypy), 492 tests passing across the related suites. The pass's HIGH
+(handler length) and two MEDIUMs (role magic strings; identity keys persisted
+to `conversation_contexts`) were fixed in the same change — handler is back to
+153 lines via `_refuse_illegal_status_transition` /
+`_authorize_status_transition` extraction, roles compare against
+`_ELEVATED_ROLES` derived from `UserRole`, and `finalize_result.py` strips the
+per-request identity keys before persisting. The two remaining findings:
+
+### 347. [MEDIUM] `crud_handlers.py` now 2,724 lines — extends #345
+Added 2026-06-11. Extends [#345](#345-medium-crud_handlerspy-2495-and-work_item_field_handlerspy-1270-exceed-the-800-line-guideline)
+— 2,495 there, 2,724 after the status-transition enforcement work (+229 across
+the two 2026-06-11 changes). Same fix, same deferral: split the estimate
+handler mixins by sub-domain when the area is next actively reworked. The new
+`_refuse_illegal_status_transition` / `_authorize_status_transition` /
+`_load_estimate_for_update`-guard cluster is a ready-made seed for a
+`status_policy.py` (or similar) module in that split.
+
+### 348. [LOW] Defensive `'Sent'` fallback in `_authorize_status_transition` is logically unreachable
+Added 2026-06-11. `agents/estimate/crud_handlers.py::_authorize_status_transition`:
+in the `involves_sent and not is_owner_or_admin` refusal, the
+`current_status.value if current_status else 'Sent'` else-branch can't be hit —
+when `target_status` isn't Sent-like, `involves_sent` can only be True via
+`current_status`, so it can't be `None` there. Kept deliberately because
+`current_status` is typed `Optional[EstimateStatus]` and mypy requires the
+guard (an inline comment marks it typing-only). Fix (optional): narrow the
+parameter type instead, e.g. split the gate so the unsend branch receives a
+non-Optional `EstimateStatus`. Not worth doing on its own — fold into #347's
+split if that happens.
+
 ---
 
 ## How to work through this
