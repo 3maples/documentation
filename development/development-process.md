@@ -40,69 +40,67 @@ Consequences worth remembering:
 
 ## 2. The development lifecycle
 
-Every functional change follows the same arc. The steps are enforced today by
-**discipline and the AI assistant's instructions**, not by automation (see
-§7 for why that matters).
+The arc is **plan → iterate per phase → push**. Steps are enforced today by
+**discipline and the AI assistant's instructions** plus the pre-push hook (§7.1)
+— not by CI (see §7 for why that matters). Commits accumulate locally across
+phases; the push (and its full gate run) happens once, when you decide.
 
-### 2.1 Plan first
-- Outline phases, dependencies, and risks before touching code.
+### 2.1 Plan
+- **Generate the plan; if the work is large, break it into multiple phases.**
 - For multi-step work, write a plan file in
-  `documentation/development/plans/`, add a row to that folder's `README.md`
-  index, and prefer a human-readable name (`auth-screens-overhaul.md`) over the
-  random plan-mode slugs (`binary-pondering-seal.md`).
-- Plans are not auto-created changelogs — they capture context, approach,
-  status, and follow-ups.
+  `documentation/development/plans/` (named `YYYY-MM-DD-short-topic.md`) and add
+  a row to that folder's `README.md` index. Plans capture context, approach,
+  status, and follow-ups — they are not auto-created changelogs.
+- **Manually review the plan and adjust** before touching code.
 
-### 2.2 Write the failing test (TDD)
-- **TDD is mandatory for all functional code changes** — new features, bug
-  fixes, refactors, anything that changes behavior in `.py`, `.jsx`, or `.tsx`.
-- Write the failing test *first*, then the minimal implementation.
-- TDD does **not** apply to docs, config, prompt-text edits, styling-only
-  changes, dead-code removal, dependency bumps, or pure renames. For those,
-  only update tests the change breaks.
-- The `tdd-guide` / `superpowers:test-driven-development` skill is available
-  for complex test-scaffolding sessions.
+### 2.2 Implement & verify — the per-phase loop
+Work one phase at a time. Repeat this loop for each phase:
 
-### 2.3 Implement
-- Minimal code to make the test pass.
-- Match established patterns: Beanie ODM, FastAPI dependency injection, React
-  hooks, the Maple text-utility helpers (`agents/text_utils.py`) instead of
-  inline regex.
-- US spellings everywhere (labor, color, behavior).
+1. **Implement (TDD).** Write the failing test *first*, then the minimal code to
+   pass it. TDD is mandatory for functional changes in `.py`/`.jsx`/`.tsx`; it
+   does **not** apply to docs, config, prompt-text, styling-only, dead-code
+   removal, dep bumps, or pure renames (see the TDD Policy in `CLAUDE.md`).
+   Match established patterns (Beanie ODM, FastAPI DI, React hooks, the
+   `agents/text_utils.py` helpers over inline regex); US spellings throughout.
+   Run only **scoped** gates on touched files for fast feedback
+   (`./run_mypy.sh <subtree>`, `./run_ruff.sh <subtree>`, the related test
+   file) — **not** the full project (§3.1). Self-review the diff for
+   `async`/`await`, bounds, N+1 queries, mutable shared state, and unhandled
+   exceptions; fix any pre-existing errors you surface and report them.
+2. **Manual test.** Once the phase's implementation is complete, run the app and
+   exercise the change end-to-end.
+3. **Fix any issues** that manual testing surfaces.
+4. **`/code-review`** once it works as expected (`/code-review ultra` for larger
+   work). It reviews logic, security, and quality — it does **not** run ruff or
+   mypy (the pre-push hook does); it may run `bandit`. It produces a **numbered**
+   findings list (`#N [SEVERITY] file:line — title`) and writes them to a ledger;
+   it does **not** decide what to fix.
+5. **You decide which findings to fix now** and run
+   `/fix-issues <numbers | all | none>` (e.g. `/fix-issues 1, 2, 5`). It applies
+   the fixes you chose and **auto-logs every unselected finding** to
+   `code-review-followups.md` — nothing is silently dropped. The fix-vs-defer
+   call is always explicitly yours, not the reviewer's.
+6. **Manual test again** if `/fix-issues` applied any fixes.
+7. **Commit the phase.** Use `commit-prep` to draft the `<type>: <description>`
+   message (it doesn't re-run platform/portal gates — the hook does; it runs the
+   `website/` build + tests only). Commit needs fresh explicit approval; never
+   `--amend` without checking `HEAD` first (main moves mid-session).
+8. **Decide: push now, or continue to the next phase.** Commits accumulate
+   locally until you push.
 
-### 2.4 Self-review
-- Re-read the diff for `async`/`await` correctness, array/dict bounds, N+1
-  queries, mutable shared state, and unhandled exceptions.
-- Fix any pre-existing tsc/lint/test errors surfaced along the way and report
-  them alongside the main task — don't leave a gate dirtier than you found it.
+### 2.3 Push — pre-push tasks, then `main`
+When all phases are done (or you decide to push mid-way):
 
-### 2.5 Run the quality gates (see §3)
-- Related tests, mypy, ruff for backend; related tests + lint for frontend.
-
-### 2.6 Code review
-- Use the `code-review` skill (dispatcher: backend Python rules + frontend
-  React rules for the file types that actually changed), or `/code-review ultra`
-  for a deeper multi-agent cloud review of the branch/PR.
-- `security-review` is available for security-sensitive surfaces.
-- HIGH/MEDIUM findings that aren't fixed immediately go into
-  `code-review-followups.md` as a punch-list item.
-
-### 2.7 Commit & push (explicit approval each time)
-- The flow is **trunk-based**: developers push directly to `main` and
-  fast-forward `main → release` to promote. There is no PR-gating step, so
-  **the §3 gates must pass locally before every push** — that responsibility
-  sits with each developer (and, once built, the shared pre-push hook in §7.1
-  enforces it automatically and aborts a failing push).
-- **Promoting `main → release` happens only on explicit instruction.** That
-  fast-forward ships to production, so it is never automatic, never inferred
-  from a prior approval, and never chained off a `main` push — it is always its
-  own standalone, explicit go-ahead.
-- Use `commit-prep` to gather changed files across repos, run related tests +
-  lint, and draft a `<type>: <description>` message.
-- **Commit and push each require fresh explicit approval** — never chained off
-  a prior "proceed with X". Same for **branch creation**: don't auto-pivot to a
-  feature branch when a main push is blocked; ask first.
-- Never `--amend` without checking `HEAD` first (main moves mid-session).
+- **The pre-push hook runs the full §3 gate set automatically** — `platform`:
+  ruff + mypy + the whole test suite; `portal`: lint + typecheck + tests — and
+  aborts the push on any failure (§3.1, §7.1). This is the single authoritative
+  full-gate run, validating the cumulative result of every committed phase.
+- On green, **push to `main`**. Push needs its own fresh explicit approval,
+  separate from commit — never chained off a prior "proceed with X". Don't
+  auto-pivot to a feature branch if a push is blocked; ask first.
+- **Promoting `main → release` ships to production and happens only on explicit
+  instruction** — never automatic, never inferred from a prior approval, never
+  chained off a `main` push.
 - Changelog entries (`documentation/changelog/`, non-technical, version-
   incremented) are written **only when explicitly asked**.
 
@@ -110,20 +108,19 @@ Every functional change follows the same arc. The steps are enforced today by
 
 ## 3. Quality gates
 
-These are the hard gates for `platform/`. They are currently **local and
-manual** — run before considering work complete.
+These are the hard gates. The standards never relax; what's optimized is **how
+many times each gate runs** — see §3.1.
 
 | Gate | Command | Standard |
 |---|---|---|
-| Tests (backend) | `./run_tests.sh tests/test_<module>.py` | Related tests pass |
-| Type-check | `./run_mypy.sh` (scope, then full before commit) | **Zero errors** (since 2026-05-22) |
-| Lint | `./run_ruff.sh` (full project; `--fix` for safe fixes) | **Zero errors** (since 2026-06-04) |
-| Tests (frontend) | `npm test -- <file>` | Related tests pass |
+| Tests (backend) | `./run_tests.sh` (full at push; `tests/test_<module>.py` scoped during impl) | All pass |
+| Type-check | `./run_mypy.sh` | **Zero errors** (since 2026-05-22) |
+| Lint | `./run_ruff.sh` (`--fix` for safe fixes) | **Zero errors** (since 2026-06-04) |
+| Tests (frontend) | `npm test` (full at push; `-- <file>` scoped during impl) | All pass |
+| Type-check (frontend) | `npm run typecheck` | Clean |
 | Lint (frontend) | `npm run lint` | Clean |
 
 Rules:
-- **Run only the tests related to your change.** The full suite is triggered
-  **manually by the user**, not automatically.
 - mypy and ruff are gates, not suggestions. New errors are fixed in the same
   change. The recurring playbooks (assert-narrowing for Beanie `.id`,
   `Dict[str, Any]` annotations, `# type: ignore[code]` with justification, the
@@ -131,6 +128,30 @@ Rules:
   `CLAUDE.md` and `code-review-followups.md` #3 / #323.
 - Configs are pinned (`mypy.ini`, `ruff.toml`) — change the config file, never
   pass ad-hoc flags, so every session shares one baseline.
+
+### 3.1 Where each gate runs — run once, not four times
+
+A change passes through implementation → manual test → `/code-review` →
+`/fix-issues` → `/commit-prep` → commit → push. To avoid running the same gate at
+every step, each gate runs at exactly one authoritative point, with only
+*scoped* checks before it:
+
+| Step | ruff | mypy | tests | Notes |
+|---|---|---|---|---|
+| Implementation | **scoped** | **scoped** | **related** | Fast feedback on touched files only — not the gate |
+| `/code-review` | — | — | — | Logic/security/quality only (may run `bandit`); reports numbered findings, fixes nothing |
+| `/fix-issues` | **scoped** | **scoped** | **related** | Only on the files its fixes touched; auto-logs unselected findings to follow-ups |
+| `/commit-prep` | — | — | — | Changed-file detection + message draft; runs `website/` build/tests only (no hook there) |
+| **Pre-push hook** | **full** | **full** | **full suite** | The single authoritative gate (§7.1); aborts the push on failure |
+
+So the full ruff / mypy / test-suite run happens **once**, in the pre-push hook.
+The earlier steps are deliberately scoped or gate-free so nothing is re-run
+redundantly. The trade-off: a regression a scoped check missed surfaces at push
+(the hook) rather than earlier — acceptable because the hook gates the push
+boundary, so nothing broken ever reaches the shared `main`.
+
+`website/` and `documentation/` have **no** pre-push hook: `website/`'s build +
+widget tests run in `/commit-prep`; `documentation/` has no gates.
 
 ---
 
@@ -312,20 +333,30 @@ storage, or external API surfaces — and write it into the lifecycle.
 
 ## 8. Definition of done
 
-This is the canonical pre-handoff checklist. A functional change is not "done"
-until every applicable box is checked. For a change in `platform/`:
+This is the canonical checklist, mirroring the §2 lifecycle. The full gate run
+is the pre-push hook's job (run once at push), so the per-phase boxes use only
+**scoped** checks.
 
-- [ ] Plan written/updated (if multi-step) in `documentation/development/plans/`
-- [ ] Failing test written first, now passing
-- [ ] Related tests green (`./run_tests.sh tests/test_<module>.py`)
-- [ ] `./run_mypy.sh` — zero errors
-- [ ] `./run_ruff.sh` — zero errors
-- [ ] Self-review done (async, bounds, N+1, exceptions)
-- [ ] Pre-existing errors surfaced this session fixed + reported
+**Per phase (the §2.2 loop):**
+- [ ] Plan written/reviewed (if multi-step); broken into phases if large
+- [ ] Failing test written first, now passing (TDD)
+- [ ] Scoped `./run_mypy.sh <subtree>` + `./run_ruff.sh <subtree>` + related
+      tests green on the touched files (`platform/`); for `portal/`, the scoped
+      `npm test -- <file>`
+- [ ] Self-review done (async, bounds, N+1, exceptions); pre-existing errors
+      surfaced this session fixed + reported
+- [ ] Manual testing passed
+- [ ] `/code-review` run (produces numbered findings + ledger)
+- [ ] `/fix-issues <numbers | all | none>` run — you chose what to fix; the rest
+      auto-logged to `code-review-followups.md`
+- [ ] Re-tested manually if `/fix-issues` applied fixes
 - [ ] Docs synced in the same change (CLAUDE.md / maple-phrasing-reference / etc.)
-- [ ] Code review run (`code-review`, or `/code-review ultra` for larger work)
-- [ ] Commit message drafted via `commit-prep` (`<type>: <description>`)
-- [ ] Explicit approval obtained before commit **and** before push
-- [ ] Changelog entry only if explicitly requested
+- [ ] Phase committed via `commit-prep` draft (`<type>: <description>`), with
+      fresh explicit approval
 
-For `portal/`: substitute `npm test -- <file>` and `npm run lint`.
+**Before push (once — after the last phase, or when you decide to push):**
+- [ ] Pre-push hook green — full ruff + mypy + test suite (`platform`) /
+      lint + typecheck + tests (`portal`)
+- [ ] Fresh explicit approval to push to `main` (separate from commit approval)
+- [ ] Changelog entry only if explicitly requested
+- [ ] `main → release` promotion only on explicit instruction
