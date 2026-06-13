@@ -214,50 +214,61 @@ The process is mature and well-documented. The biggest weaknesses are all about
 **enforcement living in human/AI discipline rather than automation**, and about
 **knowledge sprawl**. Prioritized:
 
-> **Status (2026-06-13):** §7.3, §7.4, §7.6, and §7.7 were addressed in this
-> pass (knowledge decision guide §6.2, archived the closed-items backlog,
-> standardized plan filenames, finalized the §8 checklist). §7.1/§7.2 were
-> revised to match the team's trunk-based, direct-to-`main` flow: a **local
-> pre-push hook is the chosen gate** (§7.1), with CI as an optional backstop
-> (§7.2). Remaining open items — §7.1 (build/install the hook), §7.5
-> (coverage), §7.8 (security-review cadence).
+> **Status (2026-06-13):** §7.1, §7.3, §7.4, §7.6, and §7.7 are done — the
+> local pre-push hook (§7.1) is built and armed in `platform/` and `portal/`,
+> plus the knowledge decision guide (§6.2), the archived closed-items backlog,
+> standardized plan filenames, and the §8 checklist. §7.2 (CI backstop) was
+> evaluated and **deliberately not built** for the current trunk-based flow.
+> Remaining open items — §7.5 (coverage) and §7.8 (security-review cadence).
 
-### 7.1 Enforce gates with a local pre-push hook (the chosen model — highest impact)
-Today, tests / mypy / ruff are enforced only by remembering to run them. A
-single tired session or a hand-off can ship a regression.
+### 7.1 Local pre-push hook (the chosen gate) — ✅ DONE 2026-06-13
+Tests / mypy / ruff used to be enforced only by remembering to run them — a
+single tired session or hand-off could ship a regression.
 
 The team runs **trunk-based**: developers push directly to `main` and
 fast-forward `main → release`; there is no PR-gating step (and we don't want
-one — see [feedback on not auto-pivoting to branches]). For a small team, the
-correct enforcement point is therefore a **local pre-push git hook** on each
-developer's machine — it runs the full §3 gate set and aborts the push if
-anything fails, so broken code never reaches the shared `main` in the first
-place. Each developer is responsible for their machine having the hook
-installed; keeping it **committed and shared** (not a hand-rolled local file)
-means everyone runs the identical gate.
+one). For a small team, the correct enforcement point is a **local pre-push git
+hook** on each developer's machine — it runs the full §3 gate set and aborts the
+push if anything fails, so broken code never reaches the shared `main`.
 
-**Recommendation:** manage the hook via a versioned tool — `lefthook` or
-`pre-commit` (run on the `pre-push` stage), or a committed script wired up with
-`core.hooksPath` — so it's shared, not per-machine. On `pre-push`:
-- `platform/`: `./run_ruff.sh` → `./run_mypy.sh` → `./run_tests.sh` (the suite;
-  full-suite pre-push is cheap and catches the cross-module regressions the
+**Implemented:** a committed, dependency-free `pre-push` script lives in each
+repo and is wired up with `core.hooksPath` (chosen over `lefthook`/`pre-commit`
+to avoid adding a tool — consistent with the project's conservative dependency
+stance):
+- `platform/.githooks/pre-push` → `./run_ruff.sh` → `./run_mypy.sh` →
+  `./run_tests.sh` (full suite pre-push catches the cross-module regressions the
   "related tests only" local loop misses — see §3).
-- `portal/`: `npm run lint` → `npm run typecheck` → `npm test`.
+- `portal/.githooks/pre-push` → `npm run lint` → `npm run typecheck` → `npm test`.
 
-Abort the push on any failure. This makes the §3 gates self-enforcing rather
-than discipline-dependent — the core weakness this whole section is about —
+Any failing gate aborts the push; emergency bypass is `git push --no-verify`.
+Because the hook is committed (not a hand-rolled `.git/hooks/` file) every
+developer runs the identical gate — but `core.hooksPath` is per-clone local
+config, so **each clone must activate it once**:
+
+```bash
+git -C platform config core.hooksPath .githooks
+git -C portal   config core.hooksPath .githooks
+```
+
+This makes the §3 gates self-enforcing rather than discipline-dependent —
 **without** adopting a PR workflow.
 
-### 7.2 CI as an optional backstop (not a merge gate)
-Because the flow is direct-to-`main`, GitHub Actions can't *gate* a merge
-without forcing PRs. It can still act as a **backstop**: a workflow on
-`push: [main]` re-runs the gates after the fact and raises a red check /
-notification if something slipped past a developer's local hook (hook not
-installed, an environment difference, etc.). It catches, it doesn't prevent —
-you fix forward. Low priority while the §7.1 hook is the real gate; worth adding
-if the team grows or local-hook drift becomes a problem. (`platform/` backend
-tests need a MongoDB, so such a workflow would run a `mongo` service container;
-the default pytest run excludes `llm_e2e`/`evaluation`, so no API keys/cost.)
+### 7.2 CI backstop — not needed now (revisit-if note)
+A `push: [main]` GitHub Actions workflow was considered as a backstop to the
+§7.1 hook. **Decision (2026-06-13): not building it.** Because the flow is
+direct-to-`main`, CI can't *gate* a merge without forcing PRs — it could only
+alarm *after* a bad commit is already on `main` (and possibly fast-forwarded
+toward `release`), which the §7.1 pre-push hook prevents strictly earlier.
+
+The only gap a hook can't cover is a **clean-environment** check (it passes on
+my machine with my cached deps) and a hook that was **bypassed/never installed**.
+For a small disciplined team that residual risk doesn't justify the cost (the
+`platform/` suite would need a `mongo` service container plus workflow upkeep).
+
+**Revisit if:** the team grows, or a bypassed/missing hook or an
+environment-drift bug actually bites — then add the `push: [main]` workflow
+(`mongo` service container; the default pytest run excludes
+`llm_e2e`/`evaluation`, so no API keys/cost).
 
 ### 7.3 Consolidate the knowledge stores — ✅ DONE 2026-06-13
 There are effectively four places context lives (`CLAUDE.md`, auto-memory,
