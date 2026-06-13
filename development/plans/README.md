@@ -21,8 +21,18 @@ Plans are versioned alongside the code so they stay discoverable, shareable, and
 | [harmonic-strolling-anchor.md](harmonic-strolling-anchor.md) | Monthly estimate quota per company |
 | [snappy-riding-pie.md](snappy-riding-pie.md) | Field extraction fixes (Contact, Property, Material agents) |
 
+## Naming convention
+
+New plans **must** use `YYYY-MM-DD-short-topic.md` (e.g.
+`2026-06-13-auth-screens-overhaul.md`). The date prefix keeps the folder
+chronologically sortable and the topic slug keeps it scannable.
+
+Do **not** use the random-word slugs that plan-mode generates
+(`binary-pondering-seal.md`); rename them to the dated form on save. The legacy
+random-word files above are grandfathered in — leave them as-is and let them age
+out; only the index table needs to stay accurate.
+
 ## When adding a new plan
 
-1. Save the file directly to this folder.
+1. Save the file directly to this folder, named `YYYY-MM-DD-short-topic.md`.
 2. Add a new row to the index table above.
-3. Use a descriptive name; the random-word filenames above came from plan-mode and can stay, but human-named plans (e.g. `auth-screens-overhaul.md`) are easier to scan.
