@@ -91,10 +91,11 @@ Work one phase at a time. Repeat this loop for each phase:
 ### 2.3 Push — pre-push tasks, then `main`
 When all phases are done (or you decide to push mid-way):
 
-- **The pre-push hook runs the full §3 gate set automatically** — `platform`:
-  ruff + mypy + the whole test suite; `portal`: lint + typecheck + tests — and
-  aborts the push on any failure (§3.1, §7.1). This is the single authoritative
-  full-gate run, validating the cumulative result of every committed phase.
+- **The pre-push hook runs automatically and aborts the push on any failure**
+  (§3.1, §7.1) — `platform`: **ruff + mypy** (fast, no DB); `portal`: lint +
+  typecheck + tests. The platform **full pytest suite is not in the hook** (too
+  slow + needs the Dev MongoDB) — run it separately (`./run_tests.sh`) when you
+  want full-suite confidence; it is not gated at push.
 - On green, **push to `main`**. Push needs its own fresh explicit approval,
   separate from commit — never chained off a prior "proceed with X". Don't
   auto-pivot to a feature branch if a push is blocked; ask first.
@@ -111,14 +112,14 @@ When all phases are done (or you decide to push mid-way):
 These are the hard gates. The standards never relax; what's optimized is **how
 many times each gate runs** — see §3.1.
 
-| Gate | Command | Standard |
-|---|---|---|
-| Tests (backend) | `./run_tests.sh` (full at push; `tests/test_<module>.py` scoped during impl) | All pass |
-| Type-check | `./run_mypy.sh` | **Zero errors** (since 2026-05-22) |
-| Lint | `./run_ruff.sh` (`--fix` for safe fixes) | **Zero errors** (since 2026-06-04) |
-| Tests (frontend) | `npm test` (full at push; `-- <file>` scoped during impl) | All pass |
-| Type-check (frontend) | `npm run typecheck` | Clean |
-| Lint (frontend) | `npm run lint` | Clean |
+| Gate | Command | Standard | Gated at push? |
+|---|---|---|---|
+| Lint (backend) | `./run_ruff.sh` (`--fix` for safe fixes) | **Zero errors** (since 2026-06-04) | **Yes** — platform hook |
+| Type-check (backend) | `./run_mypy.sh` | **Zero errors** (since 2026-05-22) | **Yes** — platform hook |
+| Tests (backend) | `./run_tests.sh` (scoped `tests/test_<module>.py` during impl) | All pass | No — runs separately vs Dev MongoDB (§4) |
+| Lint (frontend) | `npm run lint` | Clean | **Yes** — portal hook |
+| Type-check (frontend) | `npm run typecheck` | Clean | **Yes** — portal hook |
+| Tests (frontend) | `npm test` (scoped `-- <file>` during impl) | All pass | **Yes** — portal hook (~15s, no DB) |
 
 Rules:
 - mypy and ruff are gates, not suggestions. New errors are fixed in the same
@@ -142,13 +143,17 @@ every step, each gate runs at exactly one authoritative point, with only
 | `/code-review` | — | — | — | Logic/security/quality only (may run `bandit`); reports numbered findings, fixes nothing |
 | `/fix-issues` | **scoped** | **scoped** | **related** | Only on the files its fixes touched; auto-logs unselected findings to follow-ups |
 | `/commit-prep` | — | — | — | Changed-file detection + message draft; runs `website/` build/tests only (no hook there) |
-| **Pre-push hook** | **full** | **full** | **full suite** | The single authoritative gate (§7.1); aborts the push on failure |
+| **Pre-push hook** | **full** | **full** | **portal only** | The push gate (§7.1). Platform: ruff + mypy. Portal: lint + typecheck + tests (~15s, no DB). Aborts the push on failure. |
+| Full backend suite (separate) | — | — | **full** | `./run_tests.sh` vs the Dev MongoDB — run on demand, **not** gated at push (too slow + DB-dependent; see §4) |
 
-So the full ruff / mypy / test-suite run happens **once**, in the pre-push hook.
-The earlier steps are deliberately scoped or gate-free so nothing is re-run
-redundantly. The trade-off: a regression a scoped check missed surfaces at push
-(the hook) rather than earlier — acceptable because the hook gates the push
-boundary, so nothing broken ever reaches the shared `main`.
+So ruff and mypy run **once at full scope** in the pre-push hook; before that
+they're scoped, so they aren't re-run redundantly. The platform **test suite is
+deliberately out of the hook** — it's ~20 min and needs the Dev MongoDB, too
+heavy for a per-push gate — so it's a separate on-demand run. The trade-off: a
+backend regression that the scoped/related tests missed isn't caught at push;
+it's caught when you run the full suite (or, if adopted later, in CI — §7.2).
+Lint and type errors *are* still gated at push, and nothing reaches `main`
+without passing them.
 
 `website/` and `documentation/` have **no** pre-push hook: `website/`'s build +
 widget tests run in `/commit-prep`; `documentation/` has no gates.
@@ -159,6 +164,13 @@ widget tests run in `/commit-prep`; `documentation/` has no gates.
 
 - Backend: pytest + FastAPI `TestClient`, fixtures in `tests/conftest.py`,
   always inside the activated venv (`run_tests.sh` handles this).
+- **Backend test database: the Dev MongoDB cluster.** The connection URL lives in
+  `.env.local` (which `config.py` loads with precedence over `.env`); no local
+  container needed. Running the full suite requires the machine's IP in the Atlas
+  allowlist. **Because the suite shares the Dev cluster, every test must be
+  self-sufficient — set up the data it needs and clean up everything it creates.**
+  Never depend on pre-existing data; never leave residue. (This is also why the
+  full suite is out-of-band, not in the pre-push hook — see §3.1.)
 - Frontend: `npm test`, component behavior + interactions + API integration.
 - Maple has a dedicated coverage matrix (`test_maple_crud_coverage.py`, 117
   phrasings) with a two-tier model: Tier 1 rules-only (default, free), Tier 2
@@ -235,12 +247,14 @@ The process is mature and well-documented. The biggest weaknesses are all about
 **enforcement living in human/AI discipline rather than automation**, and about
 **knowledge sprawl**. Prioritized:
 
-> **Status (2026-06-13):** §7.1, §7.3, §7.4, §7.6, and §7.7 are done — the
-> local pre-push hook (§7.1) is built and armed in `platform/` and `portal/`,
-> plus the knowledge decision guide (§6.2), the archived closed-items backlog,
-> standardized plan filenames, and the §8 checklist. §7.2 (CI backstop) was
-> evaluated and **deliberately not built** for the current trunk-based flow.
-> Remaining open items — §7.5 (coverage) and §7.8 (security-review cadence).
+> **Status (updated 2026-06-14):** §7.1, §7.3, §7.4, §7.6, and §7.7 are done —
+> the local pre-push hook (§7.1) is built and armed in `platform/` and
+> `portal/`, plus the knowledge decision guide (§6.2), the archived closed-items
+> backlog, standardized plan filenames, and the §8 checklist. The platform hook
+> was **revised 2026-06-14** to ruff + mypy only after a real push showed the
+> full suite is ~20 min + Dev-MongoDB-dependent (§7.1). §7.2 (CI backstop) was
+> evaluated and **deliberately not built**. Remaining open items — §7.5
+> (coverage) and §7.8 (security-review cadence).
 
 ### 7.1 Local pre-push hook (the chosen gate) — ✅ DONE 2026-06-13
 Tests / mypy / ruff used to be enforced only by remembering to run them — a
@@ -249,17 +263,23 @@ single tired session or hand-off could ship a regression.
 The team runs **trunk-based**: developers push directly to `main` and
 fast-forward `main → release`; there is no PR-gating step (and we don't want
 one). For a small team, the correct enforcement point is a **local pre-push git
-hook** on each developer's machine — it runs the full §3 gate set and aborts the
-push if anything fails, so broken code never reaches the shared `main`.
+hook** on each developer's machine — it runs the fast gates and aborts the push
+if anything fails, so broken code never reaches the shared `main`.
 
 **Implemented:** a committed, dependency-free `pre-push` script lives in each
 repo and is wired up with `core.hooksPath` (chosen over `lefthook`/`pre-commit`
 to avoid adding a tool — consistent with the project's conservative dependency
 stance):
-- `platform/.githooks/pre-push` → `./run_ruff.sh` → `./run_mypy.sh` →
-  `./run_tests.sh` (full suite pre-push catches the cross-module regressions the
-  "related tests only" local loop misses — see §3).
+- `platform/.githooks/pre-push` → `./run_ruff.sh` → `./run_mypy.sh`.
 - `portal/.githooks/pre-push` → `npm run lint` → `npm run typecheck` → `npm test`.
+
+**Why the platform test suite is NOT in the hook (revised 2026-06-14):** the
+first real push attempt showed the full backend suite takes ~20 min and needs
+the Dev MongoDB — far too heavy for a gate that fires on every push in a
+frequent direct-to-`main` flow. So the platform hook runs only the fast,
+DB-free gates (ruff + mypy); the full suite is an on-demand run against the Dev
+cluster (§4). Portal's suite stays in its hook because it's ~15s with no
+external dependency.
 
 Any failing gate aborts the push; emergency bypass is `git push --no-verify`.
 Because the hook is committed (not a hand-rolled `.git/hooks/` file) every
@@ -355,8 +375,9 @@ is the pre-push hook's job (run once at push), so the per-phase boxes use only
       fresh explicit approval
 
 **Before push (once — after the last phase, or when you decide to push):**
-- [ ] Pre-push hook green — full ruff + mypy + test suite (`platform`) /
-      lint + typecheck + tests (`portal`)
+- [ ] Pre-push hook green — ruff + mypy (`platform`) / lint + typecheck + tests (`portal`)
+- [ ] Full backend suite (`./run_tests.sh` vs Dev MongoDB) run on demand if the
+      change warrants full-suite confidence — it is **not** gated by the hook
 - [ ] Fresh explicit approval to push to `main` (separate from commit approval)
 - [ ] Changelog entry only if explicitly requested
 - [ ] `main → release` promotion only on explicit instruction
