@@ -99,11 +99,27 @@ When all phases are done (or you decide to push mid-way):
 - On green, **push to `main`**. Push needs its own fresh explicit approval,
   separate from commit — never chained off a prior "proceed with X". Don't
   auto-pivot to a feature branch if a push is blocked; ask first.
-- **Promoting `main → release` ships to production and happens only on explicit
-  instruction** — never automatic, never inferred from a prior approval, never
-  chained off a `main` push.
 - Changelog entries (`documentation/changelog/`, non-technical, version-
   incremented) are written **only when explicitly asked**.
+
+### 2.4 Promote to production (`/release`)
+Promotion is a **separate, deliberate** event — not every push. Production ships
+by fast-forwarding a repo's `release` branch to `main`, done via the `/release`
+command:
+
+- `/release portal` · `/release platform` · `/release website` · `/release app`
+  (`app` = platform + portal, promoted atomically — if either fails its gate,
+  neither is promoted).
+- `/release` runs the **full production gate first** — `platform`: ruff + mypy +
+  the **full pytest suite** (vs the Dev MongoDB); `portal`: lint + typecheck +
+  tests; `website`: build + widget tests — then fast-forwards `release` to `main`
+  and pushes it. This is where the full test suite runs (§3.1).
+- **Fast-forward only**; if `release` has diverged it aborts (never force-push).
+- **Pushing `release` triggers the production deploy** (website → GitHub Actions,
+  platform → Render, portal → Firebase). So `/release` ships to prod, and per the
+  hardened rule it runs **only when the user explicitly invokes it** — never
+  automatically, never inferred, never chained. (Typing `/release <target>` *is*
+  that explicit instruction.)
 
 ---
 
@@ -144,16 +160,18 @@ every step, each gate runs at exactly one authoritative point, with only
 | `/fix-issues` | **scoped** | **scoped** | **related** | Only on the files its fixes touched; auto-logs unselected findings to follow-ups |
 | `/commit-prep` | — | — | — | Changed-file detection + message draft; runs `website/` build/tests only (no hook there) |
 | **Pre-push hook** | **full** | **full** | **portal only** | The push gate (§7.1). Platform: ruff + mypy. Portal: lint + typecheck + tests (~15s, no DB). Aborts the push on failure. |
-| Full backend suite (separate) | — | — | **full** | `./run_tests.sh` vs the Dev MongoDB — run on demand, **not** gated at push (too slow + DB-dependent; see §4) |
+| `/release` (production gate) | **full** | **full** | **full** | The full suite's home: ruff + mypy + full pytest (`platform`, vs Dev MongoDB) / lint + typecheck + tests (`portal`) / build + tests (`website`) before fast-forwarding `release` to `main`. Runs only when you invoke `/release` (§2.4). |
 
 So ruff and mypy run **once at full scope** in the pre-push hook; before that
 they're scoped, so they aren't re-run redundantly. The platform **test suite is
 deliberately out of the hook** — it's ~20 min and needs the Dev MongoDB, too
 heavy for a per-push gate — so it's a separate on-demand run. The trade-off: a
 backend regression that the scoped/related tests missed isn't caught at push;
-it's caught when you run the full suite (or, if adopted later, in CI — §7.2).
-Lint and type errors *are* still gated at push, and nothing reaches `main`
-without passing them.
+it's caught by the **full suite that `/release` runs before promoting to
+production** (§2.4) — the natural home for the slow, DB-dependent suite. Lint
+and type errors *are* still gated at every push, and nothing reaches `main`
+without passing them. Net: two tiers — fast gate on every push (hook), full
+gate before prod (`/release`).
 
 `website/` and `documentation/` have **no** pre-push hook: `website/`'s build +
 widget tests run in `/commit-prep`; `documentation/` has no gates.
