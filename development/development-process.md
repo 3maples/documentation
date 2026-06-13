@@ -88,6 +88,15 @@ Every functional change follows the same arc. The steps are enforced today by
   `code-review-followups.md` as a punch-list item.
 
 ### 2.7 Commit & push (explicit approval each time)
+- The flow is **trunk-based**: developers push directly to `main` and
+  fast-forward `main → release` to promote. There is no PR-gating step, so
+  **the §3 gates must pass locally before every push** — that responsibility
+  sits with each developer (and, once built, the shared pre-push hook in §7.1
+  enforces it automatically and aborts a failing push).
+- **Promoting `main → release` happens only on explicit instruction.** That
+  fast-forward ships to production, so it is never automatic, never inferred
+  from a prior approval, and never chained off a `main` push — it is always its
+  own standalone, explicit go-ahead.
 - Use `commit-prep` to gather changed files across repos, run related tests +
   lint, and draft a `<type>: <description>` message.
 - **Commit and push each require fresh explicit approval** — never chained off
@@ -205,32 +214,50 @@ The process is mature and well-documented. The biggest weaknesses are all about
 **enforcement living in human/AI discipline rather than automation**, and about
 **knowledge sprawl**. Prioritized:
 
-> **Status (2026-06-13):** §7.3, §7.4, §7.6, and §7.7 have been addressed in
-> this pass (knowledge decision guide §6.2, archived the closed-items backlog,
-> standardized plan filenames, and finalized the §8 checklist). The remaining
-> open items — §7.1 (CI), §7.2 (pre-commit hooks), §7.5 (coverage), §7.8
-> (security-review cadence) — are the automation-enforcement work still to do.
+> **Status (2026-06-13):** §7.3, §7.4, §7.6, and §7.7 were addressed in this
+> pass (knowledge decision guide §6.2, archived the closed-items backlog,
+> standardized plan filenames, finalized the §8 checklist). §7.1/§7.2 were
+> revised to match the team's trunk-based, direct-to-`main` flow: a **local
+> pre-push hook is the chosen gate** (§7.1), with CI as an optional backstop
+> (§7.2). Remaining open items — §7.1 (build/install the hook), §7.5
+> (coverage), §7.8 (security-review cadence).
 
-### 7.1 No CI gate (highest impact)
+### 7.1 Enforce gates with a local pre-push hook (the chosen model — highest impact)
 Today, tests / mypy / ruff are enforced only by remembering to run them. A
-single tired session or a hand-off can ship a regression. `code-review-followups.md`
-itself notes "pre-fix CI gate is now viable" now that mypy and ruff sit at zero.
+single tired session or a hand-off can ship a regression.
 
-**Recommendation:** add a GitHub Actions workflow to `platform/` and `portal/`
-that runs on every push / PR:
-- `platform`: `ruff check`, `mypy`, and the **full** pytest suite.
-- `portal`: `npm run lint` + `npm test`.
+The team runs **trunk-based**: developers push directly to `main` and
+fast-forward `main → release`; there is no PR-gating step (and we don't want
+one — see [feedback on not auto-pivoting to branches]). For a small team, the
+correct enforcement point is therefore a **local pre-push git hook** on each
+developer's machine — it runs the full §3 gate set and aborts the push if
+anything fails, so broken code never reaches the shared `main` in the first
+place. Each developer is responsible for their machine having the hook
+installed; keeping it **committed and shared** (not a hand-rolled local file)
+means everyone runs the identical gate.
 
-This directly resolves the tension in §3 — "run only related tests locally" stays
-fast for the dev loop, while CI catches the cross-module regressions that the
-related-tests-only approach can miss. `website/` already has CI (keyless WIF
-deploy); platform/portal are the gap.
+**Recommendation:** manage the hook via a versioned tool — `lefthook` or
+`pre-commit` (run on the `pre-push` stage), or a committed script wired up with
+`core.hooksPath` — so it's shared, not per-machine. On `pre-push`:
+- `platform/`: `./run_ruff.sh` → `./run_mypy.sh` → `./run_tests.sh` (the suite;
+  full-suite pre-push is cheap and catches the cross-module regressions the
+  "related tests only" local loop misses — see §3).
+- `portal/`: `npm run lint` → `npm run typecheck` → `npm test`.
 
-### 7.2 Optionally enforce gates pre-commit
-A `pre-commit` hook (or `lefthook`/`husky`) running ruff + mypy on staged
-Python and eslint on staged JS would catch gate violations *before* they ever
-reach a commit, making the "fix in the same change" rule self-enforcing rather
-than aspirational. Keep it fast (staged files only); leave the full suite to CI.
+Abort the push on any failure. This makes the §3 gates self-enforcing rather
+than discipline-dependent — the core weakness this whole section is about —
+**without** adopting a PR workflow.
+
+### 7.2 CI as an optional backstop (not a merge gate)
+Because the flow is direct-to-`main`, GitHub Actions can't *gate* a merge
+without forcing PRs. It can still act as a **backstop**: a workflow on
+`push: [main]` re-runs the gates after the fact and raises a red check /
+notification if something slipped past a developer's local hook (hook not
+installed, an environment difference, etc.). It catches, it doesn't prevent —
+you fix forward. Low priority while the §7.1 hook is the real gate; worth adding
+if the team grows or local-hook drift becomes a problem. (`platform/` backend
+tests need a MongoDB, so such a workflow would run a `mongo` service container;
+the default pytest run excludes `llm_e2e`/`evaluation`, so no API keys/cost.)
 
 ### 7.3 Consolidate the knowledge stores — ✅ DONE 2026-06-13
 There are effectively four places context lives (`CLAUDE.md`, auto-memory,
