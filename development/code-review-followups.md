@@ -4035,6 +4035,40 @@ on a just-transitioned estimate).
 
 ---
 
+## 2026-06-15 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review (Maple status-transition
+routing + help answer-then-offer) not fixed in that pass. Selection fixed #1, #2,
+#3, #5; #4 deferred here because the fix is much larger than the finding describes.
+
+### [LOW] platform/agents/orchestrator/service.py:~1858 — status offer made without pre-validating legality/role
+`_maybe_attach_status_offer` offers "Yes — I can set {EST} to {Y}…" whenever an
+EST-code + recognized target status is present, without checking the estimate's
+current status or the user's role. A Member, or a request for an illegal edge, is
+still offered the action and only refused after they say "yes". The copy is hedged
+("as long as that's an allowed next step from its current status"), so this is a UX
+nuance, not a correctness bug — the execution path enforces the state machine and
+role gate correctly on confirmation.
+**Suggested fix:** Pre-validate at offer time: load the estimate, run
+`validate_estimate_status_transition` + the role/creator gates, and if the
+transition would be refused, return that refusal as the help answer instead of an
+offer. NOTE this is deliberately deferred — it requires making the (currently
+sync) help-lane offer path async and duplicating the state-machine/role checks the
+agent already performs on "yes". Only worth doing if the optimistic offer proves
+confusing in practice.
+
+### [INFO] tooling / regex — not actionable now
+- `bandit` is not installed in `platform/.venv`, so the Step-3 security scan was
+  skipped during review. `pip install bandit` (or add to dev requirements) to
+  enable `bandit -r . -x tests/`. Manual review found no injection/secrets in the
+  change.
+- `_STATUS_TRANSITION_STATUS_REF_TO_PATTERN` (`agents/estimate/text_helpers.py`)
+  was checked for ReDoS: single lazy span on short chat input → ~O(n²) worst case,
+  not exponential; consistent with the existing `_STATUS_TRANSITION_*` patterns. No
+  action needed — recorded because this repo has a history of ReDoS findings.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.

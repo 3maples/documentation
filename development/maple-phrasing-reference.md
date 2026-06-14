@@ -2,9 +2,16 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-12
+**Last updated:** 2026-06-15
 
 ### Change log
+
+**2026-06-15 — Status transitions route deterministically; status *questions* offer to proceed (§1.4)**
+- **Routing fix (the reported bug):** the Orchestrator never routed estimate status changes to `update_estimate` — the rule classifier's estimate field-edit detector only knew description/notes/property, and there was no status branch. So `set the status for {EST} to Sent`, `mark {EST} as Sent`, `archive {EST}`, etc. fell through to `unknown` and (in prod, where the LLM is the primary classifier) routed inconsistently — sometimes a help answer, sometimes "that's not something I can do." Added a **deterministic status-transition lane** in `OrchestratorAgent.process()` (runs before the LLM) plus a branch in `_classify_with_rules`, both gated on an estimate reference and the shared `parse_status_transition` matcher.
+- **Word-order gap:** `_detect_status_transition` only matched `status to Y` (adjacent), `to Y status`, or `as Y`, so `set the status for|of|on {EST} to Y` (the estimate code interposed between "status" and "to") was missed. Detection logic moved to a single-source module function `parse_status_transition` in `agents/estimate/text_helpers.py` (shared by the agent and the orchestrator so routable ≡ actionable), and broadened with `_STATUS_TRANSITION_STATUS_REF_TO_PATTERN`.
+- **Status *questions* now offer to act (issue #2):** a status request phrased as a question (`Can you set {EST} to Sent?`) is still claimed by the help classifier, but Maple now answers **and offers** to do it (`Yes — I can set {EST} to Sent … Want me to go ahead?`), stashing a `pending_status_transition` record. A following "yes" executes it via `routers/agent_helpers/pending_status_transition.py`; "no" cancels. Only fires when an EST-code and a recognized target status are present.
+- **Send-gate message made self-contained:** when a confirmed send is blocked by unresolved missing items, the refusal (`_refuse_send_with_missing_items`) now returns a self-contained statement (`needs_clarification=False`, no `clarifying_question`) instead of the bare, unanswerable question "Would you like to add them to your catalog or dismiss them?" — chat can't resolve missing items (that's a portal-editor action), and the portal renders only `clarifying_question` on clarification turns, so the question previously showed with no antecedent for "them". (The general portal issue — clarification turns dropping the `response` context, which also affects illegal-transition refusals — is tracked separately.)
+- Tests: `test_estimates_status_transition_status_ref_to_phrasing`, `test_chat_blocks_sent_while_missing_items_unresolved` (`tests/test_estimate_agent.py`); `test_orchestrator_routes_estimate_status_transition`, `..._is_deterministic_not_llm`, `..._status_question_form_stays_help`, `test_help_status_question_offers_to_proceed_and_sets_pending` (`tests/test_orchestrator_intents.py`); `tests/test_pending_status_transition.py`.
 
 **2026-06-12 — Edit lock tightened to Draft/Review only (§8.7)**
 - The locked-status edit guard now mirrors the portal's `isEditableStatus` (`portal/src/lib/estimateStatus.ts`) instead of the PUT route's narrower lock: estimate contents are editable in chat **only in Draft or Review**. Won / On Hold / Lost / Scheduled / Completed (and internal statuses) now refuse edits too, closing the gap where chat could edit a Won estimate's notes while the UI showed it read-only. Allowlist constant: `_EDITABLE_ESTIMATE_STATUSES` in `agents/estimate/crud_handlers.py`.
@@ -254,14 +261,20 @@ EstimateStatus values: `DRAFT`, `APPROVED`, `WON`, `LOST`, `ONHOLD`, `SCHEDULED`
 
 **State machine + authorization enforced (2026-06-11):** every phrasing below is additionally subject to `validate_estimate_status_transition` (`models/estimate.py`, mirrors `portal/src/lib/estimateStatus.ts`) and to the HTTP layer's role gates (send/unsend → Owner/Admin; archive/unarchive → Owner/Admin or creator). A recognized phrasing whose edge is illegal for the estimate's *current* status — e.g. `mark {EST} as won` on a Draft — or that the user isn't authorized for, refuses in Maple's persona voice instead of saving. See §8.6.
 
+**Deterministic routing (2026-06-15):** the Orchestrator now routes status-transition phrasings to `update_estimate` via a `process()` fast-path (ahead of the LLM) and a `_classify_with_rules` branch, both gated on an estimate reference + the shared `parse_status_transition` matcher (`agents/estimate/text_helpers.py`). The ✅-rule rows below were previously 🤖 LLM and routed inconsistently. **Question forms** (`Can you …?`) are claimed by the help classifier and answered with an offer to proceed — see the last two rows.
+
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `approve {EST}` | `update_estimate` → Estimate Agent | 🤖 LLM |
-| `mark {EST} as approved` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `approve {EST}` | `update_estimate` → Estimate Agent | 🤖 LLM *(`approve` isn't in the status-verb set; LLM-routed)* |
+| `mark {EST} as approved` / `mark {EST} as sent` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-15 — `as Y` shape via `parse_status_transition`)* |
+| `set the status for\|of\|on {EST} to {Y}` (e.g. `set the status for EST-… to Sent`) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-15 — `_STATUS_TRANSITION_STATUS_REF_TO_PATTERN`; the estimate code may sit between "status" and "to". The originally-reported failing phrasing.)* |
+| `archive {EST}` / `unarchive {EST}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-15 routing; archive/unarchive verbs are their own triggers)* |
 | `reject the estimate` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `send {EST} for review` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `put {EST or title} on hold` / `place it on hold` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-09 — `_ON_HOLD_PATTERN` maps bare "on hold" (with a status verb incl. `put`/`place`) to ONHOLD; guarded by `_NOTE_OR_DESC_CUE_PATTERN` so a note/description body mentioning "on hold" isn't hijacked)* |
-| `move this estimate to draft` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `move this estimate to draft` | `update_estimate` → Estimate Agent | 🤖 LLM *(`to draft` has no `status` terminator; LLM-routed)* |
+| `Can you set the status for {EST} to {Y}?` (question form) | `help` → Orchestrator, then **offer** | ✅ rule *(2026-06-15 — answered with "Yes — I can set {EST} to {Y} … Want me to go ahead?" + a `pending_status_transition` record; a following "yes" executes, "no" cancels. Requires an EST-code + recognized target.)* |
+| `yes` / `go ahead` (replying to the offer above) | `update_estimate` → Estimate Agent | ✅ rule *(`handle_pending_status_transition`, `routers/agent_helpers/pending_status_transition.py`)* |
 | `update {EST or title} from {X} to {Y} status` (e.g. `from Sent to Review status`) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-08 — `_detect_status_transition` now recognizes the `update` verb and the `from X to Y status` / `to Y status` phrasings via `_STATUS_TRANSITION_TO_STATUS_PATTERN`, anchored on the trailing `status` word so it captures the target Y. Previously fell through to "What would you like to change?". **Same change** switched the status handler to the title-aware resolver `_resolve_estimate_code_or_title`, and made an explicitly-named title override `active_estimate_code` — fixes a data-integrity bug where naming an estimate by title while viewing another updated the WRONG (viewed) estimate. **2026-06-09:** extended title-awareness to ALL estimate UPDATE + READ sub-ops — work items, work-item fields, status — via the shared `_resolve_update_estimate_code` seam and a title-aware `_load_estimate_for_read`.)* |
 | `update {EST or title} to {Y} status` (e.g. `to Review status`) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-08 — same `to Y status` pattern; works with `update`/`move`/`change`/`transition`/`switch`/`put`/`place` verbs)* |
 | `what's the status of {EST}?` | `get_estimate` → Estimate Agent | 🤖 LLM |
