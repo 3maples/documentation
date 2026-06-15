@@ -6,6 +6,12 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Change log
 
+**2026-06-15 — Calculator registry refactor + 4 new landscaping calculations (§9.3.1)**
+- The Calculator Agent now derives its dispatch table, required-params, type→label map, and the extraction prompt's type list from a single declarative `CalcSpec` registry (`agents/calculator/registry.py`). Adding a calculation is now one formula in `formulas.py` plus one registry entry — the old parallel dicts and `_dispatch()` if-ladder are gone. A drift-guard test (`test_calculator_registry.py`) makes any schema-Literal ↔ registry mismatch a test failure.
+- **Five new calculation types, all deterministic:** `aggregate_tons` (gravel/crushed-stone base by weight, cu yd × density), `mulch_bags` (bagged-material count, ÷ bag volume), `retaining_wall_blocks` (courses × blocks-per-course), `step_count` (total rise ÷ riser height), `plant_count` (groundcover grid spacing — square `area ÷ spacing²` or triangular `÷ (spacing² × 0.866)`). All math stays in pure `formulas.py`; the LLM only extracts parameters.
+- **Regex fast-path now reads the output-unit signal:** "how many **tons**/**bags** … N sq ft … N inches" routes to `aggregate_tons`/`mulch_bags` instead of silently collapsing to cubic-yard coverage. `steps?` added to the orchestrator pre-classifier's measurement-unit set.
+- Tests: `tests/test_calculator_formulas.py` (4 new formula classes), `tests/test_calculator_agent.py::TestAggregateTons`, `tests/test_calculator_registry.py`.
+
 **2026-06-15 — Status transitions route deterministically; status *questions* offer to proceed (§1.4)**
 - **Routing fix (the reported bug):** the Orchestrator never routed estimate status changes to `update_estimate` — the rule classifier's estimate field-edit detector only knew description/notes/property, and there was no status branch. So `set the status for {EST} to Sent`, `mark {EST} as Sent`, `archive {EST}`, etc. fell through to `unknown` and (in prod, where the LLM is the primary classifier) routed inconsistently — sometimes a help answer, sometimes "that's not something I can do." Added a **deterministic status-transition lane** in `OrchestratorAgent.process()` (runs before the LLM) plus a branch in `_classify_with_rules`, both gated on an estimate reference and the shared `parse_status_transition` matcher.
 - **Word-order gap:** `_detect_status_transition` only matched `status to Y` (adjacent), `to Y status`, or `as Y`, so `set the status for|of|on {EST} to Y` (the estimate code interposed between "status" and "to") was missed. Detection logic moved to a single-source module function `parse_status_transition` in `agents/estimate/text_helpers.py` (shared by the agent and the orchestrator so routable ≡ actionable), and broadened with `_STATUS_TRANSITION_STATUS_REF_TO_PATTERN`.
@@ -1105,6 +1111,42 @@ Pending-state slot: `pending_calculation`. Continuation logic:
 > Note: re-engagement phrasings ("can you help with mulch coverage?") and
 > inverse-coverage math ("how many sq ft will a yard cover" → solve for area)
 > remain unsupported by design (out of scope for the continuation fix).
+
+## 9.3.1 Calculation catalog (Calculator Agent) ✅
+
+Each type is one `CalcSpec` in `agents/calculator/registry.py` → one pure
+function in `formulas.py`. The LLM only extracts parameters; all arithmetic is
+deterministic. Adding a type is a single registry entry + formula.
+
+| Calculation type | Example phrasing | Required inputs | Output | Status |
+|---|---|---|---|---|
+| `area_coverage` | "how many cubic yards of mulch for 2000 sq ft at 3 inches" | area_sqft, depth_inches | cubic yards | ✅ rule |
+| `concrete_volume` | "how much concrete for a 10x12 slab 4 inches thick" | length_ft, width_ft, depth_inches | cubic yards | ✅ rule |
+| `seed_coverage` | "how many lbs of grass seed for 5000 sq ft at 4 lbs/1000" | area_sqft, application_rate | pounds | ✅ rule |
+| `linear_material` | "how many 8-ft fence panels for 100 linear feet" | linear_ft (opt. piece_length_ft) | pieces | ✅ rule |
+| `paver_count` | "how many 12x12 pavers for 200 sq ft" | area_sqft, paver_length_inches, paver_width_inches | pieces | ✅ rule |
+| `unit_conversion` | "convert 100 sq ft to sq m" | value, from_unit, to_unit | converted value | ✅ rule |
+| `aggregate_tons` | "how many **tons** of gravel for 100 sq ft 4 inches deep" | area_sqft, depth_inches (opt. tons_per_cubic_yard, default 1.5) | tons | ✅ rule *(2026-06-15)* |
+| `mulch_bags` | "how many **bags** of mulch for 100 sq ft at 3 inches" | area_sqft, depth_inches (opt. bag_size_cuft, default 2) | bags | ✅ rule *(2026-06-15)* |
+| `retaining_wall_blocks` | "how many blocks for a 20 ft wall 3 ft high with 12x8 blocks" | wall_length_ft, wall_height_ft, block_length_inches, block_height_inches | blocks | 🤖 LLM *(2026-06-15 — regex doesn't extract block dims; LLM extraction path)* |
+| `step_count` | "how many steps for a 42 inch rise" | total_rise_inches (opt. target_riser_inches, default 7) | steps | 🤖 LLM *(2026-06-15)* |
+| `plant_count` | "how many plants for 100 sq ft at 12 inch spacing" (opt. "triangular spacing") | area_sqft, spacing_inches (opt. pattern square/triangular, default square) | plants | 🤖 LLM *(2026-06-15 — regex defers: "12 inch spacing" is spacing not depth)* |
+
+All accept an optional `waste_factor_pct` ("with 10% waste") except
+`step_count` and `unit_conversion`. The missing-parameter continuation flow in
+§9.3 applies to every type: a bare number fills a single outstanding field, and
+natural-language replies are matched for the common dimension phrasings
+("20 feet long", "3 feet high", "8 inch spacing", "42 inch rise").
+
+For area-based calculations, `area_sqft` is **derived from length × width** when
+the user gives dimensions instead of an area (e.g. "the bed is 45 feet long and
+6 feet wide" → 270 sq ft) — Maple won't re-ask for area it can compute. The
+multiplication is done in code (`_derive_implied_params`), never by the LLM.
+
+> **Deferred by design:** grading pitch (2% / quarter-inch-per-foot) and
+> irrigation/drainage hydraulics (TDH, GPM, runoff, pipe sizing). The hydraulics
+> set carries install/liability risk and needs reviewed engineering formulas —
+> tracked for a separate phase.
 
 ## 9.4 Post-creation "link to a property?" follow-up ✅ implemented *(2026-06-06)*
 

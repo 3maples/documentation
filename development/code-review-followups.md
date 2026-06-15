@@ -4106,6 +4106,21 @@ of the other. Not worth the complexity now.
 
 ---
 
+## 2026-06-16 deferred from /code-review (calculator registry refactor + new calcs)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] platform/agents/calculator/text_helpers.py:195 — calculation_type string literals spread into a third location
+"aggregate_tons"/"mulch_bags" are now hardcoded in `text_helpers` in addition to the
+schema `Literal` and the registry keys (the Magic Strings smell). Risk is low — the
+`Literal` type makes a typo a mypy error and the registry drift test guards
+schema↔registry — but the values now live in three files.
+**Suggested fix:** Acceptable as-is given the tooling guards. If the set keeps
+growing, promote `calculation_type` to a shared `StrEnum` referenced by the schema,
+the registry, and `text_helpers` so there is one source of truth.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
