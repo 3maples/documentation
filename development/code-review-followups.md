@@ -4069,6 +4069,43 @@ confusing in practice.
 
 ---
 
+## 2026-06-15 deferred from /code-review (portal orchestratorReply clarification merge)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass
+(selection: none). All LOW / optional polish on the clarification-merge change.
+
+### [LOW] portal/src/lib/orchestratorReply.ts:39 — formatOrchestratorReply is now ~54 lines (just over the 50-line guideline)
+The added clarification-merge block pushes the function just past the 50-line
+guideline. It's still linear guard-clauses + a doc comment, so it reads fine, but
+the merge logic is a self-contained unit.
+**Suggested fix:** Optional — extract the needs_clarification block into a small
+pure helper, e.g. `mergeClarification(response, question): string`, and call it
+from formatOrchestratorReply. Improves readability and lets the merge/dedup be
+unit-tested directly.
+
+### [LOW] portal/src/lib/orchestratorReply.ts:80 — combine can stack two questions on distinct question-bearing refusals
+When `response` and `clarifying_question` are distinct and neither contains the
+other, the result is `${response}\n\n${question}`. For the illegal-status-transition
+refusal — whose `response` already ends in its own question ("…want me to do one of
+those instead?") and whose `clarifying_question` is "Which status would you like
+instead?" — the reply shows two stacked questions. Cosmetic; context is preserved
+(the point of the change), and it's a deliberate, documented tradeoff.
+**Suggested fix:** Acceptable as-is. If the doubling reads poorly in practice,
+refine backend-side (drop the redundant clarifying_question on flows whose
+`response` is already self-contained) rather than adding heuristics in the portal.
+
+### [LOW] portal/src/lib/orchestratorReply.ts:74 — substring dedup could over-collapse a degenerate short question
+`context.includes(question)` / `question.includes(context)` dedup on raw substring.
+If a `clarifying_question` were a short fragment that happens to appear mid-sentence
+in `response` (e.g. question "name" inside "Add a name."), the shorter field is
+dropped. In practice clarifying_question is always a full prompt sentence, so the
+risk is negligible.
+**Suggested fix:** Acceptable as-is. If hardening is wanted, compare on a
+sentence/boundary basis or only dedup when one string fully equals a trimmed line
+of the other. Not worth the complexity now.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
