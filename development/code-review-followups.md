@@ -4121,6 +4121,44 @@ the registry, and `text_helpers` so there is one source of truth.
 
 ---
 
+## 2026-06-17 deferred from /code-review (batch materials/labour load-standard bootstrap)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [MEDIUM] platform/services/material_bootstrap.py:179 — bootstrap_company_materials exceeds the 50-line guideline
+After adding the preload + partition + insert_many, the function is ~63 code lines and
+now juggles several responsibilities (resolve company id, load templates, preload
+categories, preload units, auto-create missing cats/units, group rows, preload existing
+materials, partition into update/insert, batched write). It's cohesive and readable, but
+crosses the review rubric's 50-line threshold and is getting hard to scan.
+**Suggested fix:** Extract the per-material partition loop (resolve → update-existing vs
+collect-to-insert) into a small private helper, e.g. `_partition_materials(grouped,
+existing_by_name, categories, units, company_id, result) -> list[Material]`. Pure
+mechanical extraction, no behavior change.
+
+### [LOW] platform/services/company_bootstrap.py:68 — (name, unit) lookup key assumes canonical unit casing
+`existing_by_key` is keyed by `(doc.name, doc.unit)` where `doc.unit` is the LabourUnit
+str-enum, and looked up with the template's raw `unit` string. It works today only because
+default_labours.csv uses exactly "Hourly" (verified). If a future seed row used an
+alias/lowercase unit ("hour"), the key would miss on rerun and insert a DUPLICATE role
+instead of overwriting. The legacy find_one had the same latent gap, so this is not a
+regression — but the in-memory key makes the casing assumption implicit.
+**Suggested fix:** Normalize the template unit when building/looking up the key, e.g. key
+on `LabourUnit.from_string(template["unit"])` on both sides, so alias/case variants resolve
+to the same enum. (Or assert the seed CSV uses canonical unit values.)
+
+### [LOW] platform/services/material_bootstrap.py — insert_many is non-atomic on partial failure
+`Material.insert_many(to_insert)` (and the labour equivalent) isn't transactional. A
+mid-batch failure (e.g. a duplicate-key race, validation) leaves some rows inserted, then
+raises up to the load-standard router as a 502 with `created` never set. The pre-existing
+one-insert-per-row loop had the same partial-state shape, so this isn't a regression, just
+worth being aware of now that it's a single bulk call.
+**Suggested fix:** Optional. If atomicity matters, wrap the bulk writes in a Motor
+transaction (the atlas-local replica set supports them), or pass `ordered=False` and
+surface a partial "imported N of M" result instead of a bare 502.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
