@@ -4174,6 +4174,19 @@ covered.
 
 ---
 
+## 2026-06-19 deferred from /code-review (onboarding CompletionStep restyle)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] portal/src/components/onboarding/CompletionStep.tsx:16 — decorative sparkle icon lacks aria-hidden
+The `<Sparkles>` icon is purely decorative but has no `aria-hidden="true"`. Lucide renders a
+bare `<svg>` with no accessible name, so screen readers already skip it (hence LOW), and it
+matches the existing inline-icon pattern across the codebase.
+**Suggested fix:** Optionally add `aria-hidden="true"` for explicitness. Skip if you'd rather
+stay consistent with the rest of the codebase, which omits it on decorative icons.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
