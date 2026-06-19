@@ -4159,6 +4159,21 @@ surface a partial "imported N of M" result instead of a bare 502.
 
 ---
 
+## 2026-06-19 deferred from /code-review (onboarding back-to-Company edit)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] portal/src/pages/OnboardingPage.tsx:140 — back-nav wiring isn't covered by a test
+The new `onBack={() => goToStep(1)}` on the Contacts step and the
+`companyId`/`onCompanyUpdated` props are untested at the page level. The meaningful logic
+(create-vs-update, prefill) is covered in `CompanyStepEdit.test.tsx`; this is just one-line
+glue, but the navigation contract has no regression guard.
+**Suggested fix:** Optional — `OnboardingPage` needs firebase mocking to render (no existing
+pattern), so low-value to test directly. Acceptable to leave given the branch logic is
+covered.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
