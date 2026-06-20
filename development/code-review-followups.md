@@ -4296,6 +4296,20 @@ The docstring still enumerates only word-form phrasings ("from last week" / "thi
 
 ---
 
+## 2026-06-21 deferred from /code-review (PYTHON-J per-segment outbound translation)
+
+Logged by `/fix-issues` — findings from the review of the PYTHON-J fix (per-segment outbound translation in `services/translation.py`) not fixed in that pass. #2 (distinct clarifying_question test gap) was fixed in the same pass.
+
+### [LOW] platform/services/translation.py:712 — unbounded concurrency in `asyncio.gather`
+One LLM call is fired per segment with no concurrency cap. In practice `suggestions` is a small fixed UI set (~3-4 chips) so fan-out is caller-bounded, but there is no structural guard; a future caller passing a large `suggestions` list would launch that many simultaneous LLM calls (rate-limit / burst-cost risk).
+**Suggested fix:** Optional — bound it with a `Semaphore` or cap the number of translated chips if suggestion counts could ever grow. Not needed at current call sites.
+
+### [LOW] platform/services/translation.py:661 — `translate_response_bundle` length (~69 lines incl. docstring)
+By the mechanical >50-line rule the function is long. Mitigating context: the executable body is ~30 linear, branch-light lines, and this change reduced the function from ~90 lines (removed the batch/fallback block). Readability is fine.
+**Suggested fix:** None required. The segment-build block could be extracted to a helper if it grows.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
