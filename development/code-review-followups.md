@@ -4187,6 +4187,39 @@ stay consistent with the rest of the codebase, which omits it on decorative icon
 
 ---
 
+## 2026-06-20 deferred from /code-review (estimate role-catalog injection)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [MEDIUM] platform/prompts/role_catalog.py:55 — company-editable role text reaches the LLM prompt unsanitized for instruction-injection
+`render_labour_role_catalog` renders Labour `name` + `description` (company-editable) into both
+estimate prompts. Names are hardened (control-char/length drop) and descriptions are
+whitespace-collapsed + truncated, but description content is not scrubbed for injection text. A
+company user could embed "ignore previous instructions…" in a role description. Bounded:
+same-tenant only, and parity with the pre-existing injection of `available_labour` /
+`available_materials` / `unit_names` into the same prompts (this widens an existing surface, not
+a new trust boundary).
+**Suggested fix:** Acceptable to ship given tenant ownership + parity. For defense-in-depth, add
+a light injection scrub in the renderer or a system-prompt reminder that catalog text is data,
+not instructions. Not a blocker.
+
+### [LOW] platform/agents/estimate/llm_pipeline.py:951 — pre-existing print(formatted_prompt) now dumps role descriptions to stdout
+`_extract_estimate_with_llm` prints the full prompt (pre-existing debug code, not in this diff).
+This change enlarges what it dumps (role responsibility text). Not PII, but noisy debug output
+in a production path.
+**Suggested fix:** Out of scope here; downgrade `print(...)` → `logger.debug(...)` when next
+touching this file.
+
+### [LOW] platform/prompts/role_catalog.py — role resolution now leans on LLM prompt-adherence (conscious tradeoff)
+Activity-role correctness now depends on the model honoring "pick from the catalog." Intended
+design (live smokes confirm it works); deterministic `_resolve_labour_inventory_match` remains
+as fallback, so not Prompt Entanglement. Flagged only for record: prompt drift could regress
+role matching, which the prompt tests (wiring-only) won't catch.
+**Suggested fix:** None required. Consider a periodic live role-matching smoke if this path
+becomes critical.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
