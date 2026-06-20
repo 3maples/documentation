@@ -6,9 +6,10 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Change log
 
-**2026-06-20 — Backlog Value: explanatory routing + dashboard parity (§1.9)**
+**2026-06-20 — Backlog Value: explanatory routing + dashboard parity + all-time window (§1.9)**
 - "How is the Backlog Value calculated?" (and other definitional metric questions) now route to **HELP** instead of returning a dollar figure. `_match_analytics_query` redirects a recognized metric phrased with an explanatory cue to help; `calculated`/`computed` added to `HELP_INSTRUCTIONAL_PATTERNS`.
 - Fixed a parity bug: Maple's backlog headline summed only `[WON]` while the dashboard card sums `[WON, SCHEDULED]`, so chat reported $0.00 against a real dashboard figure. `_analytics_headline_value` now includes SCHEDULED. Tests: `tests/test_dashboard_backlog_parity.py`.
+- **Backlog relaxed to all-time:** removed the last-30-days recency window from backlog in both `compute_analytics` (dashboard) and `_analytics_headline_value` (Maple). Backlog now sums **every** Won/Scheduled estimate for the company regardless of when it closed; pipeline (90d) and won (30d) are unchanged. Maple's all-time backlog answer reads "… in total"; the dashboard card is relabeled "All time". Guide updated (`users_guide.md` §7.1).
 
 **2026-06-15 — Calculator registry refactor + 4 new landscaping calculations (§9.3.1)**
 - The Calculator Agent now derives its dispatch table, required-params, type→label map, and the extraction prompt's type list from a single declarative `CalcSpec` registry (`agents/calculator/registry.py`). Adding a calculation is now one formula in `formulas.py` plus one registry entry — the old parallel dicts and `_dispatch()` if-ladder are gone. A drift-guard test (`test_calculator_registry.py`) makes any schema-Literal ↔ registry mismatch a test failure.
@@ -528,9 +529,9 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 
 **Status comparisons / ratios:** `compute_status_comparison` counts each status (all-time unless a date window is given, in which case it constrains `updated_at`). `format_status_comparison` renders a reduced `A:B` ratio; the WON-vs-LOST pair additionally reports a win-rate percentage (`won / (won + lost)`). Generic pairs ("draft vs approved") report counts + ratio only.
 
-**Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows (pipeline=90 days, backlog/won=30 days). Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
+**Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows: **pipeline = 90 days, won = 30 days, backlog = all-time (no recency window)**. An all-time backlog answer reads "… in total" rather than "… in the last N days". Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
 
-**Status sets must mirror the dashboard cards** (`compute_analytics` in `routers/estimates.py`): pipeline = `[DRAFT, SENT, REVIEW, WON]`, **backlog = `[WON, SCHEDULED]`**, won = `[WON, SCHEDULED, COMPLETED]`. *(2026-06-20 — fixed a parity bug where the chat backlog headline summed only `[WON]`, so Maple reported $0.00 while the dashboard showed the real figure. `_analytics_headline_value` in `crud_handlers.py` now includes SCHEDULED.)*
+**Status sets must mirror the dashboard cards** (`compute_analytics` in `routers/estimates.py`): pipeline = `[DRAFT, SENT, REVIEW, WON]`, **backlog = `[WON, SCHEDULED]` (all-time)**, won = `[WON, SCHEDULED, COMPLETED]`. *(2026-06-20 — fixed a parity bug where the chat backlog headline summed only `[WON]`, so Maple reported $0.00 while the dashboard showed the real figure. `_analytics_headline_value` in `crud_handlers.py` now includes SCHEDULED.)* *(2026-06-20 — backlog relaxed from last-30-days to **all-time** in both `compute_analytics` and `_analytics_headline_value`: backlog = every Won/Scheduled estimate regardless of recency; dashboard card now labeled "All time".)*
 
 ## 1.10 Estimate-level field edits (description & notes)
 
