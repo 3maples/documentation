@@ -4282,6 +4282,20 @@ limits the stale-position window).
 
 ---
 
+## 2026-06-21 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review (numeric time windows for Maple headline metrics) not fixed in that pass. #1 (OverflowError → 500) was fixed in the same pass via a 1-year clamp.
+
+### [LOW] platform/agents/estimate/crud_handlers.py:1635 — canonical-span constants duplicated across two files
+The `named` dict keys {7, 30, 91, 365} in `_describe_date_window` mirror `days_per_unit` in `text_helpers.py` and must stay in lockstep. If `quarter` were ever retuned to 90 in the parser, the label would silently stop matching and fall back to "in the last 90 days". Latent drift coupling, not a current bug.
+**Suggested fix:** Acceptable as-is given the small surface; optionally derive both from one shared constant if these spans are touched again.
+
+### [LOW] platform/agents/estimate/text_helpers.py:589 — `_parse_estimate_date_filter` docstring not updated for numeric windows
+The docstring still enumerates only word-form phrasings ("from last week" / "this month" / "in the past year") and says it returns `None` "when no recognized qualifier appears" — it now also handles numeric windows ("last 90 days", "past 6 months"). The inline comment above the new regex documents it, but the function-level docstring is the public contract.
+**Suggested fix:** Add one line noting numeric windows are also recognized (and capped at one year).
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.

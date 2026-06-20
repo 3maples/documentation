@@ -2,9 +2,12 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-20
+**Last updated:** 2026-06-21
 
 ### Change log
+
+**2026-06-21 — Numeric time windows for headline metrics (§1.9)**
+- Fixed: "What is my completed value for the **last 90 days**?" answered "in the last 30 days" — the numeric window never parsed, so the handler used its 30-day default for both the computation and the label. Added `_NUMERIC_DATE_RANGE_PATTERN` (`(last|past) <N> day|week|month|quarter|year`) to `_parse_estimate_date_filter`, so "last 90 days" / "past 6 months" / "last 2 weeks" resolve to a real `(start, end)` window. `_describe_date_window` now reports the exact day count ("in the last 90 days") for any span that isn't a canonical named period (week/month/quarter/year), so the label never contradicts what the user asked. Word-form windows ("last week", "this month") are unchanged. Tests: `test_maple_phrasing_expansion.py::TestNumericDateRangeFilter`, `test_dashboard_backlog_parity.py`.
 
 **2026-06-20 — Headline metrics: explanatory routing, dashboard parity, all-time backlog, Won→Completed (§1.9)**
 - "How is the Backlog Value calculated?" (and other definitional metric questions) now route to **HELP** instead of returning a dollar figure. `_match_analytics_query` redirects a recognized metric phrased with an explanatory cue to help; `calculated`/`computed` added to `HELP_INSTRUCTIONAL_PATTERNS`.
@@ -530,7 +533,7 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 
 **Status comparisons / ratios:** `compute_status_comparison` counts each status (all-time unless a date window is given, in which case it constrains `updated_at`). `format_status_comparison` renders a reduced `A:B` ratio; the WON-vs-LOST pair additionally reports a win-rate percentage (`won / (won + lost)`). Generic pairs ("draft vs approved") report counts + ratio only.
 
-**Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows: **pipeline = 90 days, completed = 30 days, backlog = all-time (no recency window)**. An all-time backlog answer reads "… in total" rather than "… in the last N days". Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
+**Time windows:** Pipeline/backlog/completed headline queries respect user-specified date ranges via `_parse_estimate_date_filter`, in two shapes: **word qualifiers** ("this month", "last week", "past quarter") via `_DATE_RANGE_FILTER_PATTERN`, and **numeric windows** ("last 90 days", "past 6 months", "last 2 weeks") via `_NUMERIC_DATE_RANGE_PATTERN`. *(2026-06-21 — the numeric form was previously unparsed: "completed value for the last 90 days" silently fell back to the 30-day default and answered "in the last 30 days". `_NUMERIC_DATE_RANGE_PATTERN` (`(last|past) <N> day|week|month|quarter|year`) now resolves it to a real window; `_describe_date_window` reports the exact day count ("in the last 90 days") for any span that isn't a canonical named period. Tests: `test_maple_phrasing_expansion.py::TestNumericDateRangeFilter`, `test_dashboard_backlog_parity.py`.)* When no date qualifier is present, the handler falls back to default windows: **pipeline = 90 days, completed = 30 days, backlog = all-time (no recency window)**. An all-time backlog answer reads "… in total" rather than "… in the last N days". Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
 
 **Status sets must mirror the dashboard cards** (`compute_analytics` in `routers/estimates.py`): pipeline = `[DRAFT, SENT, REVIEW, WON]`, **backlog = `[WON, SCHEDULED]` (all-time)**, **completed = `[COMPLETED]` (last 30 days)**. *(2026-06-20 — fixed a parity bug where the chat backlog headline summed only `[WON]`, so Maple reported $0.00 while the dashboard showed the real figure. `_analytics_headline_value` in `crud_handlers.py` now includes SCHEDULED.)* *(2026-06-20 — backlog relaxed from last-30-days to **all-time** in both `compute_analytics` and `_analytics_headline_value`: backlog = every Won/Scheduled estimate regardless of recency; dashboard card now labeled "All time".)*
 
