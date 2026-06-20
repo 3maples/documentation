@@ -4244,6 +4244,27 @@ of recomputing it.
 
 ---
 
+## 2026-06-20 deferred from /code-review (Finance-page InfoTooltip)
+
+Logged by `/fix-issues` — findings from the Finance-page tooltip review not fixed in that pass
+(selection was `1`; #1 viewport-edge clipping was fixed).
+
+### [LOW] portal/src/components/settings/FinancialTab.tsx:44 — field descriptions duplicated from users_guide.md
+The six tooltip description strings are copied from the platform glossary
+(`platform/user_guides/users_guide.md` lines 718-725). Two sources of truth can drift — a guide
+edit won't propagate to the UI. The frontend can't import the backend markdown, so this is a
+conscious tradeoff, not a bug.
+**Suggested fix:** No action needed now. If these multiply, consider a shared copy module or
+surfacing them from an API. Note kept so a future guide edit remembers to update the UI strings too.
+
+### [LOW] portal/src/components/ui/InfoTooltip.tsx:92 — info button tap target is 16x16px
+The trigger is `h-4 w-4` (16px), below the ~44px recommended touch target. Fine for a secondary
+info affordance, but slightly fiddly on touch.
+**Suggested fix:** Optional — add padding (e.g. `p-1` with `-m-1` to preserve visual size) to
+enlarge the hit area without changing the icon's appearance.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
