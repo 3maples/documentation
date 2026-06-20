@@ -2,9 +2,13 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-15
+**Last updated:** 2026-06-20
 
 ### Change log
+
+**2026-06-20 — Backlog Value: explanatory routing + dashboard parity (§1.9)**
+- "How is the Backlog Value calculated?" (and other definitional metric questions) now route to **HELP** instead of returning a dollar figure. `_match_analytics_query` redirects a recognized metric phrased with an explanatory cue to help; `calculated`/`computed` added to `HELP_INSTRUCTIONAL_PATTERNS`.
+- Fixed a parity bug: Maple's backlog headline summed only `[WON]` while the dashboard card sums `[WON, SCHEDULED]`, so chat reported $0.00 against a real dashboard figure. `_analytics_headline_value` now includes SCHEDULED. Tests: `tests/test_dashboard_backlog_parity.py`.
 
 **2026-06-15 — Calculator registry refactor + 4 new landscaping calculations (§9.3.1)**
 - The Calculator Agent now derives its dispatch table, required-params, type→label map, and the extraction prompt's type list from a single declarative `CalcSpec` registry (`agents/calculator/registry.py`). Adding a calculation is now one formula in `formulas.py` plus one registry entry — the old parallel dicts and `_dispatch()` if-ladder are gone. A drift-guard test (`test_calculator_registry.py`) makes any schema-Literal ↔ registry mismatch a test failure.
@@ -520,10 +524,13 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `draft vs approved estimates` / `compare won and lost estimates` | `analytics_estimates` → Estimate Agent (generic pair) | ✅ rule *(2026-06-02 — explicit "X vs Y" / "compare X and Y"; no win-rate framing for non-WON/LOST pairs)* |
 | `what's my win rate?` / `what's my win rate this month?` | `analytics_estimates` → Estimate Agent (WON vs LOST, window-aware) | ✅ rule *(2026-06-02)* |
 | `how am I doing on bids?` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02 — landscaper-friendly win-rate cue)* |
+| `how is the backlog value calculated?` / `what does pipeline value mean?` / `how is the won value calculated?` | `help` → Orchestrator Agent | ✅ rule *(2026-06-20 — explanatory/definitional phrasing about a metric routes to HELP, not a value lookup. `_match_analytics_query` now redirects a recognized metric phrased with an explanatory cue (`calculated`/`computed`/`defined`/`mean`/…) to help; `calculated`/`computed` also added to `HELP_INSTRUCTIONAL_PATTERNS` for metrics without an analytics keyword.)* |
 
 **Status comparisons / ratios:** `compute_status_comparison` counts each status (all-time unless a date window is given, in which case it constrains `updated_at`). `format_status_comparison` renders a reduced `A:B` ratio; the WON-vs-LOST pair additionally reports a win-rate percentage (`won / (won + lost)`). Generic pairs ("draft vs approved") report counts + ratio only.
 
 **Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows (pipeline=90 days, backlog/won=30 days). Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
+
+**Status sets must mirror the dashboard cards** (`compute_analytics` in `routers/estimates.py`): pipeline = `[DRAFT, SENT, REVIEW, WON]`, **backlog = `[WON, SCHEDULED]`**, won = `[WON, SCHEDULED, COMPLETED]`. *(2026-06-20 — fixed a parity bug where the chat backlog headline summed only `[WON]`, so Maple reported $0.00 while the dashboard showed the real figure. `_analytics_headline_value` in `crud_handlers.py` now includes SCHEDULED.)*
 
 ## 1.10 Estimate-level field edits (description & notes)
 
