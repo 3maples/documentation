@@ -4265,6 +4265,23 @@ enlarge the hit area without changing the icon's appearance.
 
 ---
 
+## 2026-06-20 deferred from /code-review (InfoTooltip portal rewrite)
+
+Logged by `/fix-issues` — findings from the InfoTooltip portal/clamp/fade review (selection was
+`none`). The 16px tap-target finding from this review is the same one already tracked above
+(2026-06-20 Finance-page InfoTooltip) — not re-logged to avoid a duplicate.
+
+### [LOW] portal/src/components/ui/InfoTooltip.tsx:78 — position clamped horizontally but not vertically
+The portaled bubble always opens below the trigger (`top = triggerRect.bottom + 6`) and clamps only
+`left` to the viewport width. A field near the bottom of a short viewport can push the tooltip off
+the bottom edge — there is no flip-to-above or bottom clamp. Low impact: the Financial fields sit
+high in the card and the bubble is short, so it's unlikely in practice.
+**Suggested fix:** Optional — if the bubble would exceed `innerHeight - margin`, flip above the
+trigger (`top = triggerRect.top - bubbleHeight - gap`), or accept it (closing on scroll already
+limits the stale-position window).
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
