@@ -4220,6 +4220,30 @@ becomes critical.
 
 ---
 
+## 2026-06-20 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the orchestrator intent-first review not fixed in that
+pass (selection was `1, 3, 4`).
+
+### [HIGH] platform/agents/orchestrator/service.py:2508 — process() is a ~245-line god-method
+process() already exceeded the 50-line threshold; the intent-first change adds another inline
+fast-path block, worsening it. Pre-existing structural smell — not a defect in the new logic
+(the block mirrors the existing inline pre-checks). The DRY extraction in review-#3 (now applied,
+`_build_rule_match_result`) trims the duplicated dicts but does not shorten the method's branch
+count materially.
+**Suggested fix:** Decompose process()'s deterministic pre-check sequence into a table-driven
+dispatch (ordered list of `(matcher, builder)` pairs iterated in one loop) so each new pre-check
+is data, not another inline `if` block. Not a blocker on its own.
+
+### [LOW] platform/agents/orchestrator/service.py:2657 — `_classify_specific_phrasings` evaluated twice on the LLM-reconciliation path
+When the pre-LLM fast-path returns None, the LLM runs, then `_prefer_explicit_rule_match` →
+`_classify_with_rules` → `_match_unambiguous_command` re-invokes `_classify_specific_phrasings`.
+Same regexes run twice per ambiguous message. Cheap (regex only), no correctness impact.
+**Suggested fix:** If optimizing, reuse the pre-LLM rule classification in reconciliation instead
+of recomputing it.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
