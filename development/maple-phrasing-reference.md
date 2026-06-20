@@ -6,10 +6,11 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Change log
 
-**2026-06-20 — Backlog Value: explanatory routing + dashboard parity + all-time window (§1.9)**
+**2026-06-20 — Headline metrics: explanatory routing, dashboard parity, all-time backlog, Won→Completed (§1.9)**
 - "How is the Backlog Value calculated?" (and other definitional metric questions) now route to **HELP** instead of returning a dollar figure. `_match_analytics_query` redirects a recognized metric phrased with an explanatory cue to help; `calculated`/`computed` added to `HELP_INSTRUCTIONAL_PATTERNS`.
 - Fixed a parity bug: Maple's backlog headline summed only `[WON]` while the dashboard card sums `[WON, SCHEDULED]`, so chat reported $0.00 against a real dashboard figure. `_analytics_headline_value` now includes SCHEDULED. Tests: `tests/test_dashboard_backlog_parity.py`.
-- **Backlog relaxed to all-time:** removed the last-30-days recency window from backlog in both `compute_analytics` (dashboard) and `_analytics_headline_value` (Maple). Backlog now sums **every** Won/Scheduled estimate for the company regardless of when it closed; pipeline (90d) and won (30d) are unchanged. Maple's all-time backlog answer reads "… in total"; the dashboard card is relabeled "All time". Guide updated (`users_guide.md` §7.1).
+- **Backlog relaxed to all-time:** removed the last-30-days recency window from backlog in both `compute_analytics` (dashboard) and `_analytics_headline_value` (Maple). Backlog now sums **every** Won/Scheduled estimate for the company regardless of when it closed; pipeline (90d) is unchanged. Maple's all-time backlog answer reads "… in total"; the dashboard card is relabeled "All time". Guide updated (`users_guide.md` §7.1).
+- **Won Value → Completed Value:** retired the "Won Value" headline (Won+Scheduled+Completed, 30d) and replaced it with **Completed Value = `[COMPLETED]` only, last 30 days** across the dashboard card (API field `won_value` → `completed_value`; label "Completed Value"), Maple (`_analytics_headline_value` "completed" metric, answer "Your completed value is … in the last 30 days"; the analytics router recognizes `completed value` / `how much was completed`), and the guide (`users_guide.md` §7.1). The legacy "how much was won?" headline question is retired (parity invariant: chat must mirror the dashboard cards).
 
 **2026-06-15 — Calculator registry refactor + 4 new landscaping calculations (§9.3.1)**
 - The Calculator Agent now derives its dispatch table, required-params, type→label map, and the extraction prompt's type list from a single declarative `CalcSpec` registry (`agents/calculator/registry.py`). Adding a calculation is now one formula in `formulas.py` plus one registry entry — the old parallel dicts and `_dispatch()` if-ladder are gone. A drift-guard test (`test_calculator_registry.py`) makes any schema-Literal ↔ registry mismatch a test failure.
@@ -126,7 +127,7 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - Sections renumbered: old §6–§11 → §7–§12 to accommodate the new §6.
 
 **2026-05-26 — May expansion**
-- Dashboard analytics intent (`analytics_estimates`) with pipeline value, backlog, won value, and breakdown-by-status/division phrasings (§1.9). Custom time windows respected — "pipeline value in the last 30 days" queries the DB with the user's window, not the default 90-day headline.
+- Dashboard analytics intent (`analytics_estimates`) with pipeline value, backlog, completed value, and breakdown-by-status/division phrasings (§1.9). Custom time windows respected — "pipeline value in the last 30 days" queries the DB with the user's window, not the default 90-day headline.
 - Title-based estimate lookup — `_handle_get_estimate` now resolves estimates by quoted title or `title/called/named X` phrases when no EST-code is present (§1.2)
 - "win" added as a verb-form alias for EstimateStatus.WON so "how many estimates did I win this month?" routes correctly
 - "older than X days" age-based date filter via `_AGE_FILTER_PATTERN`
@@ -517,7 +518,7 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `what's the value in the pipeline?` | `analytics_estimates` → Estimate Agent | ✅ rule |
 | `what's my pipeline value in the last 30 days?` | `analytics_estimates` → Estimate Agent (custom window) | ✅ rule |
 | `what's the backlog value?` | `analytics_estimates` → Estimate Agent | ✅ rule |
-| `how much value was won?` | `analytics_estimates` → Estimate Agent | ✅ rule |
+| `what's my completed value?` / `how much was completed?` | `analytics_estimates` → Estimate Agent (COMPLETED only, last 30 days) | ✅ rule *(2026-06-20 — replaced the retired "won value" headline; see change log)* |
 | `what's the breakdown of estimates by statuses this month?` | `analytics_estimates` → Estimate Agent | ✅ rule |
 | `what's the breakdown of estimates by divisions?` | `analytics_estimates` → Estimate Agent | ✅ rule |
 | `what is my won-lost ratio?` / `win-loss ratio` / `win/loss ratio` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02 — `parse_status_comparison`; count ratio + win-rate %)* |
@@ -525,13 +526,13 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `draft vs approved estimates` / `compare won and lost estimates` | `analytics_estimates` → Estimate Agent (generic pair) | ✅ rule *(2026-06-02 — explicit "X vs Y" / "compare X and Y"; no win-rate framing for non-WON/LOST pairs)* |
 | `what's my win rate?` / `what's my win rate this month?` | `analytics_estimates` → Estimate Agent (WON vs LOST, window-aware) | ✅ rule *(2026-06-02)* |
 | `how am I doing on bids?` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02 — landscaper-friendly win-rate cue)* |
-| `how is the backlog value calculated?` / `what does pipeline value mean?` / `how is the won value calculated?` | `help` → Orchestrator Agent | ✅ rule *(2026-06-20 — explanatory/definitional phrasing about a metric routes to HELP, not a value lookup. `_match_analytics_query` now redirects a recognized metric phrased with an explanatory cue (`calculated`/`computed`/`defined`/`mean`/…) to help; `calculated`/`computed` also added to `HELP_INSTRUCTIONAL_PATTERNS` for metrics without an analytics keyword.)* |
+| `how is the backlog value calculated?` / `what does pipeline value mean?` / `how is the completed value calculated?` | `help` → Orchestrator Agent | ✅ rule *(2026-06-20 — explanatory/definitional phrasing about a metric routes to HELP, not a value lookup. `_match_analytics_query` now redirects a recognized metric phrased with an explanatory cue (`calculated`/`computed`/`defined`/`mean`/…) to help; `calculated`/`computed` also added to `HELP_INSTRUCTIONAL_PATTERNS` for metrics without an analytics keyword.)* |
 
 **Status comparisons / ratios:** `compute_status_comparison` counts each status (all-time unless a date window is given, in which case it constrains `updated_at`). `format_status_comparison` renders a reduced `A:B` ratio; the WON-vs-LOST pair additionally reports a win-rate percentage (`won / (won + lost)`). Generic pairs ("draft vs approved") report counts + ratio only.
 
-**Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows: **pipeline = 90 days, won = 30 days, backlog = all-time (no recency window)**. An all-time backlog answer reads "… in total" rather than "… in the last N days". Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
+**Time windows:** Pipeline/backlog/won headline queries respect user-specified date ranges ("last 30 days", "this month", "last week") via `_parse_estimate_date_filter`. When no date qualifier is present, the handler falls back to default windows: **pipeline = 90 days, completed = 30 days, backlog = all-time (no recency window)**. An all-time backlog answer reads "… in total" rather than "… in the last N days". Breakdown queries use the `period` parameter ("month"/"quarter"/"year") passed to `compute_analytics`.
 
-**Status sets must mirror the dashboard cards** (`compute_analytics` in `routers/estimates.py`): pipeline = `[DRAFT, SENT, REVIEW, WON]`, **backlog = `[WON, SCHEDULED]` (all-time)**, won = `[WON, SCHEDULED, COMPLETED]`. *(2026-06-20 — fixed a parity bug where the chat backlog headline summed only `[WON]`, so Maple reported $0.00 while the dashboard showed the real figure. `_analytics_headline_value` in `crud_handlers.py` now includes SCHEDULED.)* *(2026-06-20 — backlog relaxed from last-30-days to **all-time** in both `compute_analytics` and `_analytics_headline_value`: backlog = every Won/Scheduled estimate regardless of recency; dashboard card now labeled "All time".)*
+**Status sets must mirror the dashboard cards** (`compute_analytics` in `routers/estimates.py`): pipeline = `[DRAFT, SENT, REVIEW, WON]`, **backlog = `[WON, SCHEDULED]` (all-time)**, **completed = `[COMPLETED]` (last 30 days)**. *(2026-06-20 — fixed a parity bug where the chat backlog headline summed only `[WON]`, so Maple reported $0.00 while the dashboard showed the real figure. `_analytics_headline_value` in `crud_handlers.py` now includes SCHEDULED.)* *(2026-06-20 — backlog relaxed from last-30-days to **all-time** in both `compute_analytics` and `_analytics_headline_value`: backlog = every Won/Scheduled estimate regardless of recency; dashboard card now labeled "All time".)*
 
 ## 1.10 Estimate-level field edits (description & notes)
 
