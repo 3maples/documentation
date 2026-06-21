@@ -4310,6 +4310,24 @@ By the mechanical >50-line rule the function is long. Mitigating context: the ex
 
 ---
 
+## 2026-06-21 deferred from /code-review (default-templates bootstrap + Settings responsiveness)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass. #1 (`_build_template` length) and #2 (date_range recurrence test) were fixed in the same pass.
+
+### [LOW] platform/services/template_bootstrap.py:241 — duplicate catalog names collapse silently (last-wins)
+`materials_by_name` / `labours_by_name` are dict comprehensions keyed by name. Material has a non-unique (company, name) index, so two same-name rows silently keep only the last — resolution could bind to an unexpected size/price with no signal.
+**Suggested fix:** Optional — log a warning when a name maps to >1 catalog doc.
+
+### [LOW] platform/services/template_bootstrap.py:152 — size label kept when requested size doesn't match
+When `size_str` is provided but matches no `MaterialSizeCost`, `_resolve_material_size` falls back to the first size for price/unit, yet the item stores the original `size_str`. Result: a line item whose size label and price/unit can disagree. (No current template hits this — all sizes match.)
+**Suggested fix:** Store `size.size` (the resolved label), or route a non-matching size to `unmatched_materials`. Document the chosen behavior in the helper docstring.
+
+### [LOW] portal/src/pages/SettingsPage.tsx:1208 — tablist orientation / keyboard semantics
+This change removed `aria-orientation="vertical"`; on the desktop vertical layout that now defaults to `horizontal` (minor SR regression), and it cannot be statically correct for both responsive layouts. Separately and pre-existing (unchanged by this diff): the roving `tabIndex={isActive ? 0 : -1}` follows the ARIA tabs pattern but there is no Arrow-key keydown handler, so keyboard users can't move between tabs — only the active tab is reachable via Tab.
+**Suggested fix:** If full correctness is wanted, drive `aria-orientation` from a `matchMedia('(min-width:768px)')` state and add an ArrowLeft/Right (and Up/Down) handler that moves focus + selection across `tabs`. Low practical impact today (orientation has no keyboard effect without arrow handling), so acceptable to defer.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
