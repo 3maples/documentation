@@ -4328,6 +4328,20 @@ This change removed `aria-orientation="vertical"`; on the desktop vertical layou
 
 ---
 
+## 2026-06-22 deferred from /code-review (Settings/Dashboard intros + Work Items two-row layout)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass. #1 (`break-words` on the Work Items description cell) was fixed in the same pass.
+
+### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1213 — `key={idx}` on a deletable work-item list (pre-existing)
+Work items can be deleted, so index keys can cause React to mis-associate row state on removal. Not introduced by this change — the line was only shifted — but it sits in the edited map.
+**Suggested fix:** Use a stable id if available (e.g. the work item's own id). Out of scope for the styling change; fold into a follow-up if desired.
+
+### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1211-1279 — narrow two-row layout relies on inline-block flow; needs an eyes-on check
+The "Description row 1, meta row 2" result depends on the Description inline-block filling row 1 so the meta cells wrap below. When a description is very short, the meta cells may sit beside it on row 1 (still readable, just not strictly two rows). No correctness impact; purely visual.
+**Suggested fix:** Verify across short/long descriptions at a narrow container width. If strict two-row behavior is required, force a break (e.g. `basis-full` on the Description cell under a flex `tr`, or a wrapper element for the meta trio).
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
