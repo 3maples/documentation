@@ -4342,6 +4342,16 @@ The "Description row 1, meta row 2" result depends on the Description inline-blo
 
 ---
 
+## 2026-06-23 deferred from /code-review (People page container-query + Unit column removal)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] portal/src/pages/PeoplePage.tsx:1 — file exceeds 800-line guideline (1128 lines)
+The file is over the 800-line HIGH threshold. PRE-EXISTING; this change does not worsen it (net -6 lines). Reported for awareness only.
+**Suggested fix:** Out of scope for this change. If addressed later, extract the create/edit Modal form, the CSV-upload Modal, and the card/table row renderers into child components.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
