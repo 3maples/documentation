@@ -4352,6 +4352,16 @@ The file is over the 800-line HIGH threshold. PRE-EXISTING; this change does not
 
 ---
 
+## 2026-06-23 deferred from /code-review (Role form rename + breakdown tooltips)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] portal/src/pages/PeoplePage.tsx:1 — file exceeds 800 lines (1168 lines)
+PeoplePage.tsx is 1168 lines. PRE-EXISTING; the Role-form rename/tooltip change added ~30 lines but did not create the size problem. Reported for awareness only (per the size heuristic).
+**Suggested fix:** No action needed for this change. If the page grows further, extract the Role form Modal and the list table into sub-components.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
