@@ -4360,6 +4360,22 @@ Logged by `/fix-issues` — findings from the latest review not fixed in that pa
 PeoplePage.tsx is 1168 lines. PRE-EXISTING; the Role-form rename/tooltip change added ~30 lines but did not create the size problem. Reported for awareness only (per the size heuristic).
 **Suggested fix:** No action needed for this change. If the page grows further, extract the Role form Modal and the list table into sub-components.
 
+## 2026-06-28 deferred from /code-review (calculator open-math path)
+
+Logged by `/fix-issues` — `/fix-issues all` was requested, but these three were deliberately NOT force-applied because their correct fix would work against the approved design (#2, #3) or is tooling rather than a source change (#4). #1 (raw user message in the open-math exception log → PII risk) WAS fixed in the same pass.
+
+### [LOW] platform/agents/calculator/open_math.py:38 — whole-number rounding enforced only in the prompt
+"counts must be whole — wrap in floor/ceil" lives only in `_REASONING_SYSTEM_PROMPT`; neither `safe_eval` nor `format_open_math` enforces it, so a model slip can reproduce the fractional-count bug the feature targets (`_fmt_value` would render "6.67"). This is the residual modeling risk the design spec explicitly accepted (mitigated by the auditable `Working:` line + temperature 0).
+**Suggested fix:** A blanket floor is wrong — not every open-math result is a count (areas/weights are legitimately fractional). A correct guard needs count-vs-measurement unit classification or a re-prompt, i.e. a mini-feature, not a one-liner. Accept as documented residual risk unless it recurs in practice.
+
+### [LOW] platform/agents/calculator/service.py:236 — broad `except Exception` can mask genuine bugs
+The fail-soft catch is intentional for LLM/parse failures but also swallows programming errors (e.g. a future KeyError) into a silent fallback. Mitigated by `logger.exception` preserving the trace.
+**Suggested fix:** Narrowing to specific LLM/validation exception types would let unanticipated error types (OpenAI timeouts, new LangChain exceptions) propagate and 500 the request — contradicting the spec's mandated fail-soft guarantee. Keep the broad catch; the existing `logger.exception` already surfaces masked bugs in logs. No change recommended.
+
+### [LOW] platform/.venv — bandit not installed; automated security scan skipped
+The `/code-review` bandit step could not run; only the manual security pass covered the diff. There is no dev-requirements split — adding `bandit` to the single runtime `requirements.txt` would ship a dev-only scanner to production.
+**Suggested fix:** Introduce a `requirements-dev.txt` (or a `[project.optional-dependencies] dev` group) and pin `bandit` there, then wire it into the review tooling. Tooling/process task, not a source fix.
+
 ---
 
 ## How to work through this
