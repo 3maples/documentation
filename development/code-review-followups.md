@@ -4376,6 +4376,18 @@ The fail-soft catch is intentional for LLM/parse failures but also swallows prog
 The `/code-review` bandit step could not run; only the manual security pass covered the diff. There is no dev-requirements split — adding `bandit` to the single runtime `requirements.txt` would ship a dev-only scanner to production.
 **Suggested fix:** Introduce a `requirements-dev.txt` (or a `[project.optional-dependencies] dev` group) and pin `bandit` there, then wire it into the review tooling. Tooling/process task, not a source fix.
 
+## 2026-06-28 deferred from /code-review (reverse-calc classifier fix)
+
+Logged by `/fix-issues` — `/fix-issues none` was requested; both findings are LOW watch-points, not blockers.
+
+### [LOW] platform/tests/test_calculator_open_math_live.py:1 — classifier regression guard is opt-in only
+The reverse→open_math and forward→curated routing is verified solely by `llm_e2e` tests, which are excluded from the default/CI run and need OPENAI_API_KEY. A future prompt edit could silently regress this routing without the default suite catching it. Coverage is also narrow (3 reverse + 5 forward phrasings), so untested phrasings could still mis-route.
+**Suggested fix:** Accept (live-LLM behavior can't run in default CI). Optionally run the live suite as a manual gate before promoting calculator-prompt changes, and broaden phrasings over time.
+
+### [LOW] platform/agents/calculator/service.py:88 — extraction prompt is accumulating routing rules
+The open_math branch now spans spaced-layout + composite + orientation + reverse guidance plus 6 examples. Still clear, but classifier prompts that grow this way drift toward ambiguity and higher per-call token cost. Not a defect — a maintainability watch-point.
+**Suggested fix:** Periodically run /agent-prompt-review on the extraction prompt for clarity and token efficiency.
+
 ---
 
 ## How to work through this
