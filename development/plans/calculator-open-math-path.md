@@ -200,3 +200,57 @@ calculator_open_math_enabled: bool = Field(
 - `platform/prompts/` — researcher reasoning prompt (new) + extraction-prompt examples.
 - `platform/tests/test_calculator_safe_eval.py`, `platform/tests/test_calculator_open_math.py` — new.
 - `.env.example` — document `CALCULATOR_OPEN_MATH_ENABLED`.
+
+## 12. Extension — labor-time questions ("how long") via assumed-rate open-math *(2026-06-29)*
+
+**Problem.** "How long does it take to edge 800 linear feet of beds?" never reached the
+Calculator: the orchestrator's calculation gate (`is_calculation_query`) keys on
+"how many / how much", so "how long" fell through to a graceful-but-non-answering
+decline. It is a labor-time question — `time = quantity ÷ production_rate` — with no
+curated formula (production rates are company-specific). A small, three-touch
+extension of the open-math path handles it. This realizes a narrow slice of §10
+follow-up #2 (entry-gate broadening), scoped to time questions that still carry a
+spatial unit.
+
+**Design decisions:**
+- **Gate** (`agents/calculator/text_helpers.py`): add `\bhow\s+long\b` to
+  `_CALC_QUESTION_PATTERNS`. A measurement unit is still required, so "how long to
+  edge 800 linear feet" passes (question + "feet") while "how long until my estimate
+  is approved" does not (no spatial unit). No `_CRUD_OVERRIDE_PATTERNS` entry collides.
+- **Classifier** (`service.py` `_EXTRACTION_SYSTEM_PROMPT`): labor-time questions
+  ("how long to do *X* amount of work") classify as `open_math` — there is no
+  labor-time formula. One rule line + one worked example.
+- **Reasoner** (`open_math.py` `_REASONING_SYSTEM_PROMPT`): for a labor-time question,
+  **assume a typical production rate, state it explicitly as an assumption**, and
+  compute `time = quantity / rate`. The existing "second option only on a genuine
+  fork" rule lets *by hand* vs *power tool* rates surface as two options when they
+  genuinely differ.
+- **Rate source:** LLM-assumed rate only — **no rate-card data lookup** (deliberate;
+  keeps the change small). **No rate-card pointer** in the reply (product decision —
+  clean estimate only).
+- Behind the same `CALCULATOR_OPEN_MATH_ENABLED` flag; no new calc type.
+
+**Rendered example:**
+> Edging 800 linear feet. **By hand: ~5.3 hours · with a power edger: ~2.7 hours.**
+> Assumptions: ~150 linear ft/hour by hand, ~300 with a power edger.
+> Working: `800 / 150` = 5.3 · `800 / 300` = 2.7
+
+**Non-goals:** no rate-card lookup; unit-less "how long" stays out of the Calculator;
+no new calc type.
+
+**Testing:**
+- *Tier-1 (rule, no LLM)* in `test_calculator_text_helpers.py`:
+  `is_calculation_query("how long does it take to edge 800 linear feet of beds")` →
+  True; negative guard ("how long until my estimate is approved" → False — no unit).
+- *Live (opt-in `llm_e2e`)* in `test_calculator_open_math_live.py`: the labor-time
+  query classifies as `open_math`, and the open-math answer contains an hours figure
+  and a stated rate assumption.
+
+**Residual risk:** "how long" is broad, but the spatial-unit requirement plus the
+reasoner's graceful handling keep misroutes harmless (e.g. "how long is 800 ft of
+fence" → open_math → trivially answers "800 ft").
+
+**Files touched:** `agents/calculator/text_helpers.py` (gate),
+`agents/calculator/service.py` (extraction prompt), `agents/calculator/open_math.py`
+(reasoning prompt), `tests/test_calculator_text_helpers.py`,
+`tests/test_calculator_open_math_live.py`.

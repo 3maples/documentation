@@ -2,9 +2,14 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-21
+**Last updated:** 2026-06-29
 
 ### Change log
+
+**2026-06-29 — Open-math reasoning path + reverse/inverse coverage (§9.3.2)**
+- New **open-math fallback tier** (`agents/calculator/open_math.py`): when no curated formula faithfully models a calculation, the extraction classifier returns `open_math` and a researcher-model call proposes assumptions + one or more options, each carrying an arithmetic *expression* that a sandboxed `safe_eval` computes (the LLM never returns the final number). Handles spaced layouts, multi-orientation counts, composite shapes, and — newly — **reverse/inverse coverage** ("how many sq ft can 25 yards of mulch cover", "how much area does 10 tons of gravel cover"). Behind `CALCULATOR_OPEN_MATH_ENABLED` (default **off**); not yet promoted to production. The old §9.3 "inverse-coverage remains unsupported" note is retired.
+- **Known gap (documented, not fixed):** labor-time-from-production-rate questions ("how long to edge 800 linear feet of beds") — they depend on a crew role + rate-card production rate, not a material formula, and don't reach the Calculator's "how many / how much" query gate. Maple declines gracefully and points to the rate-card / estimate workflow. See §9.3.2.
+- Tests: `tests/test_calculator_safe_eval.py`, `tests/test_calculator_open_math.py`, `tests/test_calculator_open_math_live.py` (opt-in `llm_e2e`).
 
 **2026-06-21 — Numeric time windows for headline metrics (§1.9)**
 - Fixed: "What is my completed value for the **last 90 days**?" answered "in the last 30 days" — the numeric window never parsed, so the handler used its 30-day default for both the computation and the label. Added `_NUMERIC_DATE_RANGE_PATTERN` (`(last|past) <N> day|week|month|quarter|year`) to `_parse_estimate_date_filter`, so "last 90 days" / "past 6 months" / "last 2 weeks" resolve to a real `(start, end)` window. `_describe_date_window` now reports the exact day count ("in the last 90 days") for any span that isn't a canonical named period (week/month/quarter/year), so the label never contradicts what the user asked. Word-form windows ("last week", "this month") are unchanged. Tests: `test_maple_phrasing_expansion.py::TestNumericDateRangeFilter`, `test_dashboard_backlog_parity.py`.
@@ -1120,9 +1125,10 @@ Pending-state slot: `pending_calculation`. Continuation logic:
 `tests/test_calculator_agent.py::TestContinuePending`,
 `tests/test_calculator_text_helpers.py::TestExtractContinuationValues`.
 
-> Note: re-engagement phrasings ("can you help with mulch coverage?") and
-> inverse-coverage math ("how many sq ft will a yard cover" → solve for area)
-> remain unsupported by design (out of scope for the continuation fix).
+> Note: re-engagement phrasings ("can you help with mulch coverage?") remain
+> unsupported by the continuation fix. **Inverse-coverage math** ("how many sq
+> ft will a yard cover" → solve for area) is now handled by the open-math path
+> (§9.3.2) when `CALCULATOR_OPEN_MATH_ENABLED` is on.
 
 ## 9.3.1 Calculation catalog (Calculator Agent) ✅
 
@@ -1159,6 +1165,40 @@ multiplication is done in code (`_derive_implied_params`), never by the LLM.
 > irrigation/drainage hydraulics (TDH, GPM, runoff, pipe sizing). The hydraulics
 > set carries install/liability risk and needs reviewed engineering formulas —
 > tracked for a separate phase.
+
+## 9.3.2 Open-math reasoning path (no curated formula) 🤖 — *behind `CALCULATOR_OPEN_MATH_ENABLED`, default off (2026-06-29)*
+
+When the extraction classifier decides **no curated formula faithfully models**
+the request, it returns `open_math` instead of force-fitting the nearest type.
+The researcher model then proposes an interpretation, the assumptions it made,
+and one or more options — each an arithmetic *expression*, never a final number
+— and a sandboxed allow-list evaluator (`safe_eval`) computes them. The reply
+states the assumption and shows the working, so every number is auditable.
+
+| Pattern | Example phrasing | Why no curated formula fits | Status |
+|---|---|---|---|
+| Spaced layout | "how many 3x2 ft stepping stones along a 20 ft path, 3 in apart" | gaps on a linear run; two possible orientations | 🤖 open_math *(flag)* |
+| Reverse / inverse coverage | "how many sq ft can 25 yards of mulch cover", "how much area does 10 tons of gravel cover at 3 in" | formulas run forward (area + depth → quantity); the reverse has no formula and needs an assumed depth | 🤖 open_math *(2026-06-29 — flag)* |
+| Composite / irregular shape | "how much mulch for an L-shaped bed, 10x4 plus 6x3" | multiple sub-shapes | 🤖 open_math *(flag)* |
+
+Forward calculations (e.g. "how much mulch for 200 sq ft at 3 inches") stay on
+their curated formula — the classifier only diverts genuine misfits. With the
+flag **off**, an `open_math` query returns a short clarification instead of a
+wrong number (it is never force-fit to a curated formula). Not yet promoted to
+production. Tests: `tests/test_calculator_safe_eval.py`,
+`tests/test_calculator_open_math.py`, `tests/test_calculator_open_math_live.py`
+(opt-in `llm_e2e` — reverse + forward-sanity classification).
+
+**⚠️ gap — labor-time from a production rate:** "how long does it take to edge
+800 linear feet of beds?" is **not** handled. It is a labor/time question whose
+answer depends on a crew role and a rate-card production rate (linear ft per
+hour), not a material formula — and it doesn't even reach the Calculator: the
+"how long" phrasing isn't in the calculation-query gate (which keys on "how
+many" / "how much"). Maple currently declines gracefully and points to the
+rate-card / estimate workflow (crew role → production rate → effort). A real
+answer would need a production-rate lookup, or an assumed rate surfaced as an
+assumption — a candidate for the open-math path once it can reach labor-time
+questions.
 
 ## 9.4 Post-creation "link to a property?" follow-up ✅ implemented *(2026-06-06)*
 
