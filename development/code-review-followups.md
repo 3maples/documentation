@@ -4388,6 +4388,22 @@ The reverse→open_math and forward→curated routing is verified solely by `llm
 The open_math branch now spans spaced-layout + composite + orientation + reverse guidance plus 6 examples. Still clear, but classifier prompts that grow this way drift toward ambiguity and higher per-call token cost. Not a defect — a maintainability watch-point.
 **Suggested fix:** Periodically run /agent-prompt-review on the extraction prompt for clarity and token efficiency.
 
+## 2026-06-29 deferred from /code-review (labor-time "how long" feature)
+
+Logged by `/fix-issues` — `/fix-issues none` was requested; all three are LOW watch-points, not blockers.
+
+### [LOW] platform/agents/calculator/text_helpers.py:54 — "how long" is a broad gate trigger
+`\bhow\s+long\b` routes any "how long … <spatial unit>" query to the Calculator. Mitigated by the measurement-unit requirement, CRUD-override precedence, and the no-unit negative test — but non-labor phrasings like "how long is a 10 ft board" now reach open-math too.
+**Suggested fix:** Accept — open-math handles such strays gracefully (trivial answer). Monitor; tighten only if a real misroute surfaces.
+
+### [LOW] platform/tests/test_calculator_open_math_live.py:95 — labor-time verified only by opt-in llm_e2e
+Routing + the answer are covered solely by `llm_e2e` tests (excluded from default CI, need a key). The answer test asserts on LLM-generated text ("hour"/"assumption"), which is mildly fragile.
+**Suggested fix:** Accept (live behavior can't run in default CI). Keep the assertions loose; run the live suite manually before promoting calculator-prompt changes.
+
+### [LOW] platform/agents/calculator/service.py:88 + open_math.py:43 — classifier + reasoner prompts still growing
+Both prompts gained another rule (reverse + now labor-time). Still clear, but the trend warrants a periodic clarity/token pass.
+**Suggested fix:** Periodically run /agent-prompt-review on the extraction + reasoning prompts.
+
 ---
 
 ## How to work through this
