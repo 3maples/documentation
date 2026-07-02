@@ -4484,6 +4484,20 @@ Recurring gap: `/code-review`'s one tool-assisted scan couldn't run over the new
 
 ---
 
+## 2026-07-02 deferred from /code-review (Trello Feedback panel retirement)
+
+Logged by `/fix-issues` — findings from the Trello-retirement / tab-reorder review not fixed in that pass (selection: none).
+
+### [LOW] portal/src/components/Layout/PortalLayout.tsx:147 — flag-off environments now have NO in-app feedback entry point
+The Support tab is still gated on `supportEnabled` (VITE_SUPPORT_PANEL_ENABLED), and the Trello Feedback tab — which was unconditional — is gone. In any build without the flag, the footer is just Maple | What's New: no way to contact support in-app at all. Prod has the flag on today, so no current impact — but the documented way to "turn the panel off" (empty the GitHub var + rebuild) now has a much bigger blast radius than before: it silently removes the only contact channel, not just a beta feature. The flag has effectively changed meaning from rollout gate to kill switch.
+**Suggested fix:** Either accept (flag stays permanently on) and note the kill-switch semantics in the workflow comment next to VITE_SUPPORT_PANEL_ENABLED — or drop the flag gating entirely now that Support is the production channel (remove isSupportPanelEnabled and render unconditionally).
+
+### [LOW] platform/routers/feedback.py — backend /feedback route + Trello service are now dead code
+With portal/src/api/feedback.ts deleted, nothing calls POST /feedback anymore. The feedback router, trello_service, and the TRELLO_* config keys (trello_api_key/secret/api_token + three list IDs in config.py) are dead code in platform — an unused authenticated route that still writes to Trello if hit, plus live Trello credentials in prod env for a retired feature.
+**Suggested fix:** Separate platform change: remove routers/feedback.py (+ main.py registration), trello_service, the TRELLO_* Settings fields (or keep them declared-but-unused like trello_secret if .env files still carry them), and their tests; then revoke the Trello API token. Also retire the golden-sprouting-adleman plan doc as superseded.
+
+---
+
 ## 2026-07-02 deferred from /code-review (App Check readiness gate)
 
 Logged by `/fix-issues` — finding from the App Check readiness-gate review not fixed in that pass (selection: none).
