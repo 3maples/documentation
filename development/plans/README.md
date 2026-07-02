@@ -20,6 +20,7 @@ Plans are versioned alongside the code so they stay discoverable, shareable, and
 | [snuggly-sauteeing-rossum.md](snuggly-sauteeing-rossum.md) | Multi-step onboarding flow |
 | [harmonic-strolling-anchor.md](harmonic-strolling-anchor.md) | Monthly estimate quota per company |
 | [snappy-riding-pie.md](snappy-riding-pie.md) | Field extraction fixes (Contact, Property, Material agents) |
+| [2026-06-24-in-app-customer-support.md](2026-06-24-in-app-customer-support.md) | In-app customer support (async + live chat via Slack/Firestore) |
 
 ## Naming convention
 

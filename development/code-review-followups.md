@@ -4404,6 +4404,26 @@ Routing + the answer are covered solely by `llm_e2e` tests (excluded from defaul
 Both prompts gained another rule (reverse + now labor-time). Still clear, but the trend warrants a periodic clarity/token pass.
 **Suggested fix:** Periodically run /agent-prompt-review on the extraction + reasoning prompts.
 
+## 2026-07-01 deferred from /code-review (in-app customer support Phase 1)
+
+Logged by `/fix-issues` — findings #10–#13 from the Phase 1 support-system review; #1–#9 (all HIGHs + behavioral MEDIUMs) were fixed in the same pass.
+
+### [MEDIUM] platform/routers/support.py:~110 + platform/routers/slack_events.py:~250 — _send_flow (~85 lines) and _handle_resolve (~70 lines) exceed the 50-line guideline
+Both are cohesive top-to-bottom flows but exceed the repo's function-length guideline; Phase 2's live-availability gating lands directly in `_send_flow` and will stretch it further.
+**Suggested fix:** When Phase 2 touches these, extract helpers: conversation resolution (`_resolve_or_create`), Slack delivery (`_deliver_to_slack`), and the /resolve archive step.
+
+### [LOW] platform/routers/support.py — clear/seen/current endpoints lack per-user rate limits
+Only the send endpoints are rate-limited. `clear` posts to Slack per call; abuse is bounded (requires an open conversation, archived after one call) but the guard is one line.
+**Suggested fix:** Apply `auth_rate_limiter` with modest limits (e.g. 10/min) to the three remaining endpoints.
+
+### [LOW] platform tooling — bandit not installed; /code-review's security scan skipped
+The one tool-assisted scan the pre-push hook doesn't perform couldn't run during the Phase 1 review.
+**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/` once over the support modules.
+
+### [LOW] portal/src/lib/supportFirestore.ts — console.error in listener error paths
+Error-path logging only (rules/App Check misconfiguration surfaces here) — arguably desirable during the dev-only rollout.
+**Suggested fix:** Keep for Phase 1; route to a proper client logger if one is adopted.
+
 ---
 
 ## How to work through this
