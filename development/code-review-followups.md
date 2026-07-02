@@ -4424,6 +4424,26 @@ The one tool-assisted scan the pre-push hook doesn't perform couldn't run during
 Error-path logging only (rules/App Check misconfiguration surfaces here) — arguably desirable during the dev-only rollout.
 **Suggested fix:** Keep for Phase 1; route to a proper client logger if one is adopted.
 
+### [MEDIUM] portal/src/components/common/SupportPanel.tsx — errored Firestore listeners stay dead until panel reopen
+Found during 2026-07-01 manual dev testing: `onSnapshot` terminates permanently on `permission-denied` (no retry). A listener that errors during a transient misconfiguration leaves the panel empty — with no visible error — until the user switches tabs or refreshes. Reopening the panel re-attaches (effect on `[open, conversationId]`), so the blast radius is one stale view, but users won't know to do it.
+**Suggested fix:** Surface an error state in the panel when a listener errors ("Couldn't load messages — Retry") whose retry re-runs the subscribe effect; same for the layout-level badge listener.
+
+## 2026-07-02 deferred from /code-review (support/Maple panel UI refinements)
+
+Logged by `/fix-issues` — findings #2–#4 from the panel-refinement review; #1 (AiPanel confirm-clear test) was added in that pass.
+
+### [LOW] portal/src/components/Layout/AiPanel.tsx — confirm dialog backdrop is full-viewport, unlike Support's panel-scoped one
+The Maple confirm uses `fixed inset-0` so its dark backdrop dims the entire app, whereas the Support confirm uses `absolute inset-0` and dims only the panel. Functionally identical; rendering once at the fragment level was a deliberate choice to avoid duplicating it across the mobile+desktop asides.
+**Suggested fix:** Accept the full-screen backdrop (common modal pattern), or scope it to the panel by rendering the dialog inside each aside's relative container like SupportPanel does.
+
+### [LOW] portal/src/components/common/SupportPanel.tsx — draft/attachment cleared on message-type dropdown switch, not only tab switch
+The resolve-conversation effect (deps `[open, activeTab, activeType]`) clears draft + pendingFile on every `activeType` change, so switching the Feedback/Support dropdown mid-compose discards a half-typed message. Reasonable (separate conversation per type) but recorded as a behavior.
+**Suggested fix:** Accept, or preserve the draft across dropdown switches by keying the draft-clear on `activeTab` only.
+
+### [LOW] platform tooling — bandit not installed; security scan skipped
+/code-review's one tool-assisted scan (not covered by the pre-push hook) could not run.
+**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/` once over the support modules.
+
 ---
 
 ## How to work through this
