@@ -4454,6 +4454,16 @@ Recurring gap (same as the UI-refinements section above): `/code-review`'s one t
 
 ---
 
+## 2026-07-02 deferred from /code-review (Slack mrkdwn decoder)
+
+Logged by `/fix-issues` — findings from the mrkdwn-decoder review not fixed in that pass. #1 (end-to-end webhook decode test) was added in that pass.
+
+### [LOW] platform tooling — bandit not installed; security scan skipped
+Recurring gap: `/code-review`'s one tool-assisted scan couldn't run over the changed support modules.
+**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
