@@ -4444,6 +4444,14 @@ The resolve-conversation effect (deps `[open, activeTab, activeType]`) clears dr
 /code-review's one tool-assisted scan (not covered by the pre-push hook) could not run.
 **Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/` once over the support modules.
 
+## 2026-07-02 deferred from /code-review (support Phase 2 — Live Chat)
+
+Logged by `/fix-issues` — findings from the Phase 2 review not fixed in that pass. #1 (stale mirror reconcile), #2 (atomic upsert), and #3 (unknown-action test) were fixed in the pass.
+
+### [LOW] platform tooling — bandit not installed; security scan skipped
+Recurring gap (same as the UI-refinements section above): `/code-review`'s one tool-assisted scan couldn't run over the new Phase 2 support modules (`live_chat_availability.py`, `staff_availability.py`).
+**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/`.
+
 ---
 
 ## How to work through this

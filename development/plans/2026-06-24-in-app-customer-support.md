@@ -1,6 +1,14 @@
 # In-App Customer Support System
 
-**Status:** Phase 1 code COMPLETE (2026-07-01, backend + portal, 71 backend tests + 8 portal tests green, uncommitted). Remaining for Phase 1: commit/push, Firestore enablement + App Check in console, rules deploy, Stage B (Slack event URL), end-to-end verification. Phases 2–3 not started.
+**Status:** Phase 1 SHIPPED (2026-07-01, committed + pushed; verified end-to-end in dev). **Phase 2 (Live Chat) code COMPLETE (2026-07-01, backend + portal, 10 new backend tests + 2 new portal tests green, uncommitted).** Remaining for Phase 2: commit/push, deploy the `supportMeta/liveChat` mirror doc (created automatically on first `/livechat` toggle), end-to-end verification (verification step 8). Phase 3 (cutover) not started.
+
+### Implementation notes (Phase 2 — Live Chat)
+
+- **`StaffAvailability`** ([platform/models/staff_availability.py](../../../platform/models/staff_availability.py)) — one doc per staff Slack user (`slack_user_id` unique). Available ⇔ `online == True and expires_at > now`; the `/livechat on` command sets `expires_at = now + AUTO_EXPIRY` (4h safeguard). Registered in `models/__init__.py` + `database.py`.
+- **`services/live_chat_availability.py`** — `set_online` / `set_offline` / `is_available` / `status`; `_online_count` uses a raw `{"online": True, "expires_at": {"$gt": now}}` filter (avoids ruff E712 on `== True`). Every toggle calls `_mirror_to_firestore` → `firestore_service.set_live_availability(bool)` → `supportMeta/liveChat`.
+- **`/livechat on|off|status`** handled in [platform/routers/slack_events.py](../../../platform/routers/slack_events.py) `_handle_livechat`. Allowlist = `settings.slack_livechat_staff_ids` (comma-separated); non-allowlisted users get an ephemeral refusal with **no** state change. (Unlike `/resolve`, `/livechat` can be run from any channel, so it needs its own authorization.)
+- **Live send gate:** `_send_flow` in [platform/routers/support.py](../../../platform/routers/support.py) now refuses `type=live` (409) only when `live_chat_availability.is_available()` is false — server-authoritative. `GET /support/live-availability` returns `{available, staff_online}`.
+- **Portal:** `subscribeToLiveAvailability` (supportFirestore) + `getLiveAvailability` (api/support) drive a `liveAvailable` state in `SupportPanel`; the Live Chat composer enables only when staff are online and disables in real time (transcript retained) if they go offline mid-chat. The Phase 1 "always offline" constant is gone.
 
 ### Implementation notes (Phase 1 deviations from the plan)
 
