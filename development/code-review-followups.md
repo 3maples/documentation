@@ -4464,6 +4464,26 @@ Recurring gap: `/code-review`'s one tool-assisted scan couldn't run over the cha
 
 ---
 
+## 2026-07-02 deferred from /code-review (tooltips + New Session relocation)
+
+Logged by `/fix-issues` — findings from the button-tooltip / New-Session-relocation review not fixed in that pass (selection: none).
+
+### [LOW] platform tooling — bandit not installed; security scan skipped
+Recurring gap: `/code-review`'s one tool-assisted scan couldn't run. This batch (layout tweaks, tooltips, a constant rename) has no security surface, so the miss is immaterial — logged for consistency.
+**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/`.
+
+---
+
+## 2026-07-02 deferred from /code-review (in-thread Resolve shortcut)
+
+Logged by `/fix-issues` — findings from the message-shortcut review not fixed in that pass. #1 (best-effort Firestore archive) was fixed in the pass.
+
+### [LOW] platform tooling — bandit not installed; security scan skipped
+Recurring gap: `/code-review`'s one tool-assisted scan couldn't run over the new interaction/shortcut modules.
+**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.

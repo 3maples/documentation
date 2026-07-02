@@ -51,7 +51,7 @@ The existing **Trello "Feedback" panel stays untouched and live in production** 
 | Decision | Choice |
 |---|---|
 | Panel UI | **Two tabs: "Send Messages" + "Live Chat".** Send Messages carries a **message-type dropdown ("Feedback" / "Support")** that switches between two per-type conversations; Live Chat is the third type. |
-| Slack channels | **One dedicated private channel per type: `#feedback`, `#support`, `#live-chats`.** Conversation type ⇒ channel; **no `[Feedback]`/`[Support]` message prefixes** — the channel is the triage signal. One Slack thread per user per type. **Channels are created (2026-07-01) and shared by Dev and Prod**: non-production backends prefix the thread-opener with a **`DEV`** marker (e.g. `🧪 DEV — …`) so test threads are unmistakable next to real ones. Channel IDs + staff IDs are captured in `platform/.env.local`. |
+| Slack channels | **One dedicated private channel per type: `#feedback`, `#support`, `#live-chats`.** Conversation type ⇒ channel; **no `[Feedback]`/`[Support]` message prefixes** — the channel is the triage signal. One Slack thread per user per type. **Channels are created (2026-07-01) and shared by Dev and Prod**: non-production backends prefix the thread-opener with a **`DEV`** marker (e.g. `DEV — …`) so test threads are unmistakable next to real ones. Channel IDs + staff IDs are captured in `platform/.env.local`. |
 | Transport | **Firestore for both phases.** Backend is the *sole* Firestore writer (Admin SDK, bypasses rules); portal *only reads* via real-time `onSnapshot`. Replaces 5-min polling with instant push for all three conversation types. |
 | Clear conversation | **User side:** a "Start new conversation" action in the panel header (confirmation dialog — it archives history) closes the current Slack thread (posts a note for staff), archives history server-side; next message opens a **fresh** thread + fresh Firestore conversation doc. **Staff side:** `/resolve <customer-email>` in the conversation's channel archives it the same way; the user's panel flips to a "closed by our team" state in real time. |
 | Late replies to a closed thread | Archived conversations **keep** `slack_thread_ts`, so a staff reply in a closed thread still resolves. It is **not delivered**; the bot posts an in-thread warning ("closed — the user won't see replies here") so nothing is silently lost. |
@@ -180,7 +180,7 @@ match /supportMeta/{doc} {        // live-chat availability mirror — no PII
 - **Signature verification** (mirror Stripe, shared by both `/slack/events` and `/slack/commands`): raw `await request.body()`; reject timestamp >5 min old (replay guard); HMAC-SHA256 of `v0:{ts}:{body}` vs `X-Slack-Signature`, constant-time compare.
 - **Channel routing:** config holds `SLACK_FEEDBACK_CHANNEL_ID` + `SLACK_SUPPORT_CHANNEL_ID` + `SLACK_LIVE_CHAT_CHANNEL_ID` (a `type → channel_id` map in one place); outbound posts pick the channel from the conversation `type`, inbound webhook resolves `event.channel` back to the type. Channel names carry no PII requirement — the **private** setting does; all three are private and the bot is invited to each.
 - **Bot-echo filter (critical — prevents loops):** drop events with `bot_id`, `user == bot_user_id` (cache from `auth.test` at startup), drop-subtypes (`bot_message`, `message_changed`, `message_deleted`, joins…), missing `thread_ts`, or a `thread_ts` that doesn't resolve to a known conversation. Backend-posted user messages echo back as events — this filter is what stops double-writes.
-- **Dev marker (shared channels):** Dev and Prod share the three channels. When the backend runs in a non-production environment, `slack_service` prefixes the **thread-opener** with `🧪 DEV — ` (opener only; the thread groups everything under it). Driven by an environment flag in `config.py` (add one if none exists).
+- **Dev marker (shared channels):** Dev and Prod share the three channels. When the backend runs in a non-production environment, `slack_service` prefixes the **thread-opener** with `DEV — ` (opener only; the thread groups everything under it). Driven by an environment flag in `config.py` (add one if none exists).
 
 ### App creation runbook
 
@@ -195,6 +195,11 @@ match /supportMeta/{doc} {        // live-chat availability mirror — no PII
 6. **Event Subscriptions → Enable** → Request URL `https://<host>/slack/events` → must flip to **Verified** (the endpoint echoes the `url_verification` challenge) → **Subscribe to bot events → `message.groups`** → Save.
 7. Slash-command URLs were registered by the manifest; if using ngrok, update both commands' URLs to the current tunnel host (command URLs are *not* challenge-verified — they just need to respond when used).
 8. If any scope changed since install, Slack banners a **reinstall** prompt — accept it.
+
+**Stage C — in-thread Resolve message shortcut** (Slack blocks *slash commands* inside threads with "/resolve is not supported in threads", so `/resolve` must be typed in the channel's main box; the message shortcut is the thread-friendly alternative and needs no email argument):
+9. **Interactivity & Shortcuts → Interactivity → On** → **Request URL** `https://<host>/slack/interactions` (same HMAC gate; not challenge-verified).
+10. **Create New Shortcut → On messages** → Name "Resolve conversation", short description, **Callback ID `resolve_conversation`** (must match `RESOLVE_SHORTCUT_CALLBACK_ID` in `routers/slack_events.py`) → Save.
+11. Staff then use it from any message in a customer's thread via the message `⋯` menu → "Resolve conversation": the handler resolves `(channel, thread_ts)` → conversation → the same atomic archive + "closed by" note + Firestore flip as `/resolve`, and confirms back via the interaction's `response_url`. `/resolve <email>` stays as the main-channel fallback.
 
 ```yaml
 display_information:
