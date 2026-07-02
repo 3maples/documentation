@@ -1,5 +1,17 @@
 # In-App Customer Support System
 
+> **Change — 2026-07-02: Live Chat merged into Support.** The separate **Live
+> Chat** tab, the **`live`** conversation type, and the **`#live-chats`** channel
+> are **retired**. The panel now has exactly **two top-level tabs — "Support" and
+> "Feedback"** (no message-type dropdown), routing to **`#support`** and
+> **`#feedback`**. Live chat is folded into Support: a message **always sends**
+> (the old `type=live` 409 availability gate is gone), and staff availability
+> (`/livechat on|off|status`, still intact) now only drives a **"Live Chat" pill**
+> on the Support tab plus the online empty-state copy. `SLACK_LIVE_CHAT_CHANNEL_ID`
+> is retired but still declared in `config.py` (like `trello_secret`) so existing
+> `.env` files keep validating. Everything below this note describes the earlier
+> three-type design and is kept for historical context.
+
 **Status:** Phase 1 SHIPPED (2026-07-01, committed + pushed; verified end-to-end in dev). **Phase 2 (Live Chat) code COMPLETE (2026-07-01, backend + portal, 10 new backend tests + 2 new portal tests green, uncommitted).** Remaining for Phase 2: commit/push, deploy the `supportMeta/liveChat` mirror doc (created automatically on first `/livechat` toggle), end-to-end verification (verification step 8). Phase 3 (cutover) not started.
 
 ### Implementation notes (Phase 2 — Live Chat)
