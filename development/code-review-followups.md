@@ -4484,6 +4484,16 @@ Recurring gap: `/code-review`'s one tool-assisted scan couldn't run over the new
 
 ---
 
+## 2026-07-02 deferred from /code-review (App Check readiness gate)
+
+Logged by `/fix-issues` — finding from the App Check readiness-gate review not fixed in that pass (selection: none).
+
+### [LOW] portal/src/components/common/SupportPanel.tsx:156 — App Check gate covers only the message/doc listener
+The `waitForAppCheckReady()` gate is applied to `subscribeToMessages` + `subscribeToConversationDoc` (the important one), but the panel's `subscribeToLiveAvailability` (SupportPanel.tsx:156) and the layout badge's `subscribeToUserConversations` (useSupportUnread.ts:37, gated on `waitForAuthReady` but NOT `waitForAppCheckReady`) attach without an App Check token primed. With enforcement on, a permission-denied on their first onSnapshot kills them permanently too (no auto-retry) — the same bug class the gate was added to fix. Impact is lower for these two: both have a REST fallback (getLiveAvailability seed for the pill; getUnread seed for the badge), so a dead listener degrades to "stale until refresh" rather than an empty transcript. That's why targeting the message listener first is reasonable — but the fix is incomplete for consistency.
+**Suggested fix:** Gate the availability effect's `subscribeToLiveAvailability` and the `subscribeToUserConversations` call in useSupportUnread on `waitForAppCheckReady` too (await it before attaching, same cancelled-flag pattern). Or, if the REST fallbacks are deemed sufficient for those two, add a one-line comment on each noting the deliberate choice so the asymmetry reads as intentional.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
