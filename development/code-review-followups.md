@@ -4508,6 +4508,36 @@ The `waitForAppCheckReady()` gate is applied to `subscribeToMessages` + `subscri
 
 ---
 
+## Operations UI — deferred review follow-ups (2026-07-03)
+
+Logged from the Operations UI final-review pass. Two gaps (staff/customer email invariant case-sensitivity + invitation bypass) were fixed directly in that pass; the items below were deferred.
+
+### [LOW] platform/dependencies.py — `resolve_active_staff` return annotation
+Return type isn't precisely annotated for the staff/None resolution path. Tighten to the honest `StaffUser | None` per the mypy-playbook pattern.
+
+### [MEDIUM] platform/routers/ops.py — missing 409-path + status/pagination-edge tests
+No test coverage for the 409 conflict path, or for status-filter/pagination edge cases (empty page, out-of-range offset, invalid status value).
+
+### [LOW] platform/services/ops_verification.py — no Firebase-failure unit test
+No test simulates a Firebase Admin SDK failure (e.g. `firebase_admin_auth.get_user_by_email` raising something other than `UserNotFoundError`) to verify the verification flow degrades safely.
+
+### [LOW] platform/services/staff_service.py — no email-failure provisioning branch test
+`provision_staff_user` swallows `send_password_reset_email` failures (logs a warning, continues) but no test exercises that branch to confirm the staff record is still created.
+
+### [LOW] portal — duplicated staff-session persistence block in App.tsx + LoginPage.tsx
+Both `onIdTokenChanged` (App.tsx) and `handleLogin` (LoginPage.tsx) build the same staff `AuthUser` object and call `setCurrentUser` / session helpers inline. Extract a shared `persistStaffSession(authData)` helper (mirroring `resolvePostLoginRoute` in `src/lib/staffAuth.ts`) and wire both call sites through it.
+
+### [LOW] portal/src/pages/ops/OpsStaffPage.tsx — no per-row pending map
+Row actions share a single pending/loading flag; if parallel edits across rows ever matter, switch to a per-row pending map so one in-flight action doesn't disable controls on unrelated rows.
+
+### [LOW] portal/src/components/Layout/OpsLayout.tsx — mobile nav not addressed
+The ops layout's navigation hasn't been evaluated for small-viewport/mobile use; revisit if ops staff need mobile access.
+
+### [LOW] platform staff provisioning — email-format validation + DuplicateKeyError hardening
+`staff_service.py` / `routers/ops.py` don't validate email format before provisioning, and don't translate a Mongo `DuplicateKeyError` (race between the existence check and insert) into a clean 409 — it would currently surface as an unhandled 500.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
