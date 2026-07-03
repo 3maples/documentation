@@ -4536,6 +4536,12 @@ The ops layout's navigation hasn't been evaluated for small-viewport/mobile use;
 ### [LOW] platform staff provisioning — email-format validation + DuplicateKeyError hardening
 `staff_service.py` / `routers/ops.py` don't validate email format before provisioning, and don't translate a Mongo `DuplicateKeyError` (race between the existence check and insert) into a clean 409 — it would currently surface as an unhandled 500.
 
+### [LOW] platform/routers/auth.py — invitation staff-email 403 could name the offending email
+The staff-email guard on `POST /auth/company-invitations` fails the whole batch with a generic "This email cannot be invited". For multi-email batches, include the offending email in the 403 detail (it is the inviter's own input, so no information leak). Keep the atomic-403 semantics — do not half-process the batch.
+
+### [LOW] portal/tests/onboardingResumeApply.test.ts — test name overstates
+The test named "clears a stale in-progress flag and its saved step" only asserts the in-progress flag; `clearOnboardingInProgress()` leaves `portal.onboardingStep` behind (harmless — routing gates on the flag alone). Rename the test, or extend the helper to clear the step key too.
+
 ---
 
 ## How to work through this
