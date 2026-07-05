@@ -4542,6 +4542,26 @@ The staff-email guard on `POST /auth/company-invitations` fails the whole batch 
 ### [LOW] portal/tests/onboardingResumeApply.test.ts — test name overstates
 The test named "clears a stale in-progress flag and its saved step" only asserts the in-progress flag; `clearOnboardingInProgress()` leaves `portal.onboardingStep` behind (harmless — routing gates on the flag alone). Rename the test, or extend the helper to clear the step key too.
 
+## 2026-07-04 deferred from /code-review (voice input Phase 1 — /agents/transcribe)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] platform/routers/agents.py:759 — full-body buffering when UploadFile.size is None
+The early size gate is skipped if `audio.size` is None, so `await audio.read()` buffers the whole part into memory before the validator's size check rejects it. Mirrors the accepted pattern in routers/support.py:270; Starlette normally knows the size, so this is completeness, not a regression.
+**Suggested fix:** None required now; if hardened, read in chunks with a running cap.
+
+### [LOW] platform/services/transcription.py — language/duration always None without verbose_json
+`transcriptions.create()` is called without `response_format`. `gpt-4o-mini-transcribe` never returns language/duration, and `whisper-1` only does with `response_format="verbose_json"`. Fields are nullable and unused by the planned frontend, so behavior is correct today.
+**Suggested fix:** Either request verbose_json when the model is whisper-1, or document that language/duration are best-effort and typically None.
+
+## 2026-07-04 deferred from /code-review (voice input Phases 1–4 full review)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] portal/src/lib/voiceInputFlag.ts:5 — VITE_VOICE_INPUT_ENABLED=false evaluates as ON
+`Boolean(anyNonEmptyString)` is true, so `"false"`/`"0"` enable the mic UI while the backend pydantic flag parses `"false"` as off — mismatch shows a mic whose every transcription 404s. Pattern copied from supportPanelFlag for consistency.
+**Suggested fix:** Treat `""`, `"false"`, `"0"` (case-insensitive) as off; consider the same hardening for supportPanelFlag in a separate change.
+
 ---
 
 ## How to work through this
