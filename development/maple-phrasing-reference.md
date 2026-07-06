@@ -2,9 +2,13 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-07-05
+**Last updated:** 2026-07-06
 
 ### Change log
+
+**2026-07-06 — Item-count ≠ area guard + property auto-link in create requests (§1.3)**
+- Fixed: "Create an estimate to plant **six hydrangea** at the Primavera residence" — the sufficiency extractor hallucinated `area_measurements: "six-acre"` from the plant count, skipped the area question, and generated a six-acre job. Two layers: (1) `SUFFICIENCY_ASSESSMENT_PROMPT` / `DETAIL_EXTRACTION_PROMPT` now state that item counts are material QUANTITIES (kept with the material, e.g. "6 hydrangea"), never area; (2) a deterministic grounding guard (`is_area_value_grounded`, `agents/estimate/conversation_guide.py`) drops any extracted area whose units (acre/ft/sq/yd/m, or NxM dimensions) don't appear in the user's own text — the area question is then asked instead. Volunteered areas in gathering replies get the same guard; the directly-asked area answer is trusted. Tests: `test_estimate_area_grounding.py`.
+- New: a property named in the create request ("at the **Primavera residence**", "at **123 Main St**") is now resolved against the Property catalog up front (`agents/estimate/property_reference.py`) and linked at creation — no more "Would you like me to link this estimate to a property now?" when the property was already named. Unique match required; ambiguous/unknown references keep the ask-to-link flow. An explicitly-named property overrides the `property_id` page context (same rule as explicit estimate titles vs `active_estimate_code`). Survives the gathering detour via the `estimate_gathering_property` context stash. Tests: `test_estimate_property_reference.py`, `test_agent_helpers_delegate_create_estimate.py`, `test_estimate_gathering.py`.
 
 **2026-07-05 — Word-number follow-up replies in calculation continuation (§9.3)**
 - Fixed: "How much topsoil do I need to fill a 1,000 square feet of lawn?" → Maple asks for the depth → **"Three inches deep."** looped the same depth question forever. The continuation path is regex-only (no LLM fallback) and every extraction pattern required digits, so spelled-out numbers yielded no value and weren't a pivot, re-asking indefinitely. `extract_continuation_values` now normalizes number words to digits first (`_normalize_number_words`: units/teens/tens, hyphenated compounds, `hundred`/`thousand` scales, optional "and" — "three" → 3, "twenty-five" → 25, "seven hundred and fifty" → 750, "two thousand" → 2000, colloquial "twenty five hundred" → 2500). Ungrammatical runs ("nineteen ninety", "five five") are rejected and left as words rather than summed into a wrong value. Applies to every missing-field type and the bare-value fallback. Tests: `test_calculator_text_helpers.py::TestExtractContinuationNumberWords`, `test_calculator_agent.py::TestContinuePending::test_word_number_depth_reply_completes_calculation`.
@@ -272,12 +276,17 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `I need an estimate for [job description]` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `create a residential estimate` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `new commercial quote` | `create_estimate` → Estimate Agent | 🤖 LLM |
+| `create an estimate to plant six hydrangea at the {property} residence` — property auto-linked at creation; "six" stays a plant quantity, never an area | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — property link + area grounding guard; the generation itself remains 🤖 LLM)* |
+| `estimate for sod at {street address}` — address resolved against the Property catalog and linked | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — unique match required; ambiguous/unknown falls back to the ask-to-link follow-up)* |
 
 Handled by `agents/estimate/conversation_guide.py`. The EstimateAgent walks the user through job description → material/equipment/labour recommendations → estimate creation.
 
-**Two important branches before generation runs** (`routers/agent_helpers/delegate_create_estimate.py`):
+**Three important branches before generation runs** (`routers/agent_helpers/delegate_create_estimate.py`):
 - **Template named → AI generation is skipped entirely** and the estimate is instantiated from the template (§6.7) — no material/activity questions.
 - **Gathering decline → assumption, not cancel.** A "No"/"skip" to a gathering question (e.g. "Any material preferences?") records an assumption and continues; only an explicit cancellation ("cancel", "never mind") aborts. See `routers/agent_helpers/estimate_gathering.py` (`is_cancellation_text`, `get_assumption_value`).
+- **Property named in the request → linked at creation** (2026-07-06). `extract_property_reference` + `resolve_property_reference` (`agents/estimate/property_reference.py`) resolve "at the {Name} residence/property/house/…" and "at {street address}" against the company's Property catalog before sufficiency assessment. Unique match → the estimate is created already linked (and the post-create follow-up moves on to the description question); ambiguous or unknown → unchanged ask-to-link flow. Explicit mention overrides the `property_id` page context. If the request detours through gathering, the resolved property rides along in the `estimate_gathering_property` context key and `_finalize_gathering` links it.
+
+**Area grounding guard** (2026-07-06): an extracted `area_measurements` whose units the user never typed is dropped (`is_area_value_grounded`) — guards against item counts becoming acreage ("plant six hydrangea" → ~~"six-acre"~~). With the area back on the missing list, Maple asks "What's the approximate size of the area?" instead of inventing a job size.
 
 ## 1.4 Status transitions
 

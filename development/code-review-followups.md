@@ -4564,6 +4564,20 @@ Logged by `/fix-issues` — findings from the latest review not fixed in that pa
 
 ---
 
+## 2026-07-06 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [MEDIUM] platform/routers/agent_helpers/delegate_create_estimate.py:143 — delegate_create_estimate grew further past the 50-line guideline
+Function was already ~215 lines; the property-resolution block adds ~20 more (pre-existing violation, worsened by the 2026-07-06 property auto-link change).
+**Suggested fix:** Extract the block into a helper, e.g. `_resolve_explicit_property(message, company_ctx) -> (property_id, label)`.
+
+### [LOW] platform/routers/agent_helpers/estimate_gathering.py:238 — gathering-path response never mentions the auto-linked property
+The one-shot path confirms "…and linked it to property '{label}'", but `_finalize_gathering` applies the stashed property silently (the stash's `label` field is unused) — inconsistent UX, no confirmation of the link.
+**Suggested fix:** Append "and linked it to property '{label}'" to the finalize response when the stash was applied.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
