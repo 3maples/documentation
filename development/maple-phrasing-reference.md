@@ -2,9 +2,13 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-06-29
+**Last updated:** 2026-07-05
 
 ### Change log
+
+**2026-07-05 — Word-number follow-up replies in calculation continuation (§9.3)**
+- Fixed: "How much topsoil do I need to fill a 1,000 square feet of lawn?" → Maple asks for the depth → **"Three inches deep."** looped the same depth question forever. The continuation path is regex-only (no LLM fallback) and every extraction pattern required digits, so spelled-out numbers yielded no value and weren't a pivot, re-asking indefinitely. `extract_continuation_values` now normalizes number words to digits first (`_normalize_number_words`: units/teens/tens, hyphenated compounds, `hundred`/`thousand` scales, optional "and" — "three" → 3, "twenty-five" → 25, "seven hundred and fifty" → 750, "two thousand" → 2000, colloquial "twenty five hundred" → 2500). Ungrammatical runs ("nineteen ninety", "five five") are rejected and left as words rather than summed into a wrong value. Applies to every missing-field type and the bare-value fallback. Tests: `test_calculator_text_helpers.py::TestExtractContinuationNumberWords`, `test_calculator_agent.py::TestContinuePending::test_word_number_depth_reply_completes_calculation`.
+- Pivot hardening (same change): an interrogative fresh calculation ("**how much** concrete for a 10x12 slab **4 inches** thick") asked while another calculation is pending now pivots to the new calculation even though it mentions the pending missing field — previously its "4 inches" was mined into the stale calc. New `is_fresh_calculation_query()` (interrogative subset: how many/much, how long, calculate, convert) is checked *before* value mining; declarative follow-up answers ("I need it 3 inches deep", "750 sq ft at 3") still continue the pending calculation. Tests: `test_agent_helpers_pending_calculation.py::TestPivotDropsSilently`.
 
 **2026-06-29 — Open-math reasoning path + reverse/inverse coverage (§9.3.2)**
 - New **open-math fallback tier** (`agents/calculator/open_math.py`): when no curated formula faithfully models a calculation, the extraction classifier returns `open_math` and a researcher-model call proposes assumptions + one or more options, each carrying an arithmetic *expression* that a sandboxed `safe_eval` computes (the LLM never returns the final number). Handles spaced layouts, multi-orientation counts, composite shapes, and — newly — **reverse/inverse coverage** ("how many sq ft can 25 yards of mulch cover", "how much area does 10 tons of gravel cover"). Behind `CALCULATOR_OPEN_MATH_ENABLED` (default **off**); not yet promoted to production. The old §9.3 "inverse-coverage remains unsupported" note is retired.
@@ -1112,11 +1116,19 @@ Maple: Here's your mulch calculation: … Total needed: 6.94 cubic yards
 ```
 
 - A bare number ("750") fills the single outstanding field.
+- **Spelled-out numbers work too** *(2026-07-05)*: "Three inches deep.",
+  "three inches of depth.", bare "three", "twenty-five square feet", "seven
+  hundred and fifty", "two thousand square feet" — number words are normalized
+  to digits before extraction (`_normalize_number_words`).
 - A reply that supplies only some of the missing fields re-asks for the rest,
   keeping the pending state.
 - **Pivot drops silently:** a value-less reply that clearly matches a different
   intent (a CRUD command, or a fresh full calculation query) abandons the
   pending calculation and falls through to normal routing.
+- **Interrogative queries always pivot** *(2026-07-05)*: a "how much / how
+  many / how long / calculate / convert" query pivots to a new calculation
+  *before* value mining, so "how much concrete … 4 inches thick" never has its
+  numbers merged into a stale pending calc (`is_fresh_calculation_query`).
 
 Pending-state slot: `pending_calculation`. Continuation logic:
 `CalculatorAgent.continue_pending()` +
