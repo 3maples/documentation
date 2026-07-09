@@ -4578,6 +4578,16 @@ The one-shot path confirms "…and linked it to property '{label}'", but `_final
 
 ---
 
+## 2026-07-09 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] platform/agents/estimate/crud_handlers.py:1 — file now ~2,950 lines (threshold: 800, pre-existing)
+The Maple analytics date-window change adds ~150 lines to an already very large mixin module; the analytics handlers are a coherent seam.
+**Suggested fix:** Next refactor, move the `_analytics_*` methods (headline, total-value, windowed summary, breakdown, comparison + the shared status-set constants and `_updated_at_bounds`) into an `agents/estimate/analytics_handlers.py` mixin.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
