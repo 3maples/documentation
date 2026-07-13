@@ -4588,6 +4588,20 @@ The Maple analytics date-window change adds ~150 lines to an already very large 
 
 ---
 
+## 2026-07-12 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] portal/src/pages/PropertiesPage.tsx:714 — uploading the unmodified template creates real sample contacts
+The property upload endpoint resolves contact1–contact5 by name and creates a contact when no match exists (platform/routers/properties.py:189). A user who uploads the sample template as-is gets a real "John Smith" / "Jane Doe" contact in their tenant. Pre-existing behavior for the onboarding sample; informational — sample files are meant to be edited before upload.
+**Suggested fix:** Optional: use obviously-placeholder contact names in sample rows (e.g. "Contact Name 1"), or leave as-is.
+
+### [LOW] portal/src/pages/ContactsPage.tsx:1 — pre-existing: files exceed 800-line guideline
+ContactsPage.tsx is ~1350 lines and PropertiesPage.tsx ~900; both exceed the 800-line review guideline. The CSV-copy change adds only a few lines and does not meaningfully worsen it.
+**Suggested fix:** When next doing substantive work on these pages, extract the near-identical CSV-upload modal into a reusable component.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
