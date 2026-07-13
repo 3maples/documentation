@@ -4602,6 +4602,20 @@ ContactsPage.tsx is ~1350 lines and PropertiesPage.tsx ~900; both exceed the 800
 
 ---
 
+## 2026-07-13 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review (dashboard per-chart periods + Upcoming Tasks card) not fixed in that pass.
+
+### [MEDIUM] portal/src/components/dashboard/UpcomingTasksCard.tsx:38 — completed tasks surface in "Upcoming Tasks"
+The card lists tasks from every status column, including the terminal "Done" status. A finished task whose due date has passed will sit at the top of the card in red indefinitely, crowding out genuinely actionable tasks (the card only shows 5). Deferred pending a product decision on whether "Done" tasks belong in the card.
+**Suggested fix:** Fetch task statuses (taskStatusesApi.list), identify the final status column, and exclude tasks in it — or filter in selectDashboardTasks via a passed-in "done" status id.
+
+### [MEDIUM] portal/src/components/dashboard/UpcomingTasksCard.tsx:38 — fetches the entire task list to show 5 rows
+tasksApi.list returns every task for the company; the card discards all but 5 client-side. Fine at current data volumes, but the dashboard now pays the full tasks payload on every visit. A correct server-side top-5 needs a due-date sort (due-dated ascending first, then undated by updated date) that GET /tasks doesn't offer — likely an aggregation, since a plain due_date ascending sort puts null-due-date docs first in Mongo. Selected for fixing in the 2026-07-13 pass but moved here: it's a platform endpoint change + tests, not a review-pass edit.
+**Suggested fix:** Add sort=due_date + limit query params to GET /tasks (platform, aggregation-backed) and use them in UpcomingTasksCard; keep the client-side sort as the fallback until then.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
