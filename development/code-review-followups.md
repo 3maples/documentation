@@ -4610,9 +4610,13 @@ Logged by `/fix-issues` — findings from the latest review (dashboard per-chart
 The card lists tasks from every status column, including the terminal "Done" status. A finished task whose due date has passed will sit at the top of the card in red indefinitely, crowding out genuinely actionable tasks (the card only shows 5). Deferred pending a product decision on whether "Done" tasks belong in the card.
 **Suggested fix:** Fetch task statuses (taskStatusesApi.list), identify the final status column, and exclude tasks in it — or filter in selectDashboardTasks via a passed-in "done" status id.
 
-### [MEDIUM] portal/src/components/dashboard/UpcomingTasksCard.tsx:38 — fetches the entire task list to show 5 rows
-tasksApi.list returns every task for the company; the card discards all but 5 client-side. Fine at current data volumes, but the dashboard now pays the full tasks payload on every visit. A correct server-side top-5 needs a due-date sort (due-dated ascending first, then undated by updated date) that GET /tasks doesn't offer — likely an aggregation, since a plain due_date ascending sort puts null-due-date docs first in Mongo. Selected for fixing in the 2026-07-13 pass but moved here: it's a platform endpoint change + tests, not a review-pass edit.
-**Suggested fix:** Add sort=due_date + limit query params to GET /tasks (platform, aggregation-backed) and use them in UpcomingTasksCard; keep the client-side sort as the fallback until then.
+### [LOW] platform/routers/tasks.py — sort=due_date aggregation helper fields ride along on documents
+`_undated` and `_sort_time` are computed by the pipeline and only dropped implicitly by pydantic at `Task.model_validate`; a future `extra="allow"` config change (or raw-dict return) would leak them to clients.
+**Suggested fix:** Append `{"$unset": ["_undated", "_sort_time"]}` (or a $project) as the final pipeline stage in `_find_tasks_by_due_date`.
+
+### [LOW] platform/routers/tasks.py — sort=due_date sorts in memory, unindexed
+The $sort runs on computed fields, so no index can serve it; Mongo sorts the company's matched tasks in memory (100MB stage cap). Fine at current volumes, and the dashboard passes limit=5, but it's O(company task count) per dashboard visit.
+**Suggested fix:** None needed now; if task volumes grow, maintain a stored "due-or-updated" sort field on write, indexed under the existing Settings.indexes convention.
 
 ---
 
