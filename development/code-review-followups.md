@@ -4624,6 +4624,24 @@ handleArchive reports through the moveError state; the name no longer describes 
 
 ---
 
+## 2026-07-14 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review (mobile swipe-to-open nav drawer: useSwipeGesture hook + PortalLayout wiring) not fixed in that pass.
+
+### [LOW] portal/src/components/Layout/useSwipeGesture.ts:72 — no touchcancel handling
+A gesture interrupted by the system (incoming call, browser takeover) fires touchcancel, not touchend, leaving startPoint set. Harmless today because every new sequence begins with touchstart (which recomputes it), but it is one browser quirk away from a phantom swipe.
+**Suggested fix:** Return an `onTouchCancel` handler that clears startPoint, and spread it with the others.
+
+### [LOW] portal/src/index.css:39 — overscroll-behavior-x: none is global, not mobile-only
+Besides suppressing Chrome-on-Android overscroll navigation (the intent), this also disables two-finger trackpad back/forward swipe on desktop Chrome/Edge app-wide. Usually desirable in an SPA (prevents accidental back-nav losing form state), but it should be a deliberate UX decision, not a side effect.
+**Suggested fix:** Keep if intended (recommended); otherwise scope it inside an `@media (pointer: coarse)` block.
+
+### [LOW] portal/src/components/Layout/PortalLayout.tsx:509 — mobile drawer close button has no accessible name (pre-existing)
+The drawer's X close button renders only an aria-hidden lucide icon, so screen readers announce an unnamed button. Pre-existing (not introduced by the swipe change), but adjacent to the reviewed code; the sibling collapse/expand buttons do have aria-labels.
+**Suggested fix:** Add `aria-label="Close menu"` to the button.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
