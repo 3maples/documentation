@@ -4618,6 +4618,10 @@ The card lists tasks from every status column, including the terminal "Done" sta
 The $sort runs on computed fields, so no index can serve it; Mongo sorts the company's matched tasks in memory (100MB stage cap). Fine at current volumes, and the dashboard passes limit=5, but it's O(company task count) per dashboard visit.
 **Suggested fix:** None needed now; if task volumes grow, maintain a stored "due-or-updated" sort field on write, indexed under the existing Settings.indexes convention.
 
+### [LOW] portal/src/pages/TasksPage.tsx — moveError now carries archive failures too
+handleArchive reports through the moveError state; the name no longer describes its role as the page's generic inline action alert, which invites misuse or confusion on the next edit.
+**Suggested fix:** Rename to actionError (state + setter + alert usage) on the next touch of this file.
+
 ---
 
 ## How to work through this
