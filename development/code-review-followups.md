@@ -4642,6 +4642,33 @@ The drawer's X close button renders only an aria-hidden lucide icon, so screen r
 
 ---
 
+## 2026-07-15 follow-up from the property-geocoding feature
+
+Logged manually — follow-up work identified while building property
+coordinates + task-title snap (not a review finding).
+
+### [MEDIUM] platform/scripts — backfill coordinates for existing properties
+Properties now carry optional `latitude`/`longitude` (`models/property.py`),
+geocoded server-side on create and on address change via
+`services/address_service.py::geocode_property_coordinates` (Google
+Geocoding; fail-open; dedicated `maps-geocode:{company}` rate bucket). Two
+gaps remain: (a) properties created before 2026-07-15 have no coordinates,
+so the portal's nearest-property task snap can't match them; (b) the CSV
+bulk-upload path (`routers/properties.py::upload_properties_csv`)
+deliberately skips geocoding — bulk imports would be too slow inline (per
+the 2026-07-15 decision: run the backfill after large imports instead of
+geocoding inline or via BackgroundTasks).
+**Suggested fix:** Write `platform/scripts/backfill_property_coordinates.py`
+(follow the `scripts/` conventions incl. the ruff E402 carve-out): iterate
+properties where latitude/longitude is None, geocode via
+`GoogleAddressService.geocode_lat_lng` with a polite throttle, update with
+targeted `update_one` `$set`, print an updated/no-match/skipped summary,
+support `--dry-run` and `--company` flags. Tests per the TDD policy. Also
+mention in the CSV-upload docs that imported properties rely on this
+backfill for coordinates.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
