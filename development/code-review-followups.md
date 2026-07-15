@@ -4647,25 +4647,23 @@ The drawer's X close button renders only an aria-hidden lucide icon, so screen r
 Logged manually — follow-up work identified while building property
 coordinates + task-title snap (not a review finding).
 
-### [MEDIUM] platform/scripts — backfill coordinates for existing properties
-Properties now carry optional `latitude`/`longitude` (`models/property.py`),
-geocoded server-side on create and on address change via
-`services/address_service.py::geocode_property_coordinates` (Google
-Geocoding; fail-open; dedicated `maps-geocode:{company}` rate bucket). Two
-gaps remain: (a) properties created before 2026-07-15 have no coordinates,
-so the portal's nearest-property task snap can't match them; (b) the CSV
-bulk-upload path (`routers/properties.py::upload_properties_csv`)
-deliberately skips geocoding — bulk imports would be too slow inline (per
-the 2026-07-15 decision: run the backfill after large imports instead of
-geocoding inline or via BackgroundTasks).
-**Suggested fix:** Write `platform/scripts/backfill_property_coordinates.py`
-(follow the `scripts/` conventions incl. the ruff E402 carve-out): iterate
-properties where latitude/longitude is None, geocode via
-`GoogleAddressService.geocode_lat_lng` with a polite throttle, update with
-targeted `update_one` `$set`, print an updated/no-match/skipped summary,
-support `--dry-run` and `--company` flags. Tests per the TDD policy. Also
-mention in the CSV-upload docs that imported properties rely on this
-backfill for coordinates.
+### [MEDIUM] ~~platform/scripts — backfill coordinates for existing properties~~ — RESOLVED 2026-07-15
+**Closed as resolved 2026-07-15.** Built as one shared engine with two entry
+points (supersedes the earlier "skip CSV, backfill manually" decision):
+- `services/property_geocode.py::backfill_property_coordinates` — fills only
+  MISSING coordinates (idempotent), targeted `$set` writes, ~5 req/s
+  throttle, waits out a per-company 429 once then skips, dry-run support.
+- CSV bulk upload (`routers/properties.py::upload_properties_csv`) now
+  schedules a run scoped to the imported ids via FastAPI BackgroundTasks —
+  imports gain coordinates minutes after upload with no request latency.
+- `scripts/backfill_property_coordinates.py` (`--dry-run`, `--company`) for
+  the one-time legacy backfill and as the safety net after interrupted
+  background runs.
+Tests: `tests/test_property_geocode_backfill.py` (6) +
+`test_upload_properties_csv_geocodes_in_background`.
+**Remaining operational step:** run the script once against Dev, then once
+against production after the next platform promotion, to geocode
+pre-2026-07-15 properties.
 
 ---
 
