@@ -4667,6 +4667,35 @@ pre-2026-07-15 properties.
 
 ---
 
+## 2026-07-16 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+(Review scope: the gpt-5.6 compatibility batch — factory API modes, async Maple
+guide chain, tenant-less public usage metering, researcher temperature removal,
+print→logger conversion, `get_pymongo_collection` rename.)
+
+### [LOW] platform/models/llm_usage_event.py:46 — no index for feature-filtered usage queries
+Public usage events all carry `company=None`. They're reachable efficiently via
+the existing `(company, created_at)` index (querying `company == None` uses it),
+but the natural ops query — filter by `feature == "maple_public"` over a date
+range — has no supporting index and will collection-scan as `llm_usage_events`
+grows.
+**Suggested fix:** Add `IndexModel([("feature", 1), ("created_at", -1)])` to
+`Settings.indexes` when/if per-feature dashboards materialize; harmless to add
+now.
+
+### [LOW] platform/routers/public_maple.py:70 — public endpoint has per-IP but no aggregate spend cap
+Now that public spend is measurable: each guide answer costs ~$0.014 (13.8k-token
+prompt), and the only guard is 20 req/min per IP — a single abusive IP can run
+~$17/hour, and a small botnet scales that linearly. Metering makes this visible
+but nothing bounds it.
+**Suggested fix:** Add a global daily budget guard for `feature="maple_public"`
+(count/sum today's events before answering; refuse with the canned unavailable
+message when over budget), or at minimum a per-IP daily cap alongside the
+per-minute one.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
