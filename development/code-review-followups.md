@@ -4696,6 +4696,27 @@ per-minute one.
 
 ---
 
+## 2026-07-16 deferred from /code-review (mobile drawer swipe reveal)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+(Review scope: portal mobile-nav-drawer swipe reveal + 2/3 phone width —
+`PortalLayout.tsx`, `useSwipeGesture.ts`. 5 of 6 findings were fixed in the
+pass; this one was deliberately deferred because its own recommendation was
+"ship and observe" and the real fix is a larger refactor.)
+
+### [MEDIUM] portal/src/components/Layout/PortalLayout.tsx:345 — setState per touchmove re-renders the whole layout tree
+`onSwipeMove` calls `setDrawerDragPx` on every touchmove (~60Hz), re-rendering
+all of `PortalLayout` including the routed page (`Outlet`), desktop sidebar,
+and AiPanel on each drag frame. On low-end phones with heavy pages (dashboard
+charts, task board) the drag can jank — the exact scenario the reveal
+animation is meant to smooth out.
+**Suggested fix:** Only if jank is observed on real devices: move drag progress
+out of React state — write transform/opacity directly to drawer/backdrop refs
+inside `onSwipeMove` (optionally rAF-throttled) and keep state only for the
+settled open/closed transitions.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
