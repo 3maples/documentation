@@ -4717,6 +4717,31 @@ settled open/closed transitions.
 
 ---
 
+## 2026-07-17 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+(Review scope: portal uncommitted tour work — Estimates tour v2 + row-menu step,
+new Tasks tour, Dashboard tour v2 anchors, UpcomingTasksCard assignee filter.
+Finding #1 — the row-menu step's 8s dead wait on empty lists — was fixed in the
+pass via a per-step `stepTimeoutMs` override.)
+
+### [LOW] portal/src/components/dashboard/UpcomingTasksCard.tsx:53 — "Current User" filter silently shows all tasks when no stored email
+`loadTasks` falls back to an unfiltered fetch when `getCurrentUser()?.email` is
+missing, while the select still displays "Current User" — the UI then
+misrepresents what the list contains. The fallback is deliberate (commented)
+and the no-email state should be rare, so impact is minimal.
+**Suggested fix:** If the stored user has no email, hide the filter select or
+force the value to "all" so the label matches the data.
+
+### [LOW] workspace root — untracked files `temp data` (JSON) and `tooltips.csv`
+Carried over from the 2026-07-16 review; both files are still untracked at the
+workspace root. A grep found no credential patterns, but loose data files at
+the repo root risk accidental commit.
+**Suggested fix:** Move into a data/scratch directory, delete, or add to
+.gitignore as appropriate.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
