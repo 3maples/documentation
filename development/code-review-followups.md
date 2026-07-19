@@ -4785,6 +4785,28 @@ helper used by both the fixture and the nullable-field test.
 
 ---
 
+## 2026-07-19 deferred from /code-review (property map thumbnail)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] platform/routers/properties.py:295 — malformed property_id produces a 500 instead of 404
+`Property.get(property_id)` raises on a string that is not a valid ObjectId
+(e.g. `GET /properties/abc/map.png`), surfacing as a 500. Inherited verbatim
+from the existing `get_property` / `update_property` pattern in this router —
+the new map-image route is consistent with its siblings, but it adds one more
+instance of the pattern.
+**Suggested fix:** A shared parse-or-404 helper applied router-wide (fixing
+only the new route would make it inconsistent with siblings).
+
+### [LOW] portal/src/pages/PropertiesPage.tsx:1 — file exceeds the 800-line guideline (pre-existing)
+The file was already ~900 lines before the map-thumbnail change (net +11 from
+it). The detail-panel JSX (address/contacts/map/estimates card) is now a
+natural extraction seam.
+**Suggested fix:** Extract the selected-property detail card into
+`components/properties/PropertyDetailCard.tsx`.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
