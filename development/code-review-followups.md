@@ -4742,6 +4742,49 @@ the repo root risk accidental commit.
 
 ---
 
+## 2026-07-19 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+(Review scope: uncommitted free-plan task-limit feature across platform/ and
+portal/ — quota service + POST /tasks/ 409 gate, subscription-state fields,
+Billing-tab Tasks row, TasksPage gate + TaskLimitDialog. Findings #1 and #2 —
+failure-safe test cleanup and the missing billing mock in TasksPage.test.tsx —
+were fixed in the pass.)
+
+### [LOW] platform/services/task_quota.py:46 — accepted check-then-insert race (informational)
+Two concurrent creates at limit−1 can both pass `is_task_limit_reached` and land
+one over the cap. Deliberate and documented in the module docstring: overshoot
+is bounded by in-flight concurrency, nothing is billed, and the next create is
+blocked.
+**Suggested fix:** None required. If ever needed, an atomic claim would require
+a denormalized counter (estimate-quota pattern) with decrements on both
+hard-delete paths.
+
+### [LOW] portal/src/pages/TasksPage.tsx:296 — gate not refreshed after convert-with-delete
+`refreshSubscription()` runs after create and delete, but a convert-to-estimate
+that deletes the source task also frees a slot. Until the page remounts, the
+client-side gate can over-block (shows the limit dialog one click too long).
+The backend 409 remains authoritative either way.
+**Suggested fix:** Call `refreshSubscription()` from the ConvertTaskDialog
+success/close path, same as `handleDelete`.
+
+### [LOW] portal/src/components/settings/BillingTab.tsx:133 — "0 / 0" Tasks row during mixed-version deploys
+If the portal deploys before the platform, subscription responses lack
+`used_tasks`/`included_tasks`; strict `=== null` (correctly) refuses to treat
+`undefined` as unlimited, so the Tasks row renders "0 / 0" until the backend
+ships. Transient and flag-gated.
+**Suggested fix:** Optionally skip the row when `state.included_tasks ===
+undefined`, or deploy platform before (or together with) portal.
+
+### [LOW] platform/tests/test_billing_plan_config.py:220 — duplicated TS block-parsing regex
+`test_fe_included_tasks_matches_be` re-implements the plan-block regex parse
+instead of sharing it with the class fixture (necessary because the fixture is
+int-only, but the block-carving regex is now written twice).
+**Suggested fix:** Extract a shared "parse plan blocks from billing-plans.ts"
+helper used by both the fixture and the nullable-field test.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
