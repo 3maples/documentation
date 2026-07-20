@@ -4807,6 +4807,22 @@ natural extraction seam.
 
 ---
 
+## 2026-07-20 deferred from /code-review (per-item area applicability)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] platform/agents/estimate/conversation_guide.py:222 — vague quantifiers count as discrete evidence
+"few", "couple", "several" in `_DISCRETE_COUNT_WORDS` let "redo a few beds" pass
+the `is_discrete_item_job` guard even though bed work is area-based. Exposure is
+double-gated (the sufficiency prompt classifies beds-without-count as
+AREA-BASED, so the LLM verdict must also be wrong), but these words carry weaker
+per-item semantics than true numerals.
+**Suggested fix:** Either drop the three vague quantifiers or keep them
+deliberately (they do cover "plant a few shrubs") and document the choice — a
+one-line comment stating the trade-off is enough.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
