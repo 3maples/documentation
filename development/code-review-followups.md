@@ -4823,6 +4823,26 @@ one-line comment stating the trade-off is enough.
 
 ---
 
+## 2026-07-21 deferred from /code-review (Maple pending-flow escape + analytics window)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] platform/agents/estimate/text_helpers.py:613 — `_parse_estimate_date_filter` is 70 lines
+Sequential age → numeric → period-word → word matcher; the natural-window
+change added ~11 lines, pushing it past the 50-line guideline (it was already
+~59). Cohesive but growing.
+**Suggested fix:** If it grows further, extract the "match → (start, end)
+window" resolution into a small helper. Not urgent.
+
+### [LOW] platform/agents/orchestrator/service.py:1 — file exceeds the 800-line guideline (~2700 lines)
+Pre-existing; the analytics-detector change was net-neutral (moving the
+constants/detectors out to `intents.py` in the /fix-issues pass trimmed it
+slightly). Not introduced by this work.
+**Suggested fix:** Informational only. A future split of `OrchestratorAgent`'s
+matcher methods into a mixin would be the real remedy.
+
+---
+
 ## How to work through this
 
 1. Pick ONE HIGH item per work session. Don't batch.
