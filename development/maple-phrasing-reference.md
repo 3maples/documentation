@@ -2,9 +2,63 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-07-09
+**Last updated:** 2026-07-26
 
 ### Change log
+
+**2026-07-26 — Task Agent code-review fixes (9 of 12; 3 deferred)**
+- **ReDoS in the notes detectors (HIGH).** Every scanning segment in `agents/task/text_helpers.py` and the orchestrator's task detectors is now length-bounded (`[^.?!]{0,80}?`, an 80-char target body). "add to it " ×600 took **5.5s** before — nested unbounded lazy quantifiers, on an unbounded input field, holding the GIL and stalling the whole worker. Now ~1ms, pinned by a timing suite. `OrchestratorAgentRequest.message` also gained `max_length=2000` (matching the public Maple ask limit) as defence in depth.
+- **An awaited value is content, not intent (HIGH).** A note typed at the "what should the new description be?" prompt was **silently discarded** when its text parsed as a command, and the classifier ran that command instead (verified: "create a new estimate for Bob next week" → note lost, estimate created). Root cause was in the ROUTER, not the agent: `pending_intents` was only consulted when classification returned `unknown`. New `_get_awaiting_value_match` now **outranks** classification whenever a pending intent carries `awaiting_value_for`. The agent-side escape narrowed from any fresh intent to explicit cancel/no, and now acknowledges ("No problem — I've left the task as it is.") instead of silently re-asking.
+- **Filters pushed into Mongo (HIGH).** The resolver and list handler loaded the company's ENTIRE task collection and filtered in Python — fine under the free plan's 50-task cap, unbounded on paid plans. Search/assignee/date-window/property filters are now query conditions (all indexed), counts use `count()` instead of materializing rows, lists cap at 20 and report the true total ("that's the 20 most recently updated of 137"), and the one un-queryable step (fuzzy title) caps candidates at 200, most-recently-updated first.
+- **§7.6.1.1 fallback:** stripping the dictated payload could leave a message with no domain at all, so `notes: the estimate needs review` became unroutable. The full text is now reconsidered as a last resort — **except** for anaphoric adds, where "it" already names the target (without that gate the fallback re-broke the "Add to it … estimate" fix).
+- Also: `except Exception` around task fetches narrowed to a shared `to_object_id` helper so a DB outage no longer reads as "I couldn't find that task"; candidate matching does one `$in` query instead of up to five sequential fetches; `WEEKDAY_NAMES` de-duplicated into `agents/text_utils.py`; `_resolve_create_title` no longer mutates the context it's handed; a comment re-attached to the dict it documents.
+- Deferred by Simon (logged in [`code-review-followups.md`](code-review-followups.md)): long functions, the 1,560-line ops test file, and a direct unit test for `is_anaphoric_add_request`.
+
+**2026-07-25 — "Add the following notes to the Task" appends to the remembered task (new §7.6.1)**
+- **Routing fix (was a silent duplicate-create):** `Add the following notes to the Task: …` classified as `create_task` — `add` is a CREATE action hint — so it made a *second* task instead of annotating the active one. New `is_task_notes_update_request` in `intents.py`, wired into `_classify_specific_phrasings` ahead of the generic resolver, with an explicit create-shape exclusion so `add a task with the notes: …` still creates.
+- **Append semantics** (`detect_notes_update` → `_handle_task_notes_update`): existing notes are preserved and blank-line separated, matching the estimate-notes precedent; appending onto empty notes is a clean set; only `replace`/`overwrite`/`set … with` overwrites. `add a description to …` now appends too (previously overwrote).
+- **Resolver fix:** `extract_reference_hint` checked the `{name} task` shape before the bare-anaphora guard, so "add the following notes to **the task**" yielded the title hint *"following notes to the"* and resolved to nothing. The anaphora guard now runs first.
+- **Field-word-free form** (smoke test): `Add to the Task: {text}` carries no "notes"/"description" word, so the first pass still fell through to `create_task`. Now recognized on the strength of the colon — required, so `add a photo to the task` stays unclaimed.
+- Active-task memory itself already worked (`finalize_result` writes `active_task_id/_name` for every create/get/update); it's now covered end-to-end by a create → "add the following notes to the Task" round-trip test. Tests: +33.
+
+**2026-07-25 — Dictated payloads no longer hijack routing (new §7.6.1.1) — cross-cutting**
+- *"Add to it the following: bring a lawn mower to his place. Need to estimate the lawn size."* routed to **create_estimate**: the classifier scanned the whole message, so "estimate" in the user's dictated content outvoted the leading "add to it". Worse, `_resolve_intent_with_history` bails whenever *any* domain word is present, so the payload also blocked anaphora from rescuing it.
+- **The first intent wins.** New `strip_dictated_payload` returns the command head for `<command>: <payload>` shapes whose head carries an add/notes/following cue; the three generic resolvers (`_match_unambiguous_command`, `_classify_via_action_domain`, `_resolve_intent_with_history`) now classify on that head. Task-specific rules still see the full text (some key off the colon), and a head that names its own domain (`create an estimate for: …`) is untouched. **This is cross-cutting — it applies to every domain, not just tasks.**
+- **Anaphoric adds are updates**: `is_anaphoric_add_request` rewrites "add … to it/this/that" away from the CREATE reading of "add" — you can't create something you're pointing at. Domain still comes from the active-entity anchor, so the same sentence appends to an active estimate when that's the anchor.
+- Agent-side: `add to it the following: {text}` (field cue trailing the target) now parses as a notes append. Tests: +11.
+
+**2026-07-25 — Task update was a dead end: field-then-value flow added (new §7.6.2) + target-less notes**
+- **The loop in the smoke test:** `update the task` → "What would you like to update?" → `add to the description` → the same question → `description` → **create's "What should the task be called?"**. Root cause: the update clarify stashed no pending state, so every reply was re-classified from scratch and eventually guessed `create_task`. Each ask now stashes a `pending_intents` entry for the Task Agent (the router's pending fallback then routes the reply back here), and `match_bare_task_field` turns a bare field name — or `add to the description` — into a field selection. New `agents/task/field_flow.py`.
+- **`Add another note: {text}`** (no "task", no target) now appends to the active task; it previously fell through to the generic clarify.
+- Structure: create split into `agents/task/create.py` — `service.py` had grown back to 874 lines, over the 800 ceiling; now 644. Tests: +34.
+
+**2026-07-25 — Task create: content is the description, title is derived (§7.1)**
+
+**The rule: unless the user nominates a title, what they type is the description.** Only `called / named / titled X`, `with title X`, or a quoted string count as naming a title; everything else is content. `extract_create_content` strips the `create a (new) task [to|for|about|:]` preamble, the remainder is stored as the **description**, and `derive_title_from_description` builds the title from it (first sentence, politeness/reminder preamble stripped, truncated to 60 chars on a word boundary, first letter capitalized). The reply says the title came from the content so the user can rename it.
+
+- `Create a task with the notes: remind me to call Bob tomorrow.` → title `Call Bob tomorrow`, description = the notes. Previously asked "What should the task be called?".
+- `create a new task to: get back to john with the estimate tomorrow.` → title `Get back to john with the estimate tomorrow`, description = the sentence. **Previously the entire command line — "create a new task to: get back to…" — became the title with an empty description** (smoke test).
+- `add a task to check the retaining wall` → the "to …" phrase is now the description (title derived from it), where it used to become the title with no description.
+- **Stale-pending fix:** a fresh create command arriving while "What should the task be called?" was pending got swallowed whole as the title. The bare-reply branch now defers to `message_starts_fresh_intent`, so a new command is processed as one and the stale pending entry is dropped.
+- The awaiting-title flow is now the fallback only — no title cue AND no usable content. Tests: +29 (`test_maple_task_crud.py`, `test_maple_task_operations.py`).
+
+**2026-07-25 — Task Agent review fixes: bare-determiner anaphora + targeted-`$set` persistence (+ module split)**
+- **"mark/assign/archive/rename the task …" now resolves via the active-task context** (new §7.11 row). Bare determiners ("the", "my") leaking out of the target regex previously became a title hint — `mark the task as done` could substring-match any title containing "the", or extract garbage hints like "as done". `_normalize_target` collapses determiners to empty and `extract_reference_hint` treats a nameless "the task" as anaphora.
+- **Chat-driven task updates persist via targeted `$set`** (REST parity) instead of whole-document `save()` — a concurrent photo upload, convert claim, or archive can no longer be clobbered by a stale agent copy; `updated_at` is server-stamped.
+- Structure: `agents/task/service.py` split into `base.py` / `confirmation.py` / `operations.py` / `service.py` (all under the 800-line ceiling); no behavior change beyond the two fixes above. Tests: +12 in `test_maple_task_operations.py` (determiner unit+behavioral, concurrent-write safety).
+
+**2026-07-22 — Tasks SHIPPED: Task Agent + routing + coverage matrix (§7 flipped)**
+- New **Task Agent** (`agents/task/`): core CRUD, per-company status changes, assignee ops, archive/unarchive, and convert-to-estimate (via the new shared `services/task_convert.py` core — the REST endpoint now calls the same code). Registered in `intents.py` (`create/update/delete/list/get_task` + dedicated `convert_task`), `domain_knowledge.py`, and `routers/agents.py`.
+- **Reference resolution** (`agents/task/resolver.py`): explicit reference beats active-task context beats recency fallback; relative ("last task", "from yesterday" via the new shared `parse_relative_day_window`), by fuzzy title, by property. Ambiguity → numbered `pending_task_confirmation` flow. `active_task_id/name` persisted by `finalize_result.py`; delete clears the anchor; convert hands the anchor to the new estimate.
+- **Policies**: manager-only single delete (shared `agents/role_utils.py::assert_manager_role`, Template agent migrated), convert always confirms (billing slot), feature-flag + 50-task-cap refusals, bulk delete locked by the existing guard.
+- **Coverage matrix**: `task` added to `_CRUD_RESOURCES` (+27 generic cases) + new `task_operations` category (8) → Tier 1 159/170 (11 known-gap xfails, all bare-title class); Tier 2 task slice 28/35.
+- Tests: `test_maple_task_routing.py` (44), `test_maple_task_crud.py` (14), `test_task_resolver.py` (19), `test_maple_task_context.py` (10), `test_maple_task_operations.py` (24); `test_task_convert_api.py` green post-extraction.
+- Post-smoke-test polish (same day): **feature-definition queries** ("tell me about tasks", "what is a task?") now route to HELP for every resource instead of an empty list (`is_feature_definition_query`, see §11.1); **task details render as markdown bullets** (one field per line) in create/get/update responses.
+- Create-flow fixes (same day, user report): `with title {task}` / `title: {task}` cues recognized; an inline `notes:`/`description:` clause is captured as the task description; a missing title now stashes a `pending_intents` awaiting-title entry so the bare reply to *"What should the task be called?"* becomes the title (previously looped the same question) — inline notes survive the turn.
+
+**2026-07-22 — Tasks phrasing matrix added (new §7, all rows ⚠️ pending implementation)**
+- New: **§7 Tasks** catalogs the full planned Maple surface for the Tasks feature — CRUD (§7.1–§7.6), per-company status changes (§7.7), assignee operations (§7.8), archive/unarchive (§7.9), convert-to-estimate with confirm + billing-refusal copy (§7.10), the three task-referencing forms plus active-task anaphora and ambiguity confirmation (§7.11), and refusals incl. manager-only delete and the flag/quota gates (§7.12). Every row is ⚠️ — no Task Agent or orchestrator routing exists yet. Implementation plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-support.md).
+- Sections renumbered: old §7–§12 → §8–§13 to accommodate the new §7. Terminology table is now "6 + 1" resources with a Task row; `{task}` added to the token conventions.
 
 **2026-07-09 — Total-value patterns yield to amount filters; Generating/Failed excluded from total value (§1.1, §1.9)**
 - Fixed (regression from 2026-07-08, caught in code review before commit): the new `estimates worth` / `value of … estimates` analytics patterns hijacked amount-threshold LIST phrasings — "show me estimates worth **more than $5000**", "list estimates worth **over 10k**", "what is the total value of estimates **over $10k**?" routed to the company-wide total (dropping the $ threshold) instead of `list_estimates`. The total-value patterns now live in a separate `_TOTAL_VALUE_PATTERNS` tuple that only claims a phrasing when `_parse_estimate_amount_filter` finds **no** over/under-$N filter.
@@ -24,13 +78,13 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - Fixed: "Create an estimate to plant **six hydrangea** at the Primavera residence" — the sufficiency extractor hallucinated `area_measurements: "six-acre"` from the plant count, skipped the area question, and generated a six-acre job. Two layers: (1) `SUFFICIENCY_ASSESSMENT_PROMPT` / `DETAIL_EXTRACTION_PROMPT` now state that item counts are material QUANTITIES (kept with the material, e.g. "6 hydrangea"), never area; (2) a deterministic grounding guard (`is_area_value_grounded`, `agents/estimate/conversation_guide.py`) drops any extracted area whose units (acre/ft/sq/yd/m, or NxM dimensions) don't appear in the user's own text — the area question is then asked instead. Volunteered areas in gathering replies get the same guard; the directly-asked area answer is trusted. Tests: `test_estimate_area_grounding.py`.
 - New: a property named in the create request ("at the **Primavera residence**", "at **123 Main St**") is now resolved against the Property catalog up front (`agents/estimate/property_reference.py`) and linked at creation — no more "Would you like me to link this estimate to a property now?" when the property was already named. Unique match required; ambiguous/unknown references keep the ask-to-link flow. An explicitly-named property overrides the `property_id` page context (same rule as explicit estimate titles vs `active_estimate_code`). Survives the gathering detour via the `estimate_gathering_property` context stash. Tests: `test_estimate_property_reference.py`, `test_agent_helpers_delegate_create_estimate.py`, `test_estimate_gathering.py`.
 
-**2026-07-05 — Word-number follow-up replies in calculation continuation (§9.3)**
+**2026-07-05 — Word-number follow-up replies in calculation continuation (§10.3)**
 - Fixed: "How much topsoil do I need to fill a 1,000 square feet of lawn?" → Maple asks for the depth → **"Three inches deep."** looped the same depth question forever. The continuation path is regex-only (no LLM fallback) and every extraction pattern required digits, so spelled-out numbers yielded no value and weren't a pivot, re-asking indefinitely. `extract_continuation_values` now normalizes number words to digits first (`_normalize_number_words`: units/teens/tens, hyphenated compounds, `hundred`/`thousand` scales, optional "and" — "three" → 3, "twenty-five" → 25, "seven hundred and fifty" → 750, "two thousand" → 2000, colloquial "twenty five hundred" → 2500). Ungrammatical runs ("nineteen ninety", "five five") are rejected and left as words rather than summed into a wrong value. Applies to every missing-field type and the bare-value fallback. Tests: `test_calculator_text_helpers.py::TestExtractContinuationNumberWords`, `test_calculator_agent.py::TestContinuePending::test_word_number_depth_reply_completes_calculation`.
 - Pivot hardening (same change): an interrogative fresh calculation ("**how much** concrete for a 10x12 slab **4 inches** thick") asked while another calculation is pending now pivots to the new calculation even though it mentions the pending missing field — previously its "4 inches" was mined into the stale calc. New `is_fresh_calculation_query()` (interrogative subset: how many/much, how long, calculate, convert) is checked *before* value mining; declarative follow-up answers ("I need it 3 inches deep", "750 sq ft at 3") still continue the pending calculation. Tests: `test_agent_helpers_pending_calculation.py::TestPivotDropsSilently`.
 
-**2026-06-29 — Open-math reasoning path + reverse/inverse coverage (§9.3.2)**
-- New **open-math fallback tier** (`agents/calculator/open_math.py`): when no curated formula faithfully models a calculation, the extraction classifier returns `open_math` and a researcher-model call proposes assumptions + one or more options, each carrying an arithmetic *expression* that a sandboxed `safe_eval` computes (the LLM never returns the final number). Handles spaced layouts, multi-orientation counts, composite shapes, and — newly — **reverse/inverse coverage** ("how many sq ft can 25 yards of mulch cover", "how much area does 10 tons of gravel cover"). Behind `CALCULATOR_OPEN_MATH_ENABLED` (default **off**); not yet promoted to production. The old §9.3 "inverse-coverage remains unsupported" note is retired.
-- **Known gap (documented, not fixed):** labor-time-from-production-rate questions ("how long to edge 800 linear feet of beds") — they depend on a crew role + rate-card production rate, not a material formula, and don't reach the Calculator's "how many / how much" query gate. Maple declines gracefully and points to the rate-card / estimate workflow. See §9.3.2.
+**2026-06-29 — Open-math reasoning path + reverse/inverse coverage (§10.3.2)**
+- New **open-math fallback tier** (`agents/calculator/open_math.py`): when no curated formula faithfully models a calculation, the extraction classifier returns `open_math` and a researcher-model call proposes assumptions + one or more options, each carrying an arithmetic *expression* that a sandboxed `safe_eval` computes (the LLM never returns the final number). Handles spaced layouts, multi-orientation counts, composite shapes, and — newly — **reverse/inverse coverage** ("how many sq ft can 25 yards of mulch cover", "how much area does 10 tons of gravel cover"). Behind `CALCULATOR_OPEN_MATH_ENABLED` (default **off**); not yet promoted to production. The old §10.3 "inverse-coverage remains unsupported" note is retired.
+- **Known gap (documented, not fixed):** labor-time-from-production-rate questions ("how long to edge 800 linear feet of beds") — they depend on a crew role + rate-card production rate, not a material formula, and don't reach the Calculator's "how many / how much" query gate. Maple declines gracefully and points to the rate-card / estimate workflow. See §10.3.2.
 - Tests: `tests/test_calculator_safe_eval.py`, `tests/test_calculator_open_math.py`, `tests/test_calculator_open_math_live.py` (opt-in `llm_e2e`).
 
 **2026-06-21 — Numeric time windows for headline metrics (§1.9)**
@@ -42,7 +96,7 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - **Backlog relaxed to all-time:** removed the last-30-days recency window from backlog in both `compute_analytics` (dashboard) and `_analytics_headline_value` (Maple). Backlog now sums **every** Won/Scheduled estimate for the company regardless of when it closed; pipeline (90d) is unchanged. Maple's all-time backlog answer reads "… in total"; the dashboard card is relabeled "All time". Guide updated (`users_guide.md` §7.1).
 - **Won Value → Completed Value:** retired the "Won Value" headline (Won+Scheduled+Completed, 30d) and replaced it with **Completed Value = `[COMPLETED]` only, last 30 days** across the dashboard card (API field `won_value` → `completed_value`; label "Completed Value"), Maple (`_analytics_headline_value` "completed" metric, answer "Your completed value is … in the last 30 days"; the analytics router recognizes `completed value` / `how much was completed`), and the guide (`users_guide.md` §7.1). The legacy "how much was won?" headline question is retired (parity invariant: chat must mirror the dashboard cards).
 
-**2026-06-15 — Calculator registry refactor + 4 new landscaping calculations (§9.3.1)**
+**2026-06-15 — Calculator registry refactor + 4 new landscaping calculations (§10.3.1)**
 - The Calculator Agent now derives its dispatch table, required-params, type→label map, and the extraction prompt's type list from a single declarative `CalcSpec` registry (`agents/calculator/registry.py`). Adding a calculation is now one formula in `formulas.py` plus one registry entry — the old parallel dicts and `_dispatch()` if-ladder are gone. A drift-guard test (`test_calculator_registry.py`) makes any schema-Literal ↔ registry mismatch a test failure.
 - **Five new calculation types, all deterministic:** `aggregate_tons` (gravel/crushed-stone base by weight, cu yd × density), `mulch_bags` (bagged-material count, ÷ bag volume), `retaining_wall_blocks` (courses × blocks-per-course), `step_count` (total rise ÷ riser height), `plant_count` (groundcover grid spacing — square `area ÷ spacing²` or triangular `÷ (spacing² × 0.866)`). All math stays in pure `formulas.py`; the LLM only extracts parameters.
 - **Regex fast-path now reads the output-unit signal:** "how many **tons**/**bags** … N sq ft … N inches" routes to `aggregate_tons`/`mulch_bags` instead of silently collapsing to cubic-yard coverage. `steps?` added to the orchestrator pre-classifier's measurement-unit set.
@@ -55,26 +109,26 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - **Send-gate message made self-contained:** when a confirmed send is blocked by unresolved missing items, the refusal (`_refuse_send_with_missing_items`) now returns a self-contained statement (`needs_clarification=False`, no `clarifying_question`) instead of the bare, unanswerable question "Would you like to add them to your catalog or dismiss them?" — chat can't resolve missing items (that's a portal-editor action), and the portal renders only `clarifying_question` on clarification turns, so the question previously showed with no antecedent for "them". (The general portal issue — clarification turns dropping the `response` context, which also affects illegal-transition refusals — is tracked separately.)
 - Tests: `test_estimates_status_transition_status_ref_to_phrasing`, `test_chat_blocks_sent_while_missing_items_unresolved` (`tests/test_estimate_agent.py`); `test_orchestrator_routes_estimate_status_transition`, `..._is_deterministic_not_llm`, `..._status_question_form_stays_help`, `test_help_status_question_offers_to_proceed_and_sets_pending` (`tests/test_orchestrator_intents.py`); `tests/test_pending_status_transition.py`.
 
-**2026-06-12 — Edit lock tightened to Draft/Review only (§8.7)**
+**2026-06-12 — Edit lock tightened to Draft/Review only (§9.7)**
 - The locked-status edit guard now mirrors the portal's `isEditableStatus` (`portal/src/lib/estimateStatus.ts`) instead of the PUT route's narrower lock: estimate contents are editable in chat **only in Draft or Review**. Won / On Hold / Lost / Scheduled / Completed (and internal statuses) now refuse edits too, closing the gap where chat could edit a Won estimate's notes while the UI showed it read-only. Allowlist constant: `_EDITABLE_ESTIMATE_STATUSES` in `agents/estimate/crud_handlers.py`.
 - Refusals stay persona-voiced; when the state machine offers a one-hop path back (On Hold → Review, Lost → Review) the refusal suggests it ("Ask me to move it to Review first"). Archived and Sent/Approved keep their specific copy.
 - Note: the HTTP PUT route still only locks Sent/Approved/Archived — tracked as a follow-up (#349 in code-review-followups.md).
 - Tests: `test_locked_estimate_other_statuses_refuse_notes_edit` (Won/Scheduled/Completed), `..._review_reachable_statuses_suggest_review` (On Hold/Lost), `..._won_refuses_work_item_edit`, `test_editable_estimate_notes_edit_still_works` (Draft + Review).
 
-**2026-06-11 (follow-up 2) — Locked-status edit guard (new §8.7)**
+**2026-06-11 (follow-up 2) — Locked-status edit guard (new §9.7)**
 - Edits to an **Archived** estimate (any sub-op) and to a **Sent**/legacy **Approved** estimate (any sub-op except the unsend status change) are now refused in chat, mirroring the PUT route's locks ("Cannot update an archived estimate" / "Cannot update a sent estimate"). Enforced once in `_load_estimate_for_update` (`agents/estimate/crud_handlers.py`) — the shared loader behind every edit sub-op: notes, description, property linking, template application, and all work-item operations. Reads are unaffected; the status-transition path has its own rules (state machine + role gates) and is not blocked by this guard.
 - Refusals are persona-voiced with the next step: "Ask me to unarchive it first…" / "Ask me to move it back to Draft or Review first…".
 - Tests: `test_locked_estimate_archived_refuses_notes_edit`, `..._sent_refuses_notes_edit` (Sent + Approved), `..._sent_refuses_work_item_edit`, `test_draft_estimate_notes_edit_still_works` (`tests/test_estimate_agent.py`).
 
-**2026-06-11 (follow-up) — Status-transition authorization + persona refusals (§1.4, §8.6)**
+**2026-06-11 (follow-up) — Status-transition authorization + persona refusals (§1.4, §9.6)**
 - The status handler now also enforces the HTTP layer's **role gates**: any transition touching `Sent`/legacy `Approved` (send or unsend) is **Owner/Admin only** (mirrors the PUT role gate); **archive/unarchive** is **Owner/Admin or the estimate's creator** (mirrors the dedicated endpoints' check against `created_by_email`, case-insensitive).
 - Identity reaches agents via two new context keys set by the authenticated `/agents/orchestrate` endpoint from the verified user (never the client payload): `current_user_email` (normalized lowercase) and `current_user_role`. Gated operations **fail closed** when identity is missing from context.
 - All status-transition refusals (illegal edge, role, creator, missing identity) were rewritten in Maple's persona voice — warm, first-person, apologetic, and always offering the next step ("From Draft I can take it to Archived, On Hold, or Sent — want me to do one of those instead?" / "If you ask an Owner or Admin on your team, they can take care of it for you.").
 - Tests: `test_estimates_status_transition_send_unsend_requires_owner_or_admin`, `..._archive_member_non_creator_refused`, `..._archive_member_creator_allowed`, `..._unarchive_member_non_creator_refused`, `..._gated_op_missing_identity_fails_closed`, `..._ungated_op_member_allowed` (`tests/test_estimate_agent.py`); `test_orchestrate_endpoint_passes_user_identity_to_agents` (`tests/test_orchestrator_endpoint.py`).
 
-**2026-06-11 — Status-transition state machine enforced in chat (§1.4, new §8.6)**
+**2026-06-11 — Status-transition state machine enforced in chat (§1.4, new §9.6)**
 - Maple's status handler (`_handle_update_estimate_status_transition` in `agents/estimate/crud_handlers.py`) now calls `validate_estimate_status_transition` from `models/estimate.py` — the same single-source-of-truth state machine the PUT route enforces (#46) and the FE renders (`portal/src/lib/estimateStatus.ts`). Previously chat wrote `status` directly to the DB, so e.g. `mark {EST} as won` succeeded on a Draft estimate.
-- Legal edges are unchanged and still save (Draft → Sent/On Hold/Archived; Review → Sent/On Hold/Archived; On Hold → Review; Won → Scheduled/On Hold/Lost; Lost → Review; Scheduled → Completed; Sent/Approved → anything = "unsend"). Illegal edges now refuse with the current status, the rejected target, and the allowed next statuses (🛑 rows in §8.6).
+- Legal edges are unchanged and still save (Draft → Sent/On Hold/Archived; Review → Sent/On Hold/Archived; On Hold → Review; Won → Scheduled/On Hold/Lost; Lost → Review; Scheduled → Completed; Sent/Approved → anything = "unsend"). Illegal edges now refuse with the current status, the rejected target, and the allowed next statuses (🛑 rows in §9.6).
 - Tests: `test_estimates_status_transition_blocked_by_state_machine` / `..._allowed_by_state_machine` in `tests/test_estimate_agent.py`.
 
 **2026-06-09 — Social & personality handling (greetings + anthropomorphized questions)**
@@ -82,7 +136,7 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - **Personal questions → new `personal` help topic (persona-answered).** Anthropomorphized questions ("how are you?", "what do you look like?", "are we friends?", "are you married?", "are you an AI?") are detected by `is_personal_question` and routed through the existing help path (`HelpHandler.detect_topic` returns `personal`), then answered by the LLM guide responder from Maple's persona thanks to a rule-1 exemption in the guide prompt.
 - **New detectors** `is_greeting` / `is_personal_question` in `agents/text_utils.py`; **new persona** `agents/maple_persona.py` (playful deflection for flirty messages, no romantic reciprocation, honest about being an AI, short replies that pivot back to work).
 - **Topic-keyed by design** so product-capability phrasings stay in the product lane: "are you able to add contacts?", "can you create an estimate?", "how are you estimating this job?" are explicit negatives → normal help/CRUD, not `personal`.
-- New §10.6 (Social & personality) catalogs the greeting and personal-question phrasings.
+- New §11.6 (Social & personality) catalogs the greeting and personal-question phrasings.
 
 **2026-06-07 — Note-body quote fix + estimate anaphora persistence (user report: truncated note + "the same estimate" not recognized)**
 - **Quoted note/description bodies no longer truncate at an apostrophe.** `_NOTE_WITH_QUOTED_VALUE` and `_ESTIMATE_DESC_QUOTED` used `[^"']+?`, which treated the `'` in `"Contact me if there's any issues"` as the closing quote and captured only `Contact me if there`. Both now share `_QUOTED_VALUE_GROUP` — a matched-quote capture (straight + curly, double + single) whose close-quote is a negated class, so an apostrophe or the other quote type can appear inside the value. Callers coalesce the four branches via `_first_quoted_group`.
@@ -103,7 +157,7 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
   - **§1.10 notes** — title/anaphora resolution; informal cues `jot`/`FYI`/`remember`/`write down` detected AND routed (orchestrator `_informal_note` value-bearing arm).
   - **§1.6 linking** — relationship phrasings (`tie`/`connect`/`associate`, "is for", "property for this quote"), bare-property-name targets, `link {EST} to {property}` now rule-tier (was 🤖 LLM).
   - **§1.2 details** — `_build_estimate_details_text` renders Created / Last updated / Description / Notes / ID; "show me everything on the {title} quote" works (linked-property NAME still pending an async lookup).
-  - **§9.4 follow-up** — Estimate registered in the generic `optional_follow_up` machine; **one-turn** "Yes, link it to Bob Residential"; bare-property answers; legacy `pending_estimate_follow_up` no longer dual-writes and defers to the generic key (the legacy handler swallowing the reply was the root cause of the original report).
+  - **§10.4 follow-up** — Estimate registered in the generic `optional_follow_up` machine; **one-turn** "Yes, link it to Bob Residential"; bare-property answers; legacy `pending_estimate_follow_up` no longer dual-writes and defers to the generic key (the legacy handler swallowing the reply was the root cause of the original report).
 - **Cross-cutting:** shared `_resolve_estimate_code_or_title` (code → anaphora → latest → title) used by all update sub-handlers; bare-title extraction `_TITLE_PRE/POST_NOUN_RE` (case-sensitive first word, 2+ words incl. sentence-case tails, ordered before the any-quoted fallback so note bodies aren't mistaken for titles); orchestrator estimate field-edit fast-path in `_classify_specific_phrasings`.
 - Tests: `tests/test_maple_estimate_field_edits.py` (57) + additions to `tests/test_agent_helpers_delegate_create_estimate.py`; ~500-test regression sweep green; mypy + ruff project-wide zero.
 - Still ⚠️ after this wave (verified, with misroute notes where found): casual detail forms ("rundown", "full info" → misroutes to `get_contact`, "open up"), "when was X created/updated" (the created form misroutes to `create_estimate`), value-before-cue description ("put X as the overview"), `describe … as`, note verbs `make`/`leave`/`tack`, generalized `note … that` tail, "job site" link cue, soft negatives ("not right now", "I'll do it from the portal"), `bid`/`proposal` as title-extraction nouns, and job-name → estimate resolution (Task-8 stretch).
@@ -113,7 +167,7 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - **§1.10 (new)** — estimate-level `description` edit is unhandled (model field exists, no dispatcher sub-op → falls through to the `_handle_update_estimate` refusal); estimate-level `notes` append **is** handled rule-side (newly documented) but code-only.
 - **§1.2** — title-based details response is too thin: `_build_estimate_details_text` (`crud_helpers.py:446`) emits only Code/Title/Status/Grand total. Missing `created_at`, `updated_at`, linked property, description, notes (all present on the model and in the full result payload, just not rendered).
 - **§1.6** — title-referenced property linking ("set the property of estimate {Name} to {property}") is a gap; the link handler fires but can't resolve a titled estimate.
-- **§9.4 (new)** — the post-creation "link this to a property now?" follow-up (`extraction_helpers.build_optional_follow_up`) has no pending-intent state, so an affirmative reply ("Yes, link it to Bob Residential") isn't carried back into the linking handler.
+- **§10.4 (new)** — the post-creation "link this to a property now?" follow-up (`extraction_helpers.build_optional_follow_up`) has no pending-intent state, so an affirmative reply ("Yes, link it to Bob Residential") isn't carried back into the linking handler.
 - Each of the five sections now carries **landscaper-style variant rows** in its catalog table (informal verbs, customer/job-name references, bare-address properties, value-only notes, confirmation-word-plus-property replies) plus a concise **Implementation note**, so coverage targets the real input distribution, not just the canonical phrasing. Recurring sub-gaps surfaced by the variants: estimate synonyms `bid`/`proposal`, job-name → estimate resolution, possessive property nicknames ("Bob's place"), informal note cues (`jot down`/`FYI`/`remember`), and bare-property affirmatives in the link follow-up.
 - Implementation plan written: [`plans/maple-estimate-field-edits.md`](plans/maple-estimate-field-edits.md).
 
@@ -131,7 +185,7 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - New tests: `tests/test_maple_phrasing_expansion.py` (routing + pure parsers/formatter), plus additions to `test_material_agent.py` and `test_estimates_analytics.py`.
 
 **2026-06-02 — `clear` restored as a bulk-delete verb (with estimate-creation exemption)**
-- Reverted the May 2026 removal of `clear` from the bulk-delete verb list: `clear all {resource}` ("clear all estimates", "clear every material") is again refused as a bulk delete, matching the `delete`/`remove`/`drop`/`wipe` policy (§8.1).
+- Reverted the May 2026 removal of `clear` from the bulk-delete verb list: `clear all {resource}` ("clear all estimates", "clear every material") is again refused as a bulk delete, matching the `delete`/`remove`/`drop`/`wipe` policy (§9.1).
 - Added `is_estimate_creation_request()` in `agents/text_utils.py`, applied at the **orchestrator routing layer** (`_detect_policy_short_circuit`) so estimate/quote creation requests whose job description mentions clearing/removing work ("create an estimate to clear out all the weeds in my backyard") route to `create_estimate` instead of being refused. The exemption is deliberately NOT inside `is_bulk_delete_request()` — that guard stays strict so each domain agent's defensive delete-path check keeps full force. A `_ESTIMATE_AS_DELETE_TARGET` veto ensures "delete every estimate" (estimate as the delete target) is never read as creation.
 - Reconciled contradictory tests: `test_text_utils.py` and `test_maple_new_phrasings.py` now agree that `clear all {resource}` is bulk delete and estimate-creation-with-clearing is allowed (verified end-to-end through the orchestrator).
 
@@ -153,7 +207,7 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 **2026-05-26 — Template CRUD phrasings**
 - Template resource added to terminology table and phrasing catalog (§6). All phrasings are ⚠️ gap — no Template Agent or orchestrator routing exists yet.
 - Phrasings cover: list, get, delete, verbless, and apply-template-to-estimate (§6.7).
-- Template **creation, update, and duplicate are refused** (§8.5) — users must manage these through the portal UI.
+- Template **creation, update, and duplicate are refused** (§9.5) — users must manage these through the portal UI.
 - Sections renumbered: old §6–§11 → §7–§12 to accommodate the new §6.
 
 **2026-05-26 — May expansion**
@@ -162,10 +216,10 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - "win" added as a verb-form alias for EstimateStatus.WON so "how many estimates did I win this month?" routes correctly
 - "older than X days" age-based date filter via `_AGE_FILTER_PATTERN`
 - "at property" cross-resource variant for estimate→property queries
-- Contact→property "linked to" cross-resource patterns (§7.1)
+- Contact→property "linked to" cross-resource patterns (§8.1)
 - Material size "of" form (`how much does 12x12 of concrete blocks cost?`) and category query (`what category is material X?`) (§4.9)
 - Role field queries via "what's the X for role Y?" routing to `get_labour` (§5.8)
-- "clear" removed from bulk-delete verb patterns — ambiguous in this domain (§8.1)
+- "clear" removed from bulk-delete verb patterns — ambiguous in this domain (§9.1)
 - US English: user-facing "labour" → "labor" in response strings, accuracy suggestions, and guide content
 - User guide updated: contacts can be linked to multiple properties (no limit)
 
@@ -176,8 +230,8 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 - Wave 4.1: Contact-anchored estimate list, EST-code regex broadened to alphanumeric, suffix "property" form
 - Wave 4: Estimate ↔ property/contact outbound drilldowns (§1.8)
 - Wave 3: Estimate filters (status + date + amount), cross-resource drilldowns (materials/roles on EST-code), material query variants, partial-bulk delete refusal
-- Wave 2: Cross-resource routing + agent-side join for all four CRUD resources (§7)
-- Wave 1: Possessive/field-targeted phrasings, help gaps (§10.5), coverage blind spots consolidated into §12
+- Wave 2: Cross-resource routing + agent-side join for all four CRUD resources (§8)
+- Wave 1: Possessive/field-targeted phrasings, help gaps (§11.5), coverage blind spots consolidated into §13
 
 ## How to read this doc
 
@@ -197,11 +251,12 @@ Token conventions used throughout:
 | `{material}` | `concrete blocks` |
 | `{role}` | `Landscaper` |
 | `{template}` | `Driveway Maintenance` |
+| `{task}` | `fix the fence gate` (a task title) |
 | `{EST}` | `EST-0042`, `EST-4E73F7BB`, `EST-2026-001` (alphanumeric — anything matching `EST[-_][A-Za-z0-9\-_]*`) |
 | `{size}` | `12x12` |
 | `{unit}` | `each`, `sq ft`, `linear ft` |
 
-## Terminology note — the 5 + 1 Maple resources
+## Terminology note — the 6 + 1 Maple resources
 
 | User-facing | Code domain | What it represents |
 |---|---|---|
@@ -210,15 +265,16 @@ Token conventions used throughout:
 | **Material** | `material` | Catalog of physical products with sizes/prices |
 | **People** | `labour` | Catalog of **role definitions** (Landscaper, Foreman). NOT individuals — that's Contact. |
 | **Template** | `template` | Reusable estimate blueprints with predefined materials, activities, and cost parameters. |
+| **Task** | `task` | Field-capture to-dos with statuses, assignees, property links, and convert-to-estimate. |
 | **Estimate** | `estimate` | Quotes / job costings. Generated by an AI agent from a job description. |
 
-Equipment is **explicitly blocked** via `is_equipment_request()` at the orchestrator layer — see §8.
+Equipment is **explicitly blocked** via `is_equipment_request()` at the orchestrator layer — see §9.
 
 ## How to add new use cases
 
 1. Add the phrasing under the appropriate resource section with status ⚠️ gap. Include the intended intent/agent if you have one.
 2. Ping Claude with "add these phrasings to Maple" — Claude will write failing tests, implement the rule, and flip the status to ✅ here.
-3. For phrasings that should be refused, add under §8 with status 🛑 and note why.
+3. For phrasings that should be refused, add under §9 with status 🛑 and note why.
 
 Tests live in `platform/tests/test_maple_crud_coverage.py` (matrix) and `platform/tests/test_maple_*.py` (targeted). Running the matrix regenerates `platform/tests/reports/maple_crud_gap_report.md` with live pass/fail counts.
 
@@ -307,7 +363,7 @@ Handled by `agents/estimate/conversation_guide.py`. The EstimateAgent walks the 
 
 EstimateStatus values: `DRAFT`, `APPROVED`, `WON`, `LOST`, `ONHOLD`, `SCHEDULED`, `COMPLETED`, `SUBMITTED`, `REVIEW`, `ARCHIVED`.
 
-**State machine + authorization enforced (2026-06-11):** every phrasing below is additionally subject to `validate_estimate_status_transition` (`models/estimate.py`, mirrors `portal/src/lib/estimateStatus.ts`) and to the HTTP layer's role gates (send/unsend → Owner/Admin; archive/unarchive → Owner/Admin or creator). A recognized phrasing whose edge is illegal for the estimate's *current* status — e.g. `mark {EST} as won` on a Draft — or that the user isn't authorized for, refuses in Maple's persona voice instead of saving. See §8.6.
+**State machine + authorization enforced (2026-06-11):** every phrasing below is additionally subject to `validate_estimate_status_transition` (`models/estimate.py`, mirrors `portal/src/lib/estimateStatus.ts`) and to the HTTP layer's role gates (send/unsend → Owner/Admin; archive/unarchive → Owner/Admin or creator). A recognized phrasing whose edge is illegal for the estimate's *current* status — e.g. `mark {EST} as won` on a Draft — or that the user isn't authorized for, refuses in Maple's persona voice instead of saving. See §9.6.
 
 **Deterministic routing (2026-06-15):** the Orchestrator now routes status-transition phrasings to `update_estimate` via a `process()` fast-path (ahead of the LLM) and a `_classify_with_rules` branch, both gated on an estimate reference + the shared `parse_status_transition` matcher (`agents/estimate/text_helpers.py`). The ✅-rule rows below were previously 🤖 LLM and routed inconsistently. **Question forms** (`Can you …?`) are claimed by the help classifier and answered with an offer to proceed — see the last two rows.
 
@@ -669,7 +725,7 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 
 ## 2.9 Property gaps
 
-No outstanding property-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §7.
+No outstanding property-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8.
 
 ---
 
@@ -713,7 +769,7 @@ No outstanding property-specific gaps in scope for the current backlog. Cross-re
 
 ## 3.8 Contact gaps
 
-No outstanding contact-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `where does {contact} live?`) are tracked under §7.
+No outstanding contact-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `where does {contact} live?`) are tracked under §8.
 
 ---
 
@@ -872,7 +928,7 @@ Note: "labor burden" and "unbillable rate" are company-level settings, not per-r
 
 ## 5.9 People gaps
 
-No outstanding people-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `which properties need a {role}?`) are tracked under §7.
+No outstanding people-specific gaps in scope for the current backlog. Cross-resource phrasings (e.g. `which properties need a {role}?`) are tracked under §8.
 
 ---
 
@@ -889,7 +945,7 @@ Key fields: `name` (required, unique per company), `description`, `division`, `r
 | `list all templates` | `list_templates` → Template Agent | ✅ rule |
 | `delete the template {template}` | `delete_template` → Template Agent | ✅ rule |
 
-Template **creation** is refused — see §8.5. Users must create templates through the Templates page in the portal UI.
+Template **creation** is refused — see §9.5. Users must create templates through the Templates page in the portal UI.
 
 ## 6.2 Casual phrasings
 
@@ -918,7 +974,7 @@ All ✅ rule — routes to `list_templates` → Template Agent with count respon
 
 All ✅ rule — routes to `list_templates` → Template Agent.
 
-Template **update** and **duplicate** are refused — see §8.5. Users must edit and copy templates through the portal UI.
+Template **update** and **duplicate** are refused — see §9.5. Users must edit and copy templates through the portal UI.
 
 ## 6.6 Verbless
 
@@ -957,17 +1013,214 @@ When a **create-estimate** request names a template, `delegate_create_estimate` 
 
 ## 6.8 Template gaps
 
-Orchestrator routing, refusal guard, and Template Agent are implemented. Possessive (§6.3) and verbless (§6.6) phrasings are 🤖 LLM — they rely on the LLM classifier since template names lack a rule-tier entity-shape heuristic. Template creation, update, and duplicate are explicitly refused (§8.5).
+Orchestrator routing, refusal guard, and Template Agent are implemented. Possessive (§6.3) and verbless (§6.6) phrasings are 🤖 LLM — they rely on the LLM classifier since template names lack a rule-tier entity-shape heuristic. Template creation, update, and duplicate are explicitly refused (§9.5).
 
 Additional cross-resource phrasings (e.g. `which templates include {material}?`) are future candidates — not tracked here yet.
 
 ---
 
-# 7. Cross-resource / implicit relationships
+# 7. Tasks
+
+Field-capture to-dos (`models/task.py`) with a title, capture date, optional description / due date / property link / assignee, and a **per-company status** (`TaskStatus` documents — defaults `To Do` | `In Progress` | `Done`; users can rename/add). The Tasks feature is flag-gated (`settings.tasks_enabled`); Maple refuses gracefully when it's off. Free-plan companies have a standing 50-task cap (archived tasks count; only hard delete frees a slot).
+
+Token conventions: `{task}` = a task title (e.g. `fix the fence gate`); `{status}` = a company task-status name; `{email}` = an assignee email.
+
+## 7.1 Direct imperatives (all ✅ rule)
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `create a task called {task}` | `create_task` → Task Agent | ✅ rule |
+| `create a task with title {task}` / `title: {task}` | `create_task` → Task Agent | ✅ rule *(2026-07-22 smoke-test fix)* |
+| `create a task with title {task}. Add the following notes: {text}` | `create_task` → Task Agent (title + description in one turn) | ✅ rule *(the notes/description clause is split off before title extraction and stored as the task description)* |
+| `add a task to check the retaining wall` / `create a new task to: {text}` / `new task: {text}` | `create_task` → Task Agent | ✅ rule *(2026-07-25 — **content-is-description rule**: with no title cue, the body becomes the DESCRIPTION and the title is derived from it. Previously the "to …" phrase became the title, and a phrasing like `create a new task to: {text}` put the whole command line in the title.)* |
+| `create a task with the notes: {text}` / `Create a task. Add the following notes: {text}` (notes, **no** title) | `create_task` → Task Agent — creates immediately with a **title derived from the notes** | ✅ rule *(2026-07-25 — first sentence of the notes, politeness/reminder preamble stripped ("remind me to call Bob tomorrow" → "Call Bob tomorrow"), truncated to 60 chars on a word boundary; full notes kept as the description. The reply says the title came from the notes so the user can rename it.)* |
+| `create a new task` (no title, **no** notes) → *"What should the task be called?"* → bare reply | `create_task` field-then-value flow (§10.1) — the reply becomes the title; inline notes from the first turn are kept | ✅ rule *(only reached when there are no notes to derive a title from, or the notes yield nothing usable — e.g. `notes: ...`)* |
+| `list my tasks` | `list_tasks` → Task Agent | ✅ rule |
+| `show me the {task} task` | `get_task` → Task Agent | ✅ rule |
+| `delete the {task} task` | `delete_task` → Task Agent (manager-only, confirm first) | ✅ rule |
+
+## 7.2 Casual phrasings
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `jot down a task to order more mulch` | `create_task` → Task Agent | ⚠️ gap *(informal create cues — LLM-tier candidates, unverified)* |
+| `I need to remember to winterize the irrigation` | `create_task` → Task Agent | ⚠️ gap |
+| `pull up my tasks` | `list_tasks` → Task Agent | ✅ rule |
+| `what tasks do I have?` | `list_tasks` → Task Agent | ✅ rule |
+
+## 7.3 Possessive
+
+Bare-title possessives carry no "task" keyword for the rule tier to anchor on, and the 2026-07-22 Tier-2 run showed the LLM doesn't rescue them either (same bare-title gap class as materials/contacts pre-Phase-2b). Adding `the {task} task's …` (with the keyword) routes fine via §7.1/§7.6 shapes.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `what's the {task} task's due date?` | `get_task` → Task Agent | ⚠️ gap (bare-title form; keyword form routes ✅) |
+| `update {task}'s description` | `update_task` → Task Agent | ⚠️ gap |
+| `show me {task}'s details` | `get_task` → Task Agent | ⚠️ gap |
+
+## 7.4 Count (all ✅ rule)
+
+`how many tasks do I have?` · `count my tasks` · `total number of tasks` — `list_tasks` count path → `format_count_response`. Status-filtered counts (`how many open tasks?`) remain ⚠️ (see §7.5 status filter).
+
+## 7.5 Filter / find
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `what tasks are at {property}?` | `list_tasks` filtered by property | 🤖 LLM routing; ⚠️ property filter not yet applied agent-side |
+| `which tasks are assigned to {email}?` / `tasks assigned to me` | `list_tasks` filtered by assignee | 🤖 LLM routing; agent-side assignee filter ✅ |
+| `list my tasks` | `list_tasks` (ALL tasks — "my" is not an assignee filter, matching every other resource; use "assigned to me" to filter) | ✅ rule |
+| `tasks in progress` / `what's still to do?` | `list_tasks` filtered by status | ⚠️ gap (no status-name list filter yet) |
+| `show archived tasks` | `list_tasks` with archived-only filter | ✅ rule |
+| `tasks due this week` | `list_tasks` with `due_date` window | ⚠️ gap |
+| `find tasks about fencing` | `list_tasks` with title/description search | ✅ rule *(named/matching/about/containing all apply the search term)* |
+
+## 7.6 Field-targeted update
+
+The `the {task} task` keyword forms are ✅ rule; bare-title forms (`change the due date of {task} to Friday` with no "task" word) are 🤖 LLM for the change/update shapes and ⚠️ for the set-possessive shape (2026-07-22 Tier-2 run). Due-date values accept ISO (`2026-08-01`), `today`/`tomorrow`, and weekday names (next occurrence).
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `change the due date of the {task} task to Friday` | `update_task` → Task Agent | ✅ rule |
+| `add a description to the last task: {text}` | `update_task` → Task Agent (recency reference) | ✅ rule |
+| `rename the {task} task to {new title}` | `update_task` → Task Agent | ✅ rule |
+| `set the description of the {task} task to {text}` | `update_task` → Task Agent | ✅ rule |
+| `change the due date of {task} to Friday` (bare title) | `update_task` → Task Agent | 🤖 LLM |
+| `set {task}'s due date to next Monday` (bare title) | `update_task` → Task Agent | ⚠️ gap |
+
+## 7.6.1 Notes on an existing task (append by default)
+
+Adding notes to a task Maple already worked on is an **update**, not a create — the orchestrator's `is_task_notes_update_request` claims these before the generic resolver, because `add` is a CREATE action hint and would otherwise make a *second* task. The rule requires an explicit `task`; a bare `add a note to it` stays on the generic anaphora path (where an active *estimate* still wins).
+
+Additive is the default, matching estimate notes (§5.x) — a drive-by note never silently wipes what's there. Existing notes and the new text are blank-line separated; appending onto empty notes collapses to a clean set. Only an explicitly destructive verb (`replace` / `overwrite` / `set … with`) overwrites.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `Add the following notes to the Task: {text}` (active task) | `update_task` (notes append) → Task Agent | ✅ rule *(2026-07-25)* |
+| `Add to the Task: {text}` / `add this to the task: {text}` / `add to the {task} task: {text}` — **no field word at all** | `update_task` (notes append) → Task Agent | ✅ rule *(2026-07-25 smoke-test fix — the colon carries the meaning: everything after it is content, and notes are the only free-text field a task has. The separator is REQUIRED, so `add a photo to the task` isn't claimed.)* |
+| `add a note to the task: {text}` / `append to the task notes: {text}` | `update_task` (notes append) → Task Agent | ✅ rule |
+| `add notes to the {task} task: {text}` | `update_task` (notes append) → Task Agent | ✅ rule |
+| `add a note to it: {text}` (pronoun only) | `update_task` (notes append) → Task Agent | 🤖 LLM *(agent handler wired; routing needs the LLM tier so an active estimate keeps priority)* |
+| `Add another note: {text}` / `add a note: {text}` — **no target at all** | `update_task` (notes append) → Task Agent | ✅ agent-side *(2026-07-25 smoke-test fix — the active task is implied, same as the pronoun forms; routing is LLM-tier for the same reason)* |
+| `replace the notes on the task with: {text}` / `set the notes on the task to: {text}` | `update_task` (notes **set**) → Task Agent | ✅ rule |
+| `add a task with the notes: {text}` | `create_task` → Task Agent | ✅ rule *(create shape — the notes-update rule explicitly excludes it)* |
+
+### 7.6.1.1 Dictated payloads — the first intent wins
+
+**In `<command>: <payload>`, the payload is content, not intent.** Classifying the whole string let a domain word inside the user's own prose take over: *"Add to it the following: bring a lawn mower to his place. Need to estimate the lawn size."* routed to `create_estimate` — the trailing "estimate" beat the leading "add to it".
+
+`strip_dictated_payload` (in `intents.py`) returns just the command head when the head carries an add/notes/following cue, and the generic resolvers classify on that head — `_match_unambiguous_command`, `_classify_via_action_domain`, and `_resolve_intent_with_history` (where a payload domain word previously blocked anaphora outright). Task-specific rules still see the full text, because some key off the colon itself. A message that names its domain in the head (`create an estimate for: 123 Main St`) is unaffected.
+
+Paired rule: **an anaphoric target means the entity already exists**, so `is_anaphoric_add_request` rewrites the CREATE reading of "add … to it/this/that" to an update. Which domain it updates still comes from the active-entity anchor (estimate before task, §7.11) — so the same sentence appends to an active estimate when that's what's in play.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `Add to it the following: {text}` (active task; payload mentions other domains) | `update_task` (notes append) → Task Agent | ✅ rule *(2026-07-25 smoke-test fix)* |
+| `add to the task the following: {text}` | `update_task` (notes append) → Task Agent | ✅ rule |
+| `Add to it the following: {text}` (active **estimate**) | `update_estimate` → Estimate Agent | ✅ rule *(anchor decides, not the payload)* |
+
+## 7.6.2 Field-then-value flow (§10.1) — "update the task" → "description" → the value
+
+`update the task` alone can't be actioned, so Maple asks which field. That question is only useful if the answer can be resumed: each ask now stashes a `pending_intents` entry naming the Task Agent, which is what the router's pending fallback routes the bare reply back to. **Without it the reply landed wherever the classifier guessed** — in the 2026-07-25 smoke test, three "What would you like to update?" loops followed by create's *"What should the task be called?"*.
+
+Either step can be entered directly: `add to the description` selects the field and asks for the value; `description` on its own does the same. `match_bare_task_field` maps title/name, description/notes/note/details, due date/due/deadline, status/state, assignee/assigned to/owner — and returns nothing as soon as the message carries a payload, so an answer like "mow the lawn as well" is never mistaken for a field selection. Description values **append**; a fresh command mid-flow (`list my tasks`) is obeyed and the stale ask is dropped.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `update the task` → *"What would you like to update…?"* → `description` → *"What would you like me to add…?"* → `{text}` | `update_task` field-then-value → Task Agent | ✅ rule *(2026-07-25)* |
+| `add to the description` → *"What would you like me to add…?"* → `{text}` | `update_task` (notes append) → Task Agent | ✅ rule |
+| bare `title` / `due date` / `status` / `assignee` → value | `update_task` field-then-value → Task Agent | ✅ rule *(status resolves per-company names; assignee takes an email or "me"; due date takes ISO / tomorrow / a weekday)* |
+
+## 7.7 Status changes
+
+`TaskStatus` values are **per-company** (defaults: `To Do`, `In Progress`, `Done`). Status names resolve exact → case-insensitive → fuzzy; an unrecognized name triggers a clarification listing the company's statuses. Status changes fold under `update_task` (same pattern as estimate status transitions under `update_estimate`, §1.4).
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `mark it as done` (active task) | `update_task` (status) → Task Agent | 🤖 LLM *(pronoun-only routing needs the LLM + active-task context; the agent-side handler is fully wired)* |
+| `mark the {task} task as done` | `update_task` (status) → Task Agent | ✅ rule |
+| `move the {task} task to In Progress` | `update_task` (status) → Task Agent | ✅ rule |
+| `set the status of the {task} task to {status}` | `update_task` (status) → Task Agent | ✅ rule *(unknown names get a clarification listing the company's statuses; done/complete/finished + in-progress/started + to-do/open synonyms map to the default names when present)* |
+
+## 7.8 Assignee operations
+
+Assignees are plain emails (`assigned_to_email`); parity with the REST API — no team-membership validation.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `assign this to {email}` (active task) | `update_task` (assign) → Task Agent | 🤖 LLM *(pronoun-only routing; agent handler wired)* |
+| `assign the {task} task to me` | `update_task` (assign, current user) → Task Agent | ✅ rule |
+| `assign the {task} task to {email}` / `reassign …` | `update_task` (assign) → Task Agent | ✅ rule |
+| `who is the {task} task assigned to?` | `get_task` → Task Agent | ⚠️ gap *(details view already shows Assigned to; the who-question routing is unwired)* |
+
+## 7.9 Archive / unarchive
+
+Soft-hide only — archived tasks still count toward the free-plan cap.
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `archive that task` (active task) | `update_task` (archive) → Task Agent | ✅ rule |
+| `archive the {task} task` | `update_task` (archive) → Task Agent | ✅ rule |
+| `unarchive it` (active task) | `update_task` (unarchive) → Task Agent | 🤖 LLM *(pronoun-only routing; agent handler wired)* |
+| `unarchive the {task} task` / `restore the {task} task` | `update_task` (unarchive) → Task Agent | ✅ rule |
+
+## 7.10 Convert to estimate
+
+Converting generates a new estimate from the task's description via the AI pipeline and **consumes one included estimate** — Maple always confirms before running it. Requires a non-empty task description. Billing outcomes surface as friendly refusals (needs payment method / plan blocked / already converting).
+
+Handler: `agents/task/service.py::_handle_convert_task` → `services/task_convert.py::run_task_conversion` — the SAME claim/billing/generation/re-link core the REST endpoint uses (extracted 2026-07-22 so the two paths can't drift). On success the new estimate becomes the **active estimate** ("add a work item to it" then targets the estimate).
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `convert this task to an estimate` (active task) | `convert_task` → Task Agent (confirm first) | ✅ rule |
+| `convert the {task} task to an estimate` | `convert_task` → Task Agent (confirm first) | ✅ rule |
+| `turn the {task} task into a quote` | `convert_task` → Task Agent (confirm first) | ✅ rule |
+
+## 7.11 Task referencing & anaphora
+
+A task can be referenced three ways; an explicit reference in the message always beats the active-task context. Multiple matches trigger a numbered clarification ("I found 3 tasks matching that — which one did you mean?"); the reply (number, title, or "the first one") dispatches the original request. Once a task is identified (create/get/update/status/assign/archive), it becomes the **active task** — follow-ups ("mark it done", "add a description", "convert it") act on it. Deleting a task clears the active-task context.
+
+Resolver: `agents/task/resolver.py::find_task_from_context_or_message` — order: ObjectId → recency words → day window (`agents/text_utils.py::parse_relative_day_window`) → property (via `find_properties_by_name_or_address`) → title (exact substring, then fuzzy 0.65/0.80) → active-task context → recency fallback (gated OFF for delete/convert; never used after an unmatched explicit title). Confirmation state: `pending_task_confirmation` (numbered/title/ordinal replies; "no" cancels; a fresh command breaks the pending question).
+
+| Reference form | Example | Status |
+|---|---|---|
+| Relative (recency) | `the last task` / `my latest task` (my = assigned to me) | ✅ |
+| Relative (date) | `the task from yesterday` / `from Tuesday` / `3 days ago` | ✅ |
+| By title (fuzzy) | `the fence gate task` (typos tolerated) | ✅ |
+| By property | `the task at {property}` | ✅ |
+| Anaphora (active task) | `mark it as done` / `convert it` | ✅ agent-side *(pronoun-only messages route via the LLM tier + active-task context)* |
+| Anaphora (bare determiner) | `mark the task as done` / `assign my task to {email}` / `archive the task` / `rename the task to {new}` | ✅ agent-side *(2026-07-25 — "the/my task" with no name in between is anaphora: the target hint collapses to empty and resolution goes through the active-task context. Previously the stray determiner leaked into the title matcher and could hit ANY title containing "the".)* |
+| Ambiguity → confirmation | two similar titles → numbered clarification, reply `1` / title / `no` | ✅ |
+
+## 7.12 Task refusals — 🛑
+
+| Phrasing / condition | Behavior | Status |
+|---|---|---|
+| `delete all my tasks` / `wipe my tasks` | Bulk-delete refusal (existing domain-agnostic guard) | 🛑 refusal |
+| `delete the {task} task` as a non-manager | Refused — owners/admins only (`agents/role_utils.py::assert_manager_role`, shared with the Template agent); Maple offers to archive instead | 🛑 refusal |
+| `convert …` with an empty task description | Refused — Maple asks to add a description first | 🛑 refusal |
+| Any task request while `tasks_enabled` is off | Friendly "Tasks aren't enabled for your workspace" refusal | 🛑 refusal |
+| `create a task …` at the free-plan 50-task cap | Refused with upgrade pointer (mirrors REST 409) | 🛑 refusal |
+| Convert billing outcomes (402 needs-payment / 429 blocked / 409 already-converting) | Friendly first-person refusals mapped from `run_task_conversion`'s HTTP errors | 🛑 refusal |
+
+## 7.13 Task gaps
+
+Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-support.md)). Remaining ⚠️ rows, confirmed against both tiers where noted:
+
+- **Bare-title references** (possessive §7.3, verbless, set-possessive §7.6) — no "task" keyword to anchor on; both tiers fail (2026-07-22 Tier-2 run). Same gap class as materials/contacts pre-Phase-2b; a catalog-backed title lookup would close it.
+- **Status-name list filter** — `tasks in progress`, `how many open tasks?`.
+- **Due-date window list filter** — `tasks due this week`.
+- **Property filter on list** — `what tasks are at {property}?` routes (LLM tier) but the agent lists all tasks; wire a property filter like the assignee one.
+- **Informal create cues** — `jot down…`, `I need to remember to…` (LLM-tier candidates, unverified).
+- **`who is the {task} task assigned to?`** — unwired; details view covers the need.
+- **`add a task to the estimate`** — routes to the Task Agent (estimate work items are never called "tasks" in code or docs); when the message names an estimate, Maple should offer redirection to the work-item flow ("Did you mean a work item on the estimate?"). Not yet implemented.
+
+---
+
+# 8. Cross-resource / implicit relationships
 
 Questions users ask when they think about the domain rather than the database. Routing is via `_match_cross_resource_query` in the orchestrator (Wave 2 Phase 1); the join is performed by the target agent reading a `filter_by` payload off `context` (Wave 2 Phase 2). Direct lookups (Property↔Contact) hit the linked-id list on the Property document; transitive joins (material/labour → property) go through the Estimate collection's embedded `materials.material` / `labours.labour` lists.
 
-## 7.1 Property ↔ Contact
+## 8.1 Property ↔ Contact
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
@@ -980,7 +1233,7 @@ Questions users ask when they think about the domain rather than the database. R
 | `which properties does contact {contact} linked to?` | `list_properties` filtered by contact | ✅ rule *(May expansion — new "linked to" cross-resource pattern)* |
 | `show me (all) properties contact {contact} linked to` | `list_properties` filtered by contact | ✅ rule *(May expansion)* |
 
-## 7.2 Material → Property / Estimate
+## 8.2 Material → Property / Estimate
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
@@ -988,7 +1241,7 @@ Questions users ask when they think about the domain rather than the database. R
 | `where is {material} used?` | `list_properties` joined via estimates | ✅ rule |
 | `find estimates with {material}` | `list_estimates` filtered by material | ✅ rule (plural-aware list flip) |
 
-## 7.3 Labour → Property / Estimate
+## 8.3 Labour → Property / Estimate
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
@@ -998,9 +1251,9 @@ Questions users ask when they think about the domain rather than the database. R
 
 ---
 
-# 8. Safety refusals
+# 9. Safety refusals
 
-## 8.1 Bulk delete — 🛑 refused
+## 9.1 Bulk delete — 🛑 refused
 
 Phrasings with quantifier + delete verb. Enforced at the orchestrator layer AND defensively at each domain agent's `process()`. Verbs: `delete`, `remove`, `drop`, `wipe`, `clear`. **Note:** `clear all {resource}` (e.g. "clear all estimates") **is** treated as a bulk delete and refused — the May 2026 "remove clear" change was reverted (2026-06-02). The one exemption is estimate/quote **creation** requests whose job description mentions clearing/removing work ("create an estimate to clear out all the weeds in my backyard") — these are detected by `is_estimate_creation_request()` and pass through to `create_estimate`, never the refusal guard.
 
@@ -1014,7 +1267,7 @@ Phrasings with quantifier + delete verb. Enforced at the orchestrator layer AND 
 
 Applies to all 4 CRUD resources. Maple-only policy — HTTP routers may still expose bulk delete for UI workflows.
 
-## 8.2 Equipment — 🛑 refused
+## 9.2 Equipment — 🛑 refused
 
 Equipment isn't a Maple resource. Any phrasing mentioning equipment (excavator, skid steer, bobcat, etc.) refuses with `EQUIPMENT_REFUSAL_MESSAGE`.
 
@@ -1024,7 +1277,7 @@ Equipment isn't a Maple resource. Any phrasing mentioning equipment (excavator, 
 | `create a new equipment` | 🛑 refusal |
 | `delete the excavator equipment` | 🛑 refusal |
 
-## 8.3 Material category management — 🛑 refused
+## 9.3 Material category management — 🛑 refused
 
 Material categories (Hardscape, Masonry, etc.) live in the catalog UI. Maple can list/filter/reassign but not create/rename/delete them.
 
@@ -1034,7 +1287,7 @@ Material categories (Hardscape, Masonry, etc.) live in the catalog UI. Maple can
 | `rename the Masonry category` | 🛑 refusal |
 | `delete the Hardscape category` | 🛑 refusal |
 
-## 8.4 Partial bulk / small-N destructive — 🛑 refusal
+## 9.4 Partial bulk / small-N destructive — 🛑 refusal
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
@@ -1042,7 +1295,7 @@ Material categories (Hardscape, Masonry, etc.) live in the catalog UI. Maple can
 | `remove the first 10 properties` | Refuse | 🛑 refusal |
 | `drop the next 3 materials` | Refuse | 🛑 refusal |
 
-## 8.5 Template creation / update / duplicate — 🛑 refused
+## 9.5 Template creation / update / duplicate — 🛑 refused
 
 Templates must be created, edited, and duplicated through the Templates page in the portal UI. Maple can list, view, delete, and apply templates to estimates — but not create, update, or copy them.
 
@@ -1056,7 +1309,7 @@ Templates must be created, edited, and duplicated through the Templates page in 
 | `duplicate template {template}` | 🛑 refusal |
 | `copy template {template}` | 🛑 refusal |
 
-## 8.6 Illegal status transitions — 🛑 refused *(2026-06-11)*
+## 9.6 Illegal status transitions — 🛑 refused *(2026-06-11)*
 
 The estimate status state machine (`ESTIMATE_STATUS_TRANSITIONS` in `models/estimate.py`) is enforced in chat, matching the PUT route and the FE. The refusal names the current status and lists the legal next statuses. Whether a phrasing is refused depends on the estimate's **current** status, not the wording.
 
@@ -1081,9 +1334,9 @@ Internal lifecycle states (`Generating`, `Failed`, `Deleted`) were already refus
 
 All refusal copy follows Maple's persona (`agents/maple_persona.py`): first-person, apologetic, plain words, and always a next step — never a bare "permission denied".
 
-## 8.7 Edits to locked-status estimates — 🛑 refused *(2026-06-11, tightened 2026-06-12)*
+## 9.7 Edits to locked-status estimates — 🛑 refused *(2026-06-11, tightened 2026-06-12)*
 
-Mirrors the portal's `isEditableStatus`: estimate contents are editable **only in Draft or Review**. Enforced once in `_load_estimate_for_update` (allowlist `_EDITABLE_ESTIMATE_STATUSES`), the shared loader for every estimate edit sub-op (notes, description, link property, apply template, all work-item operations). Reads (`get_estimate`, work-item queries) are unaffected; status changes go through the §8.6 transition path instead.
+Mirrors the portal's `isEditableStatus`: estimate contents are editable **only in Draft or Review**. Enforced once in `_load_estimate_for_update` (allowlist `_EDITABLE_ESTIMATE_STATUSES`), the shared loader for every estimate edit sub-op (notes, description, link property, apply template, all work-item operations). Reads (`get_estimate`, work-item queries) are unaffected; status changes go through the §9.6 transition path instead.
 
 | Current status | Edit attempt (any sub-op) | Behavior |
 |---|---|---|
@@ -1092,16 +1345,21 @@ Mirrors the portal's `isEditableStatus`: estimate contents are editable **only i
 | Sent / legacy Approved | same | 🛑 refusal — "…locked for edits… move it back to Draft or Review first" |
 | On Hold / Lost | same | 🛑 refusal — Draft-or-Review rule + "ask me to move it to Review first" (one-hop path exists) |
 | Won / Scheduled / Completed (and internal statuses) | same | 🛑 refusal — Draft-or-Review rule, no one-hop path offered |
-| Sent / Approved | unsend status change (e.g. `move {EST} back to Review`) | ✅ allowed via the status-transition path (Owner/Admin only, §8.6) |
-| Archived | `unarchive {EST}` | ✅ allowed via the status-transition path (Owner/Admin or creator, §8.6) |
+| Sent / Approved | unsend status change (e.g. `move {EST} back to Review`) | ✅ allowed via the status-transition path (Owner/Admin only, §9.6) |
+| Archived | `unarchive {EST}` | ✅ allowed via the status-transition path (Owner/Admin or creator, §9.6) |
 
 Legacy/unknown stored statuses fail open so old data isn't stranded. The HTTP PUT route still locks only Sent/Approved/Archived — the UI/chat-vs-API gap is tracked as follow-up #349.
 
 ---
 
-# 9. Multi-turn patterns
+# 10. Multi-turn patterns
 
-## 9.1 Field-then-value flow (all 4 CRUD resources)
+## 10.1 Field-then-value flow (all 4 CRUD resources)
+
+*(2026-07-22: Tasks add a create-side variant — a create request with no
+title stashes an awaiting-title `pending_intents` entry, and the bare
+reply to "What should the task be called?" becomes the title, keeping any
+inline notes from the first turn. See §7.1.)*
 
 User responds to "What fields should I update?" with a bare field name:
 
@@ -1116,7 +1374,7 @@ Maple: I've updated the cost for Landscaper for you.
 
 Pending-intent slot: `awaiting_value_for`. Canonical implementation: `agents/property/service.py`.
 
-## 9.2 Add-size missing-field flow (materials)
+## 10.2 Add-size missing-field flow (materials)
 
 When user says "add size {size} to {material}" without providing cost or unit:
 
@@ -1127,7 +1385,7 @@ Maple: I need a unit for size '24x24' on concrete blocks. Try again with cost an
 
 Currently refuses and requests a retry with complete info (pending-intent persistence is a future UX refinement).
 
-## 9.3 Calculation continuation flow (Calculator Agent) ✅
+## 10.3 Calculation continuation flow (Calculator Agent) ✅
 
 When the Calculator Agent asks for a missing parameter (area, depth, etc.), it
 stores a `pending_calculation` record in the conversation context. On the next
@@ -1169,9 +1427,9 @@ Pending-state slot: `pending_calculation`. Continuation logic:
 > Note: re-engagement phrasings ("can you help with mulch coverage?") remain
 > unsupported by the continuation fix. **Inverse-coverage math** ("how many sq
 > ft will a yard cover" → solve for area) is now handled by the open-math path
-> (§9.3.2) when `CALCULATOR_OPEN_MATH_ENABLED` is on.
+> (§10.3.2) when `CALCULATOR_OPEN_MATH_ENABLED` is on.
 
-## 9.3.1 Calculation catalog (Calculator Agent) ✅
+## 10.3.1 Calculation catalog (Calculator Agent) ✅
 
 Each type is one `CalcSpec` in `agents/calculator/registry.py` → one pure
 function in `formulas.py`. The LLM only extracts parameters; all arithmetic is
@@ -1193,7 +1451,7 @@ deterministic. Adding a type is a single registry entry + formula.
 
 All accept an optional `waste_factor_pct` ("with 10% waste") except
 `step_count` and `unit_conversion`. The missing-parameter continuation flow in
-§9.3 applies to every type: a bare number fills a single outstanding field, and
+§10.3 applies to every type: a bare number fills a single outstanding field, and
 natural-language replies are matched for the common dimension phrasings
 ("20 feet long", "3 feet high", "8 inch spacing", "42 inch rise").
 
@@ -1207,7 +1465,7 @@ multiplication is done in code (`_derive_implied_params`), never by the LLM.
 > set carries install/liability risk and needs reviewed engineering formulas —
 > tracked for a separate phase.
 
-## 9.3.2 Open-math reasoning path (no curated formula) 🤖 — *behind `CALCULATOR_OPEN_MATH_ENABLED`, default off (2026-06-29)*
+## 10.3.2 Open-math reasoning path (no curated formula) 🤖 — *behind `CALCULATOR_OPEN_MATH_ENABLED`, default off (2026-06-29)*
 
 When the extraction classifier decides **no curated formula faithfully models**
 the request, it returns `open_math` instead of force-fitting the nearest type.
@@ -1241,7 +1499,7 @@ answer would need a production-rate lookup, or an assumed rate surfaced as an
 assumption — a candidate for the open-math path once it can reach labor-time
 questions.
 
-## 9.4 Post-creation "link to a property?" follow-up ✅ implemented *(2026-06-06)*
+## 10.4 Post-creation "link to a property?" follow-up ✅ implemented *(2026-06-06)*
 
 After an estimate is created **without** a linked property, Maple appends an optional follow-up question to the response: *"Would you like me to link this estimate to a property now?"* (`extraction_helpers.build_optional_follow_up`, surfaced in `agents/estimate/service.py:907`). The reply is now handled by the **generic pending-optional-follow-up state machine** (`routers/agent_helpers/optional_follow_up.py`):
 
@@ -1269,7 +1527,7 @@ Maple: I've linked estimate EST-… to Bob Residential for you.   ← one turn (
 
 ---
 
-# 10. Help intent
+# 11. Help intent
 
 Handled by `agents/orchestrator/help_handler.py` via the `HelpHandler` class. The orchestrator routes to it when `is_help_query()` returns True (see `agents/orchestrator/intents.py:296`). The agent is always the **Orchestrator Agent** itself — help never dispatches to a downstream domain agent.
 
@@ -1281,7 +1539,7 @@ Three topic families, in order of priority inside `HelpHandler.detect_topic()`:
 
 The result payload always has `operation="help"`, `read_only=True`, and an `intent="help"` on the envelope. Help queries are rule-only — they bypass the LLM even when `use_llm=True` (see `test_orchestrator_help_query_bypasses_llm`).
 
-## 10.1 Capability queries
+## 11.1 Capability queries
 
 Direct capability questions. Match via `HELP_DIRECT_HINTS` (`intents.py:184`).
 
@@ -1298,7 +1556,19 @@ Direct capability questions. Match via `HELP_DIRECT_HINTS` (`intents.py:184`).
 | `supported intents` | `capabilities` | ✅ rule |
 | `capabilities` | `capabilities` | ✅ rule |
 
-## 10.2 Enum queries
+### Feature-definition queries *(2026-07-22)*
+
+A definitional lead-in (`tell me about` / `what is` / `what are` / `explain` / `describe`) followed by a **bare resource noun** routes to HELP (guide-backed answer), not CRUD — previously "tell me about tasks" resolved to `list_tasks` and answered "I couldn't find any matching tasks." Detector: `is_feature_definition_query` (`intents.py`), applied inside `is_help_query` so both tiers share it. Works for every resource noun (tasks, estimates/quotes, properties, contacts, materials, templates, people/labor, to-dos).
+
+| Phrasing | Routing | Status |
+|---|---|---|
+| `tell me about tasks` / `Tell me about the Tasks feature` | `help` (guide §7.3 Tasks) | ✅ rule |
+| `what is a task?` / `what are tasks?` | `help` | ✅ rule |
+| `tell me about estimates` / `what are templates?` | `help` | ✅ rule |
+| `tell me about MY tasks` (possessive determiner) | `list_tasks` — the user's data, not a definition | ✅ rule |
+| `tell me about task {task}` / `tell me about {contact}` | `get_task` / `get_contact` — named lookups unaffected | ✅ rule |
+
+## 11.2 Enum queries
 
 Match via `HELP_ENUM_KEYWORDS` + `HELP_QUESTION_CUES` (`intents.py:194-218`). `HelpHandler.detect_topic()` disambiguates by domain keyword.
 
@@ -1329,7 +1599,7 @@ Match via `HELP_ENUM_KEYWORDS` + `HELP_QUESTION_CUES` (`intents.py:194-218`). `H
 | `what are the valid estimate divisions?` | ✅ rule |
 | `which divisions can an estimate have?` | ✅ rule |
 
-## 10.3 Procedural how-to queries
+## 11.3 Procedural how-to queries
 
 Match via `HELP_INSTRUCTIONAL_PATTERNS` (`intents.py:220-237`): `how do i`, `how can i`, `how to`, `how would i`, `how should i`, `steps to`, `step by step`, `process for`, `process to`, `guide for`, `guide to`, `explain how`, `show me how`, `walk me through`, `what are the steps`, `what's the process`.
 
@@ -1365,7 +1635,7 @@ When an instructional pattern hits, `detect_topic()` tries to match an action ke
 | `show me how to use Maple` | `how_to_use_system` | ✅ rule |
 | `how to get started` | `how_to_use_system` | ✅ rule |
 
-## 10.4 Help vs. CRUD precedence
+## 11.4 Help vs. CRUD precedence
 
 When a message contains **both** a CRUD intent (firm action+domain match) and an enum keyword, CRUD usually wins. Two important carve-outs:
 
@@ -1373,12 +1643,12 @@ When a message contains **both** a CRUD intent (firm action+domain match) and an
 |---|---|---|
 | `help me create a contact for Jane` | `create_contact` → Contact Agent | "help me" is a polite prefix, not an instructional question. CRUD action+domain is firm. |
 | `how many labour roles do I have?` | `list_labours` → Labour Agent | `action == "list"` short-circuit at `intents.py:321` prefers CRUD over help even though "roles" is an enum keyword. |
-| `what are the material categories?` | `list_material_categories` → Orchestrator Agent | Rule-level CRUD match fires before help classifier. See §8.3 refusal for create/delete variants. |
+| `what are the material categories?` | `list_material_categories` → Orchestrator Agent | Rule-level CRUD match fires before help classifier. See §9.3 refusal for create/delete variants. |
 | `how do I create a contact?` | `help` → Orchestrator Agent | Instructional pattern ("how do i") always wins over CRUD — `intents.py:310-311`. |
 
-## 10.5 Help gaps
+## 11.5 Help gaps
 
-Phase 1 of the xfail backlog (plan: `documentation/development/plans/maple-xfail-wave-1.md`) closed most §10.5 entries on 2026-05-02. Remaining gaps below are awaiting Wave 2 design work.
+Phase 1 of the xfail backlog (plan: `documentation/development/plans/maple-xfail-wave-1.md`) closed most §11.5 entries on 2026-05-02. Remaining gaps below are awaiting Wave 2 design work.
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
@@ -1401,7 +1671,7 @@ Phase 1 of the xfail backlog (plan: `documentation/development/plans/maple-xfail
 
 `HelpHandler.detect_topic` previously returned `f"how_to_manage_{domain_name}s"`, which produced `how_to_manage_propertys` for the property domain. Phase 1 introduced an inline `plural_topic` map (`property → properties`, others append `s`) so the topic key round-trips correctly to `how_to_manage_properties`.
 
-## 10.6 Social & personality
+## 11.6 Social & personality
 
 Maple handles greetings and personal/anthropomorphized questions in **two tiers**:
 
@@ -1451,17 +1721,17 @@ These read like questions *about* Maple but are really **capability / CRUD** req
 
 ---
 
-# 11. Appendix
+# 12. Appendix
 
-## 11.1 Where tests live
+## 12.1 Where tests live
 
 | Path | Purpose |
 |---|---|
 | `platform/tests/test_maple_crud_coverage.py` | Matrix — 117 phrasings × Tier 1 + Tier 2 |
-| `platform/tests/_maple_coverage_data.py` | Matrix data (10 categories × 5 resources) |
+| `platform/tests/_maple_coverage_data.py` | Matrix data (15 categories; 5 CRUD resources incl. Tasks + estimate/equipment/calculator extras) |
 | `platform/tests/test_maple_estimate_status_queries.py` | Estimate count + value queries (Phase A) |
 | `platform/tests/test_maple_material_size_operations.py` | Material size ops (Phase B) |
-| `platform/tests/test_maple_help_coverage.py` | HELP intent — supported phrasings + xfail gaps (§10) |
+| `platform/tests/test_maple_help_coverage.py` | HELP intent — supported phrasings + xfail gaps (§11) |
 | `platform/tests/test_material_agent.py` | Material Agent handler integration |
 | `platform/tests/test_estimate_agent.py` | Estimate Agent handler integration |
 | `platform/tests/test_orchestrator_intents.py` | Orchestrator intent resolution |
@@ -1471,7 +1741,7 @@ These read like questions *about* Maple but are really **capability / CRUD** req
 | `platform/tests/test_maple_phrasing_expansion.py` | June 2026 expansion — status ratios/comparisons, age/staleness (`updated_at`), status-`in`, material name∪category qualifier (routing + pure parsers/formatter) |
 | `platform/tests/reports/maple_crud_gap_report.md` | Auto-generated gap report (regenerates each test run) |
 
-## 11.2 How to run
+## 12.2 How to run
 
 ```bash
 cd platform
@@ -1482,9 +1752,9 @@ cd platform
 ./run_tests.sh tests/test_maple_new_phrasings.py                     # May 2026 expansion (31 tests)
 ```
 
-## 11.3 Current matrix score (Tier 1 / Tier 2)
+## 12.3 Current matrix score (Tier 1 / Tier 2)
 
-Snapshot as of 2026-05-02 — regenerate with the coverage test.
+Snapshot as of 2026-05-02 — regenerate with the coverage test. *(2026-07-22: counts predate the calculator category and Tasks. Current totals: **Tier 1 159/170** (11 known-gap xfails, all Task bare-title class) with the Task slice at 24/35 Tier 1 · 28/35 Tier 2. The auto-generated `maple_crud_gap_report.md` is the live truth.)*
 
 | Category | Tier 1 | Tier 2 | Verdict |
 |---|---|---|---|
@@ -1504,20 +1774,20 @@ Snapshot as of 2026-05-02 — regenerate with the coverage test.
 
 **Totals: Tier 1 127/127 · Tier 2 95/117** (Tier 2 is unchanged — Wave 4/4.1 hasn't been re-run on the LLM tier; new categories aren't included in the Tier 2 coverage column above). All Tier 1 categories pass and cross-resource list responses are correctly filtered. The `cross_resource` join layer lives in `agents/cross_resource.py`; per-agent join handlers in Contact / Property / Estimate read `context.filter_by` to apply the constraint, including the Wave 4/4.1 `estimate`, `property`, and `contact` cross-types.
 
-*Note (2026-06-09): the new Social & personality surface (§10.6) — greetings via the `social` intent and personal questions via the `personal` help topic — is not yet represented in the auto-generated matrix above; see §10.6 for its phrasing catalog.*
+*Note (2026-06-09): the new Social & personality surface (§11.6) — greetings via the `social` intent and personal questions via the `personal` help topic — is not yet represented in the auto-generated matrix above; see §11.6 for its phrasing catalog.*
 
-## 11.4 Related docs
+## 12.4 Related docs
 
 - `CLAUDE.md` > "Maple (Orchestrator) — CRUD assistant policies" — architectural overview
 - `documentation/development/plans/maple-xfail-wave-1.md` — active plan for closing the remaining xfail backlog
 
 ---
 
-# 12. Coverage blind spots & extension ideas
+# 13. Coverage blind spots & extension ideas
 
-The matrix is shape-complete for the nine CRUD categories but never exercises several phrasing families real users will type. This section is the gap-hunting backlog — entries here aren't tracked as ⚠️ gaps in §1–§8 because they're conceptual classes, not specific phrasings ready to wire. Promote an entry to a per-resource ⚠️ gap row once you've picked a concrete phrasing and a target intent.
+The matrix is shape-complete for the nine CRUD categories but never exercises several phrasing families real users will type. This section is the gap-hunting backlog — entries here aren't tracked as ⚠️ gaps in §1–§9 because they're conceptual classes, not specific phrasings ready to wire. Promote an entry to a per-resource ⚠️ gap row once you've picked a concrete phrasing and a target intent.
 
-## 12.1 Language / phrasing variation
+## 13.1 Language / phrasing variation
 
 - **Negations:** `I don't need the Landscaper role anymore`, `remove John Doe — he moved`
 - **Conjunctions / multi-action:** `create a contact and link it to {property}`, `delete the Foreman role and add Operator instead`
@@ -1525,14 +1795,14 @@ The matrix is shape-complete for the nine CRUD categories but never exercises se
 - **Pronouns / anaphora across turns:** `update it`, `that one`, `the last one I created` (estimate-scoped anaphora exists in §1.7; cross-resource anaphora is the gap)
 - **Questions that imply get vs list:** `is there a contact named John?`, `do I have concrete blocks?`
 
-## 12.2 Value / field shapes not exercised
+## 13.2 Value / field shapes not exercised
 
 - **Dates / date ranges:** `contacts added this month`, `estimates from last week`
 - **Numeric ranges / comparisons:** `materials under $10` (already in §4.9), `labour roles costing more than $40/hr`
 - **Multi-field update:** `set John Doe's phone to X and email to Y`
 - **Nullable / clearing:** `remove John Doe's phone number`, `clear the description on {material}`
 
-## 12.3 Domain overlap ambiguity
+## 13.3 Domain overlap ambiguity
 
 The matrix uses disjoint tokens by design — real users won't:
 
@@ -1542,13 +1812,13 @@ The matrix uses disjoint tokens by design — real users won't:
 
 A small `ambiguity` test category would assert the classifier's tiebreak behavior.
 
-## 12.4 Refusal surface beyond bulk + equipment
+## 13.4 Refusal surface beyond bulk + equipment
 
-- **Destructive at smaller scale:** `delete the last 5 contacts` (N>1 but not "all") — listed as a §8.4 ⚠️ gap
+- **Destructive at smaller scale:** `delete the last 5 contacts` (N>1 but not "all") — listed as a §9.4 ⚠️ gap
 - **Cross-tenant / out-of-scope:** `show me other companies' estimates`
 - **Non-CRUD slipping through:** `email John Doe`, `schedule a visit`
 
-## 12.5 Highest-value extensions (ranked by ROI)
+## 13.5 Highest-value extensions (ranked by ROI)
 
 If we want to expand coverage, here's the order:
 
@@ -1556,6 +1826,6 @@ If we want to expand coverage, here's the order:
 2. **Active-entity anaphora** — exercises the `active_estimate_code` session path beyond what §1.7 currently asserts.
 3. **Filter by status / date** — `show me draft estimates from last week`, `approved quotes over $10k`. Needs date-range parsing.
 4. **Direct coverage of the add-work-item regex path** — `agents/orchestrator/service.py` work-item rules; today only hit by orchestrator unit tests.
-5. **Cross-resource outbound from estimate** — mirrors §7.2 / §7.3 inbound pattern (e.g. `which property is {EST} for?`, `what materials does {EST} use?`).
-6. **Ambiguity fixtures** — see §12.3.
+5. **Cross-resource outbound from estimate** — mirrors §8.2 / §8.3 inbound pattern (e.g. `which property is {EST} for?`, `what materials does {EST} use?`).
+6. **Ambiguity fixtures** — see §13.3.
 7. **Typo / stemming fixtures** — 5–10 common misspellings per resource to catch fuzzy-match regressions.

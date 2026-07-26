@@ -4852,3 +4852,74 @@ matcher methods into a mixin would be the real remedy.
 5. Delete the bullet from this file in the same PR.
 
 When this file is empty, delete it.
+
+---
+
+## 2026-07-25 deferred from /code-review (website hero carousel)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [MEDIUM] website/index.html — carousel CSS still inline (remainder of finding #8)
+The carousel JS was extracted to `src/hero/hero-carousel.ts` in this pass, taking
+index.html from 1486 back down to 1355 lines. The ~175 lines of `m3s-*` CSS are
+still inline, so the file remains above the 800-line guideline. Extraction was
+deliberately not attempted: the hero is the LCP element, and moving its CSS into
+the Vite module graph means the stylesheet arrives via the JS chunk in dev,
+producing a flash of unstyled hero on every dev reload. Production is unaffected
+(Vite extracts a `<link>` at build time), so this is a dev-ergonomics trade-off
+rather than a shipping problem.
+**Suggested fix:** If the file length becomes a real maintenance problem, move
+the `m3s-*` block to `src/styles/hero-carousel.css` and link it from `<head>`
+directly (a plain `<link>`, not a JS-graph import) so there is no FOUC in either
+environment.
+
+### [LOW] website/public/screens/app-tasks.webp — placeholder copy visible in the capture
+The tasks board screenshot shows "Test Task for scale" and "Task #10 / #11 / #13"
+as task names. This is open item 1 on the supplied DEVELOPER-HANDOFF.md launch
+checklist and reads as unfinished on a public landing page. Not fixable in code —
+it needs a fresh capture of the Tasks board.
+**Suggested fix:** Re-capture the Tasks board with realistic task names and drop
+the new file in at the same path. The CSS crop is resolution-independent, so no
+`--z` / `--cx` / `--cy` values need to change.
+
+---
+
+## 2026-07-26 deferred from /code-review (Maple Tasks backend)
+
+Logged by `/fix-issues` — findings from the latest review Simon chose to defer.
+Findings #1, #2, #3, #6, #7, #8, #9, #10, #11 were fixed in that pass.
+
+### [HIGH] platform/agents/task/ — seven functions over the 50-line limit (finding #4)
+`_handle_update_task` 105 (service.py), `find_task_from_context_or_message` 128
+(resolver.py), `_resolve_create_title` 101 (create.py), `_handle_awaited_field_value`
+94 (field_flow.py), `_perform_conversion` 74 (operations.py), `_handle_delete_task`
+66, `process` 66 — plus `run_task_conversion` at 157 (services/task_convert.py),
+which is a verbatim lift from the router that was extracted without being split.
+
+Worth noting the pattern rather than just the numbers: `_handle_update_task` was
+cut to 71 lines in the first review pass and regrew with every subsequent
+smoke-test fix, because each fix added a branch to the existing function instead
+of extending the structure. The #1/#2/#3 fixes in this pass added to it again.
+**Suggested fix:** Extract the awaited-value preamble and the sub-op dispatch out
+of `_handle_update_task`; give the resolver's seven ordered resolution steps named
+helpers behind the dispatch; split `run_task_conversion` into claim / generate /
+finalize.
+
+### [HIGH] platform/tests/test_maple_task_operations.py — test file past the 800-line ceiling (finding #5)
+Now ~1,560 lines after this pass added the ReDoS-timing, awaited-value, and
+query-pushdown suites. It accreted a class per smoke-test round and spans routing,
+payload stripping, notes updates, the field-then-value flow, title derivation,
+status, assignee, archive, convert, concurrency, and performance.
+**Suggested fix:** Split on the seams that already exist —
+`test_maple_task_notes.py` (notes + field flow + dictated payloads),
+`test_maple_task_ops.py` (status/assignee/archive/convert),
+`test_maple_task_text_helpers.py` (the pure text-helper unit classes), and
+`test_maple_task_perf.py` (the pathological-input timing suite).
+
+### [LOW] platform/agents/orchestrator/intents.py — `is_anaphoric_add_request` has no direct unit test (finding #12)
+Exercised only through orchestrator behavior tests, so its own contract (which
+pronouns, which verbs, how it composes with `strip_dictated_payload`) is unpinned.
+It also now gates the #6 full-text fallback in `_classify_via_action_domain`,
+which widens what a regression there would break.
+**Suggested fix:** Add a parametrized unit test alongside
+`TestStripDictatedPayload` in `tests/test_maple_task_operations.py`.
