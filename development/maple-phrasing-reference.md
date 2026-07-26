@@ -6,6 +6,12 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Change log
 
+**2026-07-26 — Assume instead of ask: estimates complete on partial info + adjustable assumptions (new §1.3.1)**
+- **Generation no longer blocks on missing area/materials.** Only an unknowable *work type* still asks a question; every other missing detail is assumed and generation runs immediately. Assumed values come from, in priority order: **company history** (median size parsed from similar past work items via the same vector search the pipeline reuses — `infer_area_from_history`), the **curated per-work-type defaults table** (`agents/estimate/assumption_defaults.py` — lawn 500 sq ft, patio 200 sq ft, driveway 600 sq ft, …), then the **architect LLM** (which now reports any value it invents in a structured `assumptions` array instead of silently guessing).
+- **Assumptions are structured + surfaced.** New `Estimate.assumptions` field (`EstimateAssumption`: key/label/value/unit/display/source). The creation reply appends: *"I made a few assumptions — let me know if you'd like to adjust any: • Area: 500 sq ft (average lawn) • Materials: standard sod"*.
+- **Follow-up adjustments rescale deterministically.** "change the lawn to be 800 sq ft instead" resolves the estimate (active context or explicit code/title), computes factor = 800/500, scales every work item's quantities + activity effort (`scale_job_item`), recomputes sub/grand totals, updates the stored assumption (so later adjustments compound), and confirms with the new total. Manual work-item total overrides are preserved proportionally. "assume premium pavers instead" swaps the assumed material's catalog match on the matching lines and re-prices — no LLM regeneration in either path. See §1.3.1.
+- The multi-question gathering loop degenerates to at most the work-type question; the mid-gathering per-item recheck (`_maybe_skip_area_question`) and its extra `assess_sufficiency` LLM call are gone — the deterministic `is_discrete_item_job` guard alone decides per-item vs area-based (per-item jobs get **no** invented area). Tests: +75 across `test_assumption_defaults`, `test_estimate_assumption_adjustment`, delegate/gathering suites; coverage matrix +4 phrasings (`assumption_adjustment` category).
+
 **2026-07-26 — Task Agent code-review fixes (9 of 12; 3 deferred)**
 - **ReDoS in the notes detectors (HIGH).** Every scanning segment in `agents/task/text_helpers.py` and the orchestrator's task detectors is now length-bounded (`[^.?!]{0,80}?`, an 80-char target body). "add to it " ×600 took **5.5s** before — nested unbounded lazy quantifiers, on an unbounded input field, holding the GIL and stalling the whole worker. Now ~1ms, pinned by a timing suite. `OrchestratorAgentRequest.message` also gained `max_length=2000` (matching the public Maple ask limit) as defence in depth.
 - **An awaited value is content, not intent (HIGH).** A note typed at the "what should the new description be?" prompt was **silently discarded** when its text parsed as a command, and the classifier ran that command instead (verified: "create a new estimate for Bob next week" → note lost, estimate created). Root cause was in the ROUTER, not the agent: `pending_intents` was only consulted when classification returned `unknown`. New `_get_awaiting_value_match` now **outranks** classification whenever a pending intent carries `awaiting_value_for`. The agent-side escape narrowed from any fresh intent to explicit cancel/no, and now acknowledges ("No problem — I've left the task as it is.") instead of silently re-asking.
@@ -350,14 +356,44 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `create an estimate to plant six hydrangea at the {property} residence` — property auto-linked at creation; "six" stays a plant quantity, never an area | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — property link + area grounding guard; the generation itself remains 🤖 LLM)* |
 | `estimate for sod at {street address}` — address resolved against the Property catalog and linked | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — unique match required; ambiguous/unknown falls back to the ask-to-link follow-up)* |
 
-Handled by `agents/estimate/conversation_guide.py`. The EstimateAgent walks the user through job description → material/equipment/labour recommendations → estimate creation.
+Handled by `agents/estimate/conversation_guide.py` + `agents/estimate/assumption_defaults.py`.
+
+**Assume instead of ask (2026-07-26):** generation no longer blocks on missing details. Only an unknowable **work type** still asks a question ("What type of work needs to be done?"); missing area size, material preferences, etc. are **assumed** and generation runs immediately. Assumption sources, in priority order:
+1. **Company history** — median job size parsed (`parse_job_size`) from similar past Sent/Approved work items, via the same per-company vector search the pipeline reuses (`infer_area_from_history`; needs ≥2 parseable samples).
+2. **Curated defaults table** — `WORK_TYPE_DEFAULTS` (lawn 500 sq ft / standard sod, patio 200 sq ft / concrete pavers, driveway 600 sq ft, hedge/fence 100 linear ft, …).
+3. **Architect LLM fallback** — anything it still has to invent is reported in a structured `assumptions` array (never silently guessed).
+
+Assumptions persist on `Estimate.assumptions` and the reply appends a block the user can act on — see §1.3.1 for the follow-up adjustments.
 
 **Three important branches before generation runs** (`routers/agent_helpers/delegate_create_estimate.py`):
 - **Template named → AI generation is skipped entirely** and the estimate is instantiated from the template (§6.7) — no material/activity questions.
-- **Gathering decline → assumption, not cancel.** A "No"/"skip" to a gathering question (e.g. "Any material preferences?") records an assumption and continues; only an explicit cancellation ("cancel", "never mind") aborts. See `routers/agent_helpers/estimate_gathering.py` (`is_cancellation_text`, `get_assumption_value`).
+- **Work-type decline → re-ask, not cancel.** A "No"/"skip" to the work-type question re-asks (no sensible assumption exists for *what the job is*); only an explicit cancellation ("cancel", "never mind") aborts. See `routers/agent_helpers/estimate_gathering.py` (`is_cancellation_text`).
 - **Property named in the request → linked at creation** (2026-07-06). `extract_property_reference` + `resolve_property_reference` (`agents/estimate/property_reference.py`) resolve "at the {Name} residence/property/house/…" and "at {street address}" against the company's Property catalog before sufficiency assessment. Unique match → the estimate is created already linked (and the post-create follow-up moves on to the description question); ambiguous or unknown → unchanged ask-to-link flow. Explicit mention overrides the `property_id` page context. If the request detours through gathering, the resolved property rides along in the `estimate_gathering_property` context key and `_finalize_gathering` links it.
 
-**Area grounding guard** (2026-07-06): an extracted `area_measurements` whose units the user never typed is dropped (`is_area_value_grounded`) — guards against item counts becoming acreage ("plant six hydrangea" → ~~"six-acre"~~). With the area back on the missing list, Maple asks "What's the approximate size of the area?" instead of inventing a job size.
+**Area grounding guard** (2026-07-06, repurposed 2026-07-26): an extracted `area_measurements` whose units the user never typed is dropped (`is_area_value_grounded`) — guards against item counts becoming acreage ("plant six hydrangea" → ~~"six-acre"~~). With the area back on the missing list, Maple now **assumes** a size (history → table → LLM) instead of asking — except for per-item jobs (`is_discrete_item_job`), which get *no* invented area at all.
+
+### 1.3.1 Assumptions & follow-up adjustments *(2026-07-26)*
+
+When Maple assumes missing info, the creation reply ends with:
+
+> I made a few assumptions — let me know if you'd like to adjust any:
+> • Area: 500 sq ft (average lawn)
+> • Materials: standard sod
+
+Each assumption is stored structured on the estimate (`EstimateAssumption`: `key`, `label`, `assumed_value`, `unit`, `display_text`, `source` = history/table/llm/user). Follow-ups adjust them **deterministically** — no LLM regeneration:
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `change the lawn to be 800 sq ft instead` (active estimate in context) | `update_estimate` → Estimate Agent | ✅ rule *(deterministic routing in `OrchestratorAgent.process`, anchored on `active_estimate_code` or an explicit `{EST}` ref; shared detector `detect_assumption_adjustment` in `agents/estimate/assumption_handlers.py`)* |
+| `make it 800 square feet` / `make it 800` (bare number → stored unit) | `update_estimate` → Estimate Agent | ✅ rule |
+| `the area is actually 20x30` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the lawn to 100 square yards` (unit conversion within family) | `update_estimate` → Estimate Agent | ✅ rule *(cross-family — e.g. sq ft → linear ft — clarifies instead)* |
+| `adjust the assumed area to 1000 sq ft on {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `assume premium pavers instead` | `update_estimate` → Estimate Agent | ✅ rule *(material swap: re-resolves the catalog match, swaps snapshots + pricing on the lines the old assumption produced, keeps quantities)* |
+
+**Size mechanics:** factor = new ÷ stored value; every work item's material/labour/equipment quantities and activity effort scale by the factor (`scale_job_item`), sub-totals recompute from the scaled lines, the grand total is recurrence-aware, and the stored assumption updates to the new value (marked "(adjusted)", `source="user"`) so successive adjustments compound (500 → 800 → 1000 = 1.6× then 1.25×). Work items whose total was **manually overridden** (§1.5.8) keep the override semantics — scaled proportionally, not recomputed. Confirmation: *"I've updated the area from 500 sq ft to 800 sq ft and recalculated estimate {EST} — new grand total: $X."*
+
+**Guards:** locked statuses refuse via the standard edit loader; absurd factors (×<0.01 or >100) and cross-family unit changes clarify without mutating; estimates with **no stored assumptions** (created before this feature, or fully-specified requests) get a graceful "no stored assumptions — use the estimate editor" reply; phrasings owned by other sub-ops (work items, status, financial fields, `{size} of {material}` quantities) are never claimed by this detector.
 
 ## 1.4 Status transitions
 

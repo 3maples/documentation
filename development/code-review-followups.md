@@ -4923,3 +4923,45 @@ It also now gates the #6 full-text fallback in `_classify_via_action_domain`,
 which widens what a regression there would break.
 **Suggested fix:** Add a parametrized unit test alongside
 `TestStripDictatedPayload` in `tests/test_maple_task_operations.py`.
+
+## 2026-07-26 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the assumption-based-estimates review
+not fixed in that pass (selection was #1-#6; #7-#9 deferred), plus the residual
+of a partially-applied fix.
+
+### [MEDIUM] platform/agents/estimate/assumption_handlers.py:257,415 — the two assumption handlers remain over the 50-line guideline (residual of finding #2)
+Finding #2 was applied: `_handle_assumption_material_swap` went 128 → 79 lines
+and `_handle_assumption_size_adjustment` 105 → 62, by extracting
+`_resolve_swap_material`, `_swap_material_lines`, `_find_materials_assumption`,
+`_find_size_assumption`, `_parse_new_size`, and `_save_or_error`
+(`resolve_assumptions` in `assumption_defaults.py` also split into
+`_resolve_area_assumption` / `_resolve_material_assumption` and is now compliant).
+What remains in both is the declarative success envelope — a multi-line f-string
+response plus the `result` dict — not branching logic.
+**Suggested fix:** Only worth doing if the response shape gets reused elsewhere.
+Extracting it now would need a 7-8 parameter helper, which reads worse than the
+inline version; revisit if a third assumption sub-op lands and the envelope
+genuinely becomes shared.
+
+### [LOW] platform/agents/estimate/crud_handlers.py — file-length violation worsened (finding #7)
+Now 2,966 lines against the 800-line guideline. Pre-existing, but the
+assumption-adjustment dispatch and its TYPE_CHECKING stubs added 26 lines rather
+than reducing it.
+**Suggested fix:** The update-dispatch table is the natural extraction candidate
+— each `_detect_* → _handle_*` pair could move to its own module, the way the
+work-item handlers already did.
+
+### [LOW] platform/agents/estimate/llm_pipeline.py:92 — imports a private symbol across module boundaries (finding #8)
+`from services.llm.factory import _is_gpt5_reasoning_family` — an
+underscore-prefixed function consumed by another package, so a change to the
+factory's internals breaks this silently.
+**Suggested fix:** Promote it to a public `is_gpt5_reasoning_family` in
+`services/llm/factory.py` (keeping a private alias if desired) and import that.
+
+### [LOW] platform tooling — bandit not installed, so no automated security scan runs during /code-review (finding #9)
+`/code-review` calls for `bandit -r . -x tests/` when available; it is not
+installed in `platform/.venv`, so the Python security scan has been skipped on
+recent reviews (manual injection/ReDoS/bare-except checks were done instead).
+**Suggested fix:** `pip install bandit` in `platform/.venv` and add it to the
+dev requirements if the team wants it enforced.
