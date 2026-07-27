@@ -2064,7 +2064,7 @@ glance at or tweak the field before clicking Set.
 Fix: hold a `useRef` on the input and call `inputRef.current?.focus()`
 inside the Reset handler. Tiny UX polish.
 
-### 175. [MEDIUM] `JobItemCreate` margin/tax fields accept unbounded floats
+### 175. [MEDIUM] ~~`JobItemCreate` margin/tax fields accept unbounded floats~~ — RESOLVED 2026-07-27
 **Severity**: MEDIUM
 `platform/routers/estimates.py:609–614` — `original_profit_margin`,
 `profit_margin`, `overhead_allocation`, `labor_burden`, and `tax` are all
@@ -2073,11 +2073,78 @@ and arbitrarily large/negative values. A malicious or buggy client could
 persist garbage. Pre-existing pattern across the model — I added one more
 field with the same loose typing rather than tightening it.
 
-Fix: introduce shared `Annotated[float, Field(ge=…, le=…, allow_inf_nan=False)]`
-type aliases for percentage fields (e.g. `PercentField`) and apply across
-`JobItemCreate` + the corresponding `JobItem` model fields. Coordinate so
-existing data still validates on read (use `model_validate` not strict
-parsing on legacy docs).
+**Closed as resolved 2026-07-27.** New `models/numeric_fields.py` defines
+`PercentField` / `MoneyField` (+ `Optional*` variants) as
+`Annotated[float, Field(allow_inf_nan=False, ge=…, le=…)]`, applied across
+`JobItemCreate` and every child `*ItemCreate` model. Three decisions worth
+recording, because each is a deliberate departure from the original suggestion:
+
+- **Scope widened to the money fields.** `price` / `cost` / `quantity` /
+  `rate` / `effort` / `sub_total` carry the identical defect, and a NaN price
+  makes every downstream total NaN just as surely as a NaN margin does.
+  Fixing only the percentages would have left the same hole with a wider
+  entry point. Same one-line-per-field mechanism, so it was folded in.
+- **Bounds are wide, and percentages are NOT clamped to `[0, 100]`.** The
+  portal's "Adjust Work Item Total" back-solves a margin from a user-supplied
+  total (`backCalculateProfitMargin` in
+  `portal/src/utils/estimateCalculations.ts`), which legitimately yields a
+  **negative** margin when the total is set below subtotal, and margins in the
+  thousands for a small subtotal. Clamping to `[0, 100]` would have broken a
+  shipped feature. Limits are ±1,000,000% for percentages and ±1e12 for money
+  — enough to reject garbage and keep the compound
+  `(1 + p/100) × (1 + o/100)` product far from overflow, without rejecting any
+  plausible business input. Money is likewise not floored at zero (credits and
+  discounts are real line items).
+- **Stored models are not constrained**, against the original suggestion to
+  apply the aliases to `JobItem` too. Adding bounds to a stored model would
+  make any pre-existing document holding a bad value permanently unreadable (a
+  500 on every read of that estimate), which is a strictly worse failure than
+  the one being fixed. Stored values are kept clean by sanitizing at
+  construction instead — see the parsed pipeline below.
+
+**Two ingresses, not one.** The `*ItemCreate` request models only cover the
+hand-edit path (portal PUT/POST). The **AI-generation path — the primary way
+estimates are created here — never touches them**: `job_item_builders.py`
+constructs the stored `MaterialItem` / `LabourItem` / `ActivityItem` straight
+from LLM-parsed dicts. That path was left open by the first pass of this fix
+and closed by a follow-up `/code-review`; it is the more important of the two.
+
+Every numeric read out of a parsed dict now routes through
+`coerce_finite_float` (via a module-local `_finite()` in
+`job_item_builders.py`), covering `job_item_builders.py` (materials, labours,
+unmatched variants, activities, `sub_total`, `labor_burden`, `tax`),
+`calculations.py` (`parse_profit_margin`, `parse_overhead_allocation`, and the
+three line-item total loops), and `job_item_merge.py` (both builder functions).
+Three properties this buys, none of which the old bare `float()` had:
+
+- `json.loads` accepts bare `NaN` / `Infinity` literals and `float("nan")`
+  accepts the string form — both now degrade to a default.
+- A non-numeric token like `"abc"` used to *raise* `ValueError`, turning one
+  bad LLM value into a 500 for the whole estimate. It now degrades one field.
+- **`tax` degrades to `None`, not `0.0`** — via the separate `finite_or_none`
+  helper. `None` means "unset, apply the company default"; `0.0` asserts
+  *tax-exempt*. Collapsing garbage onto `0.0` would invent a tax claim on the
+  customer's behalf. This distinction is the reason there are two helpers.
+
+`_build_parsed_effort_cards` replaced an `EffortCardItem(**ci)` splat of the
+raw LLM dict in the same pass. The splat was fragile beyond the NaN issue:
+`EffortCardItem` declares no `extra="ignore"` and four of its fields are
+required, so a single unexpected or missing key from the model raised and 500'd
+the whole estimate. It now builds field by field with defaults. (The sibling
+splat in `_build_request_activities` is fine — it dumps an already-validated
+`EffortCardItemCreate`.)
+
+`grand_total` is bounded on both `CreateEstimateRequest` and
+`UpdateEstimateRequest`: the update handler writes `payload.grand_total`
+straight to the document when `job_items` is absent, with no recomputation on
+that branch, so the request model is the only thing between a client value and
+the DB.
+
+Tests: `tests/test_estimate_numeric_validation.py` (181 cases — non-finite
+floats and their string forms, non-numeric strings, absurd magnitudes, the
+parsed-builder pipeline end-to-end, the `tax`-stays-`None` rule, plus explicit
+accepts-negative-margin / accepts-margin-above-100 cases pinning the bounds
+that must stay loose).
 
 ---
 
