@@ -3485,12 +3485,64 @@ property with a **blank `street`** as a contains-match for *any* query
 
 **Fix:** Extract shared boilerplate (resolve estimate → find work item → clarify on miss) into a `_resolve_work_item_for_update()` helper returning `(target, job_items, idx, matched, err_response)`. Extract catalog lookup + item construction into `_resolve_and_build_material_item()` / `_resolve_and_build_activity_item()`. Each handler shrinks to ~30 lines of domain logic.
 
-### 306. [HIGH] `_detect_work_item_op()` is 202 lines
+### 306. [HIGH] ~~`_detect_work_item_op()` is 202 lines~~ — RESOLVED 2026-07-27
 **Where:** `agents/estimate/work_item_handlers.py:110`
 
 **Issue:** Grew from ~75 lines to 202 with the new sub-resource ops. Readable as a cascading if-chain but past the length threshold.
 
-**Fix:** Extract the `has_wi` block (lines 140–212) into `_detect_sub_resource_op()` that `_detect_work_item_op` calls first. Keeps the legacy patterns untouched.
+**Closed as resolved 2026-07-27.** `_detect_work_item_op` is now **34 lines**
+and the whole detector chain sits under the threshold (largest: 44):
+
+| function | lines |
+|---|---|
+| `_detect_work_item_op` | 34 |
+| `_detect_sub_resource_op` | 34 |
+| `_detect_catalog_sub_op` | 29 |
+| `_detect_work_item_field_op` | 44 |
+| `_detect_inferred_material_op` | 15 |
+| `_detect_total_op` | 12 |
+| `_detect_legacy_work_item_op` | 21 |
+| `_detect_legacy_update_field` / `_rename` / `_add` / `_remove` | 22 / 13 / 18 / 11 |
+
+Went past the suggested fix in two places, both deliberate:
+
+- **Material and activity now share `_detect_catalog_sub_op`.** The two blocks
+  were structurally identical — list/count, then add / remove / update, then a
+  trailing what/how-many that also means list — differing only in keyword and
+  op suffix. Parameterized on `(keyword_pattern, singular, plural)`.
+- **The legacy cascade was split too**, against "keeps the legacy patterns
+  untouched". Extracting only the `has_wi` block left two functions still over
+  50 lines, i.e. **more** oversized functions in the file than before (6 → 7).
+  Splitting the legacy loops into four single-purpose detectors brought the
+  file to 6 → 5. The pattern tuples and their ordering comments are unchanged;
+  only the enclosing function boundaries moved.
+
+**Method — characterization tests first, and they earned their keep.**
+`TestDetectWorkItemOp` already asserted 17 of the 18 op shapes, but nothing
+pinned *precedence* or *fall-through*, which is exactly what an extraction
+breaks. New `TestDetectWorkItemOpPrecedence` (15 cases) records behavior
+captured from the pre-refactor implementation, including three results that are
+not obvious from reading the code:
+
+- `"add a material to the recurring work item"` → `recurring_enable`, not
+  `add_material` — recurring is checked first and wins outright.
+- `"set the total of work item 1 to 4200"` → `update_field` with
+  `field="total"`, **not** `set_total`. Neither total pattern matches, so it
+  falls through to the generic legacy update_field pattern. Recorded as-is; it
+  is behavior, not necessarily intent.
+- `"add a work item and list them"` → `add` with an empty name, not `list` —
+  the mutation-verb guard suppresses `list` and the nameless-add pattern claims
+  it.
+
+Both extractions were mutation-tested rather than assumed safe: forcing the
+`has_wi` block to swallow instead of fall through failed 12 tests, and swapping
+material/activity precedence failed 2. 423 tests pass across
+`test_maple_work_item_ops.py`, `test_estimate_agent.py` and
+`test_maple_crud_coverage.py`; ruff + mypy clean.
+
+**Not addressed:** the five `_handle_update_estimate_work_item_*` methods in
+this file are still over 50 lines (172 / 126 / 79 / 75 / 59). That is #305's
+territory, not this item's.
 
 ### 307. [HIGH] ~~Full-catalog fetch for material/role lookup~~ — RESOLVED 2026-06-03
 **Severity**: HIGH (resolved)
