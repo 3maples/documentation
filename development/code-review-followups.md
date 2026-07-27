@@ -4186,6 +4186,88 @@ on a just-transitioned estimate).
 
 ---
 
+### 350. [HIGH] Live credentials render in plain text from any `Settings` repr — object-level masking landed 2026-07-27, `SecretStr` still open
+**Severity**: HIGH
+`platform/config.py` holds every credential as a plain `str` — `openai_api_key`,
+`stripe_sk`, `stripe_webhook_secret`, `slack_bot_token`, `slack_signing_secret`,
+`slack_webhook_url`, `brevo_api_key`, the three `trello_*` values,
+`google_maps_api_key`, `mongodb_url` (password embedded in the URI),
+`sentry_dsn`, `recaptcha_v3_secret`, and `firebase_credentials_json` /
+`google_drive_credentials_json` (whole service-account blobs, RSA private key
+included). Zero `SecretStr` usage.
+
+**This is not theoretical — it fired on 2026-07-27.** A backend test run
+surfaced Settings content in plain text, putting the live Stripe `sk_live_` key,
+OpenAI key, Brevo key, Slack signing secret and the Firebase private key into
+test output. Verified scope: **not** in any commit (`.env` / `.env.local` are
+gitignored), **not** in CI logs (`platform/` has no GitHub Actions workflows and
+the pre-push hook deliberately skips pytest). But the same output pasted into a
+bug report, a Slack thread, or Sentry would carry them.
+
+*On the exact mechanism:* an earlier draft of this entry said pytest printed the
+frame's locals. That is **not** verified and is probably wrong — `--showlocals`
+is not in this repo's `pytest.ini` `addopts`, so locals are not rendered by
+default. The producing path could not be reconstructed after the fact. The
+likelier candidate is the `ValidationError` path described below, which formats
+`input_value=<the value>` and was directly observed echoing (fake) secrets while
+this very fix was being written. Recorded this way deliberately: a follow-up
+entry that misstates *how* a credential leak happened will misdirect whoever
+investigates the next one.
+
+**Partially closed 2026-07-27.** Two distinct leak paths, closed two different
+ways — neither covers the other:
+
+1. **Rendering an existing object.** `Settings.__repr_args__` masks anything
+   `_is_secret_field()` classifies as a credential. pydantic v2 routes
+   `__repr__`, `__str__` and `__pretty__` through that hook, so reprs,
+   f-strings, `print()`, and any log line or traceback frame that displays the
+   object are covered by one override with **no call-site changes**. Verified
+   against a real `--showlocals` traceback, which renders
+   `Settings(mongodb_url='********', openai_api_key='********', …)`.
+2. **Failing to construct one.** pydantic raises before an object exists to
+   repr and formats the error as `input_value=<the value>` — a path
+   `__repr_args__` cannot reach. `hide_input_in_errors = True` on the `Config`
+   class closes it for *every* construction path, not just the module-level
+   singleton. Errors still name the offending field, so a malformed `.env`
+   remains debuggable at startup.
+
+Classification is name-based (`key`, `secret`, `token`, `password`, `credential`, `dsn`) plus an
+explicit `_EXTRA_SECRET_FIELDS` set for the three that carry no marker —
+`mongodb_url`, `stripe_sk`, `slack_webhook_url`. Name-based on purpose: a
+credential added later is masked by default rather than exposed by default.
+Unset values render honestly as `None` / `''`, because masking those would hide
+whether a credential is configured at all and an empty value leaks nothing.
+
+Tests: `tests/test_settings_repr_masking.py` (76 cases, covering both leak
+paths). Note the deliberate
+assertion style — every check computes a bool *before* asserting, because
+`assert settings.openai_api_key not in text` would make pytest print both
+operands on failure and leak the exact value under test. There is also a
+guard test that fails when a new field starts matching the classifier, forcing
+a deliberate decision instead of a silent default.
+
+**Still open — the two gaps neither fix closes:**
+- A call site that reads one field and logs it (`logger.info(settings.stripe_sk)`)
+  still handles a plain `str`.
+- `model_dump()` / `model_dump_json()` are unmasked.
+
+**Suggested fix (the remaining work):** convert the credential fields to
+`SecretStr` and update the ~98 read sites to `.get_secret_value()`. Counted
+2026-07-27: `openai_api_key` 22, `stripe_sk` 19, `mongodb_url` 17, `sentry_dsn`
+6, `google_maps_api_key` / `google_drive_credentials_json` / `brevo_api_key` 5
+each, `slack_webhook_url` / `slack_bot_token` 4 each, `trello_api_key` /
+`trello_api_token` 3 each, `stripe_webhook_secret` / `firebase_credentials_json`
+2 each, `slack_signing_secret` 1. Tedious but low-risk: `SecretStr` is not a
+`str`, so every missed site becomes a mypy error and the project's zero-error
+gate catches them all before runtime.
+
+**Unresolved and more urgent than either code change: the exposed keys have not
+been rotated.** No change to `config.py` retroactively protects a credential
+that has already been printed. Rotating Stripe, OpenAI, Brevo, Slack and the
+Firebase service account is a standing owner decision.
+
+---
+
 ## 2026-06-15 deferred from /code-review
 
 Logged by `/fix-issues` — findings from the latest review (Maple status-transition
@@ -5310,3 +5392,24 @@ same untyped module for the focus-time warm-up.
 portal's — note portal's pre-push hook already enforces `npm run typecheck`, so
 the website is the odd repo out — or convert `lib/recaptchaClient.js` to `.ts`
 so at least this boundary is typed.
+
+---
+
+## 2026-07-27 deferred from /code-review (Settings credential masking)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that
+pass. Selection fixed #1-#4 (the ValidationError leak path, the overclaiming
+code comment, the unverifiable incident-mechanism claim in #350, and the
+missing regression coverage); #5 deferred here as a latent-only edge case.
+
+### [LOW] platform/config.py — falsy non-string values render unmasked
+`Settings.__repr_args__` guards on truthiness (`if ... and value`), so a
+secret-classified field holding `0` or `False` renders as-is rather than
+masked. No current field is affected — every field the classifier matches is
+`str` or `str | None`, and the truthiness check is deliberate there so unset
+credentials show honestly as `None` / `''` instead of a misleading `********`.
+The gap is latent: a future field such as `api_key_rotation_count: int = 0`
+would match the `key` token and print unmasked while zero.
+**Suggested fix:** test `value not in (None, "")` instead of truthiness, which
+preserves the honest rendering of unset string credentials while covering
+numeric and boolean fields.
