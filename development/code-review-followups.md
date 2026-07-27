@@ -2485,7 +2485,29 @@ small `portal/src/lib/onboardingPlanStorage.ts` helper, export it, and
 have both `OnboardingPage.tsx` and the test import from there. Drives
 both sides from one source.
 
-### 221. [MEDIUM] `meter_events.report_seat_count` atomic update inside broad `except` swallows DB errors
+### 221. [MEDIUM] ~~`meter_events.report_seat_count` atomic update inside broad `except` swallows DB errors~~ — RESOLVED 2026-07-26
+**Closed as resolved 2026-07-26.** `report_seat_count` now has two separate try
+blocks with distinct failure policies:
+- **Stripe post** — unchanged best-effort semantics (log + swallow), then
+  `return`. The early return is the load-bearing part: bumping the high-water
+  mark for a value Stripe never received would permanently suppress the repost,
+  because every later snapshot at that count short-circuits on the `<=` guard.
+- **High-water write** — `logger.exception("Failed to persist the seat-count
+  high-water mark for company %s (the meter event was accepted by Stripe)")`
+  then re-raises. `snapshot_all_seat_counts` (the only caller) already
+  try/excepts per company, so the error lands in its `errors` counter and the
+  loop continues — no behavior change for the cron beyond accurate accounting.
+
+Tests: `tests/test_billing_meter_events.py::TestReportSeatCountAtomicHighWater`
+— `test_db_failure_is_not_reported_as_a_stripe_meter_failure` (asserts the
+meter event was posted, the Stripe-shaped message is absent, and a high-water
+message is present) and
+`test_stripe_failure_leaves_high_water_unbumped_and_does_not_raise`. 19 passed;
+mypy/ruff clean.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
 **File**: [platform/services/billing/meter_events.py:99-122](../../platform/services/billing/meter_events.py)
 **Severity**: MEDIUM
 
@@ -2503,6 +2525,8 @@ Fix: split into two try blocks (Stripe → log+continue, DB → propagate
 or log via a distinct error path), OR tighten the except to
 `(stripe_sdk.error.StripeError,)` so DB errors surface, matching the
 narrow-except pattern landed in `customer.py` ([#199](#199-narrow-the-except-in-customerpy67)).
+
+</details>
 
 ### 222. [MEDIUM] `ESTIMATE_STATUS_TRANSITIONS` two-step construction in `models/estimate.py`
 **File**: [platform/models/estimate.py:36-92](../../platform/models/estimate.py)
@@ -3234,7 +3258,28 @@ This refactor also unlocks unit-testing the submit handler, the captcha load pro
 
 **Suggested fix:** Use `defineString('RECAPTCHA_V3_MIN_SCORE', { default: '0.5' })` from `firebase-functions/params`, parse to float at handler start, fall back to 0.5 on `NaN`. Set per-environment via `firebase functions:config` or a runtime param.
 
-### 295. [MEDIUM] Tighten CORS
+### 295. [MEDIUM] ~~Tighten CORS~~ — RESOLVED 2026-07-26
+**Closed as resolved 2026-07-26.** `cors: true` → a named `ALLOWED_ORIGINS`
+constant in `website/functions/index.js`. Kept `cors` rather than dropping it
+(the second option) so the Firebase-provided domains and the local emulator
+keep working; production traffic is same-origin through the Hosting rewrite
+either way.
+
+The suggested list needed one correction: it named only the **dev** hosting
+site. Per `.firebaserc` the prod target `website` maps to site
+`maples-website`, so the shipped allowlist adds
+`https://maples-website.web.app` and `https://maples-website.firebaseapp.com`
+alongside the apex/www custom domain, the two dev domains, and
+`http://localhost:5050` (matching `firebase.json` → `emulators.hosting.port`).
+
+Tests: new `website/functions/corsConfig.test.js` (5) captures the config
+object from the `onRequest` mock and asserts the allowlist shape — no wildcard,
+prod + dev domains present, emulator port present, arbitrary origin absent.
+33 function tests pass; full website suite 186 passed; build clean.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
 **Where:** `website/functions/index.js:26` — currently `cors: true` (wildcard).
 
 **Why:** The contact form is served via Hosting rewrite, so traffic to `/api/contact` is same-origin and doesn't need CORS at all. Wildcard CORS lets any origin POST to the endpoint; reCAPTCHA mitigates abuse but tightening costs nothing.
@@ -3252,6 +3297,8 @@ cors: [
 ```
 
 Or drop `cors` entirely and rely on same-origin Hosting rewrites for prod traffic; only add CORS when explicit cross-origin support is needed.
+
+</details>
 
 ### 296. [MEDIUM] `install()` in `contact-modal.js` is ~120 lines
 **Where:** `website/public/contact-modal.js:240-360`.
@@ -4018,6 +4065,41 @@ Context: Maple's chat edit guard was tightened from the PUT route's lock
 editable only in Draft or Review (`_EDITABLE_ESTIMATE_STATUSES` allowlist in
 `agents/estimate/crud_handlers.py`). UI and chat now agree; the API does not:
 
+### 349. [MEDIUM] ~~PUT `/estimates/{id}` allows content edits in statuses the UI and Maple treat as read-only~~ — RESOLVED 2026-07-26
+**Closed as resolved 2026-07-26**, taking the "better" option: the allowlist now
+lives in `models/estimate.py` as `EDITABLE_ESTIMATE_STATUSES` +
+`estimate_status_allows_content_edit(status)` (accepts the raw stored string or
+the enum; unrecognized/legacy values **fail open** so a retired status can't
+strand an estimate nobody can unlock). Three consumers now share that one
+definition:
+- `routers/estimates.py` — new `elif` after the Sent/Approved block: any
+  non-editable status rejects a payload carrying fields other than `status`,
+  with `400 "Cannot edit the contents of a {status} estimate. Estimates can
+  only be edited in Draft or Review."` Status-only payloads stay allowed, so
+  the status lane (Won → Scheduled, Generating → Draft) is untouched and the
+  transition itself is still policed by `_validate_status_transition_for_update`.
+- `agents/estimate/crud_handlers.py` — `_EDITABLE_ESTIMATE_STATUSES` is now an
+  alias of the model constant rather than a second definition.
+- portal `isEditableStatus` — unchanged; the backend now matches it.
+
+**FE coordination (the deferral's open question), resolved:** audited every
+`estimatesApi.update` caller. The estimate detail page already gates on
+`canEdit`, and `EstimatesPage` sends status-only payloads. The one real gap was
+`PropertyDialog` → `EstimatesPicker`, which PUT `{property: …}` on any estimate
+regardless of status — already 400ing today for Sent estimates, and would have
+newly 400'd for Won/Lost/etc. Locked rows now render **visible but disabled**
+(so a property's real links aren't hidden) with the reason inline. Tests:
+`portal/tests/EstimatesPicker.test.tsx` (5).
+
+Backend tests: `tests/test_estimate_api.py` — `TestEstimateContentEditability`
+(5, incl. a guard that the agent and model share one object) plus 3 router
+tests via the new `won_estimate` fixture: content edit rejected, content
+smuggled alongside a legal status change rejected, status-only transition still
+200. 425 passed across the estimate + billing + Maple surface; mypy/ruff clean.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
 ### 349. [MEDIUM] PUT `/estimates/{id}` allows content edits in statuses the UI and Maple treat as read-only
 Added 2026-06-12. `routers/estimates.py` (PUT handler, ~L820): the route locks
 Archived and Sent/legacy-Approved, but still accepts content updates (notes,
@@ -4032,6 +4114,8 @@ truth. Fix: add the same Draft/Review allowlist to the PUT route's lock block
 agent share one definition. Coordinate with the FE before shipping: confirm no
 portal flow PUTs content for non-Draft/Review estimates (e.g. auto-save firing
 on a just-transitioned estimate).
+
+</details>
 
 ---
 
@@ -4558,9 +4642,27 @@ The early size gate is skipped if `audio.size` is None, so `await audio.read()` 
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [LOW] portal/src/lib/voiceInputFlag.ts:5 — VITE_VOICE_INPUT_ENABLED=false evaluates as ON
-`Boolean(anyNonEmptyString)` is true, so `"false"`/`"0"` enable the mic UI while the backend pydantic flag parses `"false"` as off — mismatch shows a mic whose every transcription 404s. Pattern copied from supportPanelFlag for consistency.
-**Suggested fix:** Treat `""`, `"false"`, `"0"` (case-insensitive) as off; consider the same hardening for supportPanelFlag in a separate change.
+### [LOW] ~~portal/src/lib/voiceInputFlag.ts:5 — VITE_VOICE_INPUT_ENABLED=false evaluates as ON~~ — RESOLVED 2026-07-26
+**Closed as resolved 2026-07-26**, and widened: `supportPanelFlag` and
+`tasksFlag` carried the identical `Boolean(anyNonEmptyString)` bug, so rather
+than patching one and deferring the others, all three now delegate to a new
+`portal/src/lib/envFlag.ts` (`isEnvFlagEnabled` / `readEnvFlag`).
+
+The falsy set mirrors **pydantic v2's** bool coercion — `""`, `"false"`,
+`"0"`, `"off"`, `"no"`, `"n"`, `"f"`, trimmed and case-insensitive — rather
+than the narrower `"", "false", "0"` originally suggested, so the FE and the
+backend's `bool` settings agree on what "off" looks like. Unrecognized
+non-empty values still enable, preserving the old `VITE_X=enabled` behavior.
+
+**Shipping note — this change is behavior-neutral today.** Audited every
+configured value before landing it: `.env.local`, `.env.development`, and the
+GitHub Actions `production` + `development` environment variables all set
+`"true"`; nothing anywhere is set to `"false"`. No flag flips state on deploy.
+
+Tests: new `tests/envFlag.test.ts` (5) and `tests/supportPanelFlag.test.ts`
+(7, the module had none), plus falsy/truthy cases appended to the existing
+`voiceInputFlag` / `tasksFlag` suites — 32 across the four files. Full portal
+suite 1,357 passed; typecheck + lint clean.
 
 ---
 
@@ -4684,7 +4786,76 @@ grows.
 `Settings.indexes` when/if per-feature dashboards materialize; harmless to add
 now.
 
-### [LOW] platform/routers/public_maple.py:70 — public endpoint has per-IP but no aggregate spend cap
+### [LOW] ~~platform/routers/public_maple.py:70 — public endpoint has per-IP but no aggregate spend cap~~ — RESOLVED 2026-07-26 (different approach)
+**Closed as resolved 2026-07-26, deliberately NOT via the suggested spend cap.**
+Product decision (Simon, 2026-07-26): the public widget is a marketing
+surface and prospects using it freely is the *point*. A daily budget ceiling
+that silences Maple mid-campaign is the wrong failure mode for lead-gen — the
+requirement is "stop bots", not "cap spend". Both suggested fixes (global daily
+budget, per-IP daily cap) were dropped on those grounds.
+
+Shipped instead — two layers:
+
+**1. The rate-limit key was broken.** `client_host` came from
+`request.client.host`, which behind Render's load balancer is the *proxy's*
+address — so the "per-IP" 20/min was one global bucket shared by every visitor
+on Earth. A test reproduces it: two distinct visitors, second one 429s.
+`services/request_protection.client_ip_for_rate_limit` now resolves the caller
+properly, and is deliberately **not** the same as
+`audit_service._get_client_ip`: that one takes `X-Forwarded-For[0]`, which is
+whatever the *client* sent, so a bot rotating the header would mint itself a
+fresh bucket per request. Proxies append, so the real client sits
+`trusted_proxy_hops` from the RIGHT (new `trusted_proxy_hops` setting,
+default 1 for Render; 0 disables header trust entirely). Falls back to the
+unforgeable TCP peer whenever the chain is shorter than expected.
+Tests: `tests/test_request_protection_client_ip.py` (12) +
+2 endpoint tests (spoofed prefix shares a bucket; distinct visitors don't).
+
+**2. reCAPTCHA v3 bot filtering**, reusing the site key + secret already
+provisioned for the marketing contact form. Invisible (score-based, no
+challenge), so zero friction for prospects. New `services/recaptcha.py` is the
+Python counterpart to `website/functions/lib/recaptcha.js`.
+
+The policy is asymmetric on purpose:
+- **Confident bot signal** (low score, wrong action, replayed token, or — once
+  enforced — *no token at all*) → 403. A missing token is a bot signal, NOT a
+  verification error; failing open on it is exactly how this control ends up
+  decorative, since an attacker just omits the field.
+- **No verdict obtainable** (Google unreachable, non-JSON body) → allow. A
+  third-party outage must never silence the assistant.
+- No secret configured → check skipped entirely (local dev).
+
+Threshold is **0.3**, lower than the contact form's 0.5: a free question
+deserves less protection than a lead submission, and v3 scores are
+probabilistic, so borderline humans should still get answered.
+
+**Rollout is two-phase** — `maple_public_recaptcha_enforced` defaults to
+**False**, which verifies a token when present but allows a missing one. The
+platform and website deploy independently and visitors may hold a cached
+bundle, so flipping this to True before the widget ships would 403 real
+people. **Flip it only after the website deploy is live.**
+
+Browser side: `website/lib/recaptchaClient.js` extracted from
+`contact-modal/install.js` so both surfaces share one loader with a per-surface
+action (`contact` vs `maple_ask`). It exposes two minters, because the surfaces
+genuinely differ — `getRecaptchaToken` rejects on failure (contact form fails
+CLOSED, shows an error, skips the POST — behavior preserved, caught by its
+existing tests) and `getRecaptchaTokenSoft` resolves `''` (widget fails soft,
+matching the server's fail-open). Also added a 4s timeout: a blocked script tag
+fires neither `onload` nor `onerror`, so the old loader would hang the submit
+handler forever.
+
+Tests: `tests/test_recaptcha_service.py` (11), 8 endpoint tests in
+`TestPublicMapleRecaptcha`, `website/lib/__tests__/recaptchaClient.test.js`
+(11), `website/widget/__tests__/api.test.ts` (3).
+
+**Deploy checklist:** set `RECAPTCHA_V3_SECRET` on Render (same secret the
+Firebase function uses) → deploy platform → deploy website → set
+`MAPLE_PUBLIC_RECAPTCHA_ENFORCED=true`.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
 Now that public spend is measurable: each guide answer costs ~$0.014 (13.8k-token
 prompt), and the only guard is 20 req/min per IP — a single abusive IP can run
 ~$17/hour, and a small botnet scales that linearly. Metering makes this visible
@@ -4693,6 +4864,8 @@ but nothing bounds it.
 (count/sum today's events before answering; refuse with the canned unavailable
 message when over budget), or at minimum a per-IP daily cap alongside the
 per-minute one.
+
+</details>
 
 ---
 
@@ -4959,9 +5132,114 @@ factory's internals breaks this silently.
 **Suggested fix:** Promote it to a public `is_gpt5_reasoning_family` in
 `services/llm/factory.py` (keeping a private alias if desired) and import that.
 
-### [LOW] platform tooling — bandit not installed, so no automated security scan runs during /code-review (finding #9)
-`/code-review` calls for `bandit -r . -x tests/` when available; it is not
-installed in `platform/.venv`, so the Python security scan has been skipped on
-recent reviews (manual injection/ReDoS/bare-except checks were done instead).
-**Suggested fix:** `pip install bandit` in `platform/.venv` and add it to the
-dev requirements if the team wants it enforced.
+### [LOW] ~~platform tooling — bandit not installed, so no automated security scan runs during /code-review (finding #9)~~ — RESOLVED 2026-07-27
+**Closed as resolved 2026-07-27.** bandit 1.9.4 installed into `platform/.venv`
+and pinned as `bandit>=1.8` in `requirements.txt`. Configuration follows the
+same convention as the other two gates — pinned config file, wrapper script,
+no ad-hoc flags:
+- `platform/bandit.yaml` — excludes `.venv` / `tests` / `scratch`.
+- `platform/run_bandit.sh` — mirrors `run_ruff.sh` / `run_mypy.sh` shape.
+
+**`B101` (assert_used) is skipped by deliberate decision.** bandit flags every
+`assert` because `python -O` strips them; CLAUDE.md's mypy playbook *mandates*
+`assert <x> is not None` for Beanie `.id` narrowing (~106 across
+agents/routers/services/models). Those are type-checker directives, not runtime
+security checks. The skip is documented in `bandit.yaml` with the caveat that
+it is **not** a licence to authorize with asserts — a security-guarding assert
+must be an `if ...: raise`.
+
+**bandit is advisory, NOT in the pre-push hook** (unlike ruff/mypy). It is a
+syntactic scanner: it catches shell injection, weak crypto, unsafe
+deserialization, missing HTTP timeouts, silent excepts. It cannot find logic or
+authorization flaws — nothing it does would have caught #349 or the public-Maple
+rate-limit key collapse. Treat a clean run as "no classic footguns", not
+"secure".
+
+First scan: 19 findings, all LOW severity, zero MEDIUM/HIGH. Six B105
+false positives cleared (3 by renaming a loop variable `token` → `word` in
+`agents/calculator/text_helpers.py` — they were number words, never
+credentials; 3 by `# nosec B105` on Stripe Price lookup keys in
+`services/billing/plan_config.py`). **Baseline is now 13 B110 findings**,
+tracked in the entry below.
+
+### [LOW] platform/agents/**, routers/agent_helpers/estimate_resolver.py — 13 bare `except Exception: pass` blocks (bandit B110)
+Surfaced by the first bandit scan (2026-07-27) and left unfixed deliberately —
+all pre-existing, and each needs its intent understood rather than a blanket
+edit. Sites: `agents/contact/service.py` (2), `agents/equipment/service.py` (2),
+`agents/labour/service.py` (2), `agents/material/service.py` (2),
+`agents/property/service.py` (2), `agents/estimate/service.py` (1),
+`routers/agent_helpers/estimate_resolver.py` (2).
+
+All follow one shape: *try an enhancement or resolution strategy; on any
+failure fall through to a safe default.* The swallow is intentional — but a
+bare `except Exception` with `pass` and no logging makes a genuine defect (a
+`TypeError` in a suggestion builder, an `AttributeError` in the resolver)
+indistinguishable from the expected miss, and nothing reaches the logs. This is
+the same class the `/code-review` cross-cutting checklist rates CRITICAL
+("bare `except:` or `except Exception: pass` hiding errors").
+
+**Do not silence these with `# nosec`** — that would suppress a real finding
+rather than resolve it. Until they're fixed, `./run_bandit.sh` exits non-zero
+with exactly these 13; a count above 13 means the change under review added one.
+**Suggested fix:** per site, narrow the exception to what's actually expected
+and add `logger.debug(...)` (or `logger.exception(...)` where a failure is not
+routine) before falling through. Best done as one focused sweep, since the
+pattern is near-identical across the seven files.
+
+---
+
+## 2026-07-26 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+(Review scope: estimate content-edit lock #349, seat-count error split #221,
+env-flag parsing, website CORS allowlist, public-Maple rate-limit key +
+reCAPTCHA v3. Selection fixed #1–#7; #8 was closed as a side effect of #2's
+`ipaddress` validation, since a parsed address cannot carry control
+characters.)
+
+### [LOW] portal/src/components/properties/EstimatesPicker.tsx:83 — the locked-row reason is conveyed only by a title attribute
+Locked rows set `title={LOCKED_HINT}` on the `<label>`, but the checkbox is
+`disabled` and therefore not focusable, so keyboard and screen-reader users may
+never surface the tooltip and just see an unexplained un-toggleable row. Partly
+mitigated: the same sentence was appended to the always-visible helper text
+below the list.
+**Suggested fix:** Render the reason as visible per-row text, or
+`aria-describedby` pointing at the helper paragraph, rather than relying on
+`title`. Same family as the icon-only-button a11y sweep in
+[#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name).
+
+### [LOW] ~~platform tooling — bandit is still not installed (recurring)~~ — RESOLVED 2026-07-27
+**Closed as resolved 2026-07-27** — installed and configured; see the resolved
+entry above for the config, the deliberate `B101` skip, and the 13-finding
+B110 baseline. The 2026-07-26 review's security-scan gap is now closed for
+future reviews (that review's own backend findings remain manual-inspection
+only). Note the older per-review "bandit not installed; security scan skipped"
+lines further up this file are historical records of individual passes, not
+open work — they need no action.
+
+### [LOW] CLAUDE.md — the bandit baseline is a hardcoded "13" and will drift
+Logged 2026-07-27 from the second `/code-review` pass. The bandit section added
+to CLAUDE.md states "Known baseline: 13 B110 findings" and tells the reader a
+count above 13 means their change added one. As the B110 sweep (entry above)
+lands, that number goes stale and the guidance silently inverts — a reader
+seeing 9 can't tell whether that's progress or a miscount.
+**Suggested fix:** Either drop the number and point at the followups entry as
+the source of truth, or adopt `bandit -b baseline.json` so the tool tracks the
+delta itself instead of a human-maintained integer in prose. The second is
+better if the B110 sweep is going to be gradual.
+
+### [LOW] website — no tsconfig or typecheck script, so the new TS→JS import is unchecked
+`widget/api.ts` and `widget/MapleWidget.tsx` now import
+`../lib/recaptchaClient.js`, an untyped JavaScript module. The website has no
+`tsconfig.json` and no `typecheck`/`tsc` npm script — Vite transpiles without
+type checking — so `getRecaptchaTokenSoft`, `loadRecaptcha`, and
+`resolveRecaptchaSiteKey` are implicitly `any` at that boundary, with nothing
+to catch signature drift. Pre-existing repo condition (the website has never
+type-checked), marginally widened by adding the cross-boundary imports.
+**Re-confirmed 2026-07-27** — still deferred, and now slightly wider again:
+`MapleWidget.tsx` imports `loadRecaptcha` / `resolveRecaptchaSiteKey` from the
+same untyped module for the focus-time warm-up.
+**Suggested fix:** Add a `tsconfig.json` + `typecheck` script mirroring
+portal's — note portal's pre-push hook already enforces `npm run typecheck`, so
+the website is the odd repo out — or convert `lib/recaptchaClient.js` to `.ts`
+so at least this boundary is typed.
