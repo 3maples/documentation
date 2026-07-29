@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-07-28
+**Last updated:** 2026-07-29
 
 ### Change log
 
@@ -1808,25 +1808,30 @@ cd platform
 
 ## 12.3 Current matrix score (Tier 1 / Tier 2)
 
-Snapshot as of 2026-05-02 — regenerate with the coverage test. *(2026-07-22: counts predate the calculator category and Tasks. Current totals: **Tier 1 159/170** (11 known-gap xfails, all Task bare-title class) with the Task slice at 24/35 Tier 1 · 28/35 Tier 2. The auto-generated `maple_crud_gap_report.md` is the live truth.)*
+**Tier 1 re-counted 2026-07-29** straight from a fresh `maple_crud_gap_report.md` (the auto-generated live truth), not adjusted by hand. **Tier 2 was NOT re-run** — it needs `-m llm_e2e` and a live `OPENAI_API_KEY`; those figures are still the 2026-05-02 LLM run and are labeled as such.
 
-| Category | Tier 1 | Tier 2 | Verdict |
+| Category | Tier 1 *(2026-07-29)* | Tier 2 *(2026-05-02 run)* | Verdict |
 |---|---|---|---|
-| direct_imperative | 12/12 | 9/12 | covered (LLM flubs "create a new X") |
-| casual | 12/12 | 12/12 | covered |
-| possessive | 12/12 | 6/12 | covered (Wave 1 Phase 2) |
-| count | 12/12 | 12/12 | covered |
-| filter_find | 12/12 | 12/12 | covered |
-| field_targeted_update | 12/12 | 8/12 | covered (Wave 1 Phase 2) |
-| implicit_relationship | 12/12 | 4/12 | covered (Wave 2 — orchestrator routing + agent-side join) |
-| bulk | 12/12 | 12/12 | refused correctly |
-| verbless | 12/12 | 11/12 | covered |
+| direct_imperative | 15/15 | 9/12 | covered (LLM flubs "create a new X") |
+| casual | 15/15 | 12/12 | covered |
+| possessive | 12/15 | 6/12 | rule gap (Task slice) |
+| count | 15/15 | 12/12 | covered |
+| filter_find | 15/15 | 12/12 | covered |
+| field_targeted_update | 12/15 | 8/12 | rule gap (Task slice) |
+| implicit_relationship | 13/15 | 4/12 | rule gap (Task slice) |
+| bulk | 15/15 | 12/12 | refused correctly |
+| verbless | 12/15 | 11/12 | rule gap (Task slice) |
 | material_size | 6/6 | 6/6 | covered |
-| material_query_variants | 5/5 | n/a | covered (Wave 3 Workstream B) |
-| estimate_outbound | 5/5 | n/a | covered (Wave 4 + 4.1 — orchestrator routing + Property/Contact/Estimate agent cross-resource branches; contact-anchored variant gated on person-name shape) |
+| material_query_variants | 5/5 | – | covered (Wave 3 Workstream B) |
+| estimate_outbound | 5/5 | – | covered (Wave 4 + 4.1 — orchestrator routing + Property/Contact/Estimate agent cross-resource branches; contact-anchored variant gated on person-name shape) |
+| assumption_adjustment | 4/4 | – | covered (2026-07-26) |
+| task_operations | 8/8 | – | covered |
 | equipment_blocked | 3/3 | 3/3 | refused correctly |
+| calculator | 8/8 | – | covered |
 
-**Totals: Tier 1 127/127 · Tier 2 95/117** (Tier 2 is unchanged — Wave 4/4.1 hasn't been re-run on the LLM tier; new categories aren't included in the Tier 2 coverage column above). All Tier 1 categories pass and cross-resource list responses are correctly filtered. The `cross_resource` join layer lives in `agents/cross_resource.py`; per-agent join handlers in Contact / Property / Estimate read `context.filter_by` to apply the constraint, including the Wave 4/4.1 `estimate`, `property`, and `contact` cross-types.
+**Totals: Tier 1 163/174** *(2026-07-29, live)* **· Tier 2 95/117** *(2026-05-02, not re-run)*. The 11 Tier 1 misses are the known-gap `xfail(strict=False)` Task bare-title class — the Task resource slice is 24/35; every other resource is at 100% (property 27/27, contact 27/27, material 38/38, labour 27/27, estimate 9/9, equipment 3/3, calculator 8/8). The `cross_resource` join layer lives in `agents/cross_resource.py`; per-agent join handlers in Contact / Property / Estimate read `context.filter_by` to apply the constraint, including the Wave 4/4.1 `estimate`, `property`, and `contact` cross-types.
+
+*Count-provenance note (2026-07-29): the two numbers this table previously carried were **both already stale before the fuzzy-property-matching work** — the totals line read `Tier 1 127/127` (a 2026-05-02 snapshot) while a 2026-07-22 parenthetical above it read `Tier 1 159/170`; neither matched the generator. They have been replaced by a single re-count rather than patched. Note also that this table counts **coverage-matrix cases** from `tests/test_maple_crud_coverage.py`, not the hand-curated ✅/⚠️/🛑 rows elsewhere in this document — so §10.4's fuzzy-property rows do not appear in it, and the 159/170 → 163/174 delta comes from other work, not from that feature.*
 
 *Note (2026-06-09): the new Social & personality surface (§11.6) — greetings via the `social` intent and personal questions via the `personal` help topic — is not yet represented in the auto-generated matrix above; see §11.6 for its phrasing catalog.*
 
