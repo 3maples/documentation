@@ -5572,3 +5572,36 @@ Note the mild irony that this entry lengthens the file it describes.
 (`code-review-followups-archive-2026.md`), keeping only open items in the
 working file — mirroring the `.remember/` archive convention this project
 already uses.
+
+---
+
+## 2026-07-29 found while running the full suite
+
+### [LOW] agents/task/resolver.py:94 — `-updated_at` recency sort has no tiebreaker
+`_fetch_candidates` sorts on `.sort("-updated_at")` alone. BSON dates are
+millisecond-precision and `Task.update_timestamp` is a
+`@before_event([Replace, Insert])` hook that re-stamps `updated_at` to *now* on
+every write, so two tasks written inside the same millisecond store an identical
+value. Under a tie the sort is unspecified and Mongo returned the **older**
+document deterministically — verified with a temporary probe that forced both
+seeds to one timestamp: "the last task" resolved to "Older task".
+
+Impact in production is small: it needs two task writes inside one millisecond
+for the same company (a bulk/scripted path, not human editing), and the wrong
+answer is a neighbouring task rather than a foreign one. It surfaced as an
+intermittent `test_task_resolver.py::test_last_task_recency` failure (1 of 4
+full-suite runs; 0 of 25 runs in isolation, where the machine is unloaded and
+the two inserts reliably land in different milliseconds). The test has since
+been hardened with a `_backdate` helper, so the flake is gone — this entry is
+about the underlying resolver behaviour, which is unchanged.
+
+**Suggested fix (needs a decision, not a drive-by):** add `-_id` as a secondary
+sort key so ties resolve in insertion order. Note the cost: the existing
+`IndexModel([("company", 1), ("updated_at", DESCENDING)])` on `models/task.py`
+would no longer cover the compound sort, so Mongo would fall back to a blocking
+in-memory sort over the tenant's matching tasks — precisely the scaling the
+`_fetch_candidates` docstring set out to avoid. Doing it properly means
+extending that index to `(company, updated_at DESC, _id DESC)`, which is an
+index migration (Beanie's `init_db` create cannot reshape an existing index in
+place — the old one has to be dropped), so it should ship deliberately with a
+migration step rather than bundled into unrelated work.
