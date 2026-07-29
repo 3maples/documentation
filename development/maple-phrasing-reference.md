@@ -1808,28 +1808,32 @@ cd platform
 
 ## 12.3 Current matrix score (Tier 1 / Tier 2)
 
-**Tier 1 re-counted 2026-07-29** straight from a fresh `maple_crud_gap_report.md` (the auto-generated live truth), not adjusted by hand. **Tier 2 was NOT re-run** — it needs `-m llm_e2e` and a live `OPENAI_API_KEY`; those figures are still the 2026-05-02 LLM run and are labeled as such.
+**Both tiers re-counted 2026-07-29**, straight from a full `./run_tests.sh tests/test_maple_crud_coverage.py -m ""` run against the live gpt-5.6 models — not adjusted by hand. This is the first Tier 2 run since the 2026-07-14 model upgrade; the previous figures (95/117) were measured on the retired gpt-5.5/5.4 family and are superseded.
 
-| Category | Tier 1 *(2026-07-29)* | Tier 2 *(2026-05-02 run)* | Verdict |
+| Category | Tier 1 *(2026-07-29)* | Tier 2 *(2026-07-29)* | Verdict |
 |---|---|---|---|
-| direct_imperative | 15/15 | 9/12 | covered (LLM flubs "create a new X") |
-| casual | 15/15 | 12/12 | covered |
-| possessive | 12/15 | 6/12 | rule gap (Task slice) |
-| count | 15/15 | 12/12 | covered |
-| filter_find | 15/15 | 12/12 | covered |
-| field_targeted_update | 12/15 | 8/12 | rule gap (Task slice) |
-| implicit_relationship | 13/15 | 4/12 | rule gap (Task slice) |
-| bulk | 15/15 | 12/12 | refused correctly |
-| verbless | 12/15 | 11/12 | rule gap (Task slice) |
+| direct_imperative | 15/15 | 15/15 | covered |
+| casual | 15/15 | 15/15 | covered |
+| possessive | 12/15 | 11/15 | rule gap (Task slice) + 1 LLM miss |
+| count | 15/15 | 15/15 | covered |
+| filter_find | 15/15 | 15/15 | covered |
+| field_targeted_update | 12/15 | 14/15 | rule gap (Task slice) |
+| implicit_relationship | 13/15 | 15/15 | rule gap (Task slice); LLM covers it |
+| bulk | 15/15 | 15/15 | refused correctly |
+| verbless | 12/15 | 12/15 | rule gap (Task slice) |
 | material_size | 6/6 | 6/6 | covered |
-| material_query_variants | 5/5 | – | covered (Wave 3 Workstream B) |
-| estimate_outbound | 5/5 | – | covered (Wave 4 + 4.1 — orchestrator routing + Property/Contact/Estimate agent cross-resource branches; contact-anchored variant gated on person-name shape) |
-| assumption_adjustment | 4/4 | – | covered (2026-07-26) |
-| task_operations | 8/8 | – | covered |
+| material_query_variants | 5/5 | 5/5 | covered (Wave 3 Workstream B) |
+| estimate_outbound | 5/5 | 5/5 | covered (Wave 4 + 4.1 — orchestrator routing + Property/Contact/Estimate agent cross-resource branches; contact-anchored variant gated on person-name shape) |
+| assumption_adjustment | 4/4 | 4/4 | covered (2026-07-26) |
+| task_operations | 8/8 | 8/8 | covered |
 | equipment_blocked | 3/3 | 3/3 | refused correctly |
-| calculator | 8/8 | – | covered |
+| calculator | 8/8 | 7/8 | 1 LLM miss ("how much topsoil do I need for 1000 sq ft") |
 
-**Totals: Tier 1 163/174** *(2026-07-29, live)* **· Tier 2 95/117** *(2026-05-02, not re-run)*. The 11 Tier 1 misses are the known-gap `xfail(strict=False)` Task bare-title class — the Task resource slice is 24/35; every other resource is at 100% (property 27/27, contact 27/27, material 38/38, labour 27/27, estimate 9/9, equipment 3/3, calculator 8/8). The `cross_resource` join layer lives in `agents/cross_resource.py`; per-agent join handlers in Contact / Property / Estimate read `context.filter_by` to apply the constraint, including the Wave 4/4.1 `estimate`, `property`, and `contact` cross-types.
+**Totals: Tier 1 163/174 · Tier 2 165/174** *(both 2026-07-29, live)*.
+
+*Tier 2's 9 misses: seven are the same known Task bare-title class as Tier 1's ("Fix the Fence Gate" without a verb). The other two — `possessive/property` "what's 123 Main St's city" and `calculator` "how much topsoil do I need for 1000 sq ft" — were verified to fail identically on `main`, so they are standing LLM-tier gaps, not regressions. The model upgrade moved Tier 2 from 81% (95/117) to 95% (165/174); `implicit_relationship` improved most (4/12 → 15/15).*
+
+The 11 Tier 1 misses are the known-gap `xfail(strict=False)` Task bare-title class — the Task resource slice is 24/35; every other resource is at 100% (property 27/27, contact 27/27, material 38/38, labour 27/27, estimate 9/9, equipment 3/3, calculator 8/8). The `cross_resource` join layer lives in `agents/cross_resource.py`; per-agent join handlers in Contact / Property / Estimate read `context.filter_by` to apply the constraint, including the Wave 4/4.1 `estimate`, `property`, and `contact` cross-types.
 
 *Count-provenance note (2026-07-29): the two numbers this table previously carried were **both already stale before the fuzzy-property-matching work** — the totals line read `Tier 1 127/127` (a 2026-05-02 snapshot) while a 2026-07-22 parenthetical above it read `Tier 1 159/170`; neither matched the generator. They have been replaced by a single re-count rather than patched. Note also that this table counts **coverage-matrix cases** from `tests/test_maple_crud_coverage.py`, not the hand-curated ✅/⚠️/🛑 rows elsewhere in this document — so §10.4's fuzzy-property rows do not appear in it, and the 159/170 → 163/174 delta comes from other work, not from that feature.*
 

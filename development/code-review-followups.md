@@ -5465,3 +5465,110 @@ would match the `key` token and print unmasked while zero.
 **Suggested fix:** test `value not in (None, "")` instead of truthiness, which
 preserves the honest rendering of unset string credentials while covering
 numeric and boolean fields.
+
+---
+
+## 2026-07-29 deferred from the Maple fuzzy-property-matching branch
+
+Logged from the subagent-driven execution of
+`documentation/development/plans/maple-fuzzy-property-matching-implementation.md`.
+The whole-branch review returned READY WITH FIXES; both must-fix findings (a
+Critical wrong-property write on an ordinal reply, and a fuzzy multi-match that
+armed no pending record) were fixed on the branch, as were two pre-merge items
+(a malformed-`candidates` 500 and the short-query substring trap). Everything
+below was adjudicated as defer, with rulings recorded in the execution ledger.
+
+### [MED] platform/routers/agent_helpers/pending_property_link.py — `_write_link` has no company scoping
+`_write_link` calls `Estimate.get(estimate_id)` and
+`parse_object_id(property_id, …)` on values read straight out of
+`context_payload`, which is populated from the client's request context. Neither
+id is checked against the caller's company, so a crafted context could link one
+company's estimate to another company's property. **Not a regression** — it is
+the same seam as `pending_estimate_follow_up.py:364`, which the feature spec
+explicitly named as the pattern to mirror. Logged because this branch makes it
+the *second* copy of an unscoped write in a multi-tenant app, and "inherited" is
+a reason to track it, not to stop noticing it.
+**Suggested fix:** resolve both ids through a company-scoped query
+(`Estimate.find_one(Estimate.id == oid, Estimate.company == company_oid)`) and
+refuse rather than write when either lookup misses. Fix both call sites in one
+change, since they will otherwise drift.
+
+### [MED] platform/routers/agents.py — four pending state machines share one journey
+`pending_estimate_follow_up` (legacy), `pending_optional_follow_up` (generic),
+`pending_estimate_fuzzy_confirmation`, and the new
+`pending_property_link_confirmation` are all live on the estimate→property
+journey, disambiguated only by dispatch order inside a ~60-line stretch of
+`orchestrate_agent_endpoint`. Three of the defects found on this branch were
+cases where a newer machine lacked behavior an older one already had (re-arming
+on a failed resolve; keeping the turn owned on a correction; not clobbering a
+sibling's key). The ordering is currently correct and pinned by
+`TestRouterOrderingRuntime`, but the coupling is implicit.
+**Suggested fix:** collapse them behind one registry that declares priority and
+ownership explicitly, so precedence is data rather than statement order.
+Sizeable; worth doing before a fifth machine is added.
+
+### [LOW] platform/agents/estimate/crud_handlers.py — fuzzy disclosure dropped on sorted and aggregate list responses
+`_handle_list_estimates` names the fuzzily-matched property via
+`property_constraint_label`, but the `sort_field == "grand_total"` /
+`sort_field == "created_at"` branches and the `total_value` aggregate return all
+precede that branch. So *"show me my latest estimate for 153 Ashroken Ave"*
+filters on a fuzzy-matched property and never says which one it picked — the
+read path's entire safety mechanism (disclose, don't gate) silently does not
+apply to those phrasings.
+**Suggested fix:** thread the label into the sorted/aggregate lead-ins too, or
+hoist the disclosure ahead of the response-shape branch so it cannot be skipped.
+
+### [LOW] platform/routers/agent_helpers/pending_property_link.py — 0-match reply to a near-tie list re-asks about "that property"
+A near-tie record carries no `property_label` (it holds `candidates` instead), so
+an unresolvable free-text reply falls into the 0-match branch and renders the
+generic fallback: *"I couldn't find a property matching 'Bogus'. I believe you
+are looking for that property…"*. Data-safe — the record stays armed, the
+affirmative guard refuses to link an unpinned record, and an ordinal reply still
+works — but the copy is confusing.
+**Suggested fix:** when the record carries `candidates`, re-render the numbered
+list in the 0-match branch instead of falling back to `property_label`.
+
+### [LOW] platform/routers/agent_helpers/pending_property_link.py — `_is_pivot` exempts any action on the `property` domain
+The exemption exists so a property name ("the Downtown property") reads as an
+answer rather than a pivot. It is coarser than that: a genuine pivot such as
+*"create a new property at 42 Elm St"* mid-confirmation also fails to release the
+turn and is answered as a failed property lookup. It errs toward keeping the
+turn, which is the safe direction here, but it is now the only escape hatch from
+a flow that can re-ask indefinitely.
+**Suggested fix:** exempt only a domain match with no action verb; tighten as
+part of the state-machine consolidation above.
+
+### [LOW] platform — untested branches and one simulated test premise
+Three small gaps, none behavioral: (a) the `resolution["error"]` path and the
+estimate-deleted branch of `_write_link` have no covering test — both are simple
+early returns with no state mutation; (b) there is no router-level end-to-end
+test for arm-near-tie → reply `"2"` — both halves are unit-tested with a fake on
+the other side, and the record shape was verified by inspection; (c) the Critical
+ordinal test simulates the substring trap with a fake resolver rather than
+exercising real tier-1 matching, so nothing in the suite pins
+`"2" in "12 oak rd"` as the mechanism. (c) is now largely moot — the short-query
+floor in `_resolve_property_address` closes that trap at its source.
+**Suggested fix:** add the covering tests opportunistically when these files are
+next touched.
+
+---
+
+## 2026-07-29 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that
+pass. Selection fixed #1 (the stale coverage-matrix counts in `CLAUDE.md`) and
+#2 (the `.gitignore` rule that missed the review-ledger backup variants); #3 is
+deferred here.
+
+### [LOW] documentation/development/code-review-followups.md — append-only log at 5,552 lines
+The cross-cutting review heuristic flags files over 800 lines as HIGH, but that
+rule targets source files, where length signals tangled responsibility. This is
+an append-only ledger, so the heuristic does not transfer and it was
+deliberately not reported as HIGH. It is still worth noting: at 5,552 lines the
+file is hard to scan, and resolved entries sit interleaved with open ones, so
+"what is still outstanding?" cannot be answered without reading the whole thing.
+Note the mild irony that this entry lengthens the file it describes.
+**Suggested fix:** rotate resolved entries into a dated archive
+(`code-review-followups-archive-2026.md`), keeping only open items in the
+working file — mirroring the `.remember/` archive convention this project
+already uses.

@@ -78,10 +78,6 @@ class TestPropertyFuzzyResolution:
         ))
 
     @pytest.mark.parametrize("query,expected_name", [
-        # The mangled string from the 2026-07-28 bug report. Fuzzy is a safety
-        # net for this, NOT the fix — the extraction fix is load-bearing.
-        ("of this estimate to Primavera - 153 Asharoken Ave", "Primavera"),
-        ("Primavera, 153 Asharoken Avenue", "Primavera"),
         ("primavara", "Primavera"),              # name typo
         ("153 Ashroken Ave", "Primavera"),       # street typo
         ("Maple Rige", "Maple Ridge"),           # name typo, different property
@@ -113,6 +109,23 @@ class TestPropertyFuzzyResolution:
         result = self._resolve(monkeypatch, "Primavera - 153 Asharoken Ave")
         assert len(result["matches"]) == 1
         assert result["fuzzy"] is False, "tier 2 must short-circuit before fuzzy"
+
+    @pytest.mark.parametrize("query", [
+        "of this estimate to Primavera - 153 Asharoken Ave",
+        "Primavera, 153 Asharoken Avenue",
+    ])
+    def test_substring_tiers_win_before_fuzzy(self, monkeypatch, query):
+        """Both contain the property NAME as a literal substring, so tier 2
+        resolves them exactly and tier 3 never runs. Pinned because the fuzzy
+        tier must stay a LAST resort: a fuzzy hit makes the link path stop and
+        ask the user to confirm (Task 3), so downgrading an exact match to a
+        guess would be a UX regression, not a safety net.
+        """
+        result = self._resolve(monkeypatch, query)
+        assert len(result["matches"]) == 1
+        assert result["matches"][0].name == "Primavera"
+        assert result["fuzzy"] is False
+        assert result["score"] == 0.0
 
     def test_ambiguous_fuzzy_returns_all_candidates(self, monkeypatch):
         catalog = [self._prop("Maple Ridge", "12 Oak Rd"),
@@ -1317,7 +1330,8 @@ git commit -m "docs: record fuzzy property matching in the phrasing reference"
 
 ## Self-review notes
 
-- **Every score in Task 1's tests was measured, not guessed.** Run against `fuzzy_utils` with the Task 1 extractor set: `of this estimate to Primavera - 153 Asharoken Ave` → Primavera 0.711; `primavara` → 0.889; `153 Ashroken Ave` → 0.980; `Maple Rige` (3-property catalog) → Maple Ridge 0.952, single hit; `Maple Rdge` (against `Maple Ridge` + `Maple Rigde North`) → two candidates at 0.952 / 0.833, which is what the ambiguity test asserts; `Bogus Place` / `the property` / `somewhere else entirely` → no match. If the implementer sees different numbers, the extractor set has drifted from Task 1 Step 3 — fix that rather than relaxing the threshold.
+- **Every score in Task 1's tests was measured, not guessed.** Run against `fuzzy_utils` with the Task 1 extractor set: `primavara` → 0.889; `153 Ashroken Ave` → 0.980; `Maple Rige` (3-property catalog) → Maple Ridge 0.952, single hit; `Maple Rdge` (against `Maple Ridge` + `Maple Rigde North`) → two candidates at 0.952 / 0.833, which is what the ambiguity test asserts; `Bogus Place` / `the property` / `somewhere else entirely` → no match. If the implementer sees different numbers, the extractor set has drifted from Task 1 Step 3 — fix that rather than relaxing the threshold.
+- **Corrected during execution (2026-07-28):** this plan originally asserted `fuzzy is True` for `of this estimate to Primavera - 153 Asharoken Ave` and `Primavera, 153 Asharoken Avenue`. That was wrong — those scores were measured by calling `fuzzy_best_matches` directly, never through the resolver, and both strings contain the property name as a literal substring, so **tier 2 resolves them exactly and tier 3 never runs**. They now live in `test_substring_tiers_win_before_fuzzy` asserting `fuzzy is False`, which is the behavior we want: a fuzzy hit makes the link path stop and ask for confirmation (Task 3), so downgrading an exact match to a guess would be a UX regression. The Task 1 implementer caught this.
 - **Spec coverage:** §1 resolver tier → Task 1. §2 scoring/extractors → Task 1 Step 3. §3 link UX → Task 3; list UX → Task 4. §4 pending record incl. the corrected-answer rule → Task 2. §5 turn ordering + re-arm guard → Task 3 Steps 4-5. Spec testing section → distributed across every task plus Task 5. Out-of-scope items are not implemented anywhere.
 - **Type consistency:** `PENDING_PROPERTY_LINK_CONFIRMATION_KEY` and the five record fields (`estimate_id`, `estimate_label`, `property_id`, `property_label`, `score`) are written in Task 3 Step 3 and read in Task 2 — spellings match. `resolution["fuzzy"]` / `["score"]` defined in Task 1 are consumed identically in Tasks 3 and 4.
 - **Seams verified against source, not assumed:** `_handle_list_estimates` calls `Estimate.find(*filters)` directly (`crud_handlers.py:1229`) — there is no repository-style helper, so Task 4's test stubs the cursor chain (`sort`/`limit`/`to_list`/`count`). `_handle_update_estimate` dispatches to `_handle_update_estimate_property_link` at `crud_handlers.py:2377-2379`, which is why Task 3's tests can drive the public handler. `_crud_envelope` returns `context` unmodified (`crud_helpers.py:559`), which is how the pending record survives the turn.
