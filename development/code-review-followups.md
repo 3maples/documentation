@@ -5671,3 +5671,45 @@ otherwise server-derived signal.
 **Suggested fix:** no action required for correctness. If tightening is wanted,
 derive the marker server-side from the persisted conversation context rather than
 trusting the echoed request field.
+
+## 2026-07-30 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+That review covered the Maple "add to the task(s) …" notes-append widening and the
+shared ordinal-reply helper; its two HIGH findings (a `"the 2"` regression in the
+Task confirmation flow, and a widened `TypeError` surface on malformed
+`candidates`) were fixed in the same change.
+
+### [MEDIUM] platform/routers/agent_helpers/pending_property_link.py:141 — `handle_pending_property_link_confirmation` is 277 lines
+Well past the 50-line guideline. Pre-existing (~258 lines), worsened by ~19 when
+the word-ordinal support and the re-show-the-list branch landed. It is one linear
+state machine with eight independent return paths; the new no-match branch had to
+be inserted mid-function, and finding the right insertion point meant reading the
+whole body.
+**Suggested fix:** extract the reply-classification arms into named helpers
+(`_handle_ordinal_reply`, `_handle_corrected_identifier`) so the top-level
+function reads as a dispatch table.
+
+### [MEDIUM] platform/agents/text_utils.py:859 — file is now 1075 lines (guideline: 800)
+Pre-existing (1001 lines), worsened by +74 when `match_ordinal_reference` landed.
+The module is a grab-bag of unrelated shared parsers — field patterns, refusal
+copy, greeting detection, day windows, and now ordinals — and is the default
+dumping ground for anything two agents share.
+**Suggested fix:** split into focused modules (e.g. `agents/text/ordinals.py`,
+`agents/text/dates.py`) re-exported from `text_utils` for backwards
+compatibility. Coordinate with the `crud_handlers.py` split logged above, since
+both are "shared module grew too big" with the same remedy.
+
+### [LOW] platform/agents/task/text_helpers.py:117 — "add to the tasks: X" with no active task appends to an unrelated task
+The plural now routes to a notes append. With no `active_task_id`, the resolver's
+step-7 recency fallback picks the most-recently-updated task in the company, so a
+user who meant "add an item to my task list" annotates whatever they last
+touched. Pre-existing behavior for every notes phrasing, but the plural widening
+makes it materially easier to reach.
+**Suggested fix:** none required — this is an accepted design decision, not an
+oversight. The append/create fork was put to the user, who chose append; the
+trade is recorded in §6 of
+`documentation/development/plans/maple-append-to-task-and-ordinal-replies.md`.
+Mitigated by the append being additive (never overwrites) and by Maple echoing
+the updated task back. If it bites in practice, gate the plural form on an active
+task being present and fall through to create otherwise.
