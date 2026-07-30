@@ -5713,3 +5713,30 @@ trade is recorded in §6 of
 Mitigated by the append being additive (never overwrites) and by Maple echoing
 the updated task back. If it bites in practice, gate the plural form on an active
 task being present and fall through to create otherwise.
+
+## 2026-07-30 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review (positional follow-ups
+to a result list, §10.5 of the phrasing reference) not fixed in that pass.
+Findings #1–#8 of that review were fixed; these two were not.
+
+### [LOW] platform/agents/text_utils.py:1 — shared helper module now 1332 lines
+The listed-items work added ~260 lines to a module already past the 800-line
+guideline (~1080 before). The positional/listed-items block is a self-contained
+concern: the ordinal + positional matchers, the `last_listed_items` record, and
+the pick helpers.
+**Suggested fix:** split the listed-items + ordinal helpers into
+`agents/listed_items.py` and re-export from `text_utils` for backwards
+compatibility. This is the same remedy as the earlier "text_utils grew too big"
+entry above — do them together rather than twice.
+
+### [LOW] platform/agents/template/service.py:161 — full-collection load to resolve one id
+`_template_from_listed_position` calls `_list_templates_db` and scans the result
+for the picked id; `Template.get(...)` plus a company check is one round trip
+instead of a full-collection load. It only runs when a positional reference
+actually resolved, and it matches the existing `_find_templates_by_name` scan
+pattern, so this is consistency-vs-efficiency rather than a defect.
+**Suggested fix:** fetch by id directly, keeping the
+`safe_str(template.company) == company_id` tenant check. Consider doing the same
+for the `_resolve_target_*` id branches in Property / Contact / Material /
+Labour, which scan a full `_list_*_via_api` result for the same reason.
