@@ -5633,3 +5633,41 @@ and CI are en-US today, so it is latent.
 **Suggested fix:** pin the locale in the formatter (`toLocaleString("en-US")`) if
 ops output should be stable regardless of operator locale, or assert with a
 locale-independent matcher.
+
+## 2026-07-30 deferred from /code-review (Maple rename routing)
+
+Logged by `/fix-issues`. Selection fixed #1, #2, #3 and #4, and #6 was fixed in a
+follow-up pass the same day (`is_pronoun_targeted_edit` and
+`strip_dictated_payload` now live in `agents/text_utils.py`, with module-level
+imports in all four domain agents). The three below were not selected.
+
+### [MEDIUM] platform/agents/estimate/crud_handlers.py:2917 — handler exceeds the 50-line guideline; shared preamble duplicated
+`_handle_update_estimate_title` is 52 lines. Its first ~20 lines (resolve
+code-or-title → return clarify → ask-which-estimate envelope →
+`_load_estimate_for_update`) are near-identical to
+`_handle_update_estimate_description` and `_handle_update_estimate_property_link`.
+Related growth in the same change: `_handle_update_estimate` is now 140 lines,
+`_resolve_domain_from_history` 64, `_resolve_target_property` 68.
+**Suggested fix:** extract the shared "resolve target estimate or return an
+envelope" preamble into one helper and call it from all three handlers. Best done
+together with the file-split below.
+
+### [LOW] platform/agents/estimate/crud_handlers.py — file length 3216 lines (guideline: 800)
+Pre-existing violation, worsened by +123 lines when the estimate title rename
+landed. The new code is cohesive with its neighbours, so this is informational
+rather than a defect introduced by that change.
+**Suggested fix:** split the estimate-level field handlers (title / description /
+notes / property link) into their own module, mirroring how
+`work_item_handlers.py` was already carved out of this file.
+
+### [LOW] platform/agents/orchestrator/service.py:1815 — recency marker trusts a caller-supplied context key
+`active_entity_domain` arrives in the request context, which the portal
+round-trips from the previous response. A client could set it to any of the six
+domain names to steer which resource a pronoun follow-up resolves against. Impact
+is bounded: the guard already requires the matching `active_<domain>_*` anchor to
+be present, and every downstream handler re-authorizes by company scope, so this
+cannot cross a tenant boundary. Noted because the key is new attack surface on an
+otherwise server-derived signal.
+**Suggested fix:** no action required for correctness. If tightening is wanted,
+derive the marker server-side from the persisted conversation context rather than
+trusting the echoed request field.

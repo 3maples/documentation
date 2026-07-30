@@ -2,9 +2,29 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-07-29
+**Last updated:** 2026-07-30
 
 ### Change log
+
+**2026-07-30 — "rename it to …" created an estimate (§7.6, §7.11)**
+- **`rename` was never an action hint.** `ACTION_HINTS["update"]` listed update/edit/change/modify only, so every rename phrasing scored `unknown` on the rule tier. The LLM classified it correctly (verified live at 0.99), but the demotion guard in `_prefer_explicit_rule_match` reads an action-less, domain-less message as a *follow-up answer*: it discarded the LLM's `update_task` and rebuilt an intent from history — action from the previous turn (`create`) plus the highest-priority active anchor. Reproduced end to end: with a stale `active_estimate_code`, "rename it to {title}" **created an estimate**; with only task anchors it created a **duplicate task**. `rename` and `retitle` are now update hints, which also makes `rename the {task} task to {new}` resolve deterministically at the rule tier.
+- **Anaphora anchors are now chosen by recency, not by a fixed ranking.** `_resolve_domain_from_history` walked a static list where `task` trailed `estimate`, and anchors are never cleared when the user moves on — so an estimate opened twenty turns earlier captured every later pronoun follow-up on a task. `finalize_orchestrate_result` now also writes `active_entity_domain` naming the freshest anchor, and that wins whenever its own anchor is still present (a delete pops the anchor but not the marker, so the static list remains the fallback — and still applies to conversations persisted before the marker existed).
+- **A pronoun-targeted edit's payload is a value, not a domain signal.** `_supplement_domain_from_entity_signals` mined the text after "rename it to …" for entity shapes, so a Capitalized new title tripped the person-name heuristic and produced `update_contact` — "update it to Prune the Hinoki by the Putting Green" edited a contact. New `is_pronoun_targeted_edit` guard suppresses the guess for these messages (same rule `is_anaphoric_add_request` already enforced for "add … to it"); with no anchor they now ask instead of guessing.
+- Tests: `tests/test_maple_task_routing.py` (T5 rename routing, T6 pronoun-edit detector), `tests/test_maple_task_context.py` (anchor recency + marker write). Existing task-rename tests injected `orchestrator_intent="update_task"` and so never exercised routing — that hole is what let all three bugs ship.
+
+**2026-07-30 — where "rename it to …" actually LANDS, per resource (§1.10, §7.6)**
+
+Routing the pronoun rename correctly only mattered if the receiving agent could complete it. Audited all five; two could not, and one had no handler at all:
+
+| Resource | Before | Now |
+|---|---|---|
+| Task | ✅ renamed via the active-task anchor | unchanged |
+| **Estimate** | ❌ no title handler anywhere — fell through to the capability-list clarification | ✅ `_handle_update_estimate_title`, edit-lock enforced (§1.10) |
+| **Contact** | ❌ classifier puts the new name in `full_name`, the same slot used as the lookup key — searched for a contact that doesn't exist, and **fuzzy-matched a different real contact** ("Robert Smith" → "Bob Smith"), i.e. it could edit the wrong person | ✅ anchor wins |
+| **Property** | ❌ new name landed in `fields`, which fed the lookup query; the fuzzy fallback could return an unrelated property | ✅ anchor wins |
+| Material / People | ✅ already worked — the pre-dispatch guard promotes the active id because their classifiers leave `full_name` empty | hardened + pinned by tests |
+
+The shared signal is `is_pronoun_targeted_edit` (`agents/text_utils.py`, alongside the other cross-agent Maple detectors), surfaced to each domain agent as `parsed["target_is_anaphoric"]`: when a pronoun names the target, anything name-shaped in the payload is the NEW value and must never be used as a lookup key. It reuses `strip_dictated_payload`, so a dictated body (`add a note to it: please update it to reflect …`) does not trip it.
 
 **2026-07-28 — Property linking after estimate creation actually resolves (§1.6, §10.4)**
 - **The identifier handed to the property lookup was mangled.** `_PROPERTY_NAME_PATTERN` captured *everything* after the word "property", so the follow-up's synthetic message `set the property of this estimate to Primavera - 153 Asharoken Ave` searched for the literal string *"of this estimate to Primavera - 153 Asharoken Ave"* and reported `I couldn't find a property matching "of this estimate to …"`. The pattern now skips an `of|on|for [this|that|the|my] estimate|quote|bid|proposal … to|with|is` preamble before capturing. This also fixes the directly-typed `set the property of estimate {Name} to {property}` and `the property for this quote is {property}` phrasings, whose ✅ rows were only ever verified at the *routing* tier — the extraction underneath them was broken.
@@ -681,12 +701,16 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 
 **Status sets must mirror the dashboard cards** (`compute_analytics` in `routers/estimates.py`): pipeline = `[DRAFT, SENT, REVIEW, WON]`, **backlog = `[WON, SCHEDULED]` (all-time)**, **completed = `[COMPLETED]` (last 30 days)**. *(2026-06-20 — fixed a parity bug where the chat backlog headline summed only `[WON]`, so Maple reported $0.00 while the dashboard showed the real figure. `_analytics_headline_value` in `crud_handlers.py` now includes SCHEDULED.)* *(2026-06-20 — backlog relaxed from last-30-days to **all-time** in both `compute_analytics` and `_analytics_headline_value`: backlog = every Won/Scheduled estimate regardless of recency; dashboard card now labeled "All time".)*
 
-## 1.10 Estimate-level field edits (description & notes)
+## 1.10 Estimate-level field edits (title, description & notes)
 
-These edit **top-level `Estimate` fields** — distinct from the work-item (`JobItem`) description edits in §1.5.3. Both `description` and `notes` exist on the `Estimate` model (`models/estimate.py`). Routing is `update_estimate` → Estimate Agent; the dispatcher is `_handle_update_estimate` (`crud_handlers.py:1632`).
+These edit **top-level `Estimate` fields** — distinct from the work-item (`JobItem`) description edits in §1.5.3. `title`, `description`, and `notes` all exist on the `Estimate` model (`models/estimate.py`). Routing is `update_estimate` → Estimate Agent; the dispatcher is `_handle_update_estimate` (`crud_handlers.py:1632`).
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
+| `rename {EST} to {new title}` / `retitle this estimate as {new title}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-07-30 — `_detect_estimate_title_update` + `_handle_update_estimate_title`. Before this the chain had NO title branch: `rename` existed only as a **work-item** op, so an estimate-level rename fell through to the capability-list clarification.)* |
+| `rename it to {new title}` (pronoun target) | `update_estimate` → Estimate Agent | ✅ rule *(resolves via `active_estimate_code`)* |
+| `change/set the title of this estimate to {new title}` / `change the name of this quote to {new title}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-07-30)* |
+| Renaming a **locked** estimate (Sent / Approved / Archived / Won / Completed …) | Refused | 🛑 refusal *(2026-07-30 — the handler resolves through `_load_estimate_for_update`, so the Draft/Review edit-lock covers the title exactly like notes, description, and work-item edits. Locked means locked for everything.)* |
 | `for estimate {EST}, add to the notes the following: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(`_detect_note_update` → `_handle_update_estimate_notes`, append-mode; preserves existing notes. 2026-06-07 — the quoted body is captured in full even with an apostrophe inside (`"Contact me if there's any issues"`); straight + curly, double + single quotes via the shared `_QUOTED_VALUE_GROUP`)* |
 | `set the notes on {EST} to "..."` / `update notes: ...` | `update_estimate` → Estimate Agent | ✅ rule *(same handler; set-mode vs append-mode chosen by verb)* |
 | `for estimate {Estimate Name}, add to the notes the following: "..."` (estimate referenced by **title**) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — notes handler resolves via the shared `_resolve_estimate_code_or_title`; bare titles extracted by `_TITLE_PRE/POST_NOUN_RE` — first word capitalized, 2+ words (sentence-case OK) near "estimate"/"quote". The bare-title patterns run **before** the any-quoted fallback so a quoted note body is never mistaken for the title.)* |
@@ -701,6 +725,8 @@ These edit **top-level `Estimate` fields** — distinct from the work-item (`Job
 | `note on the {title} job: ...` | `update_estimate` → Estimate Agent | ⚠️ gap *(verbless + "the {X} job" isn't an estimate reference — Task-8 stretch)* |
 | `jot down on the {title} estimate: "..."` / `remember on this estimate that ...` / `FYI on the {title} job: "..."` (with an estimate/quote token) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — informal cues `jot`/`fyi`/`remember`/`write down` in `_NOTE_UPDATE_CUES` + value extractors (`_NOTE_WITH_COLON_SEP` broadened, new `_NOTE_REMEMBER_TAIL`); routed end-to-end by the orchestrator's value-bearing `_informal_note` arm. Always **append**-mode. Note: the phrase still needs an estimate/quote/EST token — "the Smith job" alone doesn't reference an estimate.)* |
 | `write down on the {title} estimate that ...` | `update_estimate` → Estimate Agent | ⚠️ gap *(`write down` is a cue, but only `remember` has a `... that ...` tail extractor; needs the tail generalized)* |
+
+**Title-vs-target trap (2026-07-30):** the rename handler must resolve its target from the message **head**, never the raw query. `_resolve_estimate_code_or_title` treats the bare word "title" as an explicit name cue (`_TITLE_BARE_RE`), so `change the title of this estimate to Patio Rebuild` would otherwise hunt for an estimate literally named *"of this estimate to Patio Rebuild"*, miss, and refuse instead of falling back to the active estimate. `_detect_estimate_title_update` returns `(new_title, target_text)` for exactly this reason. Two exclusions run against that **head**, never the new value (an estimate may legitimately be titled "Scope of Work"): a work-item noun in the head (`rename the patio work item|scope to X`) leaves the message to the work-item op, and a *qualified* name field (`set the name **of the property** on {EST} to X`) leaves it to the property-link branch — without that second guard the value was silently written into `Estimate.title` instead.
 
 **Disambiguation note:** `set the description of {WI} to "..."` (§1.5.3) targets a **work item** and is already ✅ rule. The phrasings here target the **estimate as a whole** — the implementation must detect the absence of a work-item reference (no `work item` / `job item` / `scope` / `line item` token) to route to the estimate-level handler rather than the work-item one.
 
@@ -1132,14 +1158,16 @@ The `the {task} task` keyword forms are ✅ rule; bare-title forms (`change the 
 |---|---|---|
 | `change the due date of the {task} task to Friday` | `update_task` → Task Agent | ✅ rule |
 | `add a description to the last task: {text}` | `update_task` → Task Agent (recency reference) | ✅ rule |
-| `rename the {task} task to {new title}` | `update_task` → Task Agent | ✅ rule |
+| `rename the {task} task to {new title}` | `update_task` → Task Agent | ✅ rule *(2026-07-30 — genuinely rule-tier now; `rename` was missing from `ACTION_HINTS` so this row previously described the agent-side handler only, and routing fell through to the LLM)* |
+| `retitle the {task} task to {new title}` | `update_task` → Task Agent | ✅ rule |
+| `rename it to {new title}` (pronoun target) | `update_task` → Task Agent | ✅ agent-side *(2026-07-30 — resolves through the active-task anchor; see §7.11)* |
 | `set the description of the {task} task to {text}` | `update_task` → Task Agent | ✅ rule |
 | `change the due date of {task} to Friday` (bare title) | `update_task` → Task Agent | 🤖 LLM |
 | `set {task}'s due date to next Monday` (bare title) | `update_task` → Task Agent | ⚠️ gap |
 
 ## 7.6.1 Notes on an existing task (append by default)
 
-Adding notes to a task Maple already worked on is an **update**, not a create — the orchestrator's `is_task_notes_update_request` claims these before the generic resolver, because `add` is a CREATE action hint and would otherwise make a *second* task. The rule requires an explicit `task`; a bare `add a note to it` stays on the generic anaphora path (where an active *estimate* still wins).
+Adding notes to a task Maple already worked on is an **update**, not a create — the orchestrator's `is_task_notes_update_request` claims these before the generic resolver, because `add` is a CREATE action hint and would otherwise make a *second* task. The rule requires an explicit `task`; a bare `add a note to it` stays on the generic anaphora path, which since 2026-07-30 resolves to whichever domain the user touched **most recently** rather than to a fixed ranking that always preferred an active estimate.
 
 Additive is the default, matching estimate notes (§5.x) — a drive-by note never silently wipes what's there. Existing notes and the new text are blank-line separated; appending onto empty notes collapses to a clean set. Only an explicitly destructive verb (`replace` / `overwrite` / `set … with`) overwrites.
 
@@ -1237,7 +1265,7 @@ Resolver: `agents/task/resolver.py::find_task_from_context_or_message` — order
 | Relative (date) | `the task from yesterday` / `from Tuesday` / `3 days ago` | ✅ |
 | By title (fuzzy) | `the fence gate task` (typos tolerated) | ✅ |
 | By property | `the task at {property}` | ✅ |
-| Anaphora (active task) | `mark it as done` / `convert it` | ✅ agent-side *(pronoun-only messages route via the LLM tier + active-task context)* |
+| Anaphora (active task) | `mark it as done` / `convert it` / `rename it to {new}` | ✅ agent-side *(pronoun-only messages route via the LLM tier + active-task context. 2026-07-30 — two routing bugs used to steal these: a stale `active_estimate_code` from earlier in the session out-ranked the just-created task, and a Capitalized new value was mined as a person name and sent to Contact. The anchor is now chosen by recency (`active_entity_domain`), and a pronoun-targeted edit's payload is never read as a domain signal.)* |
 | Anaphora (bare determiner) | `mark the task as done` / `assign my task to {email}` / `archive the task` / `rename the task to {new}` | ✅ agent-side *(2026-07-25 — "the/my task" with no name in between is anaphora: the target hint collapses to empty and resolution goes through the active-task context. Previously the stray determiner leaked into the title matcher and could hit ANY title containing "the".)* |
 | Ambiguity → confirmation | two similar titles → numbered clarification, reply `1` / title / `no` | ✅ |
 
