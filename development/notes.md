@@ -195,3 +195,63 @@ on schedule; making it truthful would require the SSE work.
 - Metering gap (separate follow-up): the researcher's raw `responses.parse`
   calls bypass the langchain token callback — researcher tokens are never
   recorded in `LLMUsageEvent` / company counters.
+
+---
+
+## 2026-07-29 — Ops user lists: verified-only, and orphaned vs never-joined
+
+Two related decisions about who belongs on `/ops/users` vs `/ops/new-users`.
+
+### Orphaned users are derived from the audit log, not stored on the User doc
+
+A user removed from a team has `company = None`, which on the document alone is
+indistinguishable from a signup that never created a company. The distinguishing
+fact already exists in `audit_logs`: every removal path writes one of two
+actions, both anchored to the prior company —
+
+- `USER_REMOVE_FROM_COMPANY` — `PUT /users/{id}` with a null company **and**
+  `DELETE /users/{id}` (routers/users.py deliberately emits the same action for
+  both so audit queries can't miss a path)
+- `USER_LEAVE_COMPANY` — `DELETE /users/me/company`, the self-leave
+
+`services/ops_membership.py::fetch_ever_joined_user_ids` runs one `distinct` on
+the indexed `action` field and returns those user ids. `/ops/users` includes
+"anyone in a company **or** in that set"; `/ops/new-users` excludes the set.
+
+**Why derive rather than add `previous_company` to the User model:** no schema
+change, no backfill, and it answers correctly for removals that already happened.
+It also self-clears — `company` becoming non-null ends the orphan state because
+that is checked first, so there is no field to remember to reset on the two join
+paths (invitation accept, company onboarding). The rejected alternative's failure
+mode is worse: a future removal path that forgets to maintain the field
+mislabels that user permanently and invisibly, whereas this approach degrades
+only if someone adds audit retention.
+
+**The one thing that would break it:** a retention policy that prunes those two
+actions would silently turn orphans back into "never joined" (i.e. back to the
+pre-2026-07-29 behaviour). If audit pruning is ever introduced, either exempt
+membership transitions or switch to the stored field. Sorting or filtering the
+Users list *by* orphan status would also force the stored field, since you can't
+sort on another collection.
+
+### `/ops/users` hides unverified emails — with an inexact `total`
+
+Verification lives in Firebase, not Mongo, so it cannot be part of the query.
+The lookup is scoped to the rendered page (one batched call; `page_size <= 100`
+is Firebase's per-call limit) and only an explicit `False` excludes a row —
+`None` means "couldn't ask" (lookup failed, or `firebase_auth_disabled` in dev),
+and treating that as unverified would blank the page during an outage.
+
+Consequence: `total` is counted pre-filter, so it reads high by the number of
+unverified accounts and a page can come back short. Mirroring `email_verified`
+onto the User document (synced from the token claim on `/auth`, which every
+login hits) would make it exact — deferred, because a mirrored flag goes stale
+when a user verifies without returning to the app.
+
+**Known gap:** `/auth/company-invitations/accept` uses `verify_firebase_token`,
+not the `verify_verified_firebase_token` variant, so an unverified user *can*
+accept an invite and join an established company. Such a user is now excluded
+from `/ops/users` but is not picked up by `/ops/new-users` either (that query
+only looks at company-less users and incomplete-onboarding companies), so they
+are invisible to ops. Fix by either widening the New Users query or requiring a
+verified email to accept an invitation — not yet decided.

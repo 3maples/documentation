@@ -5605,3 +5605,31 @@ extending that index to `(company, updated_at DESC, _id DESC)`, which is an
 index migration (Beanie's `init_db` create cannot reshape an existing index in
 place — the old one has to be dropped), so it should ship deliberately with a
 migration step rather than bundled into unrelated work.
+
+---
+
+## 2026-07-29 deferred from /code-review (ops enhancements)
+
+Logged by `/fix-issues`. Selection fixed #1, #3, #4, #5, #6, #7, #8 and #9; the
+two below were not selected.
+
+### [MEDIUM] platform/routers/ops.py:200 — task counts aggregate the whole collection
+`_counts_by_company` runs `$group` with no `$match`, and is now called on `tasks`
+as well as `users` for the ops Companies list. The page needs counts for at most
+100 company ids, but the pipeline scans every task in the database on every load.
+Tasks are the highest-volume company-scoped collection (50 per company on Free
+alone), so the cost grows without bound while the page's needs stay fixed.
+Harmless at present data size; the shape is the problem.
+**Suggested fix:** pass the page's company ids and prepend
+`{"$match": {"company": {"$in": ids}}}` — the existing
+`IndexModel([("company", 1), ...])` prefixes on Task serve it. Applies equally to
+the pre-existing users call.
+
+### [LOW] portal/tests/opsUsage.test.ts — assertions depend on the runtime locale
+`formatUsage` / `formatCreditsBalance` use `toLocaleString()`, and the tests
+assert `"1,200 / 100,000"` and `"49,876"`. Under a non-en ICU locale those become
+`"1.200"` / `"49 876"` and the suite fails for reasons unrelated to the code. Dev
+and CI are en-US today, so it is latent.
+**Suggested fix:** pin the locale in the formatter (`toLocaleString("en-US")`) if
+ops output should be stable regardless of operator locale, or assert with a
+locale-independent matcher.
