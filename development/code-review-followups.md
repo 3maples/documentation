@@ -5740,3 +5740,21 @@ pattern, so this is consistency-vs-efficiency rather than a defect.
 `safe_str(template.company) == company_id` tenant check. Consider doing the same
 for the `_resolve_target_*` id branches in Property / Contact / Material /
 Labour, which scan a full `_list_*_via_api` result for the same reason.
+
+## 2026-07-30 deferred from /code-review (portal — property estimates + Maple composer)
+
+Logged by `/fix-issues` — findings from the latest review (property-detail
+estimate list, Maple composer layout) not fixed in that pass. Findings #1–#5
+were fixed; this one was not.
+
+### [LOW] portal/src/components/Layout/AiPanel.tsx:387 — `renderAiComposer` is ~140 lines
+Pre-existing (~130 lines before the composer restructure; moving the buttons
+above the textbox and the disclaimer to the panel bottom added ~10). The helper
+now holds the voice-error banner, the mic/new-session/send button row, the
+textarea plus its voice-capture overlay, the auto-send countdown row, and the
+disclaimer — five separable concerns in one render function, well past the
+50-line guideline.
+**Suggested fix:** not introduced by that change, so no action was required
+then. If it grows again, split the button row into its own
+`renderComposerControls()` helper (and possibly the countdown/error rows into a
+`renderComposerStatus()`), keeping `renderAiComposer` as the layout shell.
