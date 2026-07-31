@@ -2,9 +2,21 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-07-30
+**Last updated:** 2026-07-31
 
 ### Change log
+
+**2026-07-31 — a paver patio was filed under Turf & Plant Care (§1.5.2)**
+
+Reported live: a generated work item reading "Assumes a 500 sq ft standard concrete-paver patio with a compacted 4-inch aggregate base and 1-inch bedding sand." carried the **Turf & Plant Care** division. It should have been Design/Build. No phrasing changed here — this is how divisions get assigned when Maple *generates* an estimate, so the §12.3 counts are untouched.
+
+- **Rule 4g was dead prompt text.** The generation prompt has always listed the seven divisions and told the model to classify each job item — but `ExtractedJobItem` had no `division` field, so `with_structured_output(..., method="function_calling")` never offered the property and `model_dump()` discarded any answer. Same for `ArchitectScope`, which is the stage that actually decides the work-item split in the research pipeline. Every division on every Maple-generated estimate came from the keyword table alone.
+- **That table had no hardscape vocabulary at all.** `patio`, `paver`, `walkway`, `driveway`, `retaining wall`, `deck` — none of them were keywords, so hardscape scopes fell through to `Unassigned`. It also matched whole words only (`shrub` matched, `shrubs` didn't) and returned the **first** division whose keyword appeared in dict order, so "Seasonal cleanup and tree pruning" scored Maintenance before Tree Care ever got a look.
+- **The architect now classifies each scope**, and the division rides scope → research deliverable → job item. A high-confidence vector match to an approved past estimate donates *that* estimate's division instead — the strongest signal available, since a human reviewed it. New rule 4h/9 tells both models to classify on the primary scope, not incidental mentions ("a paver patio bordering a lawn is a build scope, not lawn care"), and the JSON example no longer hardcodes `Turf & Plant Care` as the sole worked example.
+- **Both prompts now render the company's own division names**, not the seeded seven — divisions are per-company editable rows, so a company that renamed one could never be matched against it. Labels that still match a seeded division keep that division's scope examples; renamed ones render bare. Names are sanitized and brace-escaped like the unit allow-list.
+- **Whatever the model returns is re-anchored** (`apply_division_names`): a match is canonicalized to the company's stored spelling, and a hallucinated or deleted division falls back to keyword inference rather than persisting.
+- **The keyword fallback was rebuilt** — hardscape vocabulary, light stemming for plurals/gerunds, and weighted scoring (strong domain nouns vs. supporting terms) instead of first-match-wins.
+- Tests: `tests/test_estimate_division_inference.py`, `tests/test_estimate_division_classification.py`.
 
 **2026-07-30 — "show me the fourth one" answered with the first (§10.5)**
 
@@ -508,7 +520,9 @@ Synonyms: `work item`, `job item`, `scope`, `line item` are interchangeable in a
 
 ### 1.5.2 Division assignment
 
-Division and description are editable via chat. Values come from `EstimateDivision` enum: Design/Build, Irrigation & Lighting, Maintenance, Snow & Ice, Tree Care, Turf & Plant Care, Unassigned — plus custom `Division` documents per company.
+Division and description are editable via chat. The seeded values come from the `EstimateDivision` enum: Design/Build, Irrigation & Lighting, Maintenance, Snow & Ice, Tree Care, Turf & Plant Care, Unassigned. Each company owns editable `Division` rows bootstrapped from that same seed (`data/default_divisions.csv`).
+
+**How a generated work item gets its division** (2026-07-31): the estimate architect classifies each scope against the company's own division list, and that value rides through research onto the work item; a high-confidence vector match to an approved past estimate donates that estimate's division instead. Whatever arrives is re-anchored to a division the company actually has (`apply_division_names`), and anything unrecognized falls back to weighted keyword inference over the description (`routers/estimate_helpers/division.py`), then `Unassigned`.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
@@ -520,6 +534,7 @@ Division and description are editable via chat. Values come from `EstimateDivisi
 | `what division is {WI} in?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `which division does {WI} belong to?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `set all work items in {EST} to Maintenance` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `move {WI} to {custom division}` (a division the company added or renamed) | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-07-31 — the chat handler validates against the `EstimateDivision` enum only (`work_item_handlers.py`), so it answers "isn't a recognized division" for a company's own division rows. Generation-time classification is already company-aware; this write path is not.)* |
 
 ### 1.5.3 Description
 
