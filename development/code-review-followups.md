@@ -5802,3 +5802,35 @@ Pre-existing and not worsened (the property-label fix adds two lines).
 Recorded because the file was in review scope.
 **Suggested fix:** out of scope on its own. If tackled, the natural seams are
 the sidebar computed values (~lines 410–465) and the work-items table.
+
+## 2026-07-31 deferred from /code-review (Team page — expired invitations)
+
+Logged by `/fix-issues` — the selection was `all`; this finding was the one
+fix that proved substantially larger than its ledger entry described, so it is
+recorded here rather than half-applied. Findings #2–#7 from that review were
+fixed in the same pass.
+
+### [HIGH] portal/src/pages/SettingsPage.tsx:1 — file is 2,605 lines (guideline 800)
+The Team tab is the only settings tab still living inline in `SettingsPage.tsx`.
+Every other tab is an extracted component under `components/settings/`
+(`RateCardsTab`, `DivisionsTab`, `MaterialUnitsTab`, `TaskStatusesTab`,
+`MaterialCategoriesTab`, `TemplatesTab`, `BillingTab`, `FinancialTab`). The
+expired-invitation work added ~130 lines of invitation logic to that inline
+mass, so the drift from the established pattern grew. Pre-existing condition,
+worsened rather than introduced.
+
+**Why it was deferred rather than fixed:** the extraction is not a move of the
+~320 lines of team JSX. It carries roughly 28 `useState` declarations, four
+dialogs (member role, member remove, leave company, invite) plus the overage
+and add-card modals, ~15 handlers, and three loaders — around 1,000 lines with
+`currentUser` / `isOwner` / `companyDetails` shared across other tabs. Test
+coverage over that surface is thin: `SettingsPageInvitationActions.test.tsx`
+exercises the invitation rows only, and member edit / member remove / leave
+company have no component tests at all, so a regression in the moved code would
+be silent.
+
+**Suggested fix:** extract `components/settings/TeamTab.tsx` as its own change,
+in two steps — first add component tests covering member role edit, member
+removal and leave-company so the move has a safety net, then move state,
+handlers and dialogs across with the tab's props limited to `currentUser` /
+`isOwner` / `companyDetails` and an `onCompanyChanged` callback.
