@@ -5758,3 +5758,47 @@ disclaimer — five separable concerns in one render function, well past the
 then. If it grows again, split the button row into its own
 `renderComposerControls()` helper (and possibly the countdown/error rows into a
 `renderComposerStatus()`), keeping `renderAiComposer` as the layout shell.
+
+## 2026-07-31 deferred from /code-review (portal — property label + Tasks tour Maple step)
+
+Logged by `/fix-issues` — findings from the latest review (read-only property
+label fix, Tasks tour Maple step) not fixed in that pass. Findings #1 and #2
+were fixed; #3 was reviewed and accepted as-is; #4 and #5 remain open.
+
+### [LOW] portal/src/tours/registry.ts:209 — Tasks tour can end with a full-viewport spotlight on mobile — ACCEPTED, NO ACTION
+The Tasks tour's final Maple step deliberately does not drive the Maple panel,
+so on a mobile viewport where the user already had Maple open, the resolved
+anchor is the full-screen sheet (`fixed inset-0`). `computePosition` finds no
+side that clears a full-viewport target and falls back to the bottom slot, so
+nothing breaks — but the highlight ring frames the whole screen and the tour
+ends there.
+
+Two remedies were considered and rejected. `closesMaplePanelOnMobile` is not
+usable on a step whose anchor IS the panel: closing it races the anchor's
+unmount (the flag is safe on the Dashboard tour only because it sits on a step
+anchored to `nav-account`). Reordering so the step isn't last contradicts the
+feature request, and leaves the same ring mid-tour.
+
+**Decision (2026-07-31):** accepted as-is. The case requires the user to have
+opened Maple themselves, and the outcome is cosmetic. **No action** — this
+entry exists so the next reviewer doesn't re-raise it. If it ever needs
+fixing, the clean remedy is a second `data-tour` value (e.g. `maple-entry`) on
+three small elements — the floating button and each panel's header strip — so
+the step always spotlights something small, leaving the Dashboard tour's
+whole-panel `maple` anchor untouched.
+
+### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1083 — read-only property field can render a raw ObjectId
+The fallback chain ends `... || property || "-"`, where `property` is the raw
+property id string. If both the fetched property and the list lookup miss
+(deleted property, failed fetch), a locked estimate shows the user a Mongo
+ObjectId. Pre-existing — the property-label fix neither introduced nor worsened
+it — but the line was touched.
+**Suggested fix:** replace the `property` term with `UNASSIGNED_PROPERTY_LABEL`
+from `lib/propertyDisplay`, matching how `getEstimateProperty` handles a
+missing property.
+
+### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — file is 1838 lines
+Pre-existing and not worsened (the property-label fix adds two lines).
+Recorded because the file was in review scope.
+**Suggested fix:** out of scope on its own. If tackled, the natural seams are
+the sidebar computed values (~lines 410–465) and the work-items table.
