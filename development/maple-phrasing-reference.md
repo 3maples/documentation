@@ -6,6 +6,17 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Change log
 
+**2026-07-31 (later) — divisions are matched against the company's own list, description-first (§1.5.2)**
+
+Follow-up to the entry below, after the seeded division descriptions were rewritten from terse tag-lists into real coverage prose. Divisions are per-company rows a user can rename, add, and describe, so "which division does this work item belong to?" is a match against *their* list — and what a custom division covers is only knowable from the description they wrote. One phrasing closes (`set the division of {WI} to {custom division}`), one new gap opens (the same request without the word "division"); §12.3's auto-generated counts are unaffected — none of these are coverage-matrix cases.
+
+- **Both LLM stages now classify against the company's divisions with their descriptions**, and return a `division_confidence` alongside the label. Below a floor the label is dropped and the work-item text decides — a bare label gives the model no way to say "none of these fit", so it picks one anyway.
+- **The lexical fallback scores the company's own divisions**, in tiers: their description beats the division name, which beats the built-in vocabulary. Before this, that vocabulary was hardcoded to the seven seeded divisions — a company running its own set could only ever be scored against names it had deleted, so *every* fallback returned `Unassigned`.
+- **Two regressions were caught by scoring against the real seed rather than test fixtures.** The built-in `sod`/`shrub` keywords out-voted a description that explicitly handed installs to Design/Build; and the boilerplate every seeded description ends with ("Usually sold as per-event, per-push, or seasonal contracts…") scored as domain vocabulary, so "seasonal service contract" landed on Snow & Ice. Both now covered by `tests/test_estimate_division_seed_catalog.py`, which scores `data/default_divisions.csv` as shipped.
+- **Chat-side division updates validate against the company's live divisions** instead of the `EstimateDivision` enum, canonicalize casing and punctuation to the stored spelling, and list the company's own divisions when refusing.
+- **The prompt's fallback description list is read from the seed CSV**, not restated in the prompt module — a hand-maintained copy had already drifted from it on all seven entries.
+- Tests: `test_estimate_division_seed_catalog.py`, `test_estimate_division_inference.py`, `test_estimate_division_classification.py`, `test_maple_work_item_division_update.py`.
+
 **2026-07-31 — a paver patio was filed under Turf & Plant Care (§1.5.2)**
 
 Reported live: a generated work item reading "Assumes a 500 sq ft standard concrete-paver patio with a compacted 4-inch aggregate base and 1-inch bedding sand." carried the **Turf & Plant Care** division. It should have been Design/Build. No phrasing changed here — this is how divisions get assigned when Maple *generates* an estimate, so the §12.3 counts are untouched.
@@ -522,7 +533,9 @@ Synonyms: `work item`, `job item`, `scope`, `line item` are interchangeable in a
 
 Division and description are editable via chat. The seeded values come from the `EstimateDivision` enum: Design/Build, Irrigation & Lighting, Maintenance, Snow & Ice, Tree Care, Turf & Plant Care, Unassigned. Each company owns editable `Division` rows bootstrapped from that same seed (`data/default_divisions.csv`).
 
-**How a generated work item gets its division** (2026-07-31): the estimate architect classifies each scope against the company's own division list, and that value rides through research onto the work item; a high-confidence vector match to an approved past estimate donates that estimate's division instead. Whatever arrives is re-anchored to a division the company actually has (`apply_division_names`), and anything unrecognized falls back to weighted keyword inference over the description (`routers/estimate_helpers/division.py`), then `Unassigned`.
+**How a generated work item gets its division** (2026-07-31): the estimate architect classifies each scope against the company's own divisions — names *and* the coverage description each carries — and reports a `division_confidence` with it; that value rides through research onto the work item. A high-confidence vector match to an approved past estimate donates that estimate's division instead, at full confidence. Whatever arrives is re-anchored to a division the company actually has (`apply_company_divisions`); an unrecognized or low-confidence label falls back to scoring the description against those same divisions (`routers/estimate_helpers/division.py`), then `Unassigned`.
+
+The fallback scorer ranks evidence in tiers: **the company's own description** for a division outranks its **name**, which outranks the built-in keyword vocabulary. So a company whose "Turf & Plant Care" description reads *"fertilization, weed and pest control, aeration"* has said sod installs belong elsewhere, and the built-in `sod` keyword no longer overrules it. Division descriptions are editable in Settings → Divisions and are seeded from `data/default_divisions.csv`.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
@@ -534,7 +547,8 @@ Division and description are editable via chat. The seeded values come from the 
 | `what division is {WI} in?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `which division does {WI} belong to?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `set all work items in {EST} to Maintenance` | `update_estimate` → Estimate Agent | 🤖 LLM |
-| `move {WI} to {custom division}` (a division the company added or renamed) | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-07-31 — the chat handler validates against the `EstimateDivision` enum only (`work_item_handlers.py`), so it answers "isn't a recognized division" for a company's own division rows. Generation-time classification is already company-aware; this write path is not.)* |
+| `set the division of {WI} to {custom division}` (a division the company added or renamed) | `update_estimate` → Estimate Agent | ✅ rule *(2026-07-31 — was a ⚠️ gap earlier the same day: the handler validated against the `EstimateDivision` enum only and answered "isn't a recognized division" for a company's own rows. It now validates against the company's live divisions, canonicalizes casing/punctuation to the stored spelling, and lists the company's own divisions when it refuses.)* |
+| `move {WI} to {custom division}` — **without** the word "division" | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-07-31 — the op detector (`work_item_handlers.py::_detect_work_item_field_op`) still gates on a hardcoded alternation of the seven seeded names, so a bare custom name isn't recognized as a division op at all. Any phrasing that includes the word "division" works for every value.)* |
 
 ### 1.5.3 Description
 
