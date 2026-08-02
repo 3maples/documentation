@@ -5882,3 +5882,38 @@ estimate resolution, work-item matching, save, and response construction.
 **Suggested fix:** split the division branch into its own
 `_handle_work_item_division_update` when the file is next touched — not
 attributable to this change alone.
+
+## 2026-08-02 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+Review scope was the Brevo lifecycle-list feature, company-close detach, the
+reinstate flow, the ops Last Login column, and the ErrorBoundary crash fix.
+
+### [HIGH] platform/routers/auth.py — 1117 lines, exceeds the 800-line threshold
+Pre-existing (1030 lines at HEAD) but worsened by +87 in this change. The module
+now carries authentication, signup, verification email, password reset, the full
+invitation lifecycle (create / list / resend / revoke / accept), company
+onboarding, onboarding progress, and the Brevo member fan-out — the God Router
+smell. `accept_company_invitation` is 105 lines; `create_company_invitations` is
+160. Not attributable to this change, which is why it was deferred rather than
+fixed: splitting it is its own piece of work with its own test surface.
+
+**Suggested fix:** extract the invitation lifecycle into
+`platform/routers/invitations.py` (create / list / resend / revoke / accept plus
+their helpers `_hash_invitation_token`, `_generate_invitation_token`,
+`_get_effective_invitation_status`, `_is_actionable_invitation`,
+`_serialize_invitation`, `_find_pending_invitation`, `_find_invitation_by_token`).
+That alone moves roughly 400 lines and leaves `auth.py` close to the threshold.
+
+### [MEDIUM] long functions added by the Brevo lifecycle change
+`reinstate_company_account` (72 lines, `platform/routers/companies.py:111`),
+`detach_non_owner_members` (60, `platform/services/company_service.py:25`) and
+`sync_user_stage` (55, `platform/services/brevo_contacts.py:361`) all exceed the
+50-line guideline. Docstrings and explanatory comments dominate — the executable
+logic is roughly half of each — so this reads as borderline rather than genuinely
+dense, which is why it was deferred.
+
+**Suggested fix:** optional. `reinstate_company_account`'s guard chain (token
+email → user → owner role → has company → company exists) is the one worth
+extracting, into a `_require_owner_of_own_company()` helper mirroring the
+existing `_require_owner_company_access` in the same module.
