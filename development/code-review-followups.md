@@ -5917,3 +5917,27 @@ dense, which is why it was deferred.
 email → user → owner role → has company → company exists) is the one worth
 extracting, into a `_require_owner_of_own_company()` helper mirroring the
 existing `_require_owner_company_access` in the same module.
+
+## 2026-08-02 deferred from /code-review (ops archived-company fix)
+
+Logged by `/fix-issues` — findings from that review not fixed in the pass.
+
+### [LOW] platform/routers/ops.py:417 — company-detail payload carries stale membership fields
+Reviewed and **accepted as-is** rather than deferred by omission. `list_company_users`
+calls `_serialize_user_summary(u, company.name)` with defaults, so the payload reports
+`membership_status="active"` and `company_archived=False` even for an archived company.
+
+This was originally raised as HIGH ("the two ops pages contradict each other") and that
+was wrong about impact: `OpsCompanyDetailPage` renders Name / Email / Role / Joined and
+never reads either field, so no operator-visible inconsistency exists. The page is also a
+*roster* view — "who is attached to this company" — and its header already shows the
+company as archived, so per-row orphan labelling would be redundant. The product decision
+is that the roster should keep listing attached users exactly as it does now.
+
+What remains is dead data that could mislead later: whoever next adds a Status column to
+that table would get wrong values with no hint why.
+
+**Suggested fix:** if that table ever grows a Status column, pass the real values at the
+same time — `company` is already loaded on line 410, so it costs no extra query:
+`membership_status(u.company, ..., company_archived=_is_archived(company))` and
+`company_archived=_is_archived(company)`. Until then, no change.
