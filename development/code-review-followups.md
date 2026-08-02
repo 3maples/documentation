@@ -5941,3 +5941,26 @@ that table would get wrong values with no hint why.
 same time — `company` is already loaded on line 410, so it costs no extra query:
 `membership_status(u.company, ..., company_archived=_is_archived(company))` and
 `company_archived=_is_archived(company)`. Until then, no change.
+
+## 2026-08-02 deferred from /code-review (Team page — responsive layout + plan Tasks copy)
+
+Logged by `/fix-issues` — the selection was `1, 2, 4, 5, 6`; findings #1, #2, #4,
+#5 and #6 were fixed in that pass. One finding is deferred, and it is a
+recurrence rather than a new item.
+
+### [MEDIUM] portal/src/pages/SettingsPage.tsx:1 — file is 2,745 lines (guideline 800)
+**Duplicate of the 2026-07-31 entry above** (`SettingsPage.tsx:1 — file is 2,605
+lines`); recorded here only to update the count and confirm the trend. The
+responsive-layout work added ~45 lines to the same inline Team tab, taking it
+from 2,605 to 2,745 — the third consecutive review to flag this file.
+
+Raised at MEDIUM this time rather than HIGH: the risk belongs to the file's
+history, not to this diff, which is a copy change plus Tailwind class edits.
+
+**Suggested fix:** unchanged — see the 2026-07-31 entry for the full extraction
+plan (add component tests for member role edit / member removal / leave company
+first, then move state, handlers and dialogs into
+`components/settings/TeamTab.tsx`). Note that the stacked-table markup added on
+2026-08-02 moves with the tab and needs no rework; the new
+`SettingsPageTeamResponsive.test.tsx` covers part of the safety net that entry
+asks for, though the member-edit and leave-company paths are still untested.
