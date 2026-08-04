@@ -9,11 +9,19 @@ Phase 0 is **resolved** (see Ops prerequisites): DEV list IDs are configured in
 `.env.local`, no new Brevo attributes were needed, and a live end-to-end run
 confirmed a contact moves cleanly through all four DEV lists.
 
-**Still to do before production:** set the four PROD list IDs (`11`/`12`/`13`/`14`)
-on the Render web service **and** on the new `brevo-lifecycle-reconcile` cron
-service, then run `scripts/backfill_brevo_contacts.py --dry-run` and check the
-tally before `--apply`. Until those env vars are set, production is a safe
-no-op: `is_configured()` returns False and every hook returns early.
+**DONE 2026-08-03:** the four PROD list IDs (`11`/`12`/`13`/`14`) are set, the
+dry run was checked against the ops Users / New Users counts, and `--apply`
+seeded all 24 prod contacts (16 Active / 6 Incomplete Setup / 2 Unverified,
+0 Orphaned) plus `has_ever_joined_company` on 18 users. The backfill script was
+deleted on 2026-08-04 — the nightly cron repeats everything it did.
+
+**Still open:** the `brevo-lifecycle-reconcile` cron reports
+`Firebase verification lookup failed`, so stages are being classified from the
+stored `email_verified` mirror rather than live Firebase. Same on DEV and PROD.
+`FIREBASE_CREDENTIALS_JSON` is set on both services, so the remaining candidates
+are an unauthorized service account or blocked egress; the `exc_info` added to
+`services/ops_verification.py` on 2026-08-04 will name the cause in the next run
+once deployed.
 
 **Scope:** `platform/` backend + `portal/` (reinstate page, ops Last Login column)
 
@@ -367,7 +375,8 @@ bounded-concurrency push → write `brevo_stage` / `brevo_synced_at` **on succes
 non-owner members still attached to ARCHIVED companies** via `detach_non_owner_members`.
 
 - `scripts/backfill_brevo_contacts.py` — dry-run default, `--apply` to write; same argparse shape and
-  "would →" output as `scripts/backfill_email_verified.py`.
+  "would →" output as `scripts/backfill_email_verified.py`. **Removed 2026-08-04** once DEV and PROD
+  were both seeded; recover from git history if a new environment needs a preview.
 - `scripts/reconcile_brevo_contacts.py` — Render cron entry point mirroring
   `scripts/snapshot_seat_counts.py` (Sentry init, `init_db()`, per-item try/except,
   `capture_exception` + `sys.exit(1)` on top-level failure).
@@ -535,8 +544,8 @@ the resend-invitation endpoint touches Brevo not at all.
    there. For someone who both filled in that form and uses the app, whichever wrote last wins. Give
    it a dedicated attribute if that ambiguity ever matters.
 2. **Backfilled users get the wrong "Creation date."** Brevo stamps it when the contact is created,
-   so it equals the signup date for everyone who signs up from now on — but for users seeded by
-   `scripts/backfill_brevo_contacts.py` it will read as the backfill date. Only a dedicated
+   so it equals the signup date for everyone who signs up from now on — but for the users seeded by
+   the one-time backfill (2026-08-03) it reads as the backfill date. Only a dedicated
    `SIGNUP_DATE` attribute would fix that.
 
 Still unverified (neither is blocking): whether the upsert can reset `emailBlacklisted` — we never
@@ -558,8 +567,8 @@ ceiling (currently 4).
    returns to **Active**. Confirm the removed members are *not* back.
 4. Ops portal → Users: the Last Login column shows a date for the walked-through user and "Never" for a
    user who has never logged in.
-5. `python scripts/backfill_brevo_contacts.py` (dry run) — confirm the tally matches the ops Users /
-   New Users counts before `--apply`.
+5. ~~`python scripts/backfill_brevo_contacts.py` (dry run) — confirm the tally matches the ops Users /
+   New Users counts before `--apply`.~~ Done 2026-08-03; script removed 2026-08-04.
 
 ## Risks / out of scope
 
