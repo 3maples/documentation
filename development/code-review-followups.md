@@ -5964,3 +5964,30 @@ first, then move state, handlers and dialogs into
 2026-08-02 moves with the tab and needs no rework; the new
 `SettingsPageTeamResponsive.test.tsx` covers part of the safety net that entry
 asks for, though the member-edit and leave-company paths are still untested.
+
+## 2026-08-05 deferred from /code-review (Team page — unverified-member pill)
+
+Logged by `/fix-issues` — the selection was `1, 2`; findings #1 and #2 were
+fixed in that pass. One finding is deferred, and it is again a recurrence
+rather than a new item.
+
+### [LOW] portal/src/pages/SettingsPage.tsx:1 — file is 2,766 lines (guideline 800)
+**Fourth consecutive flag on this file** — see the 2026-07-31 entry (2,605
+lines) for the full extraction plan and the 2026-08-02 entry (2,745 lines) for
+the previous recurrence. The count is now 2,766.
+
+Raised at LOW, a step down from the last two entries, because this diff is a
+net **+17** lines to the file (`git diff --numstat`: +28 / −11) and roughly
+half of that is offset work: the "Unverified" pill and its `isUnverifiedMember`
+helper add ~28 lines, while removing the dead "Accepted" invitation column
+takes 11 away. The drift from 2,745 to 2,766 is almost entirely this change,
+but the magnitude is small and the file's size problem is structural, not
+diff-driven.
+
+**Suggested fix:** unchanged — see the 2026-07-31 entry. Worth noting that the
+safety net that entry asks for has grown again: `SettingsPageTeamVerification.
+test.tsx` (new in this change, 8 tests) now covers the members-table row
+rendering and the invitations-table columns, on top of
+`SettingsPageTeamResponsive.test.tsx` and `SettingsPageInvitationActions.
+test.tsx`. Member role edit, member removal and leave-company remain the
+untested paths blocking a confident extraction.
