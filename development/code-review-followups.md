@@ -5991,3 +5991,87 @@ rendering and the invitations-table columns, on top of
 `SettingsPageTeamResponsive.test.tsx` and `SettingsPageInvitationActions.
 test.tsx`. Member role edit, member removal and leave-company remain the
 untested paths blocking a confident extraction.
+
+## 2026-08-06 deferred from /code-review (website — footer social links + contact-modal waitlist removal)
+
+Logged by `/fix-issues` — the selection was `none`; no findings were fixed in
+that pass. All seven are deferred. The review returned zero CRITICAL and zero
+HIGH and was recommended **Approve**, so nothing here blocks a commit; #1 and #2
+are cleanup debt created by the change itself and are the two worth closing.
+
+### [MEDIUM] website/contact-modal/install.js:297 — optional-field validation machinery is now inert
+Removing the pre-launch waitlist checkbox removed the only code path that could ever mark an
+optional field invalid. `optionalFieldWrappers` survives and is still iterated by
+`clearAllFieldErrors()` (line 316) and the input-listener loop (line 319), but both are now
+guaranteed no-ops — nothing can put a `cm-invalid` class on those controls. The five
+`<div class="cm-field-error">Field is required</div>` nodes under each `data-optional-field`
+wrapper are likewise unreachable markup. Line 370's
+`const wrappersToValidate = baseRequiredWrappers` is a redundant alias left from the
+conditional it replaced. None of this is a defect today; it is dead weight that will read as
+intentional to the next person touching the form.
+
+**Suggested fix:** either drop `optionalFieldWrappers`, the `data-optional-field` attributes
+and the dead error divs; or keep them deliberately and add a one-line comment saying the
+wrappers exist only so optional fields share the "clear error as you type" wiring. Inline
+`wrappersToValidate` into the `forEach` either way.
+
+### [MEDIUM] website/functions/index.js:170 — server-side joinWaitlist path is now permanently dormant
+The frontend no longer sends `joinWaitlist`, so `wantsWaitlist` is always false. Three
+consequences, none breaking but all misleading: (a) the 400 branch at line 170 ("A message is
+required when joining the pre-launch waitlist") is unreachable from the UI; (b) every ops
+notification email now carries a constant `Pre-launch waitlist: No` row (line 265) — pure
+noise on every submission; (c) `BREVO_PRELAUNCH_LIST_ID` is referenced at line 74 but can
+never be appended to `listIds`, so the env var is dead config. Deliberately left in place
+during the UI change because this is a deployed cloud function wired to live Brevo lists.
+
+**Suggested fix:** decide whether the pre-launch list is retired for good. If so, remove the
+field from the handler, drop the email row and the unreachable 400, and retire
+`BREVO_PRELAUNCH_LIST_ID` from config and docs. Tests in `functions/joinWaitlist.test.js` and
+`functions/brevoContactSync.test.js` cover this field and must move with it. If the list may
+return, leave the backend alone and note it in the changelog.
+
+### [MEDIUM] website/index.html:698 — footer icon block duplicated five ways
+The social row adds ~13 lines of CSS and ~20 lines of SVG markup, copy-pasted verbatim into
+all five static pages (`index`, `pricing`, `faq`, `privacy`, `terms` — ~165 duplicated lines
+total). A future edit — one URL change, one glyph swap — has to land in five files or the
+pages silently diverge. This follows the existing convention (the whole footer is already
+duplicated) and `src/content/__tests__/social-footer-links.test.ts` does assert all five stay
+in sync, so the risk is contained rather than open-ended.
+
+**Suggested fix:** no action needed if the duplicated-footer convention is intentional. If it
+is being outgrown, the fix is a shared partial injected at build time rather than a per-change
+workaround — that is a separate refactor covering the whole footer, not just the icons.
+
+### [LOW] website/index.html:1248 — `title` and `aria-label` carry different text on each icon link
+Each anchor has `aria-label="3Maples on LinkedIn"` and `title="LinkedIn"`. `aria-label` wins
+as the accessible name; some screen readers additionally announce `title` as the description,
+producing "3Maples on LinkedIn, LinkedIn". Harmless but redundant. Applies to all five pages.
+
+**Suggested fix:** keep `title` for the sighted-user tooltip and accept the duplication, or
+drop `title` and rely on the accessible name alone.
+
+### [LOW] website/index.html:701 — icon links rely on the UA default focus ring
+The new anchors style `:hover` but not `:focus-visible`. There is no global outline reset, so
+keyboard focus is still visible via the browser default — not a WCAG 2.4.7 failure. It is
+however inconsistent with `.m3s-dot:focus-visible` (index.html:299), which defines an explicit
+2px accent ring with offset. Applies to all five pages.
+
+**Suggested fix:** add `.foot-col .foot-social a:focus-visible { outline: 2px solid
+var(--social-accent); outline-offset: 2px; }` to match the established treatment.
+
+### [LOW] website/index.html:700 — 34px touch targets
+The icon tiles are 34x34 CSS px with an 8px gap. This clears WCAG 2.2 SC 2.5.8 Target Size
+(Minimum, AA = 24px) but sits under the 44px commonly recommended for comfortable thumb use,
+and these are the only touch targets in the mobile footer.
+
+**Suggested fix:** optional. Bumping to 40-44px would need the `repeat(3, 34px)` track and the
+`svg` sizing adjusted together; verify the 2-column mobile footer still fits at 320px.
+
+### [LOW] website/contact-modal/__tests__/install.test.js:135 — regex assertion spans the entire document body
+`expect(document.body.innerHTML).not.toMatch(/pre-launch/i)` guards the whole body rather than
+the modal. In jsdom the body only holds the modal, so it passes today, but any unrelated
+fixture that ever mentions "pre-launch" would fail this test in a way that points at the wrong
+code.
+
+**Suggested fix:** scope it —
+`expect(document.querySelector('.cm-dialog').innerHTML).not.toMatch(/pre-launch/i)`.
