@@ -6075,3 +6075,58 @@ code.
 
 **Suggested fix:** scope it —
 `expect(document.querySelector('.cm-dialog').innerHTML).not.toMatch(/pre-launch/i)`.
+
+## 2026-08-06 deferred from /code-review (portal — unverified-login resend + invitation ordering)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+Fixed in that pass: #1 (handleSubmit extraction), #2 (shared `isDeadActionCode`),
+#3 (action-code effect clobbering a login attempt).
+
+### [MEDIUM] portal/src/pages/auth/LoginPage.tsx:201 — terminal invitation failure silently dropped for unverified users
+When the sign-in is unverified AND the invitation accept failed, `inviteError` is discarded so
+the verify banner wins — deliberate, and commented in the code. But on a terminal status
+(403/404/409) the pending invitation is ALSO cleared, so the token is gone and the user was
+never told. They verify, sign back in, and land in `/onboarding` with no company and no
+indication an invitation ever existed, let alone lapsed. This is the exact path for an invitee
+whose invitation hits the 7-day expiry while they work through verification — the scenario the
+change was written to unblock.
+
+**Suggested fix:** when `inviteError` had a terminal status, append a second line to the verify
+banner ("Your invitation has expired — ask them to send a new one."). Turns a silent dead end
+into an actionable one. Needs a test in `tests/LoginPageInvitationOrdering.test.tsx`.
+
+### [MEDIUM] portal/src/pages/auth/LoginPage.tsx:330 — resend button unmounts from a live region, dropping focus
+The Resend button renders inside `AuthBanner` (`role="status"` or `role="alert"`). On a
+successful resend — and on the 409 already-verified path — `resendToken` is cleared, so the
+button the user just activated unmounts while the banner swaps message. Focus falls to
+`<body>`, so keyboard and screen-reader users lose their place immediately after acting. The
+expired-link `<Link>` does not share this problem: activating it navigates away.
+
+**Suggested fix:** move focus deliberately once the resend resolves — to the email input, or to
+the banner container given `tabIndex={-1}` and `.focus()`, which also anchors the announcement
+of the new message.
+
+### [LOW] portal/src/pages/auth/LoginPage.tsx:330 — the two banner action blocks are duplicated markup
+The `resendToken` and `linkExpired` blocks are near-identical (`div.mt-1.5` wrapping an
+underlined action with the same utility classes) and are mutually exclusive by construction —
+`handleSubmit` clears `linkExpired`, and `resendToken` is only ever set inside it. Two copies
+will drift.
+
+**Suggested fix:** render one action slot whose content is chosen by whichever state is set, or
+extract a small `BannerAction` wrapper carrying the shared classes.
+
+### [LOW] portal/src/pages/auth/LoginPage.tsx:303 — dismissBanner discards a still-valid resend token
+`dismissBanner` clears `resendToken` along with the banner, so a user who closes it to re-read
+the form cannot get the resend back without submitting the whole login again, though the
+captured token is good for the best part of an hour.
+
+**Suggested fix:** either leave `resendToken` alone (it is already cleared at the top of
+`handleSubmit` and on the success/409 paths), or — better — surface the affordance outside the
+banner so dismissing the message does not dismiss the remedy.
+
+### [LOW] footer-desktop.png (repo root) — stray untracked binary
+An untracked PNG has sat in the workspace root since before the 2026-08-06 session, referenced
+by no tracked file. It will eventually be swept in by an unrelated `git add .`.
+
+**Suggested fix:** delete it, move it under `website/` if it is a real asset, or gitignore it
+if it is scratch output.
