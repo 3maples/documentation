@@ -6130,3 +6130,27 @@ by no tracked file. It will eventually be swept in by an unrelated `git add .`.
 
 **Suggested fix:** delete it, move it under `website/` if it is a real asset, or gitignore it
 if it is scratch output.
+
+## 2026-08-06 deferred from /code-review (portal — per-file test timeouts + release-gate de-duplication)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+Fixed in that pass: #1 (release preflight now asserts `core.hooksPath`), #2 (timeout
+constants extracted to `tests/helpers/testTimeouts.ts`), #3 (vitest fork pool bounded).
+
+### [LOW] portal/tests/TaskDialog.test.tsx:105 — raised timeouts slow the failure of genuine hangs
+A real infinite-await in a 20s-tier file now takes 20s to surface instead of 5s — up to
+43 tests in TaskDialog. This is the inherent cost of the fix and was a deliberate call:
+the rest of the suite was left at the 5s default specifically to confine the cost to nine
+files rather than all ~176.
+
+**Suggested fix:** none — accept. Revisit only if the 20s tier grows, at which point the
+right move is probably to make the slow files faster rather than to widen the margin.
+
+### [LOW] portal/tests/ — tiers derive from a one-off measurement with no drift check
+The tier assignment reflects timings taken once, on one idle machine. Nothing re-verifies
+that TaskDialog is still >= 2.0s, and nothing flags a newly-slow file that has no override.
+The tiering will go stale silently — which is exactly how the 5s default became wrong in
+the first place.
+
+**Suggested fix:** no action now. If it recurs, a CI step that fails when an un-overridden
+file exceeds the tier threshold would catch drift without manual re-measurement.
