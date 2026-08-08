@@ -6154,3 +6154,87 @@ the first place.
 
 **Suggested fix:** no action now. If it recurs, a CI step that fails when an un-overridden
 file exceeds the tier threshold would catch drift without manual re-measurement.
+
+## 2026-08-07 — deferred during the Tasks readable-ID / dialog-rework change
+
+### [LOW] platform/routers/tasks.py — `POST`/`PUT /tasks/` still bind the raw `Task` Document
+There is no `TaskCreate`/`TaskUpdate` Pydantic schema, so PUT is a full-replace bind: every
+field a client omits resets to its model default. The exclude set at `routers/tasks.py`
+is now eight entries long (`readable_id`, `title`, `task_date`, `photos`, `estimate`,
+`converting`, `converting_since`, `archived`) and each one is load-bearing — the
+`readable_id` entry exists purely because the portal's kanban drag would otherwise blank
+the id on every column move. That is a list you have to remember to extend every time a
+server-owned field is added, and forgetting is silent data loss.
+
+**Suggested fix:** introduce explicit `TaskCreate` / `TaskUpdate` request models listing
+only the client-writable fields. Then a forgotten field is inert rather than destructive.
+
+### [LOW] portal/src/components/common/SearchableSelect.tsx — no keyboard navigation
+The component gained combobox/listbox/option roles and Escape-to-close in this change, but
+still has no arrow-key navigation or type-ahead focus movement: a keyboard user can open it
+and tab through the option buttons, which works but does not match the combobox pattern
+screen readers announce.
+
+**Suggested fix:** add ArrowUp/ArrowDown/Home/End over the filtered rows with
+`aria-activedescendant`. Deferred because it touches all six consumers' focus behaviour and
+was out of scope for the Tasks work.
+
+### [LOW] platform/agents/task/create.py — Maple still asks "What should the task be called?"
+When a create message carries neither a title cue nor usable content, create falls through
+to asking for a title — a concept the portal no longer exposes. The answer is now folded
+into the note (so the behaviour is correct), but the wording still names a field the user
+cannot see anywhere in the UI.
+
+**Suggested fix:** reword to "What should the task say?" and route the bare reply straight
+into `description`. Touches `_resolve_create_title` / `_CREATE_TITLE_PENDING_ID` /
+`_stash_awaiting_title` plus three agent test files; the branch is rare, hence deferred.
+
+## 2026-08-08 — logged by /fix-issues (Tasks readable-ID review)
+
+Fixed in that pass: #3 (bounded the quadratic scan in `_CONVERT_PRONOUN_PATTERN` and
+extended the ReDoS guard to cover every `service.py` module pattern), #5 (pinned the
+Escape interaction between SearchableSelect and Modal), #8 (a PUT omitting
+`description` no longer wipes the note and renames the task).
+Waived by the user: #1, #4 (backfill scalability — there is little data to backfill,
+even in Prod).
+
+### [HIGH] platform/agents/orchestrator/service.py — 3,091 lines, well past the 800-line ceiling
+Selected for fixing, ATTEMPTED, and reverted. Recording what the attempt established so
+the next one starts informed rather than repeating it.
+
+The plan was to extract the rule tier into `agents/orchestrator/rules.py` as a mixin,
+matching the layering `agents/task/` already uses for exactly this reason. A static check
+looked encouraging: the 16 rule-tier methods are ~954 lines, and of the module constants
+they touch, **zero** are also referenced by the non-rule methods — no import cycle.
+
+The extraction was mechanically completed (service.py 3,051 → 1,528; rules.py ~1,200) and
+then reverted, for two reasons the constant analysis had not predicted:
+
+1. **The coupling is bidirectional.** mypy found **14** call-backs from the extracted tier
+   into methods that remain on `OrchestratorAgent` (`_ambiguity_fallback`,
+   `_resolve_action_from_history`, and others). A mixin can only express that with an
+   explicit seam — the `raise NotImplementedError` contract `agents/task/base.py` uses —
+   and that seam has to be *designed*, one declaration per crossing, not discovered by
+   moving code and seeing what breaks.
+2. **It does not actually clear the ceiling.** The result is a 1,528-line file and a
+   1,200-line file. Both still over 800. The split has to be finer than "rules vs. the
+   rest" to be worth doing at all.
+
+**Suggested fix:** treat this as its own change, not a rider on a feature commit. Start by
+listing the 14 crossings and deciding which are genuinely the rule tier's business versus
+which belong to the agent — that boundary, not the line count, is the thing to get right.
+Then split into more than two modules (candidates: action/domain resolution, the
+specific-phrasing overrides, entity-shape inference, history/anchor resolution).
+
+### [MEDIUM] platform/scripts/backfill_task_readable_ids.py:70 — `_run` is 53 lines
+Just over the 50-line guideline, mixing querying, the dry-run preview branch, and the
+apply branch with its own error tally.
+**Suggested fix:** extract `_preview(grouped)` and `_apply(grouped)`, leaving `_run` as
+orchestration plus the summary. Low priority — it is a one-off migration script.
+
+### [LOW] platform/agents/orchestrator/service.py — the domain name "task" is a magic string
+`active_domain == "task"` is compared literally in two new places. The codebase has no
+Domain enum — `DOMAIN_HINTS` / `ACTIVE_ANCHOR_FIELD_BY_DOMAIN` are keyed by plain strings —
+so this matches existing convention and is not a regression.
+**Suggested fix:** none now. If a Domain enum is ever introduced, these two sites join the
+sweep.
