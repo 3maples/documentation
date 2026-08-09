@@ -6238,3 +6238,49 @@ Domain enum — `DOMAIN_HINTS` / `ACTIVE_ANCHOR_FIELD_BY_DOMAIN` are keyed by pl
 so this matches existing convention and is not a regression.
 **Suggested fix:** none now. If a Domain enum is ever introduced, these two sites join the
 sweep.
+
+## 2026-08-09 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the property activity panel review not
+fixed in that pass (#1–#7 were).
+
+### [LOW] portal/src/components/properties/PropertyActivityPanel.tsx:233 — redundant effect dependencies
+The fetch effect lists `activeFilter.length`, `estimateFilter` and `taskFilter`
+alongside `cacheKey`, which already encodes the active filter. Changing the inactive
+tab's filter re-runs the effect for no reason; it is harmless only because the cache
+absorbs it.
+**Suggested fix:** depend on `cacheKey` alone (plus `propertyId`, `activeTab` and
+`reloadToken`), and read the filters through a ref or recompute them inside the effect.
+
+### [LOW] portal/src/components/properties/PropertyActivityPanel.tsx:152 — panel cache grows unbounded for the session
+Entries accumulate per property x tab x filter combination and are only ever cleared
+wholesale by the mutation event. A long session across many properties retains every
+result set.
+**Suggested fix:** cap it (a small LRU, or evict entries for other properties when
+`propertyId` changes).
+
+### [LOW] portal/src/components/common/StatusFilterDropdown.tsx:186 — reposition runs setState on every scroll event
+The scroll listener is registered with `capture: true` and calls `setPosition` on each
+event, re-rendering the menu for every scroll frame while it is open.
+**Suggested fix:** throttle with `requestAnimationFrame`, or close the menu on scroll.
+
+### [LOW] portal/src/pages/TasksPage.tsx:199 — taskId param never clears when the list is empty
+The effect returns early when `tasks.length === 0`, so `?taskId=` stays in the URL when
+the filtered list has no rows. A later filter change that produces rows can then open a
+dialog the user did not ask for.
+**Suggested fix:** clear the param whenever `requestedTaskId` is set and loading has
+completed, independent of the row count.
+
+### [LOW] portal/src/components/common/StatusFilterDropdown.tsx:196 — trigger has no accessible name beyond its summary
+The button's accessible name is just the current summary ("8 statuses", "No statuses"),
+which does not say what it filters. `aria-haspopup="true"` also implies a menu rather
+than the checkbox group actually rendered. Pre-existing, but the control now appears in
+more places.
+**Suggested fix:** give the trigger an `aria-label` such as "Filter by status, 8
+selected", and set `aria-haspopup` to match the rendered role.
+
+### [LOW] platform/tests/test_estimate_api.py:1 — test file well past the size guideline
+Now ~5,200 lines, against the 800-line guideline. Pre-existing; the panel work added
+~160.
+**Suggested fix:** split by concern (CRUD / status transitions / listing / docs) when
+next doing substantial work in it.
