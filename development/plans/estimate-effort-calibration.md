@@ -1,7 +1,11 @@
 # Estimate effort calibration — anchor generated hours to real production rates
 
-Status: **DRAFT — awaiting approval**
+Status: **IN PROGRESS — Phase 1 built 2026-08-10** (research prompt + rate→hours
+conversion + history gate); Phases 2-4 pending
 Created: 2026-08-09
+Related: [per-work-item-assumed-sizes.md](per-work-item-assumed-sizes.md) — the
+size that feeds `work_quantity` must be resolved per work item, or one wrong
+size multiplies into every scope's hours
 
 ## Context
 
@@ -40,23 +44,23 @@ web-verify coverage and pricing. Effort gets none of it.
 | `embed_approved_estimate()` — indexes on SENT/APPROVED only | `services/work_item_summary.py:172` | Defines what "history" means — see below |
 | `effort = size ÷ rate` | `portal/src/lib/effortCalculator.ts:21` | Frontend only; backend has no equivalent |
 
-### ⚠️ History is past *estimates*, not actual hours worked
+### History is won work — but still estimated hours, not recorded ones
 
-`embed_approved_estimate` indexes a work item when its estimate reaches SENT or
-APPROVED. So "the company's job history" means **previously approved estimates**,
-not recorded hours from completed jobs.
+`embed_won_estimate` indexes a work item once its estimate is locked in:
+`HISTORY_ELIGIBLE_STATUSES` = Won, Scheduled, Completed. The gate previously
+fired on Sent/Approved, which are both pre-win — a quote that had gone out, or
+been internally signed off to go out, with nobody having accepted the price.
+Tightening it means the corpus is now work the customer actually bought.
 
-That matters directly for this work: **every existing approved estimate was
-produced by the same generator that under-estimates effort.** Anchoring to that
-history would re-teach the exact bias we are removing, and would do it with the
-authority of "the company's own data".
+Two caveats remain:
 
-There is a partial correction signal — approval means a human looked at it, and
-anyone who edited the hours upward before approving baked that fix into history.
-But we cannot currently distinguish a user-corrected effort from an
-accepted-as-generated one, so we cannot tell a good sample from a circular one.
+- **It is still the estimated hours, not the hours the crew recorded.** A won
+  estimate proves the customer accepted the price, not that the effort was
+  right.
+- **Existing summaries predate the tighter gate**, so the stored corpus still
+  contains never-won quotes until it is cleaned.
 
-This is the strongest argument for the gating below, independent of the
+Both argue for the hard tier-1 gate below, independent of the
 wrong-activity-match concern.
 
 ## Design
@@ -179,7 +183,8 @@ Internal only — no user-facing output.
 
 | Risk | Mitigation |
 |---|---|
-| **History re-teaches the low bias.** Existing approved estimates came from the under-estimating generator, so anchoring to them imports the bug as "company data". | Accepted knowingly — no cutoff date. Mitigated by phase ordering (research lands first and is the common path), by the hard tier-1 gate, and by median-over-samples rather than last-value. Phase 4 logging will show whether it bites in practice. |
+| **History re-teaches the low bias.** Past estimates came from the under-estimating generator, so anchoring to them imports the bug as "company data". | Reduced by restricting the corpus to won work. Otherwise accepted knowingly — no cutoff date. Mitigated by phase ordering (research lands first and is the common path), by the hard tier-1 gate, and by median-over-samples rather than last-value. Phase 4 logging will show whether it bites. |
+| **A stale summary survives a status change.** Indexing is transition-triggered, and the state machine allows `Won → Lost` / `Won → On Hold`. | Closed three ways: `leaves_history` deletes on exit; `search_similar_work_items` filters on the estimate's *current* status so a missed path can never surface one; and the Dev corpus was cleaned (14 of 27 removed, all pre-win). |
 | **History matches the wrong past job.** A patio anchored to a mulch job produces confidently wrong hours — worse than today's honest guess. | Similarity floor, unit-family agreement, sample-count floor. Fails closed to research. Log every anchor. |
 | **Researched rates are unverified.** | Never persisted, so a bad one is confined to the estimate that used it. Sanity-band validation catches obvious errors. |
 | **Research adds latency and cost** to every generation, since it is now the common path rather than a fallback. | Measure before and after. Batch rate lookups per estimate rather than per activity where possible. |
