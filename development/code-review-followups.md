@@ -6331,3 +6331,29 @@ in this change.
 the busy paragraph.
 **Resolved:** both applied, covered by two tests in `tests/ConvertTaskDialog.test.tsx`
 (failure is exposed as an `alert`; the busy line announces politely).
+
+## 2026-08-12 deferred from /code-review (material unit column width)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+`/fix-issues 1,2,3` fixed the rest (Unit column widened to 240px in the resolve
+dialog, full unit name exposed as a native tooltip on both unit selects, and the
+resolve dialog's sizes table made horizontally scrollable).
+
+### [LOW] portal/src/components/estimates/AddMaterialGapDialog.tsx:315 — the read-only sizes table in the same dialog keeps a 160px Unit column
+When the resolve dialog shows an *existing* material, the Unit cell renders plain
+`text-sm` text (line 355) in a `w-[160px]` column with no `whitespace-nowrap`. At 14px,
+"Cubic yards (cu yd)" needs ~157px including the `px-3` padding, so the longest names wrap
+onto two lines and the row heights jump. Not a truncation, so lower severity than the
+editable select — but it is the same dialog the user was looking at, and it now disagrees
+with the editable table's 240px.
+**Suggested fix:** widen this header to match the editable table (`w-[240px]`) so unit
+names stay on one line and both tables in the dialog line up.
+
+### [LOW] portal/src/components/estimates/AddMaterialGapDialog.tsx:435, portal/src/pages/MaterialsPage.tsx:923 — unit-column width is now a magic literal in three places
+The same conceptual column is sized `w-[240px]`, `w-[180px]`, and `w-[160px]` across three
+tables, each tuned by hand to a different font size. Nothing ties them together, so the
+next unit added to the catalog requires finding and re-deriving all three independently —
+which is how the original 160px went stale.
+**Suggested fix:** extract a shared constant (e.g. `UNIT_COLUMN_WIDTH_CLASS` in `src/lib/`
+or alongside the other estimate constants) and reference it from all three headers so they
+move together.
