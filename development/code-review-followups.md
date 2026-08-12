@@ -6313,3 +6313,21 @@ change added the enter/leave hooks inline rather than in a helper, nudging both 
 past the guideline.
 **Suggested fix:** move the history-transition side effects into
 `routers/estimate_helpers/` alongside the other extracted update logic.
+
+## 2026-08-12 deferred from /code-review (dropdown placement + Create Estimate dialog)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+`/fix-issues 1,4,5,6,7` fixed the rest. #2 (panel can flip sides mid-scroll) was
+reviewed and **accepted as-is** by the user — deliberately not tracked here.
+
+### [MEDIUM] ~~portal/src/components/tasks/ConvertTaskDialog.tsx:75 — conversion failure is not announced to assistive tech~~ — RESOLVED 2026-08-12
+The error paragraph is rendered conditionally with no `role="alert"` or `aria-live`. A
+screen-reader user who triggers Create Estimate and hits a failure (e.g. estimate quota
+exhausted) gets no announcement — the button silently re-enables and focus never moves.
+The same applies to the "This can take a minute" busy line, which is the only signal that
+a long-running request is in flight. Pre-existing, but both messages moved into the footer
+in this change.
+**Suggested fix:** add `role="alert"` to the error paragraph and `aria-live="polite"` to
+the busy paragraph.
+**Resolved:** both applied, covered by two tests in `tests/ConvertTaskDialog.test.tsx`
+(failure is exposed as an `alert`; the busy line announces politely).
