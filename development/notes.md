@@ -255,3 +255,143 @@ from `/ops/users` but is not picked up by `/ops/new-users` either (that query
 only looks at company-less users and incomplete-onboarding companies), so they
 are invisible to ops. Fix by either widening the New Users query or requiring a
 verified email to accept an invitation — not yet decided.
+
+---
+
+## 2026-08-11 — Estimate catalog matching had no fuzzy path at all
+
+`agents/estimate/catalog_matching.py::_score_catalog_match` returned three
+discrete bands — 100 (exact), 80 (substring), <=60 (token overlap) — while
+`_find_best_catalog_match` gated at `estimate_fuzzy_match_threshold` (85).
+**Only the exact band could ever clear that gate.** The substring band and the
+entire fuzzy-token band were unreachable dead code at the estimate-generation
+call site, so AI generation matched inventory by exact string equality only.
+
+Reported symptom: an LLM line named "Bulk compost soil amendment" scored 45
+against the catalog's "Compost / organic soil amendment" and was silently
+dropped into `unmatched_materials`. The module's own docstring advertised
+"excavtor" → "excavator", which scored -1 (no match) — synonym canonicalization
+rewrote "excavator" to "excavate" and only the canonical form was ever compared.
+There was zero test coverage on the scorer, which is why this went unnoticed.
+
+**Rewrite:** continuous 0-100 weighted token coverage,
+`0.6 * coverage(requested) + 0.4 * coverage(candidate)`, with:
+
+- **Alias splitting** on `/` — catalogs write alternate names that way. Numeric
+  fragments are skipped so "3/4 inch" stays a size, not an alias.
+- **Token weighting, not stopword removal** — qualifiers ("bulk", "premium",
+  "organic") and unit words score 0.25, bare numbers 0.5, content 1.0.
+  *Dropping* qualifiers would make "Organic fertilizer" and "Synthetic
+  fertilizer" identical; down-weighting keeps them apart (80) while still
+  letting "bulk compost" reach "compost" (92).
+- **Raw AND canonical forms both scored, max wins** — fixes the excavator case.
+- **Head-noun guard** — if neither side's last full-weight token matches, the
+  score is capped at 60, below the review bar. Stops "Cedar post" being priced
+  as "Cedar compost".
+- **Field weighting** — `name` x1.0, `description` x0.9, `category` x0.75, so a
+  shared category can never on its own produce a confident match.
+
+**Two bars, not one** (`config.Settings`): at/above
+`estimate_fuzzy_match_threshold` (85) the match applies silently; at/above
+`estimate_fuzzy_review_threshold` (65) it still applies but the line is stamped
+with `match_confidence` + `matched_from` (new optional fields on `MaterialItem`,
+`LabourItem`, `ActivityItem`) and logged at INFO. **Why not one threshold:** a
+silently mispriced line is worse than an unmatched one, but so is discarding a
+correct match — the review stamp keeps recall without hiding the guess. Merging
+duplicate lines inherits the *lowest* confidence of its parts, so a merge can't
+launder a guess into a confident line.
+
+**Perf:** the scorer runs per line per catalog entry. Memoizing token
+similarity plus a length-ratio pre-filter (a SequenceMatcher ratio is bounded by
+`2*min/(min+max)`, so tokens differing in length by more than 0.82/1.18 can't
+clear the match bar) took a 250-item catalog from ~64 ms/line to ~3 ms/line.
+
+**Known adjacent gap (not fixed):** `agents/estimate/llm_pipeline.py` sends only
+`material_catalog[:50]` to the LLM, so companies with more than 50 materials
+never show the model the rest — better matching can't recover a line the LLM
+never knew existed.
+
+**Not done:** no portal UI surfaces `match_confidence` yet; the flag is
+persisted and returned by the API only.
+
+---
+
+## 2026-08-11 — The researcher never saw the material catalog (the `[:50]` was a red herring)
+
+Follow-up to the catalog-matching rewrite above. The reported problem — the AI
+inventing generic product names for materials the company already stocks — was
+attributed to `llm_pipeline.py`'s `material_catalog[:50]`. That slice is real
+but it is **not** the cause: it lives in `_generate_accuracy_suggestions`, a
+post-generation advisory audit with a full rule-based fallback.
+
+Actual exposure per path, before the fix:
+
+| Path | Material catalog seen by the model |
+|---|---|
+| Pipeline researcher `_step3_research_for_scope` — **primary** | **none at all** |
+| LLM extraction fallback (`service.py`, `available_materials`) | full, untruncated JSON |
+| ReAct loop (`estimate_react_mode_enabled`, default **off**) | first 30 names + "and N more" + `lookup_materials` tool |
+| Accuracy suggestions | first 50, as JSON |
+
+The primary path builds its research prompt with
+`build_estimate_research_prompt(..., labour_catalog=...)` — the **labour**
+catalog was threaded through so activities could be assigned to real roles, but
+the material catalog never was. The researcher named products from web search
+with no idea what the company stocks, and the catalog matcher was left to
+reconcile an invented name after the fact.
+
+**Fix:** `prompts/material_catalog.py::render_material_catalog`, mirroring
+`role_catalog.py`, threaded `_run_pipeline` -> `_step2_and_3_for_scope` ->
+`_step3_research_for_scope`, plus a "use the EXACT catalog name" rule.
+
+**Why name lines, not JSON:** measured at ~148 tokens per material as
+pretty-printed JSON (id, description, category, every size with price and cost)
+versus ~13 for a `` - `Name` (Category) `` line. A 300-item catalog is ~44k
+tokens as JSON, ~3.9k as lines. The researcher only needs to know *what exists*
+in order to name it; prices come from the catalog after matching. Rows past
+the cap are **disclosed** ("... and N more not shown") and rows are ordered by
+relevance to the scope text so the cut falls on the irrelevant tail. Rendering
+also carries the same injection hardening as roles — note that the
+control-character check must run **before** whitespace collapsing, or an
+embedded newline is folded to a space and waved through.
+
+**Two caps, because the researcher runs once per scope.** A scoped render
+(`scope_text` supplied) uses `estimate_prompt_max_scoped_materials` (40); an
+unscoped one uses `estimate_prompt_max_materials` (300). Injecting 300 rows
+into every per-scope researcher call cost ~4.5k tokens *per scope* — ~13.6k on
+a 3-scope job — for scopes that each concern a handful of products. The tight
+cap is 86% cheaper (651 vs 4,543 tokens per scope) and loses nothing that
+matters, because relevant rows are ordered first. The remaining slots are
+deliberately **filled with non-matching rows rather than hard-filtered**:
+relevance is crude token overlap and will miss materials a scope genuinely
+needs (a paver patio needs base fabric, which shares no token with "paver
+patio"), so a strict filter would recreate the original bug. Accuracy
+suggestions passes `scope_text` for ordering but overrides back to the wide
+cap — it is one call whose job is spotting what is *missing*, so it wants
+breadth.
+
+**Why inject at all when step 4 already fuzzy-matches?** The two cover
+different failure modes. The matcher is string similarity, so it closes
+*near*-misses ("Bulk compost soil amendment" -> "Compost / organic soil
+amendment", 92) but provably cannot bridge a vocabulary gap — "Geotextile weed
+barrier" vs "Landscape fabric", "Decomposed granite" vs "Crushed stone
+screenings", "Screened loam" vs "Topsoil" all score **0**, with no signal to
+threshold on. Only a model that has seen the catalog picks the right name. This
+matters beyond cosmetics: `materials_total` sums matched lines only, so an
+unmatched material contributes **$0** and silently under-prices the job.
+
+Also fixed: `render_labour_role_catalog` capped at 40 roles **silently**. The
+cap stays (role rows carry up to 300 chars of responsibility text, so they cost
+several times a material line) but now discloses the remainder — silently
+truncating lets the model believe it has seen every role and confidently invent
+one that already exists further down.
+
+Token effect on the suggestions prompt: catalogs up to ~120 materials got
+*cheaper* and complete (50-item catalog: 3,020 -> 793 tokens); a 300-item
+catalog costs ~1.5k more but shows 6x the materials.
+
+**Not changed:** the extraction-fallback path still dumps the full catalog as
+JSON (`service.py`, `available_materials`) — ~44k tokens for a 300-item
+catalog. It is a genuine cost problem but it is the *fallback*, and switching it
+to name lines would drop the size/price detail that path's prompt relies on.
+Worth revisiting separately.

@@ -1,6 +1,6 @@
 # Per-work-item assumed sizes — decompose first, then assume
 
-Status: **DRAFT — awaiting approval**
+Status: **COMPLETE — all four phases built 2026-08-10**
 Created: 2026-08-10
 Related: [estimate-effort-calibration.md](estimate-effort-calibration.md) — sizes
 feed `work_quantity`, so a wrong size multiplies straight into anchored hours.

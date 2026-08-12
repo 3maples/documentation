@@ -2,9 +2,23 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-08-07
+**Last updated:** 2026-08-10
 
 ### Change log
+
+**2026-08-10 — assumed sizes became per work item, and adjustments target one of them (§1.3, §1.3.1)**
+
+Generated totals were landing low. The activities Maple picks were fine; their *sizes and hours* were not.
+
+- **One size no longer covers the whole request.** `resolve_assumptions` ran before the architect and did a single first-keyword-match over the raw message, so "build a paver patio **and** mow the lawn" stamped one size on both — a 5,000 sq ft patio. The architect now decomposes **first**, then each scope resolves its own size (`resolve_scope_area_assumption`): a stated size wins outright, else that scope's own history (queried with the scope text, not the whole message), else its own row in the curated table. Assumptions are tagged with their work item via the long-dormant `EstimateAssumption.scope` field.
+- **The area question is gone.** `area_measurements` is no longer a required gathering detail — a single answer cannot size a multi-item request. Volunteered sizes are still extracted and honored; only the question disappeared.
+- **The reply names each work item** — `• Paver Patio — Area: 300 sq ft` — because bare "Area:" lines are indistinguishable once there are several.
+- **Adjustments target one work item.** "change the lawn to 8000 sq ft" resolves by name, then by position ("the second one"), then by being the only candidate, and **asks** when genuinely ambiguous. Only the targeted item rescales; previously *every* work item did, which was right for one estimate-wide assumption and wrong the moment sizes became per-item. Legacy `scope="estimate"` estimates keep whole-estimate rescaling.
+- **Curated sizes recalibrated** against typical residential jobs (lawn 500 → 5,000 sq ft, patio 200 → 300, deck 150 → 320, beds 300 → 800, fence 100 → 150 ln ft, irrigation 500 → 5,000), with **sod split out of the lawn bucket** — a mow request no longer suggests sod as its material, and a sod job is sized as a section (2,000 sq ft) rather than the whole property. The old 500 sq ft lawn was a 22×22 patch; at a seeded mower rate it implied a three-minute mowing visit.
+- **`is_discrete_item_job` widened.** Its locational-phrase pattern only stripped an area noun sitting immediately after the preposition, and did not recognize `in`/`from`/`within`/`at` — so "replace 3 shrubs **in the mulch bed**" read as area-based and was sized as an 800 sq ft bed. Pre-existing; it now costs more because effort is derived from size.
+- **History means won work.** Work-item summaries index on **Won/Scheduled/Completed** instead of Sent/Approved (`embed_won_estimate`), are removed when an estimate leaves that lane, and are filtered on the estimate's *current* status at read time. Retrieval also prefers the most **recent** qualifying match rather than the highest similarity score.
+
+Tests: `test_scope_assumptions.py`, `test_assumption_adjustment_targeting.py`, `test_assumed_job_sizes.py`, `test_history_eligibility.py`, `test_history_recency.py`, plus updates across the gathering/applicability/grounding suites.
 
 **2026-08-07 — tasks gained a readable ID, and their title became a derived mirror of the note (§7)**
 
@@ -471,12 +485,17 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 
 Handled by `agents/estimate/conversation_guide.py` + `agents/estimate/assumption_defaults.py`.
 
-**Assume instead of ask (2026-07-26):** generation no longer blocks on missing details. Only an unknowable **work type** still asks a question ("What type of work needs to be done?"); missing area size, material preferences, etc. are **assumed** and generation runs immediately. Assumption sources, in priority order:
-1. **Company history** — median job size parsed (`parse_job_size`) from similar past Sent/Approved work items, via the same per-company vector search the pipeline reuses (`infer_area_from_history`; needs ≥2 parseable samples).
-2. **Curated defaults table** — `WORK_TYPE_DEFAULTS` (lawn 500 sq ft / standard sod, patio 200 sq ft / concrete pavers, driveway 600 sq ft, hedge/fence 100 linear ft, …).
-3. **Architect LLM fallback** — anything it still has to invent is reported in a structured `assumptions` array (never silently guessed).
+**Assume instead of ask (2026-07-26; sizes became per work item 2026-08-10):** generation no longer blocks on missing details. Only an unknowable **work type** still asks a question ("What type of work needs to be done?"); missing area size, material preferences, etc. are **assumed** and generation runs immediately. The area question is never asked at all.
 
-Assumptions persist on `Estimate.assumptions` and the reply appends a block the user can act on — see §1.3.1 for the follow-up adjustments.
+**Sizes are resolved per work item, after decomposition.** A multi-item request used to get ONE size from a first-keyword-match over the whole message — "build a paver patio and mow the lawn" produced a 5,000 sq ft *patio*. The architect now decomposes first, then each scope missing a size resolves its own (`resolve_scope_area_assumption`), in priority order:
+1. **Stated size wins** — a scope whose description carries a size ("a 400 sq ft patio") gets **no** assumption; nothing was assumed.
+2. **Company history** — median job size parsed (`parse_job_size`) from similar past **Won-and-beyond** work items, via the per-company vector search, queried with *that scope's* text rather than the whole message (`infer_area_from_history`; needs ≥2 parseable samples). *(The corpus tightened from Sent/Approved to Won/Scheduled/Completed on 2026-08-10 — a quote nobody bought is not history.)*
+3. **Curated defaults table** — `WORK_TYPE_DEFAULTS`, recalibrated 2026-08-10 against typical residential jobs: sod 2,000 sq ft, lawn/mow 5,000 sq ft, patio 300 sq ft, deck 320 sq ft, beds 800 sq ft, driveway 600 sq ft, fence 150 linear ft, wall 40 linear ft, irrigation 5,000 sq ft. Sod split out of the lawn bucket so a mow request no longer suggests sod as its material.
+4. **Researcher/architect LLM fallback** — anything still invented is reported in a structured `assumptions` array (never silently guessed).
+
+Per-item jobs (`is_discrete_item_job`) get **no** invented area. That guard now runs per scope, and its locational-phrase handling was widened 2026-08-10 so a job located by an area noun ("replace 3 shrubs **in the mulch bed**", "remove one stump **from the back lawn**") is no longer misread as area-based.
+
+Assumptions persist on `Estimate.assumptions`, each tagged with its work item (`scope`), and the reply appends a block the user can act on — see §1.3.1 for the follow-up adjustments.
 
 **Three important branches before generation runs** (`routers/agent_helpers/delegate_create_estimate.py`):
 - **Template named → AI generation is skipped entirely** and the estimate is instantiated from the template (§6.7) — no material/activity questions.
@@ -490,8 +509,11 @@ Assumptions persist on `Estimate.assumptions` and the reply appends a block the 
 When Maple assumes missing info, the creation reply ends with:
 
 > I made a few assumptions — let me know if you'd like to adjust any:
-> • Area: 500 sq ft (average lawn)
-> • Materials: standard sod
+> • Paver Patio — Area: 300 sq ft (average patio)
+> • Lawn Mowing — Area: 5000 sq ft (average lawn)
+> • Materials: standard pavers
+
+Work-item assumptions are prefixed with their scope (2026-08-10) — with a size assumed per work item, bare "Area:" lines would be indistinguishable. Estimate-wide assumptions (`scope="estimate"`, e.g. materials) stay unprefixed.
 
 Each assumption is stored structured on the estimate (`EstimateAssumption`: `key`, `label`, `assumed_value`, `unit`, `display_text`, `source` = history/table/llm/user). Follow-ups adjust them **deterministically** — no LLM regeneration:
 
@@ -503,10 +525,18 @@ Each assumption is stored structured on the estimate (`EstimateAssumption`: `key
 | `change the lawn to 100 square yards` (unit conversion within family) | `update_estimate` → Estimate Agent | ✅ rule *(cross-family — e.g. sq ft → linear ft — clarifies instead)* |
 | `adjust the assumed area to 1000 sq ft on {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `assume premium pavers instead` | `update_estimate` → Estimate Agent | ✅ rule *(material swap: re-resolves the catalog match, swaps snapshots + pricing on the lines the old assumption produced, keeps quantities)* |
+| `change the lawn to 8000 sq ft` (estimate has both a patio and a lawn) | `update_estimate` → Estimate Agent | ✅ rule *(2026-08-10 — names the work item; only that item is rescaled)* |
+| `change the second one to 8000 sq ft` | `update_estimate` → Estimate Agent | ✅ rule *(2026-08-10 — positional reference, `match_positional_reference`)* |
+| `make it 800 sq ft` with several assumed sizes | clarifies — *"Estimate {EST} has more than one assumed size — Paver Patio, Lawn Mowing. Which one should I change?"* | ⚠️ asks *(2026-08-10 — ambiguous; nothing is mutated)* |
+| `change the lawn to 8000 sq ft` where a **Front Lawn** and **Back Lawn** both match | clarifies, listing both | ⚠️ asks *(2026-08-10 — a name matching several items is ambiguous, not positional)* |
 
-**Size mechanics:** factor = new ÷ stored value; every work item's material/labour/equipment quantities and activity effort scale by the factor (`scale_job_item`), sub-totals recompute from the scaled lines, the grand total is recurrence-aware, and the stored assumption updates to the new value (marked "(adjusted)", `source="user"`) so successive adjustments compound (500 → 800 → 1000 = 1.6× then 1.25×). Work items whose total was **manually overridden** (§1.5.8) keep the override semantics — scaled proportionally, not recomputed. Confirmation: *"I've updated the area from 500 sq ft to 800 sq ft and recalculated estimate {EST} — new grand total: $X."*
+**Targeting (2026-08-10):** with a size assumed per work item, an estimate carries several `area_size` records. The one to adjust is resolved by, in order: the **work item the user named** (distinctive-word overlap against each assumption's `scope`), a **positional reference** ("the second one"), or being the **only** candidate. Genuine ambiguity **asks** rather than guessing — a wrong pick silently rewrites the wrong work item's quantities.
 
-**Guards:** locked statuses refuse via the standard edit loader; absurd factors (×<0.01 or >100) and cross-family unit changes clarify without mutating; estimates with **no stored assumptions** (created before this feature, or fully-specified requests) get a graceful "no stored assumptions — use the estimate editor" reply; phrasings owned by other sub-ops (work items, status, financial fields, `{size} of {material}` quantities) are never claimed by this detector.
+**Size mechanics:** factor = new ÷ stored value; **only the targeted work item's** material/labour/equipment quantities and activity effort scale by the factor (`scale_job_item`), sub-totals recompute from the scaled lines, the grand total is recurrence-aware, and the stored assumption updates to the new value (marked "(adjusted)", `source="user"`) so successive adjustments compound (500 → 800 → 1000 = 1.6× then 1.25×). Work items whose total was **manually overridden** (§1.5.8) keep the override semantics — scaled proportionally, not recomputed. Confirmation: *"I've updated the area from 500 sq ft to 800 sq ft and recalculated estimate {EST} — new grand total: $X."*
+
+Legacy estimates created before per-item sizes carry a single `scope="estimate"` assumption that genuinely described the whole estimate — those still rescale every work item, unchanged.
+
+**Guards:** locked statuses refuse via the standard edit loader; absurd factors (×<0.01 or >100), out-of-range positions, and cross-family unit changes clarify without mutating; estimates with **no stored assumptions** (created before this feature, or fully-specified requests) get a graceful "no stored assumptions — use the estimate editor" reply; phrasings owned by other sub-ops (work items, status, financial fields, `{size} of {material}` quantities) are never claimed by this detector.
 
 ## 1.4 Status transitions
 

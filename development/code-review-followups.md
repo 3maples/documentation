@@ -6284,3 +6284,32 @@ Now ~5,200 lines, against the 800-line guideline. Pre-existing; the panel work a
 ~160.
 **Suggested fix:** split by concern (CRUD / status transitions / listing / docs) when
 next doing substantial work in it.
+
+## 2026-08-12 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+`/fix-issues 1,2,3,4,5,6,7,8` fixed the rest.
+
+### [MEDIUM] platform/agents/estimate/llm_pipeline.py:677 — functions grown past the 50-line rule by the per-scope-assumptions change
+`_step2_and_3_for_scope` went from ~20 to 64 lines; `_step3_research_for_scope` is 136,
+`_run_pipeline` 104, `search_similar_work_items` 94, `build_estimate_research_prompt` 107,
+`render_material_catalog` 66 (new). Much of the growth is comment prose rather than
+logic, but the per-scope orchestration in `_step2_and_3_for_scope` now does four distinct
+things (vector retrieval, area assumption, reuse decision, research dispatch).
+**Suggested fix:** extract the area-assumption resolution and the reuse decision from
+`_step2_and_3_for_scope` into named helpers.
+
+### [MEDIUM] platform/agents/estimate/catalog_matching.py:1 — file at 793 lines, 7 under the 800 threshold
+The fuzzy-matching rewrite added ~250 lines (scoring engine + module docstring). The next
+addition crosses the guideline. The module already has two unrelated halves: the scoring
+engine (module-level pure functions) and the mixin's measurement-unit / size-capacity /
+purchase-quantity helpers, which have nothing to do with matching.
+**Suggested fix:** split the measurement-unit and size-capacity helpers into their own
+module before the next substantial change to this file.
+
+### [LOW] platform/routers/estimates.py:983 — oversized file and function touched again
+Pre-existing: the file is 1652 lines and `update_estimate` is 298. The work-item history
+change added the enter/leave hooks inline rather than in a helper, nudging both further
+past the guideline.
+**Suggested fix:** move the history-transition side effects into
+`routers/estimate_helpers/` alongside the other extracted update logic.
