@@ -395,3 +395,36 @@ JSON (`service.py`, `available_materials`) — ~44k tokens for a 300-item
 catalog. It is a genuine cost problem but it is the *fallback*, and switching it
 to name lines would drop the size/price detail that path's prompt relies on.
 Worth revisiting separately.
+
+---
+
+## 2026-08-14 — HSTS on the marketing site, staged rollout
+
+`3maples.com` shipped without a `Strict-Transport-Security` header while
+`app.3maples.ai` has carried `max-age=31536000; includeSubDomains` for months.
+Firebase does redirect http→https, but that redirect happens *after* a plaintext
+request has left the browser — so anyone typing the domain or following a
+scheme-less link made one cleartext round trip, URL and `utm_*` parameters
+included. The marketing site is the property most likely to be typed into an
+address bar, so it was the wrong one to be missing it.
+
+**Currently deployed: `max-age=300` (5 minutes), no `includeSubDomains`.**
+That is stage 1 of a deliberate ramp, not a final value. A short max-age is the
+standard way to introduce HSTS: the commitment is nearly free to reverse while
+you confirm nothing on the domain needs plaintext.
+
+Ramp, raising only after each stage is confirmed healthy:
+
+| Stage | Value | Confirm before advancing |
+|---|---|---|
+| 1 (now) | `max-age=300` | Site loads normally; no mixed-content or redirect loops. |
+| 2 | `max-age=86400; includeSubDomains` | **Every** `*.3maples.com` subdomain serves https. This is the risky step — it binds subdomains too, and a plaintext-only one breaks for a day. |
+| 3 | `max-age=31536000; includeSubDomains; preload` | Only if we actually want browser-preload-list inclusion, which is effectively permanent and removal takes months. |
+
+Note `includeSubDomains` on `3maples.com` does **not** affect `app.3maples.ai` —
+different apex (`.ai` vs `.com`), so the portal is unaffected either way.
+
+Config lives in `website/firebase.json` under `hosting.headers`. JSON allows no
+comments, which is why the ramp is recorded here: a bare `max-age=300` left in
+place indefinitely provides almost no protection, and raising it blind skips the
+subdomain check that stage 2 exists for.
