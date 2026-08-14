@@ -400,13 +400,33 @@ Worth revisiting separately.
 
 ## 2026-08-14 — HSTS on the marketing site, staged rollout
 
-`3maples.com` shipped without a `Strict-Transport-Security` header while
-`app.3maples.ai` has carried `max-age=31536000; includeSubDomains` for months.
-Firebase does redirect http→https, but that redirect happens *after* a plaintext
-request has left the browser — so anyone typing the domain or following a
-scheme-less link made one cleartext round trip, URL and `utm_*` parameters
-included. The marketing site is the property most likely to be typed into an
-address bar, so it was the wrong one to be missing it.
+`website/firebase.json` carried no `headers` block, while `portal/firebase.json`
+has sent `max-age=31536000; includeSubDomains` for months. Firebase does redirect
+http→https, but that redirect happens *after* a plaintext request has left the
+browser — so anyone typing the domain or following a scheme-less link made one
+cleartext round trip, URL and `utm_*` parameters included. The marketing site is
+the property most likely to be typed into an address bar, so it was the wrong one
+to be missing it.
+
+**Which domains firebase.json actually governs** — measured, because assuming
+this wrong is easy and the first version of this note did:
+
+| Domain | `Strict-Transport-Security` | Set by |
+|---|---|---|
+| `app.3maples.ai` (custom) | `max-age=31536000; includeSubDomains` | `portal/firebase.json` |
+| `fieldservice-portal-tangz.web.app` | `max-age=31556926; includeSubDomains; preload` | Firebase, forced |
+| `maples-website*.web.app` | `max-age=31556926; includeSubDomains; preload` | Firebase, forced |
+
+Firebase sends its own HSTS on every `*.web.app` host regardless of config — the
+whole TLD is on the browser preload list — and it **overrides** whatever
+`firebase.json` says. Only custom domains take the configured value, which the
+portal row proves: it returns exactly the value its config sets, `preload`
+absent.
+
+Two consequences. The ramp below governs **`3maples.com` only**; the `.web.app`
+mirrors are already permanently preloaded and nothing here changes them. And
+"does the site send HSTS?" cannot be answered by curling a `.web.app` URL — that
+always says yes. It has to be the custom domain.
 
 **Currently deployed: `max-age=300` (5 minutes), no `includeSubDomains`.**
 That is stage 1 of a deliberate ramp, not a final value. A short max-age is the
@@ -428,3 +448,18 @@ Config lives in `website/firebase.json` under `hosting.headers`. JSON allows no
 comments, which is why the ramp is recorded here: a bare `max-age=300` left in
 place indefinitely provides almost no protection, and raising it blind skips the
 subdomain check that stage 2 exists for.
+
+**Not yet verified on the domain that matters.** `3maples.com` is unreachable
+from the office network — something terminates port 443 and answers in plaintext
+with `HTTP/1.1 302 → safebrowse.io/warn.html`, which is a filtering proxy, not
+Firebase (`app.3maples.ai` on the same infrastructure returns a normal TLS
+handshake). So the header's arrival on the custom domain has to be confirmed from
+an unfiltered network — a phone on cellular is enough:
+
+    curl -sI https://3maples.com/ | grep -i strict-transport
+
+Expect `max-age=300` after the release promotion. Anything else — including the
+`31556926 … preload` value — means you hit a `.web.app` host rather than the
+custom domain. The same proxy will make GA4/pixel acceptance tests against
+`3maples.com` fail for reasons unrelated to the code, so check it before
+debugging anything else.
