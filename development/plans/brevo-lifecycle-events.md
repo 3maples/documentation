@@ -14,8 +14,9 @@ attributes carrying the state that stops them.
 The app already has a mature Brevo integration — transactional email, a
 four-list lifecycle sync, a nightly reconcile cron. What's missing is the
 *events* channel and the *activation* attributes. This plan adds one new
-service alongside the existing ones, hooks it at five points, and extends the
-nightly cron as the safety net.
+service alongside the existing ones, hooks it at four places — signup, the
+verification edge, the onboarding edge, and one model hook on `Estimate` — and
+extends the nightly cron as the safety net.
 
 Decisions taken with Simon before writing this plan:
 
@@ -28,8 +29,11 @@ Decisions taken with Simon before writing this plan:
 - **Existing users** — attribute backfill only; no events fired, and every event
   pre-marked as sent so nothing re-triggers.
 - **`account_created`** fires at signup, with an `EMAIL_VERIFIED` attribute and
-  an `email_verified` event so Ron can hold Cliff 1's first send until
-  verification lands.
+  an `email_verified` event.
+- **`setup_completed`** (added 2026-08-22) fires on the onboarding false→true
+  edge and is what the build-your-first-estimate sequence enters on. Verification
+  alone turned out to be the wrong line — see §3.1 item 2. It also took over
+  `ACTIVATED`, which now means setup-complete rather than first-value.
 
 ---
 
@@ -122,7 +126,7 @@ or via `POST /v3/contacts/attributes/normal/{NAME}`:
 |---|---|---|
 | `ACCOUNT_CREATED_AT` | Date | W1 |
 | `EMAIL_VERIFIED` | Boolean | signup (false) → verification (true) |
-| `ACTIVATED` | Boolean | W1 sets false, W3 sets true |
+| `ACTIVATED` | Boolean | signup sets false, `setup_completed` sets true — **see below** |
 | `ESTIMATE_STARTED_AT` | Date | W2 |
 | `FIRST_ESTIMATE_AT` | Date | W3 |
 | `DOCUMENT_GENERATED_AT` | Date | W4 |
@@ -132,9 +136,21 @@ Do **not** reuse `SUBMITTED_AT` — it is already shared between the website
 contact form and the app's last-login push, documented at
 [services/brevo_contacts.py:227](platform/services/brevo_contacts.py:227).
 
-**Events Ron will see as real-time entry points:** `account_created`,
-`email_verified`, `estimate_draft_started`, `first_estimate_built`,
-`first_document_generated`.
+> **`ACTIVATED` here means setup-complete, not first-value.** This diverges from
+> the industry reading of the word and from the original work order, and it is
+> deliberate (2026-08-22). The boolean and `FIRST_ESTIMATE_AT` were written in
+> the same call and carried the same fact, so one of them was doing no work. The
+> activation question is now asked as **`FIRST_ESTIMATE_AT is empty`**, and the
+> boolean expresses what nothing else did: whether the account is usable at all.
+> Anyone reading Brevo later needs to know this — the name is conventional, the
+> meaning here is not.
+
+No new attribute was needed for the sixth event: `ACTIVATED` already exists.
+
+**Events selectable as real-time entry points:** `account_created`,
+`email_verified`, `setup_completed`, `estimate_draft_started`,
+`first_estimate_built`, `first_document_generated`. Only four are entered on —
+`email_verified` and `first_estimate_built` fire as data and as stop signals.
 
 **Automation wiring.** Simon builds these, not Ron. The Cliff sequences do
 **not** exist in the account — nothing to re-point, they are built from nothing.
@@ -149,16 +165,15 @@ Section E acceptance tests — get it before building).
 | Automation | Entry event | Templates | Delays | Check before each send |
 |---|---|---|---|---|
 | AUTO-1a — welcome | `account_created` | T0 | immediate | none (unconditional) |
-| AUTO-1b — nudges | `email_verified` | T1.1, T1.2, T1.3 | +1d, +3d, +6d **from verification** | `ACTIVATED` not true; end if `JOINED_EXISTING_TEAM` |
-| AUTO-2 | `estimate_draft_started` | T2.1, T2.2 | +2h, +1d | `ACTIVATED` is not true |
+| AUTO-1b — nudges | `setup_completed` | T1.1, T1.2, T1.3 | +1d, +3d, +6d **from setup completion** | `ACTIVATED` is true **and** `FIRST_ESTIMATE_AT` is empty |
+| AUTO-2 | `estimate_draft_started` | T2.1, T2.2 | +2h, +1d | `ACTIVATED` is true **and** `FIRST_ESTIMATE_AT` is empty |
 | AUTO-3 | `first_estimate_built` | T3.1, T3.2 | +1d, +3d | `DOCUMENT_GENERATED_AT` is empty |
 | Habit | `first_document_generated` | T3.3 | +7d | — |
 
 **AUTO-1 is split in two — decided 2026-08-20, see §3.1 item 2.** T0 is
-unconditional and immediate on the transactional stream; the three nudges wait
-for verification, because an unverified user gets a **403 from `POST /estimates`**
-([firebase_auth.py:137](platform/firebase_auth.py:137)) and cannot do the thing T1.1–T1.3 ask
-for. Ron's check-before-each-send structure is otherwise kept exactly — attributes
+unconditional and immediate on the transactional stream; the three nudges wait,
+because a user who hasn't finished setup cannot do the thing T1.1–T1.3 ask for.
+Ron's check-before-each-send structure is otherwise kept exactly — attributes
 are the durable state, which is why each moment writes an event *and* an
 attribute. His §6 makes the same argument from the copy side: the IF conditions
 are the honesty mechanism, not an optimization.
@@ -196,12 +211,22 @@ itself"*), replies to T0 reach Brad directly, and the eight Maple sends keep
 landing in the monitored support inbox — which is what makes the P4 reply lines
 answerable (§3.3).
 
-**New dependency: `brad@3maples.ai` must be a receivable mailbox.** Brevo
-validates a new sender address by emailing it; someone has to open that and
-click through. A forwarding alias is fine, a non-existent mailbox blocks T0. No
-DNS work either way — domain authentication on `3maples.ai` is already live per
-P3 (Brevo TXT, both DKIM CNAMEs, DMARC at quarantine), so the new address
-inherits it.
+**Configured 2026-08-22.** Brevo's sender list now holds `Brad <brad@3maples.ai>`
+(new) and `Maple <support@3maples.ai>` — the latter is the pre-existing
+**"Support" record renamed**, not a second record on the same address. A third,
+`No Reply <noreply@3maples.ai>`, predates this work and nothing in the codebase
+references it; left alone. All show DKIM and DMARC green on `3maples.ai`.
+
+**Outstanding check, because that record is shared.** `BREVO_SENDER_EMAIL` is
+also `support@3maples.ai`, so the app's transactional mail goes out on the record
+that just changed name. If Brevo resolves the display name from the *record*
+rather than the `sender.name` passed inline by
+[services/brevo_email.py](platform/services/brevo_email.py), password resets and verification
+emails now arrive from **"Maple"** — which is the outcome the note below argues
+against. Confirm on the next verification email: a From name of *3Maples.ai*
+means the inline name wins and the rename is safe; *Maple* means it doesn't, and
+the fix is to rename the record back and give the persona its own address
+(`maple@3maples.ai`).
 
 **The app's transactional sender is unaffected, despite sharing an address with
 Maple.** `.env.production` sets `BREVO_SENDER_EMAIL=support@3maples.ai` with
@@ -244,28 +269,47 @@ on day 4 has T1.1 and T1.2 dropped and meets Maple for the first time through
 T1.3, *"Should I stop?"*.
 
 So: **AUTO-1a** carries T0 alone on `account_created` (immediate, unconditional),
-and **AUTO-1b** carries T1.1/T1.2/T1.3 on `email_verified` with the +1d/+3d/+6d
-delays measured from verification. Everyone gets the full arc in order whenever
-they verify; a never-verifier gets the welcome and nothing else.
+and **AUTO-1b** carries T1.1/T1.2/T1.3 on its own entry event.
 
-For anyone who verifies promptly — nearly everyone — all three designs behave
-identically. This only changes the tails.
+**Superseded 2026-08-22 — AUTO-1b now enters on `setup_completed`, not
+`email_verified`.** Verification turned out to be the wrong line. It is
+necessary but not sufficient: a verified user who hasn't finished onboarding
+*also* can't reach the estimate builder, because the portal's route guards
+carry them back into the wizard
+([onboarding.ts:66](portal/src/lib/onboarding.ts:66), applied at
+[auth.ts:177](portal/src/api/auth.ts:177)). Nudging them to build one is the same
+mistake one step later.
 
-*One line for Ron:* T1.3 opens *"You signed up six days ago"*, now measured from
-verification rather than signup. Identical for prompt verifiers, wrong for the
-late tail. His copy, his call — not worth blocking on.
+`setup_completed` subsumes the verification gate rather than replacing it:
+`derive_stage` returns `UNVERIFIED` before it can return `ACTIVE`, so anyone
+reaching setup-complete has already verified. Delays are measured from setup
+completion. `email_verified` still fires and still writes `EMAIL_VERIFIED`, but
+nothing enters on it.
 
-**3. `JOINED_EXISTING_TEAM` — and the split makes this load-bearing.** The guard
-isn't in Ron's deck, and it now matters more than it did. The backend suppresses
-the `account_created` *event* for a signup matching a live invitation, so
-AUTO-1a already skips invited joiners for free. But `email_verified` is **not**
-suppressed — it fires for everyone — so **AUTO-1b would nudge invited teammates
-unless the attribute guard is on it.** Without it a new hire at an established
-customer gets T1.3's *"you signed up six days ago and I haven't written a single
-estimate for you"* six days into a job at a company that has been estimating for
-months. Put `end if JOINED_EXISTING_TEAM is true` on AUTO-1b. No copy change, no
-code change — deliberately a Brevo-side condition so it stays reversible without
-a deploy.
+The rejected fix above applies equally here, and is why this had to be an entry
+point rather than a condition: a per-send `ACTIVATED is true` check silently
+drops any send whose moment passed while setup was unfinished.
+
+For anyone who verifies and sets up promptly — nearly everyone — every design
+considered behaves identically. This only changes the tails.
+
+*One line for Ron:* T1.1's *"You made an account yesterday"* and T1.3's *"You
+signed up six days ago"* are now measured from setup completion rather than
+signup. Identical for the prompt path, wrong for the late tail. His copy, his
+call — not worth blocking on.
+
+**3. `JOINED_EXISTING_TEAM` — kept, but no longer load-bearing.** The guard
+isn't in Ron's deck. Under the `email_verified` entry it was essential, because
+that event fires for everyone including invited teammates. Under
+`setup_completed` it mostly stops mattering: the event fires on the *company's*
+onboarding edge and fans out to whoever is attached at that moment
+(`_sync_company_members_stage`), so a teammate who joined during setup was part
+of it and belongs in the sequence, while one who joins a fully-onboarded company
+a year later never sees the edge and never enters AUTO-1b at all.
+
+Keep the guard anyway as belt-and-braces — it costs nothing and covers the case
+where a company somehow re-runs onboarding. Deliberately a Brevo-side condition,
+so it stays reversible without a deploy.
 
 **4. T2.1/T2.2 claim content that may not exist — flag to Ron.**
 `estimate_draft_started` fires when the user *opens* the estimate builder: the
@@ -488,7 +532,7 @@ failed — an unguarded pass would drop the entire customer base into Cliff 1.
    lines each existing user has already crossed and writes their attributes,
    firing nothing. Run once per environment, *then* arm the sweep.
 
-The backfill deliberately does **not** claim all five events for everyone. That
+The backfill deliberately does **not** claim all six events for everyone. That
 would be simpler and would permanently suppress activation for every existing
 customer who hasn't built an estimate yet — the north-star metric wrong forever,
 silently. Only lines already behind a user are claimed.
@@ -574,7 +618,7 @@ table end to end:
 6. Generate the customer document → `first_document_generated` once.
 7. Set `BREVO_API_KEY` to garbage → signup and estimate flows still complete
    normally; only warnings in the log (acceptance test 6).
-8. Ron confirms all five event names appear as real-time entry points in the
+8. Ron confirms all six event names appear as real-time entry points in the
    automation editor (acceptance test 7).
 
 Finally, the one-off sequence per environment:
@@ -613,7 +657,7 @@ Still ours, and none of it blocked on Ron:
   not signup), and T3.1's *"Send it to my customer"* button on an app that has
   no send.
 - **Run the DEV sequence.** `--verify`, backfill dry run, `--apply`, then one
-  test account end to end. That walkthrough is what makes the five event names
+  test account end to end. That walkthrough is what makes the six event names
   appear in Brevo's entry-point picker, so **no automation can be built until it
   has run.** This is the next action.
 - **Flag §3.1 item 4 to Ron** — T2.1/T2.2 claim a draft has content when the
