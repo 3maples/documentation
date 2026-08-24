@@ -5,7 +5,7 @@
 
 ## Context
 
-Ron's work order ([3maples-wo-brevo-events.md](3maples-wo-brevo-events.md)) asks the backend to tell Brevo
+Ron's work order (`WO-BREVO-EVENTS`, 2026-08-10 — held outside this repo) asks the backend to tell Brevo
 the moment a user crosses each lifecycle line, so onboarding emails fire on real
 behavior instead of timers. Today Brevo automations enter on timed sends; Ron
 wants them to enter on real-time custom events (`POST /v3/events`) with contact

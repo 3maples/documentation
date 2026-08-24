@@ -6430,3 +6430,41 @@ matching `portal/` (which already runs `tsc --noEmit`); costs one dependency plu
 pre-existing errors it surfaces. Option B: accept the status quo. A is the better end state —
 `portal/` proves the pattern and the website now carries real logic in TS rather than a
 couple of DOM helpers — but it is scope beyond an SEO change.
+
+## 2026-08-23 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the Brevo lifecycle-events review not
+fixed in that pass. Findings #1–#5 (the HIGH plus four MEDIUMs) were fixed.
+
+### [LOW] platform/services/brevo_lifecycle.py:361 — a new httpx client per event
+`emit` opens `httpx.AsyncClient()` per call, so the reconcile sweep builds and tears down a
+connection pool for every event of every user. Harmless in a request handler firing one
+event; wasteful in a sweep that may fire thousands.
+**Suggested fix:** either accept it (it matches `services/brevo_contacts.py`, and the sweep
+has no deadline) or let `emit` take an optional client the sweep creates once and passes in.
+Leaning accept — consistency with the sibling module is worth more here than the connections
+saved on a nightly job. Logged so the choice is deliberate rather than inherited.
+
+### [LOW] platform/services/brevo_lifecycle_reconcile.py:184 — `dict[Any, Company]` where the key type is known
+`_collect_companies` returns `dict[Any, Company]`. The key is `Company.id`, a
+`PydanticObjectId`. `Any` silently disables checking at every call site that indexes into it.
+**Suggested fix:** annotate `dict[PydanticObjectId, Company]` and import the type from
+beanie. If mypy then objects that `company.id` is `Optional`, the existing
+`if company.id is not None` filter already narrows it.
+
+### [LOW] platform/services/brevo_lifecycle.py:194 — `reset_cache` docstring claims a caller it does not have
+The docstring says "For tests and for the backfill", but the only callers are
+`tests/conftest.py` and `tests/test_brevo_estimate_hook.py`. The backfill never calls it. A
+future reader may preserve behaviour for a caller that isn't there.
+**Suggested fix:** either drop "and for the backfill" from the docstring, or have the backfill
+actually call it — it arguably should, since it rewrites claims out from under a warm cache.
+Since the backfill only ever runs as a standalone script, the cache is cold anyway and the
+docstring is simply the thing to correct.
+
+### [LOW] platform/scripts/prime_brevo_events.py — no test coverage
+The one file in the change with no tests. It is an operational script in the same mould as
+`scripts/create_brevo_attributes.py`, which is also untested, so this is consistent rather
+than novel — but it posts to a live Brevo account.
+**Suggested fix:** a test is optional given the sibling precedent; if one is wanted, the
+meaningful assertion is that a dry run performs zero HTTP calls, which is the property that
+makes the script safe to hand to someone else.
