@@ -964,6 +964,11 @@ in an optimistic-concurrency retry keyed on `estimate.updated_at`.
 Low priority — the user would need to double-click "New Version" within
 the Drive latency window to trigger the race.
 
+**Superseded 2026-08-24** by the conflict-detection plan
+(`plans/2026-08-24-concurrent-update-conflict-detection.md`), which puts a real
+`version` field on Estimate rather than keying on `updated_at`. See the
+2026-08-24 section at the end of this file.
+
 ---
 
 ## 2026-04-24 external review (indexes + httpx + DB-side sort)
@@ -6468,3 +6473,118 @@ than novel — but it posts to a live Brevo account.
 **Suggested fix:** a test is optional given the sibling precedent; if one is wanted, the
 meaningful assertion is that a dry run performs zero HTTP calls, which is the property that
 makes the script safe to hand to someone else.
+
+---
+
+## 2026-08-24 — deferred from the concurrent-update work (sparse writes)
+
+Phase 1 of the concurrent-update plan landed: every resource update is now a
+sparse `$set` of only what the caller sent, so concurrent edits to *different*
+fields both survive. See
+[`plans/2026-08-24-concurrent-update-sparse-writes.md`](plans/2026-08-24-concurrent-update-sparse-writes.md).
+These three were deliberately left out of that scope.
+
+### [MEDIUM] Same-field conflicts are still silent — the conflict-detection phase
+Two writers changing the **same** field still resolve to whoever saves last,
+with no detection and no signal to either user. Sparse writes shrink the
+exposure to genuinely overlapping edits; they do not remove it.
+
+**Suggested fix:** the designed, unscheduled follow-on plan is
+[`plans/2026-08-24-concurrent-update-conflict-detection.md`](plans/2026-08-24-concurrent-update-conflict-detection.md)
+— a `version` field on Estimate and Task, an atomic conditional write using the
+`find_one_and_update` idiom already in `services/task_convert.py:77`, auto-merge
+when the changed-field sets do not overlap, and a 409 naming the conflicting
+fields when they do. **Supersedes #59**, which proposed optimistic concurrency
+keyed on `estimate.updated_at` for the Drive-filename race.
+
+### [MEDIUM] `JobItem` has no stable id — work items are addressed positionally
+`Estimate.job_items` is a list of `JobItem` (`models/estimate.py:439`) with no
+identity field, so items are addressed by list index. Consequences: any
+work-item edit rewrites the entire array, `WorkItemSummary` keys on
+`(estimate_id, job_item_index)` and desynchronizes on any reshuffle, and the
+portal's `unmatched_*` carry-forward in `portal/src/lib/workItemV2.ts:162`
+reads `rawJobItems[idx]` from a possibly-stale snapshot — so a reordered list
+attaches gaps to the wrong item.
+
+Two people editing *different work items in the same estimate* therefore still
+lose one set. Phase 1 narrowed the window (a title-only save no longer sends
+`job_items` at all), and conflict detection would turn the remaining case into a
+visible 409 rather than silent loss, but neither fixes the root cause.
+
+**Suggested fix:** add `id: UUID` to `JobItem` with a backfill, rekey
+`WorkItemSummary` on it, and match by id rather than index in
+`workItemV2ToJobItemPayload`. Enables true per-work-item merging.
+
+### [LOW] Stripe webhooks replace the whole Company document
+`services/billing/webhook_handlers.py` calls `await company.save()` at six sites
+(lines 75, 87, 102, 122, 142) on `customer.subscription.*`, `invoice.paid`,
+`invoice.payment_failed` and `payment_method.attached`. Each is a
+read-modify-write of the entire company record, racing with anyone editing
+Settings — and `portal/src/components/settings/FinancialTab.tsx:213` spreads a
+possibly-stale `companyDetails` into its own save, so the collision runs both
+ways. No seat count required; this is reachable on a one-person account.
+
+Deliberately out of scope: the sparse-writes work was scoped to the seven
+resources the request named, and Company was not one of them.
+
+**Suggested fix:** the same treatment — an `UpdateCompanyRequest` DTO on
+`routers/companies.py:220` plus `services/sparse_update.build_patch`/`finalize`,
+and targeted `.set()` calls in the webhook handlers instead of `.save()`.
+
+### [LOW] The estimate builder never refetches while open
+`NewEstimateWithActivityPage`'s load effect depends only on `[estimateId]`, and
+the page does not listen to the `portal:estimates:changed` bus that every list
+page already subscribes to (`src/components/Layout/agentMutationEvents.ts:13`).
+So Maple can rewrite an estimate the builder has open and the builder never
+learns. Phase 1 stops a stale save from clobbering fields the user did not
+touch; it does not stop the user from looking at stale data.
+
+**Suggested fix:** subscribe to `portal:estimates:changed` and either refetch
+when the page is not dirty, or show a "this estimate changed" prompt when it is.
+
+---
+
+## 2026-08-25 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [MEDIUM] portal/src/pages/EquipmentsPage.tsx:166 — plan committed to including EquipmentsPage; it was skipped, and naive inclusion would break saves
+The approved sparse-writes plan's Step 5 lists EquipmentsPage "for consistency", but it still
+sends the whole object. Note the trap: the equipments *router* still binds the full
+`Equipment` document (it was outside the 7-resource backend scope), so wiring `diffPayload`
+into the page alone would 422 on missing required fields. The skip was correct in effect but
+is an undocumented deviation from the approved plan.
+**Suggested fix:** either (a) extend the backend treatment to `routers/equipments.py` (an
+`UpdateEquipmentRequest` DTO + `build_patch`/`finalize`, same recipe) and then wire the page —
+consistent, ~30 min; or (b) drop EquipmentsPage from the plan doc explicitly. Option (a)
+preferred: Equipment is a catalog resource identical in shape to Material/Labour, and leaving
+one full-bind PUT invites the old bug class back.
+
+### [LOW] platform/agents/material/service.py:1899 — `narrow_to_changes` call lacks `always=fields.keys()`, unlike every sibling agent
+Contact, labour, and property agents force-keep explicitly-requested fields so an idempotent
+"set cost to 14" (already 14) still writes; the material agent drops it. Harmless today
+(response is still correct), but the asymmetry will surprise the next reader and diverges the
+audit trail.
+**Suggested fix:** pass `always=fields.keys()` to match the siblings.
+
+### [LOW] platform/routers/properties.py:418 — `changed()` gate lost the old whitespace/None normalization
+The old comparison normalized with `str(x or "").strip()`; the new `changed()` compares raw
+values, so `"Toronto "` vs `"Toronto"`, or `""` sent for a stored `None`, counts as an address
+change and spends a geocode round-trip (fail-open, so cost only).
+**Suggested fix:** normalize in the property handler before calling `changed()` (strip
+strings, coerce `""`/`None` equivalence) — three lines — or accept the occasional spurious
+geocode and note it in the comment.
+
+### [LOW] platform/services/sparse_update.py:68 — `merge_onto` is unused by production code
+The routers use `existing.model_copy(update=...)` directly; `merge_onto` exists only in the
+module docstring and its unit tests. Dead public API invites drift between the documented
+recipe and the real one.
+**Suggested fix:** use `merge_onto` at the three call sites that inline `model_copy`
+(materials, labours, properties), or delete the helper and update the docstring example.
+
+### [LOW] portal — empty-patch behavior is inconsistent across the five edit surfaces
+MaterialsPage, PeoplePage, and PropertyDialog skip the API call when the diff is empty;
+ContactsPage and TaskDialog still send `{}` (a server round-trip that only bumps
+`updated_at`). Both are safe; the inconsistency is the issue.
+**Suggested fix:** pick one convention (skipping is better — no spurious `updated_at` bump for
+a no-op save) and apply it to ContactsPage and TaskDialog.
