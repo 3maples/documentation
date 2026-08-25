@@ -1,433 +1,167 @@
 # Code Review Follow-ups
 
-Follow-up tracker for HIGH and MEDIUM issues surfaced by `/code-review`.
-Originally captured on 2026-04-19 after the 18 CRITICAL findings from that
-pass were fixed; refreshed 2026-04-20 with new findings from the
-material-categories change.
+Follow-up tracker for issues surfaced by `/code-review` and deferred by
+`/fix-issues`. Started 2026-04-19. Closed items live in
+[`code-review-followups-archive.md`](code-review-followups-archive.md).
 
-Treat this list as a punch-list, not a sprint plan. Pick what's valuable when
-touching the affected area. Items are ordered by impact within each severity.
+Treat this as a punch-list, not a sprint plan. Pick what's valuable when
+touching the affected area.
+
+## Conventions
+
+Set by the 2026-08-25 consolidation pass — 418 entries down to 350 by
+relocating what was already closed and merging what was already tracked.
+
+- **Every entry is numbered and unique.** Next free number: **499**. Numbers are
+  permanent — the archive preserves them for cross-references, so never reuse or
+  reassign one. Include the number when adding an entry; `/fix-issues` selects
+  by it.
+- **File and function length go in #4, not a new entry.** Update its table.
+- **Recurring themes have a home.** Before filing, check whether one of these
+  already covers it: #4 (size), #25/#26 (full-collection scans), #64 (silently
+  swallowed errors), #67 (malformed ObjectId → 500).
+- **A length finding that also names a distinct defect stays separate** — the
+  defect outlives the line count.
+- **When you close an item:** mark it RESOLVED in place, then relocate it to the
+  archive in the next cleanup pass. Don't let resolved entries accumulate here.
+- **Tooling gaps are not findings.** A missing local tool is a setup problem,
+  not a code follow-up (seven duplicate "bandit not installed" entries were the
+  lesson).
+
+## How to work through this
+
+1. Pick ONE HIGH item per work session. Don't batch.
+2. Write the failing test first (TDD per `CLAUDE.md`).
+3. Run the related test file, not the full suite.
+4. Commit each item on its own — easier to revert, easier to review.
+5. Mark it RESOLVED here in the same commit.
 
 ---
 
 ## HIGH
 
-### 3. [HIGH] ~~mypy baseline — themed gaps (271 errors across 38 files)~~ — RESOLVED 2026-05-22
-**Closed as resolved 2026-05-22.** mypy now reports **`Success: no issues found in 265 source files`** on the full project. From 271 errors at the original 2026-04-26 baseline → 0 errors across 265 files. All themed sub-entries (#86 union-attr, #87 boundary arg-type, #88 implicit-Optional, #89 resource-narrowing arg-type, #90 Optional[int] arithmetic, #91 ChatOpenAI signature, #92 call-arg, #93 BlockingPortal, #124 / #183 / #256 misc) are closed. Pre-fix CI gate is now viable; suggested follow-up tracked separately if a CI step is desired.
-
-Final session (2026-05-22) cleared the residual 77 errors via:
-- `routers/materials.py` (10) — `assert` narrowings on `find_one().id` / `insert().id`, explicit `Dict[str, Any]` annotations, renamed shadowed `existing` variable.
-- `routers/agents.py` (7) — `Dict[str, Any]` annotation on `detail`; `set_llm_context` widened to accept `Optional[PydanticObjectId]` with internal `None` short-circuit (more honest about the `User.company` model); replaced `[{"description": ...}]` dict literals with explicit `JobItemCreate(description=...)`; guarded `release_estimate_slot(company_doc)` calls with `if company_doc is not None`.
-- `services/audit_service.py` (6) — `sanitized: Dict[str, Any]` and `changes: Dict[str, Dict[str, Any]]` annotations.
-- `routers/billing.py` (6) — `assert company.id is not None` at all 6 `assert_company_access(decoded_token, company.id)` sites (replace_all on the canonical line).
-- `routers/estimate_helpers/ai_generation.py` (4) — return-type annotations tightened from `Optional[Tuple[…]]` to `Tuple[…]` (functions actually never return None); `assert company_obj_id is not None` after the `if not company: raise` guard.
-- `routers/auth.py` (4) — `# type: ignore[arg-type]` on the `float(value: object)` cast (TypeError caught below for non-floatable), `# type: ignore[operator]` on Beanie unary-minus sort, `results: List[Dict[str, Any]]` annotation.
-- `user_guides/content.py` (3) — bind `guide.get("tips")` / `.get("notes")` / `.get("related_topics")` to locals before the truthy check.
-- `routers/audit_logs.py` (3) — two `# type: ignore[operator]` on Beanie sort idioms, `Optional[PydanticObjectId]` annotation for the user-fallback branch.
-- `scripts/setup_stripe_webhook.py` (3) — `cast(Any, ...)` on `enabled_events` / `api_version` to bypass Stripe SDK Literal stubs.
-- `routers/companies.py` (2), `routers/properties.py` (2), `routers/change_logs.py` (1), `services/brevo_email.py` (2), `services/company_service.py` (1), `services/google_drive_service.py` (2), `services/trello_service.py` (2), `services/estimate_doc_generator.py` (1), `routers/agent_helpers/estimate_update.py` (1), `routers/estimate_helpers/job_item_builders.py` (1), `agents/contact/service.py` (3), `agents/material/service.py` (2), `firebase_auth.py` (2), `config.py` (2), `scripts/db/backfill_divisions.py` (1), `scripts/seed_stripe_products.py` (2), `tests/test_billing_plan_config.py` (1), `tests/test_estimate_agent.py` (1), `tests/test_maple_crud_coverage.py` (1), `scratch/test_owner_leave.py` (1) — same playbook variations (assert narrowing, dict[str, Any] annotation, type: ignore on third-party Literal/operator stubs).
-
-Verified: 245 tests pass across `test_material_api.py`, `test_audit_service.py`, `test_billing_*`, `test_orchestrator_endpoint.py`, `test_estimate_agent.py`, `test_recurrence_model.py` (most likely-affected test surface).
-
-<details>
-<summary>Original body (preserved for history)</summary>
-
-### 3. [HIGH] mypy baseline — themed gaps (271 errors across 38 files)
-Generated 2026-04-26 via `mypy . --ignore-missing-imports --explicit-package-bases`
-after fixing the 7 implicit-Optional `http_request: Request = None` router
-sites (the only mechanically safe category — `Optional[Request]` breaks
-FastAPI's request injection, so the kept-default + `# type: ignore[assignment]`
-form is the canonical fix). Remaining errors split into the themed entries
-below; see [#86](#86-mypy-no_implicit_optional-defaults-on-agentestimateservicepy)
-through [#90](#90-models-estimate-arithmetic-on-optional-int-fields) for
-specific scopes.
-
-Pre-fix CI gate is **not** recommended yet — too many false positives from
-LangChain/Beanie type erasure. The right next move is one of:
-- enable `mypy --strict` only on `services/` (the smallest, most type-clean
-  package), or
-- add a `mypy.ini` with the noisy categories disabled (e.g. `disable_error_code = union-attr,arg-type` while the agents are refactored).
-
-Categories below are sorted by error count.
-
-Specific instances:
-- #84 — `_coerce_company_oid` returns `Optional[Any]` to keep beanie lazy-import.
-- #86 — `union-attr` on `dict.get(...)` chains across agent services (92 errors).
-- #87 — `arg-type` on `PydanticObjectId | None` → required at router/service boundaries (~25 errors).
-- #88 — `assignment` implicit-Optional defaults across agents / prompts (~50 errors).
-- #89 — `arg-type` on agent services — `Material | None` → `Material` (~30 errors).
-- #90 — `models/estimate.py` arithmetic on `Optional[int]` fields (16 errors).
-- #91 — `call-arg` on `ChatOpenAI(openai_api_key=...)` signature drift (5 errors).
-- #92 — `call-arg` on agent → router calls missing `http_request` (5 errors).
-- #93 — `BlockingPortal | None` errors in tests (12 errors).
-- #124 — `openai_api_key=` keyword on ChatOpenAI flags mypy in maple_guide / maple_public.
-- #183 — `change_logs.py` `.sort()` tuple type mismatch (pre-existing).
-- #256 — `detail` lacks an explicit type annotation in the orchestrate credits-gate try/except.
-
-**Absorbed:** #84, #86, #87, #88, #89, #90, #91, #92, #93, #124, #183, #256 — themed mypy gaps surfaced in later review passes. See `## Closed` for original bodies.
-
-Progress 2026-05-20: cleared all `union-attr` errors from `agents/property/service.py` (15 → 0 in file; total mypy errors 384 → 365 globally — the assert-on-`target_property` added for union-attr coverage also collapsed three `arg-type` errors on `_property_to_dict` calls). Closes the `union-attr` portion of #86 for this file; the `Property | None` → `Property` arg-type slice of #89 also drops 3 errors. Fixes were pure type narrowing via `assert` (LLM guarded by callers, `target_property` guaranteed non-None after `if resolve_error: return`, `active_pending_intent` guaranteed non-None inside `should_fallback_to_pending`) plus tightening two `if active_pending_intent_id and ...` conditions to also check `active_pending_intent is not None`. No real null-deref bugs surfaced — all 15 were narrowing gaps.
-
-Progress 2026-05-20: applied the same playbook to `agents/contact/service.py` (21 → 2 in file; total mypy errors 365 → 346 globally). Cleared 15 `union-attr` + 4 `arg-type` errors via 6 narrowing edits: 2 `assert self.llm is not None` on the `_classify_with_llm` / `_extract_entities_with_llm` paths (callers gate on `self.use_llm and self.llm is not None`), 1 `assert active_pending_intent is not None` inside `should_fallback_to_pending`, 1 `assert target_contact is not None` after the `if resolve_error: return` early-bail, and 2 pending-delete conditions tightened with `and active_pending_intent is not None`. Closes the `union-attr` portion of #86 for contact; the `Contact | None` → `Contact` arg-type slice of #89 also drops 4 errors. Remaining 2 errors in this file (`no-redef` at L1794, `assignment` at L2014) are unrelated — separate categories from #3. Verified with `tests/test_contact_agent.py` + `test_contact_api.py` + `test_contact_model.py` + `test_cross_resource_envelope_contact.py` (99 tests passing).
-
-Progress 2026-05-20: applied the same playbook to `agents/material/service.py` (17 → 4 in file; total mypy errors 346 → 333 globally). Cleared 10 `union-attr` + 3 `arg-type` errors via 5 narrowing edits: 2 `assert self.llm is not None` on `_classify_with_llm` / `_extract_entities_with_llm`, 1 `assert active_pending_intent is not None` inside `should_fallback_to_pending`, 1 `assert target_material is not None` after the `if resolve_error: return` early-bail (collapses 3 `arg-type` errors on `_handle_get_material` / `_handle_delete_material` / `_material_to_dict` calls plus 3 `.name`/`.id` union-attrs), and 1 pending-delete condition tightened with `and active_pending_intent is not None`. Closes the `union-attr` portion of #86 for material; the `Material | None` → `Material` arg-type slice of #89 also drops 3 errors. Remaining 4 errors in this file are out of scope (390: `_parse_cost(Any | None)` arg-type; 1227, 1230: `call-arg` missing `http_request` — part of #92; 1356: `len(Any | list[Any] | None)`). Verified with `tests/test_material_agent.py` + `test_maple_material_size_operations.py` + `test_material_response_envelope.py` (88 tests passing).
-
-Progress 2026-05-20: applied the same playbook to `agents/labour/service.py` (15 → 2 in file; total mypy errors 333 → 320 globally). Cleared 10 `union-attr` + 3 `arg-type` errors via 6 narrowing edits: 2 `assert self.llm is not None` on `_classify_with_llm` / `_extract_entities_with_llm`, 1 `assert active_pending_intent is not None` inside `should_fallback_to_pending`, 1 `assert target_labour is not None` after the `if resolve_error: return` early-bail (collapses 3 `arg-type` errors on `_labour_to_dict` calls plus 2 `.id` union-attrs), and 2 pending-delete conditions tightened with `and active_pending_intent is not None`. Closes the `union-attr` portion of #86 for labour; the `Labour | None` → `Labour` arg-type slice of #89 also drops 3 errors. Remaining 2 errors in this file (721, 724: `call-arg` missing `http_request`) are part of #92. Verified with `tests/test_labour_agent.py` + `test_labour_api.py` (40 tests passing).
-
-Progress 2026-05-20: applied the same playbook to `agents/equipment/service.py` (16 → 3 in file; total mypy errors 320 → 307 globally). Cleared 10 `union-attr` + 3 `arg-type` errors via 6 narrowing edits: 2 `assert self.llm is not None` on `_classify_with_llm` / `_extract_entities_with_llm`, 1 `assert active_pending_intent is not None` inside `should_fallback_to_pending`, 1 `assert target_equipment is not None` after the `if resolve_error: return` early-bail (collapses 3 `arg-type` errors on `_equipment_to_dict` calls plus 2 `.id` union-attrs), and 2 pending-delete conditions tightened with `and active_pending_intent is not None`. Closes the `union-attr` portion of #86 for equipment; the `Equipment | None` → `Equipment` arg-type slice of #89 also drops 3 errors. **All four agent services (property/contact/material/labour/equipment) are now union-attr-clean — the `dict[str, Any] | None` and `<Resource> | None` slices of #86 are closed for this resource cluster.** Remaining 3 errors in this file (574, 586, 589: `call-arg` missing `request`/`http_request`) are part of #92. Verified with `tests/test_equipment_agent.py` + `test_equipment_api.py` (20 tests passing). Cumulative #3 progress this session: 384 → 307 mypy errors (-77 across the four agent services).
-
-Progress 2026-05-20: cleared the remaining 4 errors in `agents/orchestrator/service.py` (4 → 0 in file; total mypy errors 271 → 267 globally on the `mypy agents/ routers/ models/` slice). Three targeted edits: (1) renamed the inner-loop variable `domain` → `hint_match` at line 1269 so the `str | None` return from `_match_first_hint` doesn't clash with the outer `str`-typed `domain` from the `for domain in domain_priority:` loop (cleared the `assignment` error); (2) added `assert self.llm is not None  # Callers gate on self.use_llm and self.llm is not None.` before the `prompt | self.llm.with_structured_output(...)` chain in `_classify_with_llm` (caller at line 1902 already gates on `self.use_llm and self.llm is not None`); (3) annotated `normalized_matches: List[Dict[str, Any]] = [...]` in `_normalize_llm_result` so the downstream `float(match.get("probability") or 0.0)` and `', '.join(match['intent'] for match in delegate_matches)` calls stop tripping `arg-type`/`misc` on the inferred `dict[str, object]`. Verified with `tests/test_orchestrator_intents.py` (185 passing) + `tests/test_orchestrator_bare_entity_helpers.py` + `tests/test_orchestrator_endpoint.py` (94 passing) — 279 total green. Closes the union-attr/arg-type slice of #86 for orchestrator; the file now has zero open mypy errors.
-
-Progress 2026-05-20: closed **#92** (agent → router `call-arg` cluster). Cleared all 7 errors by applying the canonical implicit-Optional pattern (already used by `create_material`, `delete_all_materials`, `create_labour`, etc.) to 7 router sites: `update_material` and `delete_material` in `routers/materials.py`, `update_labour` and `delete_labour` in `routers/labours.py`, and `create_equipment` / `update_equipment` / `delete_equipment` in `routers/equipments.py`. Each was `http_request: Request,` (or `request: Request,` for equipment-create) made into `http_request: Request = None,  # type: ignore[assignment]` — the form documented in #3's preamble as "the only mechanically safe category" (`Optional[Request]` would break FastAPI's request injection). Behavioral check: all three audit-log call sites pass `request=http_request` directly to `create_audit_log`, which already accepts `Optional[Request] = None` (see `services/audit_service.py:101`) — when called via HTTP, FastAPI still injects the real Request; when called directly from an agent service (the path that previously raised `TypeError: missing positional argument`), audit logging still runs but without client_ip / user_agent metadata. Total mypy errors 267 → 260 globally. Verified with `tests/test_material_api.py` + `test_material_agent.py` + `test_labour_api.py` + `test_labour_agent.py` + `test_equipment_api.py` + `test_equipment_agent.py` (125 tests passing). The 2 remaining `call-arg` errors in `config.py:86` are unrelated (Pydantic Settings construction — `mongodb_url` / `openai_api_key` validated at runtime via env vars but not visible to mypy).
-
-Progress 2026-05-20: cleared the 4 residual errors in `agents/property/service.py` (4 → 0 in file; total mypy errors 260 → 256 globally). Three edits: (1) added `assert linked_property is not None  # _resolve_estimate_linked_property guarantees non-None when error_message is None.` before `self._property_to_dict(linked_property)` in the estimate-code cross-resource handler (line ~1171) — the resolver's contract returns `(None, message)` on any failure and `(Property, None)` on success; (2) annotated `pending_record: Dict[str, Any] = {...}` at line 1804 (the `create_property` missing-fields branch) so the subsequent `dict["confirm_delete"] = False` reassignment at line 1967 (in the fuzzy-match `delete_property` branch — both paths share the variable via the outer `process()` scope) doesn't trip the inferred `dict[str, Collection[str]]` from the `"fields": dict[Any, Any]` value; (3) renamed the inner-loop `options = [str, ...]` at line 2167 → `contact_options` to avoid clashing with the outer-scope `options` from `_resolve_target_property`'s tuple unpack at line 1923 (which is `list[dict[str, Any]]`). Verified with `tests/test_property_agent.py` + `test_property_api.py` (57 tests passing). All `union-attr` / `arg-type` / `assignment` / `misc` errors in this file are now closed.
-
-Progress 2026-05-20: cleared 2 errors in `prompts/estimate_react.py` and `prompts/estimate_architect.py` (total mypy errors 256 → 254 globally). Both `build_estimate_*_prompt(industry: str = None)` signatures used the implicit-Optional pattern. Fix: changed to `industry: Optional[str] = None` and added `from typing import Optional` to each file. These are pure-Python helper functions (not FastAPI routes), so the standard `Optional[str]` form is correct — the `# type: ignore[assignment]` shim is only needed for `Request` parameters where FastAPI's dependency injection breaks if the annotation is widened to `Optional[Request]`. No behavior change; both functions already test `if industry:` against falsy.
-
-**This-session running totals**: 384 → 254 mypy errors (-130 across `agents/`, `routers/`, `models/`, `prompts/`). Closed in full: `#92` (call-arg cluster), `union-attr`/`arg-type` slice of `#86`/`#89` for property/contact/material/labour/equipment/orchestrator. Next candidate batches (require user approval — substantial scope): `agents/estimate/*` cluster (133 errors across crud_handlers.py / service.py / work_item_handlers.py / llm_helpers.py / conversation_guide.py / catalog_matching.py — these are mostly `#88` implicit-Optional defaults and `WorkItemHandlersMixin` attr-defined errors from the mixin pattern, not the resolve-error narrowing playbook); `models/estimate.py` arithmetic on Optional[int] fields (13 errors, `#90`); `routers/estimates.py` boundary `PydanticObjectId | None` → required (17 errors, `#87`).
-
-Progress 2026-05-20: cleared the 17 errors in `routers/estimates.py` (17 → 0 in file; total mypy errors 254 → 237 globally). Seven edits: (1) `assert company_obj_id is not None` after `parse_object_id(company, ...)` at the top of `create_estimate` (line 295) — the `if not company: raise` check above guarantees the parse returns a real OID; cascades to clear errors at L296 (`assert_company_access`) and L324 (`get_company_defaults`); (2) `# type: ignore[operator]  # Beanie descriptor unary-minus sort idiom.` on `query.sort(-Estimate.created_at).limit(limit)` at L426 — Beanie's negate-field syntax is correct at runtime but unmodellable in mypy stubs; (3) annotated `update_data: Dict[str, Any] = {}` in `update_estimate` (L801) — was being inferred as `dict[str, str]` from the first `update_data["title"] = payload.title` assignment, breaking subsequent assigns of `description`/`property`/`status`/`job_items`/`grand_total`/`updated_at` (clears 7 errors at L809–1020); (4) `effort_card_items=[EffortCardItem(**ci.model_dump()) for ci in a.effort_card_items]` at L962 — explicit `EffortCardItemCreate → EffortCardItem` conversion via Pydantic constructor instead of relying on auto-coercion of `dict` payloads (mypy can't see Pydantic's runtime coercion); (5–7) four `assert <reload> is not None` after `await Estimate.get(estimate_id)` re-reads following a `.set(...)` mutation — archive (L1207), unarchive (L1285), generate-doc (L1362), delete-doc-version (L1410). Each reload is on the same estimate_id that was just mutated, so a None return would indicate a concurrent delete race or DB outage — `assert` is correct since the route has already authenticated and the prior mutation succeeded. Closes the bulk of `#87` for this file. Tests verified: 107 passing in `tests/test_estimate_api.py` + `test_estimate_docs_api.py` + `test_estimate_quota.py`. 3 pre-existing test-isolation flakes (`test_archive_estimate_as_non_creator_member_fails`, `test_docs_versions_sorted_by_version_desc`, `test_docs_versions_empty`) all pass in isolation and exercise code paths untouched by these edits (403 auth path and GET routes); flagged but not introduced by this change.
-
-Progress 2026-05-21: closed the **`agents/estimate/*` cluster** — the single largest remaining batch flagged in the 2026-05-20 "next candidates" line (133 errors across 6 files in the original estimate; the actual surface was 180 errors across 6 files at the start of this work). Total mypy errors 217 → 77 globally (-140). All 12 source files under `agents/estimate/` now show `Success: no issues found in 12 source files`.
-
-The work split into three patterns matching the file shapes:
-
-1. **Mixin attr-defined cluster (#88-adjacent)** — `crud_handlers.py` (64 errors) and `work_item_handlers.py` (32 errors) were both 100% `attr-defined` from the mixin pattern: methods called via MRO from sibling mixins (`CrudParsingMixin`, `WorkItemHandlersMixin`, etc.) but invisible to mypy at the call site. Fix: added a `if TYPE_CHECKING:` stub block at the top of each mixin class declaring the sibling-resolved methods (`_crud_envelope`, `_resolve_estimate_code`, `_estimate_status_from_text`, `_estimate_summary_payload`, `_load_estimate_for_*`, the work-item handler quintet, etc.). 19 stub declarations in `crud_handlers.py`, 4 in `work_item_handlers.py` — all signatures lifted verbatim from the real implementations in `crud_helpers.py` and `work_item_handlers.py`. The `if TYPE_CHECKING:` guard means zero runtime cost — these stubs only exist during mypy's pass. Also added one `assert code is not None` after `_load_estimate_for_read` in `work_item_handlers.py:_handle_get_work_item` (resolver contract: code is non-None when error is None).
-
-2. **`#88` implicit-Optional defaults in `service.py`** — 23 errors, all `param: X = None` where `X` was non-Optional. Canonical fix: widened each to `Optional[X] = None`. Touched signatures: `_merge_duplicate_line_items` (carry_fields), `_step1_architect` / `_step2_and_3_for_scope` / `_step3_research_single_scope` (industry, tokens), `_run_pipeline` / `_run_react_loop` (company_id, industry, max_iterations, tokens), `_generate_estimate` / `_score_with_inventory_check` (tokens), `process` / `analyze_project` / `answer_question` (company, property, context, estimate_data), `generate_estimate` (job_items). Also propagated the Optional widening down to `_step2_vector_retrieval(company_id)` and the `create_estimate_tools(company_id)` factory in `tools.py`. None of these required runtime guards added — the function bodies already handle the None case.
-
-3. **Inference fixes** — handful of one-off shape issues: (a) split three sites where `payload.get("X") if isinstance(payload.get("X"), list) else []` was tripping `Any | list[Any] | None` (the same `.get()` called twice can't narrow); bound the value to a local first then narrowed (`_base_raw = base.get(...); base_items: List[Any] = _base_raw if isinstance(_base_raw, list) else []`); same pattern applied to three `dict(working_context.get(KEY))` sites; (b) `messages: List[Any] = [SystemMessage(...)]` to allow `HumanMessage` appends (langchain doesn't expose a `BaseMessage` union convenient for the local annotation); (c) `final_summary = str(msg.content)` to coerce langchain's `str | list[str | dict]` content union to a flat string for log use; (d) `context: Dict[str, Any] = {"project_description": ...}` in `generate_estimate` to allow the later `context["job_items"] = job_items` assignment; (e) widened `_score_catalog_match(requested_value: Any, candidate_values: List[Any])` + `_canonicalize_text(text: Any)` + `_find_best_catalog_match(requested_value: Any, ...)` in `catalog_matching.py` — the functions already coerce via `_normalize_catalog_text(value: Any)` so the strict `str` annotations were over-specified; (f) `ESTIMATE_DETAILS: List[Dict[str, Any]] = [...]` in `conversation_guide.py` to stop mypy inferring `object` for the heterogeneous dict values; (g) removed the dead `try/except ImportError → fallback to ()` block in `llm_helpers.py:format_llm_error` — both `openai` and `httpx` are hard deps in `requirements.txt` so the import fallback never fires, and the `if AuthenticationError and isinstance(...)` truthy guards became always-True after the cleanup.
-
-Verified with `tests/test_estimate_agent.py` (112 passing) + `test_estimate_tools.py` + `test_estimate_crud_handler_helpers.py` (137 passing across those + `test_estimate_agent.py` re-run) + recurrence/analytics tests already covered in earlier #90 work. **This-session running totals**: 276 → 77 mypy errors (-199), closing #90, #93, and the `agents/estimate/*` cluster — the three remaining named batches from the 2026-05-20 candidate line are now done.
-
-Progress 2026-05-21: closed **#93** (`BlockingPortal | None` errors in tests). Cleared all 29 errors across 10 test files (note: original entry estimated 12 errors across 5 files; the actual surface grew to 29 sites across 10 files as more API tests adopted the `client.portal.call(...)` pattern). Total mypy errors 263 → 234 globally. Pattern: 17 added `assert client.portal is not None  # TestClient context manager guarantees a portal (mypy hygiene)` calls — one per function/helper that invokes `.portal.call(...)`; mypy's flow analysis narrows the union for the rest of the function scope so a single assert covers multiple `.portal.call` sites in the same function. Files touched: `test_rate_card_bootstrap.py` (5 asserts for 9 sites: 2 helpers + 3 tests), `test_change_logs_api.py` (2: 1 fixture + 1 helper), `test_audit_integration.py` (2: 2 tests), `test_feedback_anonymous.py` (2: 2 tests), and one assert each in `test_template_api.py`, `test_resources_rbac.py`, `test_property_api.py`, `test_divisions_api.py`, `test_feedback_api.py`, `test_company_api.py`. Rejected the alternative "thin `_get_portal()` helper" suggested in the original entry — would have required touching every `.call` site in 10 files plus changes to test function signatures; the per-function `assert` matches the playbook used in earlier #3 progress notes (`assert self.llm is not None`, `assert target_<resource> is not None`) and is the minimum-touch fix. Verified by re-running mypy: 0 BlockingPortal-related errors remain.
-
-Progress 2026-05-21: closed **#90** (`models/estimate.py` arithmetic on `Optional[int]` fields). Cleared all 13 errors in this file (13 → 0; total mypy errors 276 → 263 globally). Two edits in `RecurrenceSchedule`: (1) added `assert month_val is not None` inside the `for month_val in [self.start_month, self.end_month]:` loop in `validate_end_type_fields` — guaranteed non-None by the preceding `if any(v is None ...)` guard inside the `DATE_RANGE` branch; (2) added per-branch `assert <field> is not None` block at the top of each `if/elif` in `calculate_occurrences()` — `end_year`/`start_year`/`end_month`/`start_month` for `DATE_RANGE`, `total_occurrences` for `TOTAL_OCCURRENCES`, `end_year`/`start_year`/`specific_months` for `SPECIFIC_MONTHS`. All asserts reference the `@model_validator(mode="after")` contract that fires on construction (covered by `tests/test_recurrence_model.py` with explicit `pytest.raises(ValidationError)` cases for each branch's required-field shape). Tightening the model declarations to `int = 0` was rejected — the fields are conditionally required *based on `end_type`*, so the Optional typing is correct at the field level; narrowing belongs in the methods. Verified with `tests/test_recurrence_model.py` + `test_estimate_api.py` + `test_estimates_analytics.py` (133 passing). No behavior change.
-
-Progress 2026-05-20: closed the audit-log channel-provenance gap surfaced during the `/code-review` of the `#92` fix. The implicit-Optional widening of `http_request: Request` on 7 router signatures means agent → router calls now succeed silently with `request=None`, dropping `ip_address` / `user_agent` / `method` / `path` from those audit log rows. Without a channel marker, downstream consumers can't distinguish Maple-initiated mutations from a misconfigured Portal request that lost its Request context. **Fix**: added `_audit_source_ctx: ContextVar[Optional[str]]` + `audit_source(source: str)` context manager in `services/audit_service.py`, and modified `create_audit_log` to merge `{"source": ctx_source}` into `metadata` when the var is set (caller-supplied `metadata["source"]` wins). Then wrapped the 7 previously-untagged agent → router callsites with `with audit_source("<resource>_agent"):` — `_update_material_via_api` + `_delete_material_via_api` (material), `_update_labour_via_api` + `_delete_labour_via_api` (labour), and `_create_equipment_via_api` + `_update_equipment_via_api` + `_delete_equipment_via_api` (equipment). The existing `_create_material_via_api` / `_create_labour_via_api` already tagged `metadata={"source": "<resource>_agent"}` directly (they bypass the router) — now the entire CRUD-via-Maple surface is consistently provenance-tagged. **Tests**: added 6 new tests in `tests/test_audit_service.py` — 3 unit tests for the ContextVar (set/reset/nesting/exception-safety), and 3 integration tests that mock the router call and assert the context var resolves to the expected source mid-call (`material_agent` / `labour_agent` / `equipment_agent`). All 132 tests pass across `test_audit_service.py` + `test_material_*` + `test_labour_*` + `test_equipment_*` + `test_audit_integration.py`. Closed independently of `#3` — this was a side-effect of the `#92` resolution, not a pre-existing mypy gap.
-
-</details>
-
 ### 4. [HIGH] File and function size
-Files over the 800-line HIGH threshold (line counts refreshed 2026-04-26):
-- `routers/agents.py` — 1360 lines (2026-05-22 refresh; was 1407
-  before the delegate-generic extraction this session, 1642 before the
-  delegate-get/update/delete-estimate extractions, 1821 before the
-  delegate-create-estimate extraction, 1905 before the estimate-resolver
-  extraction, 1977 before the finalize-result extraction, 2203 before
-  the estimate-gathering extraction, 2478 before the optional-follow-up
-  extraction, 2772 before the pending-estimate-follow-up extraction,
-  2917 before 2026-04-26). **53% reduction from the 2026-04-26
-  baseline.** Recent extractions landed under `routers/agent_helpers/`:
-  - `text_helpers.py` — `is_affirmative_text` / `is_negative_text` (50 lines).
-  - `estimate_update.py` — `run_update_estimate` add-items flow (175 lines).
-  - `fuzzy_confirmation.py` — `handle_estimate_fuzzy_confirmation` +
-    `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY` (180 lines).
-  - `pending_estimate_follow_up.py` — landed 2026-05-22 (377 lines).
-    Lifted the `_handle_pending_estimate_follow_up` closure (294 lines)
-    plus its five property-lookup helpers (`_property_name_of`,
-    `_property_address_of`, `_property_label_of`, `_property_full_address_of`,
-    `_find_property_by_name_or_address`) out of `orchestrate_agent_endpoint`
-    into a module-level helper. Owns `PENDING_ESTIMATE_FOLLOW_UP_KEY` and
-    the `ESTIMATE_FOLLOW_UP_STAGE_CONFIRM` / `_SELECT_PROPERTY` constants
-    (re-exported from `routers/agents.py` for the existing test imports).
-    All 9 return paths now go through a small `_envelope()` helper instead
-    of inline 11-key dicts; signature reduced to
-    `handle_pending_estimate_follow_up(message, context_payload)`. Tests:
-    52 passing in `test_orchestrator_endpoint.py`; `properties_api_get_properties`
-    mocks moved from `agents_router` to the helper module via string-form
-    `monkeypatch.setattr(...)` (4 sites + 1 contract assertion). The now-dead
-    `from routers.properties import fetch_properties as properties_api_get_properties`
-    alias was removed from `routers/agents.py`.
-  - `optional_follow_up.py` — landed 2026-05-22 (356 lines). Lifted the
-    `_handle_pending_optional_follow_up` closure (~195 lines) plus its
-    three builders (`_build_optional_follow_up_prompt`,
-    `_build_optional_follow_up_update_message`, `_get_optional_follow_up_spec`)
-    and the three closure-level constants (`PENDING_OPTIONAL_FOLLOW_UP_KEY`,
-    `OPTIONAL_FOLLOW_UP_STAGE_CONFIRM`, `OPTIONAL_FOLLOW_UP_STAGE_COLLECT_VALUE`)
-    out of `orchestrate_agent_endpoint`. The closure-level `_get_processor`
-    factory (used in 4 sites — only one of which moves into the helper)
-    was lifted to module-level in `routers/agents.py` and passed in as a
-    `processor_factory: ProcessorFactory` parameter. Five return paths in
-    the handler now go through a single `_envelope()` helper. Re-exported
-    from `routers/agents.py` so the existing test imports
-    (`OPTIONAL_FOLLOW_UP_STAGE_CONFIRM`, etc.) still resolve unchanged.
-    Tests: 52 passing in `test_orchestrator_endpoint.py`; no mock-target
-    changes needed because no FastAPI-helper aliases were moved.
-  - `delegate_generic.py` — landed 2026-05-22 (100 lines). Lifted the
-    generic non-Estimate-Agent delegate-and-shape tail (~54 lines) used
-    by every agent that isn't routed through one of the Estimate-Agent
-    specialized branches (Contact / Property / Labour / Material, plus
-    intents Estimate-Agent doesn't claim). Calls
-    `processor.process(message, context=...)`, merges the agent-surfaced
-    `optional_follow_up` question and stashes a pending follow-up record
-    (reusing `get_optional_follow_up_spec` from the existing optional-
-    follow-up module), then backfills `completion_ready` /
-    `missing_fields` / `accuracy_suggestions` and re-packages as the
-    standard 11-key orchestrator envelope. Companion to
-    `optional_follow_up.handle_pending_optional_follow_up`, which uses
-    the same shape but with slightly different fallback behavior — kept
-    separate to avoid parameter explosion. Tests: 52 passing; no mock
-    changes needed (`processor.process` is mocked at the agent-instance
-    level via `get_<agent>_agent` factory replacements).
-  - `delegate_get_estimate.py` — landed 2026-05-22 (145 lines). Lifted
-    the `get_estimate` sub-branch (~93 lines) of `_delegate_to_agent`'s
-    Estimate Agent block. Pure read path — no Beanie mutations, no
-    quota gate, no audit log. The stop-word regex and ObjectId-extraction
-    regex moved to module-level constants. Three tests
-    (`test_orchestrate_get_estimate_*`) updated with string-form
-    `monkeypatch.setattr` on the helper's `estimates_api_get_estimates`.
-  - `delegate_estimate_ops.py` — landed 2026-05-22 (226 lines).
-    Bundled `delegate_update_estimate` + `delegate_delete_estimate`
-    (~82 + ~91 lines of the closure body) since they share the
-    `find_estimate_from_context_or_message` resolver, the
-    `fuzzy_disclaimer` copy, and the `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY`
-    stash record. Closure-only predicates
-    (`_should_delegate_update_estimate_to_agent`,
-    `_is_work_item_op_message`) are passed in as callables to avoid a
-    circular import on `routers/agents.py`. SAFETY GUARDS preserved
-    verbatim: update_estimate routes property-link / status-transition
-    phrasings straight to the agent BEFORE the fuzzy-resolver; delete
-    always requires confirmation regardless of exact vs fuzzy match, and
-    refuses the most-recent fallback (destructive callers can't guess).
-    All existing delete tests continue to pass via the already-redirected
-    resolver mocks from the earlier `estimate_resolver` extraction.
-  - `delegate_create_estimate.py` — landed 2026-05-22 (275 lines).
-    Lifted the create_estimate sub-branch (~192 lines) of the
-    `_delegate_to_agent` closure's Estimate Agent block into a
-    module-level helper. Same shape as `estimate_gathering._finalize_gathering`
-    — sufficiency check → either enter gathering OR proceed with quota
-    gate + estimate generation + audit log + optional follow-up record.
-    Closure dependencies passed in: `processor`, `current_user_name`,
-    `decoded_token`, and the `_check_estimate_limit_or_refuse` callable
-    (latter would be a circular import). Three return paths go through
-    a small `_envelope()` helper. Tests: 52 passing; one test
-    (`test_orchestrate_endpoint_delegates_to_estimate_agent`) updated to
-    also patch `routers.agent_helpers.delegate_create_estimate.prepare_generated_estimate`
-    and `save_generated_estimate` via string-form `monkeypatch.setattr`
-    (the existing `agents_router` patches stay because the aliases are
-    still used in the remaining `_delegate_to_agent` branches).
-  - `estimate_resolver.py` — landed 2026-05-22 (119 lines). Lifted the
-    `_find_estimate_from_context_or_message` closure (~85 lines) into a
-    module-level helper. Resolves the user's target estimate via the
-    five-step ladder: active-context → estimate_id code → MongoDB _id
-    → fuzzy title match → most-recent fallback. The two regex constants
-    are now module-level (`_ESTIMATE_SEARCH_STOP_WORDS`, `_MONGO_OBJECT_ID`).
-    Tests: 52 passing; two delete-estimate tests updated to also patch
-    `routers.agent_helpers.estimate_resolver.estimates_api_get_estimate{s}`
-    via string-form `monkeypatch.setattr` (the existing `agents_router`
-    patches stay because the aliases are still used in two other call
-    sites inside `_delegate_to_agent`).
-  - `finalize_result.py` — landed 2026-05-22 (119 lines). Lifted the
-    82-line `_finalize_result` closure body (chat-history append + active-
-    entity coreference + suggestions enrichment + conversation persistence)
-    into a module-level `finalize_orchestrate_result(...)` helper.
-    `_finalize_result` closure remains in `routers/agents.py` as a 9-line
-    thin wrapper that calls the helper and wraps the resulting dict in
-    `OrchestratorAgentResponse` (the Pydantic response model stays in
-    `routers/agents.py` to avoid a circular import). The 5-way entity-key
-    scan was extracted into a small `_resolve_entity_reference()`
-    private helper inside the new module. All 6 existing call sites are
-    untouched — they still call the closure wrapper. Dependencies passed
-    in: `delegate_context`, `merged_context`, `user_id`, and the
-    `_save_conversation_context` callable. Tests: 52 passing in
-    `test_orchestrator_endpoint.py`.
-  - `estimate_gathering.py` — landed 2026-05-22 (315 lines). Lifted the
-    `_handle_pending_estimate_gathering` closure (236 lines) plus the
-    three state-key constants (`ESTIMATE_GATHERING_STATE_KEY`,
-    `ESTIMATE_GATHERED_DETAILS_KEY`, `ESTIMATE_NEXT_QUESTION_KEY`) out of
-    `orchestrate_agent_endpoint`. The closure captured `message`,
-    `decoded_token`, and `current_user_name` from request scope and
-    called the module-level `_check_estimate_limit_or_refuse` (a
-    circular import if pulled into the helper); these now flow through
-    keyword parameters (`decoded_token`, `current_user_name`,
-    `estimate_agent`, `check_estimate_limit_or_refuse`). Internal split:
-    the per-turn step is the public `handle_pending_estimate_gathering`,
-    and the all-details-collected path lives in a private
-    `_finalize_gathering` so the main entry stays well under the 50-line
-    ceiling. Five return paths go through a single `_envelope()` helper.
-    Tests: 75 passing across `test_orchestrator_endpoint.py` +
-    `test_estimate_gathering.py`. No mock surgery — no test directly
-    exercises the closure-level call path.
 
-  Candidates for the next extraction round:
-  - `_finalize_result` and the orchestrate-endpoint epilogue (chat-history
-    persistence + suggestion enrichment + response shaping). Still inline
-    in `orchestrate_agent_endpoint`.
-  - The orchestrate-endpoint's main classification + delegate loop
-    (~700 lines after this extraction round). Largest remaining inline
-    block in `routers/agents.py`.
-- `agents/material/service.py` — 2874 lines (2026-05-22 refresh; was 2875
-  pre-extraction this session; doc's earlier "2560" baseline preceded the
-  cost/size-guard helpers and accuracy-suggestion code that landed in the
-  intervening weeks). `process()` is a mega-switch that inserts a new
-  50-line inline handler per intent. ~~Easiest extraction target: the
-  `list_material_categories` block~~ landed 2026-04-26 as
-  `_handle_list_material_categories()` (44 lines) plus a static
-  `_format_material_categories_response()` helper. Follow-up extractions
-  landed 2026-04-26: `_handle_create_material`, `_handle_get_material`
-  (incl. size-scoped lookup), `_handle_delete_material` (post-resolve
-  confirmation flow), and `_handle_list_materials` (count + category-filter
-  + name-hint dispatch). `_handle_update_material` landed 2026-05-22:
-  the ~246-line inline `update_material` block (multi-turn field-then-value
-  state, add-size cost+unit guard, remove-last-size refusal, per-size
-  unit-OID resolution, and the final merge/update via
-  `_update_material_via_api`) was lifted into a dedicated method that
-  reuses `_build_response_envelope` for all 5 return shapes. `process()`
-  call site collapses from 246 inline lines to a 14-line kwargs call
-  mirroring the `_handle_create_material` / `_handle_delete_material`
-  pattern. Verified: 78 tests pass across `test_material_agent.py` +
-  `test_material_api.py` + `test_maple_material_size_operations.py`;
-  full-project mypy stays at `Success: no issues found in 265 source files`.
-  Remaining inline block: the `delete_material` early-confirm shortcut
-  that fires before `_resolve_target_material` (small; pre-resolve so it
-  can't easily share the post-resolve `_handle_delete_material` signature).
+**Consolidated 2026-08-25.** This is the *single* tracker for every file-length
+and function-length finding. Forty-four separate entries logged between
+2026-04-22 and 2026-08-12 were folded in here; their full bodies — including the
+suggested split for each — are preserved under
+[`## 4 — folded file/function-size entries`](code-review-followups-archive.md)
+in the archive. (A first fold of 15 entries happened on 2026-05-09; this
+completes it.)
 
-  Pure-helper extraction landed 2026-05-23 in four steps, all into a new `agents/material/text_helpers.py` (375 lines) modeled on `agents/estimate/text_helpers.py`. `agents/material/service.py` dropped from 2,874 → 2,541 lines (**-333, -11.6%**) across the session. Steps:
-  - **Step 1**: four leaf-level methods with no `self.*` dependencies (`_is_confirm_text`, `_explicit_intent_from_message`, `_normalize_unit`, `_normalize_size_text`) lifted from instance methods to module-level functions, following the existing pattern set by `_parse_price_range_filter` / `_material_matches_price_filter` / `_format_amount`. 17 callsites rewritten across the file (`self._foo(x)` → `_foo(x)`).
-  - **Step 2**: moved Step-1 helpers into a dedicated `agents/material/text_helpers.py` module (76 lines initially).
-  - **Step 3**: moved the three pre-existing module-level helpers (`_parse_price_range_filter`, `_material_matches_price_filter`, `_format_amount`) plus the `_PRICE_RANGE_PATTERN` / `_PRICE_RANGE_OP_DIRECTION` constants into `text_helpers.py`. (-75 lines from service.py; 4 internal callsites already module-level so no `self.` rewrites needed.)
-  - **Step 4**: moved seven instance methods plus four module-level constants. Methods: `_match_intent_rules`, `_extract_name_from_message`, `_normalize_material_name`, `_parse_cost`, `_has_explicit_cost_field`, `_should_default_cost_to_price`, `_normalize_sizes_field`. Constants: `MATERIAL_ACTION_HINTS`, `NAME_STOPWORDS`, `NAME_LEADING_PREPOSITIONS`, `NAME_TRAILING_NOISE`. 41 `self._foo(x)` → `_foo(x)` callsites rewritten via `replace_all`. (-205 lines from service.py.) All seven methods were transitively pure (chain: `_normalize_sizes_field` uses `_parse_cost` + `_normalize_size_text`; `_extract_name_from_message` uses `_normalize_material_name`; `_has_explicit_cost_field` uses `_parse_cost`); moving them en bloc kept the import dependency one-way (service.py → text_helpers.py).
+**When a review flags a long file or function, update the row below — do not
+file a new entry.** A new row is warranted only for a file not yet listed. Left
+as separate entries: a length finding that also names a *distinct* defect
+(duplication, dead code), because the defect outlives the line count — see #316,
+#326 and the crud_handlers preamble entry.
 
-  The structural win: every helper in `text_helpers.py` is callable and unit-testable without instantiating `MaterialAgent`. Backwards-compat for tests is preserved by the `from agents.material.text_helpers import ...` line at the top of `service.py` — names imported into service.py's namespace are still resolvable via `from agents.material.service import <name>` (used by `tests/test_material_agent.py` for `_material_matches_price_filter` and `_parse_price_range_filter`). Verified: 119 tests pass across `test_material_agent.py` + `test_material_api.py` + `test_maple_material_size_operations.py` + `test_material_response_envelope.py` + `test_audit_service.py`; full-project mypy clean at 275 source files.
+Guideline is 800 lines per file and 50 per function (CLAUDE.md). Counts below
+measured 2026-08-25 on `main`.
 
-  `_handle_update_material` refactor landed 2026-05-23: split 234 → 120 lines (**-49%**) across the orchestration shell, with four new helpers:
-  - `_request_update_fields_clarification` (78 lines — bare-field-name selection vs. generic "which fields?" prompt; both terminal)
-  - `_check_add_size_guard` (65 lines — refuse add-size when cost or unit missing; returns `Optional[envelope]`)
-  - `_check_remove_last_size_refusal` (31 lines — refuse removing the last size; returns `Optional[envelope]`)
-  - `_finalize_update_material` (61 lines — merge fields → `_update_material_via_api` → accuracy suggestions → envelope)
+#### Source files over 800 lines
 
-  Shell now reads as a linear pipeline: derive state → fields-clarification → add-size guard → remove-size guard → per-size unit-OID resolution → finalize. File-size cost on that single refactor: service.py +121 lines from helper signatures and docstrings — an honest tradeoff where per-function readability wins.
+| Lines | File |
+|------:|------|
+| 3,251 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) |
+| 3,091 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) |
+| 2,788 | [platform/agents/material/service.py](../../platform/agents/material/service.py) |
+| 2,766 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) |
+| 2,397 | [platform/agents/property/service.py](../../platform/agents/property/service.py) |
+| 2,195 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) |
+| 1,855 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) |
+| 1,715 | [platform/routers/agents.py](../../platform/routers/agents.py) |
+| 1,652 | [platform/routers/estimates.py](../../platform/routers/estimates.py) |
+| 1,555 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) |
+| 1,544 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) |
+| 1,382 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) |
+| 1,365 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) |
+| 1,352 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) |
+| 1,271 | [platform/agents/estimate/work_item_field_handlers.py](../../platform/agents/estimate/work_item_field_handlers.py) |
+| 1,238 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) |
+| 1,210 | [platform/routers/auth.py](../../platform/routers/auth.py) |
+| 1,180 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) |
+| 1,155 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) |
+| 1,151 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) |
+| 1,095 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) |
+| 865 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) |
+| 810 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) |
 
-  **`_extract_fields_from_message` and `_build_sizes_from_fields` lifted to `text_helpers.py`** (2026-05-23). Both were pure functions despite being methods — neither used `self.*`. Combined ~278 lines moved out of service.py. Two test callsites updated to use the module-level function (`agent._extract_fields_from_message(...)` → `_extract_fields_from_message(...)` plus an import). text_helpers.py grew to 656 lines (12 pure helpers + 6 constants); service.py dropped from 2,662 → 2,384 (-278).
+**Highest-value split, unchanged from the folded entries:** `routers/auth.py` →
+extract the invitation lifecycle into `routers/invitations.py` (~400 lines, a
+clean seam, leaves auth.py near the threshold). `crud_handlers.py` and
+`orchestrator/service.py` are the two worst but have no comparably clean seam.
 
-  **`process()` refactor landed 2026-05-23**: split 457 → **138 lines (-70%)** in two passes via six helper extractions:
-  - `_dispatch_intent_to_handler` (147 lines) — the intent-routing mega-switch
-  - `_maybe_confirm_pending_delete` (~55 lines) — pending-delete confirmation fast-path
-  - `_run_llm_classification` (86 lines) — LLM classify + entity-extraction pipeline; returns ``(parsed, llm_error)``
-  - `_apply_post_classify_fallbacks` (~75 lines) — explicit-intent override + name normalization + regex fallback; mutates parsed in place, returns explicit_intent
-  - `_apply_pending_intent_fallback` (~66 lines) — pending-intent merge for low-confidence intents; returns `(intent, probability, fields, pending_override_applied)`
-  - `_check_pre_dispatch_refusals` (~78 lines) — three pre-dispatch refusal guards (unsupported intent, missing company_id, invalid company_id shape); returns `Optional[envelope]`
+#### Test files over 800 lines
 
-  Shell `process()` now reads as a linear pipeline: bulk-delete refusal → context setup → LLM classification → post-classify fallbacks → derive intent/probability/fields → pending-intent fallback → secondary pending-intent merge → pre-dispatch refusals → `_dispatch_intent_to_handler(...)`.
+The guideline is softer here — inline-explicit setup is a deliberate trade
+against hidden fixtures — but these are past the point of scanning.
 
-  Session totals for `agents/material/service.py`: **2,874 → 2,568 lines (-306, -10.6%)** across the full session, with `text_helpers.py` at 656 lines (16 pure helpers + 6 constants). The file got bigger than the post-extraction count because each new helper added ~10–15 lines of signature + docstring overhead — function-size is the primary HIGH-issue target so this is a net win even when file-size ticks up. 97 material tests + 22 audit tests pass; full-project mypy clean at 275 source files.
+| Lines | File |
+|------:|------|
+| 5,974 | platform/tests/test_estimate_agent.py |
+| 5,208 | platform/tests/test_estimate_api.py |
+| 3,925 | platform/tests/test_orchestrator_endpoint.py |
+| 2,406 | platform/tests/test_orchestrator_intents.py |
+| 2,295 | platform/tests/test_contact_agent.py |
+| 2,279 | platform/tests/test_maple_estimate_field_edits.py |
+| 2,020 | platform/tests/test_material_agent.py |
+| 1,783 | platform/tests/test_maple_task_operations.py |
+| 1,767 | platform/tests/test_property_agent.py |
+| 1,501 | platform/tests/test_auth_api.py |
+| 1,367 | platform/tests/test_maple_task_crud.py |
+| 1,279 | platform/tests/test_text_utils.py |
+| 1,273 | platform/tests/test_tasks_api.py |
+| 1,194 | portal/tests/TaskDialog.test.tsx |
+| 1,174 | platform/tests/test_cross_resource_joins.py |
+| 957 | platform/tests/test_user_api.py |
+| 923 | platform/tests/test_labour_agent.py |
+| 891 | portal/tests/TasksPage.test.tsx |
+| 831 | platform/tests/test_maple_listed_positional_reference.py |
+| 823 | platform/tests/test_estimate_gathering.py |
+| 820 | platform/tests/conftest.py |
 
-  **`_dispatch_intent_to_handler` refactor landed 2026-05-23**: split 147 → 75 lines (-49%) via one extraction:
-  - `_resolve_and_dispatch_target_op` (112 lines) — pending-delete fast-path → `_resolve_target_material` → per-intent handler for the `update_material` / `delete_material` / `get_material` cluster (the only branch that needed target-material resolution). Stashes a pending-update intent on resolve-error and returns the clarification envelope with optional candidate suggestions.
+`test_maple_task_operations.py` has the only pre-planned split:
+`test_maple_task_notes.py` / `_ops.py` / `_text_helpers.py` / `_perf.py`, on
+seams that already exist as separate classes.
 
-  The dispatcher shell now reads as: `create` branch → `update/delete/get` branch (delegates to `_resolve_and_dispatch_target_op`) → `list_material_categories` branch → fall-through `list_materials`.
+#### Functions over the 50-line guideline
 
-  Session totals for `agents/material/service.py`: **2,874 → 2,608 lines (-266, -9.3%)** with `text_helpers.py` at 656 lines (16 pure helpers + 6 constants). Top-N method sizes after this round: `process` (138), `_handle_update_material` (120), `_resolve_and_dispatch_target_op` (112), `_handle_list_materials` (97), `_handle_delete_material` (90), `_run_llm_classification` (86), `_handle_create_material` (85), `_check_pre_dispatch_refusals` (78), `_request_update_fields_clarification` (78), `_handle_list_materials_for_estimate` (76), `_dispatch_intent_to_handler` (75). No method now exceeds 140 lines (was 457 at session start). 97 material tests + 22 audit tests pass; full-project mypy clean at 275 source files.
-- `agents/estimate/service.py` — 5685 lines after the 2026-04-26 #80
-  refactor. Similar split: prompt-building / inventory fetch / LLM
-  extraction / totals calc / CRUD read handlers are each their own concern.
-  Cleanest first cut: move the new CRUD methods
-  (`_handle_list_estimates`, `_handle_get_estimate`, `_crud_envelope`, plus
-  the small parsing helpers) into `agents/estimate/crud.py` as a mixin.
-- `agents/labour/service.py` — **1,732 → 1,474 lines (-258, -15%)** across 2026-05-24. Same playbook:
-  - **Pure-helper lift to new `agents/labour/text_helpers.py`** (370 lines): 10 leaf-level methods (`_is_confirm_text`, `_match_intent_rules`, `_explicit_intent_from_message`, `_extract_name_from_message`, `_normalize_role_text`, `_parse_cost`, `_normalize_unit`, `_is_bare_rate_reference`, `_match_bare_field_name`, `_extract_fields_from_message`) plus 4 constants (`LABOUR_ACTION_HINTS`, `NAME_STOPWORDS`, `NAME_LEADING_PREPOSITIONS`, `ROLE_TRAILING_NOISE`), class-level `_BARE_FIELD_ALIASES` / `_BARE_RATE_PHRASES`, and the module-level `_format_amount`. Three test sites updated (4 `agent._extract_name_from_message(...)` and 1 `agent._extract_fields_from_message(...)` → module-level + import), plus two `monkeypatch.setattr(LabourAgent, "_extract_*", ...)` rewritten to target the import location.
-  - **`process()` dispatch extraction**: lifted the 531-line try-body into `_dispatch_intent_to_handler` (554 lines). `process()` is now **286 lines (-64% from 803 starting point)**.
+| Lines | Function |
+|------:|----------|
+| 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
+| ~245 | `OrchestratorAgent.process()` — agents/orchestrator/service.py (god-method) |
+| 176 | `_handle_update_estimate_work_item_update_field` — agents/estimate/work_item_handlers.py:851 |
+| 140 | `_handle_update_estimate` — agents/estimate/crud_handlers.py |
+| ~120 | `install()` — website/contact-modal/install.js |
+| ~115 | `compute_analytics` — routers/estimates.py:507 |
+| ~85 | `_send_flow` — routers/support.py |
+| ~77 | `assert_token_quota` — services/llm/quota.py |
+| 72 | `reinstate_company_account` — routers/companies.py:111 |
+| ~70 | `_handle_resolve` — routers/slack_events.py |
+| 70 | `_parse_estimate_date_filter` — agents/estimate/text_helpers.py:613 |
+| ~67 | `bootstrap_company_materials` — services/material_bootstrap.py |
+| 64 | `_resolve_domain_from_history` — agents/estimate/crud_handlers.py |
+| 60 | `detach_non_owner_members` — services/company_service.py:25 |
+| 55 | `sync_user_stage` — services/brevo_contacts.py:361 |
+| 53 | `_run` — scripts/backfill_task_readable_ids.py:70 |
+| ~54 | `formatOrchestratorReply` — portal/src/lib/orchestratorReply.ts:39 |
+| — | seven functions in `platform/agents/task/` (see archive for the list) |
+| — | two handlers in `agents/estimate/assumption_handlers.py:257,415` |
+| — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
 
-  40 labour tests pass.
+#### Resolved by drift — verified under threshold 2026-08-25
 
-- `agents/equipment/service.py` — **1,343 → 1,151 lines (-192, -14%)** across 2026-05-24. Same playbook:
-  - **Pure-helper lift to new `agents/equipment/text_helpers.py`** (284 lines): 8 leaf-level methods (`_is_confirm_text`, `_match_intent_rules`, `_explicit_intent_from_message`, `_extract_name_from_message`, `_normalize_equipment_name`, `_parse_cost`, `_normalize_unit`, `_extract_fields_from_message`) plus 4 constants (`EQUIPMENT_ACTION_HINTS`, `NAME_STOPWORDS`, `NAME_LEADING_PREPOSITIONS`, `NAME_TRAILING_NOISE`) and `_format_amount`. Two test sites updated (1 each of `agent._extract_name_from_message(...)` and `agent._extract_fields_from_message(...)` → module-level).
-  - **`process()` dispatch extraction**: lifted the 382-line try-body into `_dispatch_intent_to_handler` (405 lines). `process()` is now **264 lines (-58% from 632 starting point)**.
+Three previously-logged files have come back under 800 without a dedicated
+effort; their entries are closed rather than folded:
+`portal/src/pages/PropertiesPage.tsx` (779),
+`portal/src/components/Layout/PortalLayout.tsx` (767),
+`portal/src/components/Layout/AiPanel.tsx` (668).
 
-  20 equipment tests pass.
+#### Watch
 
-- `agents/contact/service.py` — **2,412 → 1,928 lines (-484, -20%)** across 2026-05-24. Same playbook as property/material:
-  - **Pure-helper lift to new `agents/contact/text_helpers.py`** (593 lines): 17 leaf-level methods moved out of `ContactAgent` as module-level functions, plus 6 constants (`CONTACT_ACTION_HINTS`, `SUPPORTED_CONTACT_ROLES`, `CONTACT_ROLE_ALIASES`, `CONTACT_ENUM_FIELD_OPTIONS`, `_BARE_FIELD_ALIASES`) and the module-level enum-extraction helper (`_extract_contact_enum_field_options`). Migrated helpers: `_is_confirm_text`, `_match_intent_rules`, `_explicit_intent_from_message`, `_extract_name_from_message`, `_split_name_parts`, `_normalize_phone_token`, `_normalize_postal_zip_token`, `_normalize_country_token`, `_normalize_prov_state_token`, `_normalize_role_token`, `_field_name_variants`, `_extract_value_like_phrase`, `_normalize_enum_field_value`, `_detect_enum_help_field`, `_infer_single_missing_field_value`, `_match_bare_field_name`, `_extract_fields_from_message`. Callsites rewritten via `sed`. Three test sites updated: 10 `agent._extract_name_from_message(...)` → module-level, 10 `agent._extract_fields_from_message(...)` → module-level, 7 `agent._normalize_phone_token(...)` → module-level (the test's `agent = ContactAgent(use_llm=False)` line still works but isn't needed), and two `monkeypatch.setattr(ContactAgent, "_extract_*", ...)` rewritten to target the import location in `agents.contact.service`. (Initial deletion was too aggressive — also stripped the 4 module constants `CONTACT_AGENT_LABEL` / `PENDING_INTENTS_CONTEXT_KEY` / `ACTIVE_CONTACT_ID_CONTEXT_KEY` / `ACTIVE_CONTACT_NAME_CONTEXT_KEY`; restored in a follow-up edit.)
-  - **`process()` dispatch extraction**: lifted the 641-line try-body dispatch into `_dispatch_intent_to_handler` (665 lines). `process()` is now **407 lines (-61% from 1,040 starting point)**. Also lifted the inline `_response` closure to a module-level `_finalize_response_envelope` (16 callsites + 2 `response_wrapper=` references rewritten via `sed`).
-
-  82 contact tests pass; full-project mypy clean at 277 source files. The remaining `process()` (407 lines) still has post-classify-fallbacks, pending-intent merges, enum-help-field early-return, and pre-dispatch refusals all inline — natural follow-up extractions matching the material/property phase pattern. `_dispatch_intent_to_handler` (665 lines) is itself well over the ceiling — could split the create-contact / resolve-then-dispatch / list-contacts branches further.
-
-  **`_dispatch_intent_to_handler` split landed 2026-05-25**: the 382-line update/delete/get cluster lifted into `_resolve_and_dispatch_target_op` following the property playbook (line-for-line port of property's helper, minus the property-specific `contact_name` / `owner_name` params; the contact dispatcher's `active_contact_id` param turned out to be unused inside the body and was left untouched on the original method's signature for minimum-touch). `_dispatch_intent_to_handler` dropped from 665 → 299 lines (-55%); new helper at 412 lines (vs. property's 468). Net file size: 1,928 → 1,974 lines (+46 from new method header + the `return None` tail; the size cost is an honest tradeoff — per-function readability is the HIGH-issue target, not file-size minimization). Two `pending_record: Dict[str, Any] = {...}` annotations added to the lifted scope to keep mypy happy (the cluster's narrowest dict literal mixed with a downstream `pending_record["confirm_delete"] = False` mutation tripped `Collection[str]` inference). 99 contact tests pass across `test_contact_agent.py` + `test_contact_api.py` + `test_contact_model.py` + `test_cross_resource_envelope_contact.py`; full-project mypy clean at 279 source files. Natural next splits target the new helper's internal branches (delete-confirm fast-path / fuzzy-confirmation / get / update / delete) — same per-intent split that property's helper still needs.
-
-  **`_handle_update_target_contact` extraction landed 2026-05-25**: the 152-line `if intent == "update_contact":` branch lifted out of `_resolve_and_dispatch_target_op` into a dedicated `_handle_update_target_contact` method. Covers the three sub-flows the branch already had inline: (a) multi-turn ``awaiting_value_for`` re-entry (the prior turn stashed a field-name → this turn supplies the value), (b) bare-field-name selection + ``awaiting_value_for`` stash + ``no-fields`` clarification stash, and (c) the field-merge → Google address enrichment → ``_update_contact_via_api`` → accuracy-suggestions pipeline. `_resolve_and_dispatch_target_op` dropped from 412 → 276 lines (-33%); new helper at 177 lines. File: 1,974 → 2,015 lines (+41). 99 contact tests pass; full-project mypy clean at 279 source files.
-
-  **`_handle_delete_target_contact` extraction landed 2026-05-25**: the 79-line implicit-fall-through delete branch (reachable only when ``intent == "delete_contact"`` after update / get returned) lifted into its own method. Two-step shape preserved: first hit stashes ``pending_delete_*`` + the active-contact context keys and returns the confirmation envelope; second hit (with ``parsed.confirm_delete`` truthy or ``_is_confirm_text(message)``) hits ``_delete_contact_via_api`` and clears pending state. Signature deliberately narrower than `_handle_update_target_contact` — drops the unused ``fields`` / ``company_id`` / ``pending_override_applied`` params (delete uses ``target_contact.id`` and never enriches address fields). `_resolve_and_dispatch_target_op` dropped from 276 → 210 lines (-24%); new helper at 102 lines. File: 2,015 → 2,051 lines (+36). 99 contact tests pass; full-project mypy clean at 279 source files.
-
-  **`_handle_create_contact` extraction landed 2026-05-25**: the 160-line `if intent == "create_contact":` branch lifted out of `_dispatch_intent_to_handler` into a dedicated `_handle_create_contact` method. Covers the three sub-flows the branch already had inline: (a) name-token reconciliation between ``parsed`` and the active pending intent's first/last name slots (the "name is X" with a prior pending first-name case is preserved), (b) single-missing-field inference from the prior turn's pending ``missing_fields`` list (only fires when exactly one required field was missing), and (c) Google address enrichment → required-field check → either stash-and-ask-for-missing or ``_create_contact_via_api`` → accuracy-suggestions + optional post-create follow-up question for any of ``phone`` / ``email`` / ``street`` not supplied. Cleaned up the stale ``# noqa - re-binding ... (line 1682)`` comment on the `pending_missing_fields` initializer — the prior-line reference was already wrong after the earlier extractions, and the variable is now scoped to the helper so no shadowing exists. Replaced with a clean ``pending_missing_fields: List[str] = []`` annotation. `_dispatch_intent_to_handler` dropped from 299 → 153 lines (-49%); new helper at 188 lines. File: 2,051 → 2,093 lines (+42).
-
-  **`_handle_list_contacts` extraction landed 2026-05-25**: the 61-line list-contacts fall-through (name-hint normalization via ``parsed.full_name`` → ``first_name + last_name``; count-query / generic-words filtering against the inline ``_GENERIC_WORDS`` set; ``find_contacts_by_name`` vs. full-catalog ``_list_contacts_via_api`` dispatch; response shaping for count / empty / list cases) lifted out of `_dispatch_intent_to_handler` into a dedicated `_handle_list_contacts` method. Body moved verbatim (no dedent needed — already at method-body indent). Also fixed a pre-existing missing blank line between `_dispatch_intent_to_handler` and `process` left over from the first extraction round. `_dispatch_intent_to_handler` dropped from 153 → 101 lines (-34%); new helper at 82 lines. File: 2,093 → 2,123 lines (+30).
-
-  Session totals for `agents/contact/service.py`: 1,928 → 2,123 lines (+195 from sig+docstring overhead across the five new methods). Top-N method sizes after this round: `_resolve_and_dispatch_target_op` (210), `_handle_create_contact` (188), `_handle_update_target_contact` (177), `_handle_delete_target_contact` (102), `_dispatch_intent_to_handler` (101), `_handle_list_contacts` (82), `_classify_with_llm` (72), `_list_contacts_at_property` (71). No method now exceeds 210 lines (was 665 at session start) — every method reduced by at least 51%, the worst single function reduced by 68%. `_dispatch_intent_to_handler` is now a clean three-branch router: `create_contact` → helper, `update/delete/get` → resolve-then-dispatch helper, cross-resource filter (~34 lines, the only branch still inline since both sub-shapes are already in `_list_contacts_at_property` / `_list_contacts_for_estimate`), then `list_contacts` → helper. 99 contact tests pass; full-project mypy clean at 279 source files.
-
-- `agents/property/service.py` — **2,418 → 2,027 lines (-391, -16.2%)** across 2026-05-24. Two-pronged refactor following the material-agent playbook:
-  - **Pure-helper lift to new `agents/property/text_helpers.py`** (572 lines): 19 leaf-level methods moved out of `PropertyAgent` as module-level functions, plus 3 constants (`PROPERTY_ACTION_HINTS`, `_BARE_FIELD_ALIASES`, `_LABEL_PATTERNS`). Migrated helpers: `_is_confirm_text`, `_explicit_intent_from_message`, `_match_intent_rules`, `_sanitize_property_reference`, `_extract_name_from_message`, `_extract_contact_name_from_message`, `_extract_explicit_property_name_from_message`, `_extract_owner_name_from_message`, `_normalize_postal_zip_token`, `_normalize_country_token`, `_normalize_prov_state_token`, `_match_bare_field_name`, `_extract_label_fields`, `_try_canadian_full_address`, `_try_us_zip_address`, `_try_chunked_address`, `_try_partial_address`, `_try_at_prefix_canadian_address`, `_extract_fields_from_message`. 27 `self._foo(x)` callsites rewritten via `sed`. Three test sites updated (`agent._extract_fields_from_message(...)` → `_extract_fields_from_message(...)` plus an import) and one `monkeypatch.setattr(PropertyAgent, "_extract_name_from_message", ...)` rewritten to target the import location in `agents.property.service`.
-  - **`process()` refactor**: split 936 → 750 lines (-20%) via three helper extractions matching the material pattern: `_run_llm_classification` (88 lines — LLM classify + entity-extraction; returns `(parsed, llm_error)`), `_apply_post_classify_fallbacks` (77 lines — explicit-intent override + name normalization + regex fallback; returns explicit_intent), `_apply_pending_intent_fallback` (91 lines — pending-intent merge for low-confidence intents; returns 6-tuple `(intent, probability, fields, contact_name, owner_name, pending_override_applied)`), `_check_pre_dispatch_refusals` (~50 lines — unsupported-intent + missing-company-id guards).
-
-  58 property tests pass; full-project mypy clean at 276 source files.
-
-  **`process()` dispatch extraction landed 2026-05-24**: lifted the 610-line try-body intent dispatch into `_dispatch_intent_to_handler` (636 lines initially). `process()` is now **150 lines (-84% from 936 starting point)** and reads as a linear pipeline: bulk-delete refusal → context setup → LLM classification → post-classify fallbacks → derive intent/probability/fields → pending-intent fallback → secondary pending-intent merge → active-property fallback → pre-dispatch refusals → `_dispatch_intent_to_handler(...)`. Also lifted the inline `_response` closure to a module-level `_finalize_response_envelope` (20 callsites rewritten via `sed`) so the dispatch helper has independent access to the envelope-defaults logic.
-
-  **`_dispatch_intent_to_handler` split landed 2026-05-24**: the 438-line update/delete/get cluster lifted into `_resolve_and_dispatch_target_op`. `_dispatch_intent_to_handler` dropped from 636 → 216 lines (-66%). The new helper handles pending-delete confirmation, fuzzy-match resolve flow with stash-on-resolve-error, and the per-intent (update/delete/get) handler dispatch. Returns `Optional[Dict[str, Any]]` so the caller can fall through to the create / list / list-by-cross-resource branches when the intent isn't a resolved-target op. (The first run of the extraction script had a dedent bug — the cluster body was already at the right method-body indent and didn't need stripping. Reverted via `awk` to add the 4 spaces back, then fixed a fresh `Dict[str, Any]` annotation gap on `pending_record` exposed by mypy.)
-
-  Updated `agents/property/service.py` line count: 2,418 → 2,123 (-295, -12.2%). Top-N method sizes after this round: `_resolve_and_dispatch_target_op` (468), `_dispatch_intent_to_handler` (216), `process` (150), `_apply_pending_intent_fallback` (91), `_list_properties_by_cross_resource` (90), `_run_llm_classification` (88), `_apply_post_classify_fallbacks` (77), `_classify_with_llm` (69). Two methods still well over the 50-line ceiling — natural next splits target the create-property branch (~90 lines) and the resolve-then-dispatch internals (delete-confirm path, fuzzy-match stash, per-intent handlers).
-
-  **`_dispatch_intent_to_handler` create-property extraction landed 2026-05-28**: lifted the 92-line `if intent == "create_property":` branch into a dedicated `_handle_create_property` helper (107 lines). The dispatcher now delegates with an 11-line call site, leaving only the resolve-then-dispatch passthrough, the cross-resource filter shortcut, and the `list_properties` fall-through inline. `_dispatch_intent_to_handler` dropped from 216 → 138 lines (-36%). The new helper accepts the create-flow-specific subset of parameters (no `intent`, `active_pending_intent`, `contact_name`, or `owner_name`) and hardcodes `intent = "create_property"` internally. File grew slightly (2,123 → 2,152, +29) due to method-signature/docstring boilerplate, but per-method sizes are now more focused. Top-N method sizes after this round: `_resolve_and_dispatch_target_op` (468), `process` (150), `_dispatch_intent_to_handler` (138), `_handle_create_property` (107), `_apply_pending_intent_fallback` (91), `_list_properties_by_cross_resource` (90), `_run_llm_classification` (88), `_apply_post_classify_fallbacks` (77). Verified: 46 tests pass in `test_property_agent.py`; 52 pass in `test_orchestrator_endpoint.py`; mypy clean on `agents/property/`. The new helper is still over the 50-line ceiling — a future sub-split could separate the missing-fields stash branch (28 lines) from the post-create assembly (~70 lines), but each is one coherent code path so the value is marginal.
-
-  **`_resolve_and_dispatch_target_op` per-intent handler split landed 2026-05-28**: lifted the three per-intent handlers out of the 468-line resolve-then-dispatch parent: `_handle_get_property` (43 lines), `_handle_update_property` (244 lines), `_handle_delete_property` (93 lines). The parent now reads as a linear pipeline — pending-delete early-exit → `_resolve_target_property(...)` → fuzzy-match confirmation stash → per-intent delegate — and drops from **468 → 169 lines (-64%)**. `_handle_get_property` is the only new helper under the 50-line ceiling; `_handle_update_property` is now the largest method in the file (244 lines) but is isolated, and its natural future split is the awaiting-value/bare-field-name clarification stash (~110 lines) vs. the merge-and-update body (~130 lines). All three new helpers hardcode `intent = "<op>"` internally rather than taking it as a parameter. File grew 2,152 → 2,233 (+81) for method-signature boilerplate. Top-N method sizes after this round: `_handle_update_property` (244), `_resolve_and_dispatch_target_op` (169), `process` (150), `_dispatch_intent_to_handler` (138), `_handle_create_property` (107), `_handle_delete_property` (93), `_apply_pending_intent_fallback` (91), `_list_properties_by_cross_resource` (90), `_run_llm_classification` (88), `_apply_post_classify_fallbacks` (77), `_classify_with_llm` (69). Verified: 46 tests pass in `test_property_agent.py`; 52 pass in `test_orchestrator_endpoint.py`; mypy clean on `agents/property/`.
-
-  **`_handle_update_property` sub-block split landed 2026-05-28**: the 244-line update handler split into two sub-helpers along its natural seam — the `if not fields and not contact_name:` clarification stash → `_maybe_stash_update_clarification` (116 lines, returns `Optional[Dict[str, Any]]` so the parent falls through on `None`), and the merge-and-update body → `_merge_and_update_property` (139 lines, async; owns the existing-payload merge, address enrichment, contact lookup/disambiguation, update API call, and response assembly). `_handle_update_property` is now **62 lines** (-75%): the awaiting-value unwrap (~12 lines) plus two delegate calls. The clarification-stash helper is sync (no awaits) — kept as a method rather than a module-level function because it touches `self._upsert_pending_intent` / `self._persist_pending_intents`. File grew 2,233 → 2,306 (+73) for method-signature boilerplate. Top-N method sizes after this round: `_resolve_and_dispatch_target_op` (169), `process` (150), `_merge_and_update_property` (139), `_dispatch_intent_to_handler` (138), `_maybe_stash_update_clarification` (116), `_handle_create_property` (107), `_handle_delete_property` (93), `_apply_pending_intent_fallback` (91), `_list_properties_by_cross_resource` (90), `_run_llm_classification` (88), `_apply_post_classify_fallbacks` (77), `_classify_with_llm` (69), `_handle_update_property` (62). Verified: 98 tests pass across `test_property_agent.py` + `test_orchestrator_endpoint.py`; mypy clean on `agents/property/`.
-
-  **Property-agent chain paused 2026-05-28** — diminishing returns. The largest remaining method is `_resolve_and_dispatch_target_op` (169 lines), a linear pipeline whose sub-steps don't decompose cleanly without obscuring the flow. Pivoting to `agents/estimate/service.py` (#235), the largest file in the repo.
-
-- `agents/estimate/service.py` — **2,600 → 2,451 → 2,344 lines (-256, -9.8% total)** across two 2026-05-28 passes:
-  - Calc-cluster lift to new `agents/estimate/calc_helpers.py` (127 lines, 5 module-level functions: `get_material_default_price`, `get_material_default_cost`, `merge_duplicate_line_items`, `merge_resolved_material_items`, `merge_resolved_labour_items`). The cluster had eight methods total — three (`_calculate_material_cost`, `_estimate_labour_hours`, `_calculate_total_estimate`) were dead (zero call sites across `platform/`, `tests/`) and deleted outright. The remaining five didn't read `self` or call sibling methods, so they lifted cleanly as module-level functions. Six `self._foo(...)` call sites rewritten. Verified: 112 tests pass in `test_estimate_agent.py`.
-  - Gathering sync-helpers lift to existing `agents/estimate/text_helpers.py` (643 → 759 lines, +116). The 2026-05-11 remaining-targets list called this the "gathering/sufficiency cluster (~200 lines)", but on inspection the cluster split into two surfaces: the two async LLM methods (`assess_sufficiency`, `extract_detail_from_reply`) are public — called by `routers/agent_helpers/delegate_create_estimate.py` and `routers/agent_helpers/estimate_gathering.py` — so they stay on the agent. The 5 sync helpers (`_field_name_variants`, `_normalize_enum_value`, `_extract_value_like_phrase`, `_detect_enum_help_field`, `_infer_single_pending_field_value`) are call-only-from-`service.py` pure functions that directly parallel the same names already lifted to `agents/contact/text_helpers.py` — matched the contact pattern and appended them as module-level functions. Five `self._foo(...)` call sites rewritten via `sed`. `text_helpers.py` grew to 759 lines, still under the 800-line HIGH threshold. Stale doc note from 2026-05-11 corrected: LLM error / JSON parsing helpers (`format_llm_error`, `build_json_parse_diagnostic`, `strip_json_comments`) were **already lifted** to `llm_helpers.py` in the same 2026-05-11 pass — that list entry was outdated, no work needed there.
-  - Combined verification: 135 tests pass across `test_estimate_agent.py` + `test_estimate_gathering.py`; mypy clean on `agents/estimate/` (14 source files).
-  - Extraction normalization cluster lifted to new `agents/estimate/extraction_helpers.py` (342 lines, 7 module-level functions: `normalize_extracted_estimate`, `has_meaningful_value`, `merge_job_item_payloads`, `merge_with_pending_estimate`, `build_optional_follow_up`, `collect_missing_required_fields`, `build_clarifying_question`). All 7 are pure data transformations — none touch `self` state, only intra-cluster method calls (which become bare function calls in the module). The module imports `_normalize_enum_value` from `text_helpers` and `ExtractedEstimate` from `schemas`. Five `self._foo(...)` call sites in `service.py` rewritten via `sed`. No external callers (grep across `platform/`, `tests/`). Verified: 135 tests pass; mypy clean (now 15 source files in `agents/estimate/`).
-  - `agents/estimate/service.py` net session reduction: **2,600 → 2,055 lines (-545, -21.0%)** across the calc, gathering-sync, and extraction-normalization passes.
-  - LangChain research/architect pipeline cluster lifted to new `agents/estimate/llm_pipeline.py` as a `LlmPipelineMixin` (1,089 lines). 17 methods moved as-is: `_build_research_input`, `_collect_research_sources`, `_normalize_research_result`, `_decompose_requirement`, `_step1_architect`, `_step2_vector_retrieval`, `_step3_research_for_scope`, `_reuse_past_work_item`, `_step2_and_3_for_scope`, `_run_pipeline`, `_run_react_loop`, `_run_estimate_research`, `_estimate_has_no_line_items`, `_build_estimate_from_research`, `_extract_estimate_with_llm`, `_fallback_accuracy_suggestions`, `_generate_accuracy_suggestions`. **Mixin pattern (not module-level)** because tests + `agents/estimate/tools.py` call these as `agent._step1_architect(...)` / `monkeypatch.setattr(EstimateAgent, "_step1_architect", ...)` — preserving the agent-method surface keeps all callers unchanged. `EstimateAgent` inheritance is now: `(CatalogMatchingMixin, CrudParsingMixin, WorkItemHandlersMixin, WorkItemFieldHandlersMixin, CrudHandlersMixin, LlmPipelineMixin)`.
-  - Test patches updated: `monkeypatch.setattr(estimate_service, "search_similar_work_items", ...)` (2 sites) rewritten to target the new module (`estimate_llm_pipeline`). The `ChatOpenAI` patches at module level were unaffected because the mixin doesn't import `ChatOpenAI` directly — `self.llm` is set on the agent.
-  - TYPE_CHECKING stub block added inside `LlmPipelineMixin` declaring the host-instance attrs the mixin touches: `llm`, `architect_llm`, `responses_client`, `architect_prompt`, `research_prompt`, `web_research_enabled`, `vector_search_enabled`, `react_max_iterations`, plus `_fill_prices_and_calculate_totals` (the only sibling method called that lives outside the mixin chain). Matches the established pattern in `CrudHandlersMixin` and `WorkItemHandlersMixin`.
-  - **`agents/estimate/service.py` final session size: 2,055 → 1,089 lines (-966, -47% from this final pass; -1,511 total from session start of 2,600, -58.1%).** Cluster split out cleanly without disturbing any of the in-place CRUD / process / response-shaping logic.
-  - Verified: 144 tests pass across `test_estimate_agent.py` + `test_estimate_gathering.py` + `test_estimate_tools.py`; mypy clean across all 16 source files in `agents/estimate/`. 3 pre-existing failures in `test_agents_api.py::test_*_estimate_*_requires_confirmation` (event-loop / "Future attached to a different loop" Beanie cursor issue) reproduce on HEAD without these changes — unrelated to this refactor.
-  - **`_fetch_inventory_items` split landed 2026-05-29**: the 106-line method split into a thin orchestrator (18 lines) plus two sub-helpers — `_fetch_materials_inventory` (56 lines) and `_fetch_labour_inventory` (35 lines). The orchestrator wraps both sub-calls in a single try/except (the only Beanie failure mode worth catching), defaulting to module-level `_empty_materials_inventory()` / `_empty_labour_inventory()` sentinels on error. The `_size_price` inner closure was promoted to a module-level `_size_unit_price(size)` helper (5 lines) and is now reused inside `_fetch_materials_inventory` (was duplicated inline twice in the original). Both sub-helpers raise on error — only the orchestrator catches — which is honest about the failure mode. All 15 `monkeypatch.setattr(EstimateAgent, "_fetch_inventory_items", fake)` test sites unaffected because they replace the orchestrator wholesale (sub-helpers aren't called when patched). `_fetch_materials_inventory` is 56 lines — just over the 50-line ceiling, kept as one coherent fetch+build flow. Verified: 144 tests pass; mypy clean. After this round, `_fetch_inventory_items` is no longer on the 2026-05-11 list. `agents/estimate/service.py` final size: 1,089 → 1,118 lines (+29 for signature/docstring boilerplate, but the largest method shrunk from 106 → 56).
-  - **Session-wide summary on `agents/estimate/service.py`: 2,600 → 1,118 lines (-1,482, -57%).** Remaining over-50-line methods: `process` (333 lines — main entry orchestrator, the natural next target), `_fill_prices_and_calculate_totals` (224 lines — already on the 2026-05-11 list as "single function that should split into helper steps"), `_fetch_materials_inventory` (56 lines, just over). Top-of-funnel `process()` is the last big chunk left.
-
-- `agents/orchestrator/service.py` — 1990 lines (file-level). `_classify_with_rules` reduced 2026-05-22/23 from 238 → 76 lines via five helper extractions:
-  - `_classify_specific_phrasings` (52 lines — link/work-item/EST-code-total overrides)
-  - `_classify_via_action_domain` (47 lines — standard ACTION+DOMAIN orchestration shell)
-  - `_resolve_action_and_domain` (22 lines — ACTION + DOMAIN match with plural-aware get→list override)
-  - `_apply_add_set_update_override` (36 lines — "add/set a <field> to <entity>" create→update rewrite)
-  - `_ambiguity_fallback` (36 lines — three ambiguity clarification shapes)
-
-  All five new helpers are under the 50-line ceiling. Main shell now reads as a linear sequence of `if (result := stage(...)) is not None: return result` short-circuits. Only the shell itself (76 lines, mostly comments) and `_classify_specific_phrasings` (52 lines) remain over the soft ceiling. `process()` still duplicates the same short-circuit patterns (see MEDIUM #12). Verified: 279 tests pass across `test_orchestrator_intents.py` + `test_orchestrator_endpoint.py` + `test_orchestrator_bare_entity_helpers.py`; mypy clean on `agents/orchestrator/`.
-
-No function in this repo should exceed 50 lines. Grep for long bodies with
-a line-count tool after each refactor pass.
-
-Specific instances:
-- #18 — `agents/estimate/service.py` at 5,098 lines (2026-04-22 refresh).
-- #94 — New material handlers all exceed the 50-line ceiling.
-- #125 — `agents/orchestrator/service.py` at 1,358 lines (file-size note).
-- #137 — `NewEstimateWithActivityPage.tsx` extractions partial (1,733 lines).
-- #165 — `_list_properties_by_cross_resource` still 88 lines after #155.
-- #166 — `_list_contacts_for_estimate` still 91 lines after #156.
-- #167 — `_resolve_cross_resource_properties` at 62 lines (accepted).
-- #235 — `agents/estimate/service.py` at 6,066 lines (largest file in repo).
-- #236 — `portal/src/pages/SettingsPage.tsx` is 2,496 lines.
-- #237 — `agents/material/service.py` at 2,745 lines (file-level).
-- #238 — `routers/agents.py` at 2,640 lines.
-- #240 — `agents/property/service.py` at 2,386 lines.
-- #241 — `agents/contact/service.py` at 2,378 lines.
-- #242 — `NewEstimateWithActivityPage.tsx` at 1,814 lines.
-- #243 — `agents/orchestrator/service.py` at 1,970 lines.
-- #244 — `agents/labour/service.py` at 1,732 lines.
-- #245 — `portal/src/pages/MaterialsPage.tsx` at 1,421 lines.
-- #246 — `agents/equipment/service.py` at 1,343 lines.
-- #247 — `portal/src/pages/ContactsPage.tsx` at 1,324 lines.
-- #248 — `portal/src/pages/PeoplePage.tsx` at 1,024 lines.
-- #249 — `portal/src/pages/PropertiesPage.tsx` at 878 lines.
-- #250 — `platform/routers/auth.py` at 892 lines.
-- #257 — `routers/agents.py` grew to 2,810 lines post-gate-helpers PR.
-- #260 — `routers/estimates.py` over the 800-line soft cap (1,294 lines).
-
-**Absorbed:** #18, #94, #125, #137, #165, #166, #167, #235, #236, #237, #238, #240, #241, #242, #243, #244, #245, #246, #247, #248, #249, #250, #257, #260 — specific file/function-size instances surfaced in later review passes. See `## Closed` for original bodies.
+`platform/agents/estimate/catalog_matching.py` is at 793 — seven lines under.
+The next change to it crosses the line.
 
 ## MEDIUM — ~45 findings
 
@@ -1975,26 +1709,6 @@ follow-ups below. The `_OPEN_ESTIMATE_STATUSES` hardcoded-strings
 fragility was caught and fixed inline during the review (now derived
 from `EstimateStatus.{DRAFT,APPROVED,REVIEW,WON}.value`).
 
-### 163. [MEDIUM] Wave 3 file growth — three large agent files grew further
-**Files**:
-- [platform/agents/material/service.py](../../platform/agents/material/service.py) — 2,560 → 2,659 lines
-- [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) — 5,719 → 5,873 lines
-- [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) — 1,712 → 1,830 lines
-
-**Severity**: MEDIUM
-
-Pre-existing condition (all three were already far above the 800-line
-CLAUDE.md guideline before Wave 3); this change does not make it
-materially worse but contributes ~370 lines across the three files.
-Tracked here so the pressure stays visible.
-
-Fix: one of three options for each file —
-- Material: extract `_handle_list_materials_for_estimate`, `_handle_get_material`, `_handle_list_materials` into a `material/handlers/` package.
-- Estimate: split the 5,873-line file by phase (generation / extraction / CRUD / status-transitions are natural seams).
-- Orchestrator: extract `_match_size_scoped_material_op`, `_match_possessive_or_field_targeted`, `_match_cross_resource_query` into `orchestrator/matchers/` modules.
-
-Out of scope for any single feature commit; would warrant its own refactor PR.
-
 ### 164. [LOW] `find_estimate_by_code` loads full estimate collection
 **File**: [platform/agents/cross_resource.py:97](../../platform/agents/cross_resource.py#L97)
 **Severity**: LOW (scaling)
@@ -2068,90 +1782,6 @@ glance at or tweak the field before clicking Set.
 
 Fix: hold a `useRef` on the input and call `inputRef.current?.focus()`
 inside the Reset handler. Tiny UX polish.
-
-### 175. [MEDIUM] ~~`JobItemCreate` margin/tax fields accept unbounded floats~~ — RESOLVED 2026-07-27
-**Severity**: MEDIUM
-`platform/routers/estimates.py:609–614` — `original_profit_margin`,
-`profit_margin`, `overhead_allocation`, `labor_burden`, and `tax` are all
-`Optional[float] = None` with no bounds. Pydantic accepts NaN, ±Infinity,
-and arbitrarily large/negative values. A malicious or buggy client could
-persist garbage. Pre-existing pattern across the model — I added one more
-field with the same loose typing rather than tightening it.
-
-**Closed as resolved 2026-07-27.** New `models/numeric_fields.py` defines
-`PercentField` / `MoneyField` (+ `Optional*` variants) as
-`Annotated[float, Field(allow_inf_nan=False, ge=…, le=…)]`, applied across
-`JobItemCreate` and every child `*ItemCreate` model. Three decisions worth
-recording, because each is a deliberate departure from the original suggestion:
-
-- **Scope widened to the money fields.** `price` / `cost` / `quantity` /
-  `rate` / `effort` / `sub_total` carry the identical defect, and a NaN price
-  makes every downstream total NaN just as surely as a NaN margin does.
-  Fixing only the percentages would have left the same hole with a wider
-  entry point. Same one-line-per-field mechanism, so it was folded in.
-- **Bounds are wide, and percentages are NOT clamped to `[0, 100]`.** The
-  portal's "Adjust Work Item Total" back-solves a margin from a user-supplied
-  total (`backCalculateProfitMargin` in
-  `portal/src/utils/estimateCalculations.ts`), which legitimately yields a
-  **negative** margin when the total is set below subtotal, and margins in the
-  thousands for a small subtotal. Clamping to `[0, 100]` would have broken a
-  shipped feature. Limits are ±1,000,000% for percentages and ±1e12 for money
-  — enough to reject garbage and keep the compound
-  `(1 + p/100) × (1 + o/100)` product far from overflow, without rejecting any
-  plausible business input. Money is likewise not floored at zero (credits and
-  discounts are real line items).
-- **Stored models are not constrained**, against the original suggestion to
-  apply the aliases to `JobItem` too. Adding bounds to a stored model would
-  make any pre-existing document holding a bad value permanently unreadable (a
-  500 on every read of that estimate), which is a strictly worse failure than
-  the one being fixed. Stored values are kept clean by sanitizing at
-  construction instead — see the parsed pipeline below.
-
-**Two ingresses, not one.** The `*ItemCreate` request models only cover the
-hand-edit path (portal PUT/POST). The **AI-generation path — the primary way
-estimates are created here — never touches them**: `job_item_builders.py`
-constructs the stored `MaterialItem` / `LabourItem` / `ActivityItem` straight
-from LLM-parsed dicts. That path was left open by the first pass of this fix
-and closed by a follow-up `/code-review`; it is the more important of the two.
-
-Every numeric read out of a parsed dict now routes through
-`coerce_finite_float` (via a module-local `_finite()` in
-`job_item_builders.py`), covering `job_item_builders.py` (materials, labours,
-unmatched variants, activities, `sub_total`, `labor_burden`, `tax`),
-`calculations.py` (`parse_profit_margin`, `parse_overhead_allocation`, and the
-three line-item total loops), and `job_item_merge.py` (both builder functions).
-Three properties this buys, none of which the old bare `float()` had:
-
-- `json.loads` accepts bare `NaN` / `Infinity` literals and `float("nan")`
-  accepts the string form — both now degrade to a default.
-- A non-numeric token like `"abc"` used to *raise* `ValueError`, turning one
-  bad LLM value into a 500 for the whole estimate. It now degrades one field.
-- **`tax` degrades to `None`, not `0.0`** — via the separate `finite_or_none`
-  helper. `None` means "unset, apply the company default"; `0.0` asserts
-  *tax-exempt*. Collapsing garbage onto `0.0` would invent a tax claim on the
-  customer's behalf. This distinction is the reason there are two helpers.
-
-`_build_parsed_effort_cards` replaced an `EffortCardItem(**ci)` splat of the
-raw LLM dict in the same pass. The splat was fragile beyond the NaN issue:
-`EffortCardItem` declares no `extra="ignore"` and four of its fields are
-required, so a single unexpected or missing key from the model raised and 500'd
-the whole estimate. It now builds field by field with defaults. (The sibling
-splat in `_build_request_activities` is fine — it dumps an already-validated
-`EffortCardItemCreate`.)
-
-`grand_total` is bounded on both `CreateEstimateRequest` and
-`UpdateEstimateRequest`: the update handler writes `payload.grand_total`
-straight to the document when `job_items` is absent, with no recomputation on
-that branch, so the request model is the only thing between a client value and
-the DB.
-
-Tests: `tests/test_estimate_numeric_validation.py` (181 cases — non-finite
-floats and their string forms, non-numeric strings, absurd magnitudes, the
-parsed-builder pipeline end-to-end, the `tax`-stays-`None` rule, plus explicit
-accepts-negative-margin / accepts-margin-above-100 cases pinning the bounds
-that must stay loose).
-
----
 
 ## 2026-05-05 `/code-review` pass (header recolor + Maple FAB realignment + NumericInput blur-format)
 
@@ -2557,49 +2187,6 @@ small `portal/src/lib/onboardingPlanStorage.ts` helper, export it, and
 have both `OnboardingPage.tsx` and the test import from there. Drives
 both sides from one source.
 
-### 221. [MEDIUM] ~~`meter_events.report_seat_count` atomic update inside broad `except` swallows DB errors~~ — RESOLVED 2026-07-26
-**Closed as resolved 2026-07-26.** `report_seat_count` now has two separate try
-blocks with distinct failure policies:
-- **Stripe post** — unchanged best-effort semantics (log + swallow), then
-  `return`. The early return is the load-bearing part: bumping the high-water
-  mark for a value Stripe never received would permanently suppress the repost,
-  because every later snapshot at that count short-circuits on the `<=` guard.
-- **High-water write** — `logger.exception("Failed to persist the seat-count
-  high-water mark for company %s (the meter event was accepted by Stripe)")`
-  then re-raises. `snapshot_all_seat_counts` (the only caller) already
-  try/excepts per company, so the error lands in its `errors` counter and the
-  loop continues — no behavior change for the cron beyond accurate accounting.
-
-Tests: `tests/test_billing_meter_events.py::TestReportSeatCountAtomicHighWater`
-— `test_db_failure_is_not_reported_as_a_stripe_meter_failure` (asserts the
-meter event was posted, the Stripe-shaped message is absent, and a high-water
-message is present) and
-`test_stripe_failure_leaves_high_water_unbumped_and_does_not_raise`. 19 passed;
-mypy/ruff clean.
-
-<details>
-<summary>Original body (preserved for history)</summary>
-
-**File**: [platform/services/billing/meter_events.py:99-122](../../platform/services/billing/meter_events.py)
-**Severity**: MEDIUM
-
-The atomic `find_one_and_update` added by [#200](#200-atomic-high-water-update-in-meter_eventspy)
-lives inside the same `try / except Exception` block originally meant
-to catch Stripe failures. A pymongo error from the conditional update
-gets logged with `"Failed to report seat-count meter event"` —
-misleading because the meter event already succeeded by that point.
-Worse, the silent swallow means the next `report_seat_count` call
-sees a stale local `company.seat_count_period_high_water` and may
-re-post the same value to Stripe (which is harmless thanks to the
-date-keyed idempotency key, but still wastes a round trip).
-
-Fix: split into two try blocks (Stripe → log+continue, DB → propagate
-or log via a distinct error path), OR tighten the except to
-`(stripe_sdk.error.StripeError,)` so DB errors surface, matching the
-narrow-except pattern landed in `customer.py` ([#199](#199-narrow-the-except-in-customerpy67)).
-
-</details>
-
 ### 222. [MEDIUM] `ESTIMATE_STATUS_TRANSITIONS` two-step construction in `models/estimate.py`
 **File**: [platform/models/estimate.py:36-92](../../platform/models/estimate.py)
 **Severity**: MEDIUM
@@ -2706,20 +2293,6 @@ Fix: optional. Switch to
 `form.querySelector('#cm-waitlist').checked` (or use a captured
 reference like the other inputs at module scope) for clarity. Skip if
 you prefer to stay consistent with the existing style.
-
-### 229. [LOW] Submit handler is ~60 lines after this change
-**File**: [website/public/contact-modal.js:316-386](../../website/public/contact-modal.js)
-**Severity**: LOW
-
-The inline `form.addEventListener('submit', async (e) => { … })`
-body is long enough to be hard to scan. Pre-existing issue; this
-change adds one line so it's not regressing meaningfully.
-
-Fix: extract the body into a named function (`handleSubmit`) in a
-follow-up if/when the file is touched again. No action needed for
-this commit.
-
----
 
 ## 2026-05-09 `/code-review` pass (file-size HIGH-followup batch — #94/#99/#172/#178/#58 partial)
 
@@ -2907,25 +2480,6 @@ Review of the 211-test backfill that closed item #7 ("Missing tests for new
 public functions"). Production code unchanged; findings below all apply to
 the new test files themselves.
 
-### 276. [MEDIUM] Long test functions in #7 backfill tests
-Five test functions across two files exceed the 50-line guideline:
-
-- `test_generate_google_doc_router.py:128` — `test_generate_google_doc_batches_contact_fetch` (118 lines)
-- `test_generate_google_doc_router.py:252` — `test_generate_google_doc_zero_contacts_succeeds` (86 lines)
-- `test_generate_google_doc_router.py:404` — `test_fetch_estimate_doc_context_issues_single_batched_contact_find` (78 lines)
-- `test_feedback_anonymous.py:133` — `test_feedback_registered_user_uses_real_name` (54 lines)
-- `test_feedback_anonymous.py:189` — `test_feedback_blank_first_last_name_falls_back_to_unknown_user` (56 lines)
-
-Body bulk is fixture setup (multi-contact estimates for the doc tests,
-firebase-token + user-record scaffolding for the feedback tests), not
-assertion logic. Hard to scan.
-
-Fix: extract the multi-contact estimate scaffold into a `pytest.fixture`
-in a module-level setup so the assertion is the bulk of the test body;
-parameterize contact-count for the two related variants in
-`test_generate_google_doc_router.py`. Could also fold under #4 as
-function-size instances.
-
 ### 277. [LOW] Pydantic 2.11 deprecation warning surfaces in async tests
 Six warnings per test run from
 `lazy_model/parser/new.py:110` — "Accessing the 'model_fields' attribute on
@@ -2982,7 +2536,7 @@ the inner `<div className="flex h-screen …">` was left at the same
 indentation as the new provider tag. Functionally fine, just
 inconsistent. Fix: Prettier pass over the file.
 
-### 269. [LOW] `React.ReactNode` referenced without explicit React import in MapleMarkdown.test.tsx
+### 351. [LOW] `React.ReactNode` referenced without explicit React import in MapleMarkdown.test.tsx
 `portal/tests/MapleMarkdown.test.tsx:13` — `renderInRouter` types
 its `node` param as `React.ReactNode` but the file doesn't
 `import React` or `import type { ReactNode } from "react"`. Resolves
@@ -2991,7 +2545,7 @@ breaks if the project ever tightens `tsconfig.compilerOptions.types`
 or removes the global declaration. Fix: `import type { ReactNode }
 from "react"` and reference `ReactNode` directly.
 
-### 270. [MEDIUM] `EstimatesTable.tsx` layout comment references `min-w-0` but cells use `min-w-[8rem]`
+### 352. [MEDIUM] `EstimatesTable.tsx` layout comment references `min-w-0` but cells use `min-w-[8rem]`
 `portal/src/components/common/EstimatesTable.tsx:137-140` — the
 new layout-rationale comment claims Title/Property "can shrink to
 a small floor (`min-w-0` lets a long word break instead of forcing
@@ -3076,7 +2630,7 @@ arg optional, (b) split into two prop callbacks (`onConfirm` for non-checkbox
 variants, `onConfirmWithPref` for estimates). Either path touches all three
 call sites — defer until the dialog API is touched for another reason.
 
-### 277. [LOW] Plan file line references drift after implementation
+### 353. [LOW] Plan file line references drift after implementation
 
 `documentation/development/plans/overage-acknowledgment-dialog.md` references
 specific line numbers (e.g. "SettingsPage.tsx:1042-1062") that shifted during
@@ -3143,18 +2697,6 @@ which is non-trivial and would expand the scope of the current PR beyond the
 spec the user signed off on. Track until product asks for the consistent UX
 across all three resources or a customer reports the dual-flow inconsistency.
 
-### 281. [MEDIUM] `assert_token_quota` is ~77 lines (4 sequential 402 gates)
-
-`platform/services/llm/quota.py:assert_token_quota` crossed the 50-line HIGH
-threshold after the hard-cap branch landed. The function is still cohesive — a
-flat top-to-bottom policy of hard-cap → over-quota+no-card → over-quota+no-ack
-→ pass — and splitting now would fragment a policy that benefits from being
-read in one place.
-
-Fix when it grows another gate: extract a `_raise_quota_402(code, message)`
-helper to collapse the four near-identical `raise HTTPException(...)` blocks.
-Not worth doing today.
-
 ### 282. [LOW] `"hard_cap_reached"` string literal repeated in `routers/agents.py`
 
 The literal appears at two sites in `orchestrate_agent_endpoint` — once in
@@ -3189,22 +2731,6 @@ on `<input type="checkbox">` per the HTML spec — it's a no-op there.
 Fix: drop `readOnly`. Cosmetic only; the rendered behavior is identical
 either way. Worth doing the next time anyone touches this block to keep
 the JSX honest about what the attributes actually do.
-
----
-
-## 2026-05-20 review (dashboard analytics window change)
-
-### 284. [LOW] `compute_analytics` is ~115 lines
-
-`platform/routers/estimates.py:507` — pre-existing length, not introduced by
-the 2026-05-20 pipeline-window/updated_at change. The four-way
-`asyncio.gather` plus per-bucket reshape (headline → by_division → by_status)
-keeps everything in one function. The `/code-review` HIGH rule flags >50
-lines, so worth splitting next time the function grows further.
-
-Fix: extract `_compute_headline`, `_compute_by_division`, `_compute_by_status`
-helpers. Defer until the next behavioural change in this function — splitting
-purely for length without a behavioural driver is churn.
 
 ---
 
@@ -3293,36 +2819,6 @@ Carried over from the hodgepodge `/code-review` (2026-05-13). The two HIGHs from
 
 Carried over from the `/code-review` of the contact-form expansion + reCAPTCHA v3 integration on the marketing site (May 2026). The two security-flavored fixes (emulator gate, structured email addresses) and a vitest unit suite for `verifyRecaptcha` shipped with the original change. The HIGH refactor of the `contact` request handler from this batch was folded into #268 (with the proposed extraction shape preserved there).
 
-### 293. [HIGH] ~~Frontend test for `resolveRecaptchaSiteKey` blocked by current architecture~~ — RESOLVED 2026-05-21
-**Closed as resolved 2026-05-21.** Contact modal moved out of `website/public/` into a proper Vite entry. New layout:
-- `website/contact-modal/install.js` — extracted from `public/contact-modal.js`; named-exports `install`, `resolveRecaptchaSiteKey`, `loadRecaptcha`, `getRecaptchaToken`. No top-level side effects so vitest can import without triggering DOM injection.
-- `website/contact-modal/index.js` — 16-line build entry that imports `install` and runs it on DOMContentLoaded.
-- `website/contact-modal/__tests__/resolveSiteKey.test.js` — 4 tests (real key → returned, empty → empty string, unsubstituted Vite placeholder → empty string, whitespace trim).
-- `vite.config.ts` — added `'contact-modal'` to `rollupOptions.input` so prod build emits `dist/contact-modal.js`; added a `contactModalDevRewrite()` middleware that serves a `import('/contact-modal/index.js')` shim when the dev server receives `GET /contact-modal.js` (HTML pages already use `<script src="/contact-modal.js" defer>` — no HTML changes needed).
-- `vitest.config.ts` — extended `include` glob to `contact-modal/**/*.test.{js,ts}`.
-- `public/contact-modal.js` — deleted (was 491 lines).
-
-Also closed **#298** as a side-effect — the heuristic placeholder check became `trimmed === '%VITE_RECAPTCHA_V3_SITE_KEY%'` while editing the file. Verified: vitest 42/42 green; `vite build` emits `dist/contact-modal.js` cleanly; dev server smoke-test confirms `/contact-modal.js` returns the dynamic-import shim and `/contact-modal/index.js` serves the source.
-
-The follow-on opportunity (#296, the ~120-line `install()` split) is now unblocked — `install` is exported and could be unit-tested or split further.
-
-<details>
-<summary>Original body (preserved for history)</summary>
-
-**Where:** `website/public/contact-modal.js`.
-
-**Why blocked:** `contact-modal.js` lives in `public/` and is served verbatim by Vite/Hosting. It's wrapped in an IIFE (no exports), so its helpers can't be imported by vitest. To test `resolveRecaptchaSiteKey` (the Vite-substitution-detection logic), the file needs to become a proper Vite/Rollup entry — same pattern as `widget/index.tsx` / `maple-widget.js`.
-
-**Suggested move:**
-1. Create `website/contact-modal/index.ts` (or `.js`) with the modal logic, exporting helpers like `resolveRecaptchaSiteKey` for tests.
-2. Add the entry to `vite.config.ts` `rollupOptions.input` and `entryFileNames` rules so the build emits `dist/contact-modal.js` at the same path.
-3. Drop `website/public/contact-modal.js`.
-4. Add `website/contact-modal/__tests__/resolveSiteKey.test.ts` covering: real key → returned, empty → empty string, raw `%VITE_RECAPTCHA_V3_SITE_KEY%` placeholder → empty string.
-
-This refactor also unlocks unit-testing the submit handler, the captcha load promise, and the form validation helper.
-
-</details>
-
 ### 294. [MEDIUM] Make `RECAPTCHA_MIN_SCORE` configurable
 **Where:** `website/functions/index.js:13`.
 
@@ -3330,76 +2826,10 @@ This refactor also unlocks unit-testing the submit handler, the captcha load pro
 
 **Suggested fix:** Use `defineString('RECAPTCHA_V3_MIN_SCORE', { default: '0.5' })` from `firebase-functions/params`, parse to float at handler start, fall back to 0.5 on `NaN`. Set per-environment via `firebase functions:config` or a runtime param.
 
-### 295. [MEDIUM] ~~Tighten CORS~~ — RESOLVED 2026-07-26
-**Closed as resolved 2026-07-26.** `cors: true` → a named `ALLOWED_ORIGINS`
-constant in `website/functions/index.js`. Kept `cors` rather than dropping it
-(the second option) so the Firebase-provided domains and the local emulator
-keep working; production traffic is same-origin through the Hosting rewrite
-either way.
-
-The suggested list needed one correction: it named only the **dev** hosting
-site. Per `.firebaserc` the prod target `website` maps to site
-`maples-website`, so the shipped allowlist adds
-`https://maples-website.web.app` and `https://maples-website.firebaseapp.com`
-alongside the apex/www custom domain, the two dev domains, and
-`http://localhost:5050` (matching `firebase.json` → `emulators.hosting.port`).
-
-Tests: new `website/functions/corsConfig.test.js` (5) captures the config
-object from the `onRequest` mock and asserts the allowlist shape — no wildcard,
-prod + dev domains present, emulator port present, arbitrary origin absent.
-33 function tests pass; full website suite 186 passed; build clean.
-
-<details>
-<summary>Original body (preserved for history)</summary>
-
-**Where:** `website/functions/index.js:26` — currently `cors: true` (wildcard).
-
-**Why:** The contact form is served via Hosting rewrite, so traffic to `/api/contact` is same-origin and doesn't need CORS at all. Wildcard CORS lets any origin POST to the endpoint; reCAPTCHA mitigates abuse but tightening costs nothing.
-
-**Suggested fix:**
-
-```js
-cors: [
-  'https://3maples.ai',
-  'https://www.3maples.ai',
-  'https://maples-website-dev.web.app',
-  'https://maples-website-dev.firebaseapp.com',
-  'http://localhost:5050', // hosting emulator
-],
-```
-
-Or drop `cors` entirely and rely on same-origin Hosting rewrites for prod traffic; only add CORS when explicit cross-origin support is needed.
-
-</details>
-
-### 296. [MEDIUM] `install()` in `contact-modal.js` is ~120 lines
-**Where:** `website/public/contact-modal.js:240-360`.
-
-**Why:** Mixes DOM creation, ref binding, captcha setup, open/close handlers, and submit logic. Hard to follow at a glance.
-
-**Suggested fix:** Split into `renderModal()`, `bindOpenClose(refs)`, `bindSubmit(refs, captcha)`. Cleanest after the file is moved out of `public/` (see #293), since the helpers can then be unit-tested with injected refs.
-
 ### 297. [LOW] Hoist `optionalString` to module scope
 **Where:** `website/functions/index.js:77`.
 
 **Why:** Pure helper recreated on every request. Negligible perf cost but belongs at module scope alongside `escapeHtml`.
-
-### 298. [LOW] ~~Replace placeholder heuristic with explicit equality~~ — RESOLVED 2026-05-21
-**Closed as resolved 2026-05-21** as a side-effect of #293. Now `trimmed === '%VITE_RECAPTCHA_V3_SITE_KEY%'` in `website/contact-modal/install.js:resolveRecaptchaSiteKey`. Covered by the new vitest case at `contact-modal/__tests__/resolveSiteKey.test.js`.
-
-<details>
-<summary>Original body (preserved for history)</summary>
-
-**Where:** `website/public/contact-modal.js:5-11` — `resolveRecaptchaSiteKey`.
-
-**Why:** Current check rejects values containing `%` or starting with `VITE_`. Functional but heuristic. An explicit check on the literal placeholder is clearer:
-
-```js
-if (!trimmed || trimmed === '%VITE_RECAPTCHA_V3_SITE_KEY%') return '';
-return trimmed;
-```
-
-</details>
 
 ### 299. [LOW] Drop `escapeHtml(label)` on hardcoded labels
 **Where:** `website/functions/index.js:183`.
@@ -3444,38 +2874,6 @@ Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of 
 
 **Fix:** define an `EstimateAgentHostProtocol(Protocol)` in `agents/estimate/host_protocol.py` (or a shared types module) that captures the cross-mixin contract once. Each mixin can reference the Protocol via `Self` bound or via inheritance from a shared base. Short-term mitigation: per-method docstring pointers (`# See agents/estimate/crud_helpers.py:381 — keep in sync`). Worth doing if the stubs grow further; for now the 23 stubs are stable enough.
 
-### 303. [HIGH] ~~Unit tests missing for the 9 new `routers/agent_helpers/` modules~~ — RESOLVED 2026-06-03
-**Severity**: HIGH (resolved)
-
-**Resolved 2026-06-03**: 8 module-level unit-test files added (103 tests), one
-per untested helper — `estimate_gathering.py` already had
-`tests/test_estimate_gathering.py`, so the original "9" was 8 in practice:
-
-| Module | Test file | Tests |
-|---|---|---|
-| `finalize_result.py` | `tests/test_agent_helpers_finalize_result.py` | 17 |
-| `estimate_resolver.py` | `tests/test_agent_helpers_estimate_resolver.py` | 9 |
-| `delegate_generic.py` | `tests/test_agent_helpers_delegate_generic.py` | 7 |
-| `pending_estimate_follow_up.py` | `tests/test_agent_helpers_pending_estimate_follow_up.py` | 24 |
-| `optional_follow_up.py` | `tests/test_agent_helpers_optional_follow_up.py` | 21 |
-| `delegate_get_estimate.py` | `tests/test_agent_helpers_delegate_get_estimate.py` | 11 |
-| `delegate_estimate_ops.py` | `tests/test_agent_helpers_delegate_estimate_ops.py` | 14 |
-| `delegate_create_estimate.py` | `tests/test_agent_helpers_delegate_create_estimate.py` | 7 |
-
-Each file covers every envelope return path / state-machine branch via
-injected fakes + `monkeypatch` (no DB or LLM). All 103 pass; mypy clean.
-A latent matcher quirk surfaced and was characterized (not fixed —
-tracked as a new LOW below): `find_property_by_name_or_address` treats a
-property with a **blank `street`** as a contains-match for *any* query
-(`"" in query` is always true), so such a property auto-links. See
-`test_find_property_blank_street_contains_matches_any_query`.
-
-**Where:** `routers/agent_helpers/pending_estimate_follow_up.py`, `optional_follow_up.py`, `estimate_gathering.py`, `delegate_create_estimate.py`, `delegate_estimate_ops.py`, `delegate_get_estimate.py`, `delegate_generic.py`, `finalize_result.py`, `estimate_resolver.py` (all landed 2026-05-22).
-
-**Issue:** All 9 helper modules extracted from `orchestrate_agent_endpoint` lack module-level unit tests. Behavior is exercised through `tests/test_orchestrator_endpoint.py` integration tests (52 passing), so no regression risk today — but each helper is a state machine with multiple return paths (`handle_pending_estimate_follow_up` has 9 envelope returns spanning `confirm`/`select_property`/`negative`/`list-properties`/`no-properties`/`escape-hatch`/`resolve-error`/`success` shapes) and the integration tests don't necessarily cover every branch. Per `CLAUDE.md` "tests are mandatory after any code change" — extraction without unit-test backfill leaves the per-branch behavior implicit in the endpoint tests.
-
-**Fix:** Add per-helper unit-test files (`tests/test_pending_estimate_follow_up.py`, etc.) with one test per return path. Each test constructs a `context_payload` matching the entry state, asserts the returned envelope's `intent` / `response` / `result.operation` / `needs_clarification` flags. Use the existing fixtures (`monkeypatch` for `Estimate.get`, `properties_api_get_properties`, etc.) — same shape as the integration tests but scoped to one helper. Estimated 6-9 tests per module = ~60-80 new tests total.
-
 ### 304. [MEDIUM] Dual-mock pattern in `test_orchestrator_endpoint.py` after helper extractions
 **Where:** `tests/test_orchestrator_endpoint.py` — 4 sites for `properties_api_get_properties`, 4 sites for `estimates_api_get_estimates`, 2 sites for `estimates_api_get_estimate`, 2 sites for `prepare_generated_estimate` / `save_generated_estimate`.
 
@@ -3490,84 +2888,6 @@ property with a **blank `street`** as a contains-match for *any* query
 
 **Fix:** Extract shared boilerplate (resolve estimate → find work item → clarify on miss) into a `_resolve_work_item_for_update()` helper returning `(target, job_items, idx, matched, err_response)`. Extract catalog lookup + item construction into `_resolve_and_build_material_item()` / `_resolve_and_build_activity_item()`. Each handler shrinks to ~30 lines of domain logic.
 
-### 306. [HIGH] ~~`_detect_work_item_op()` is 202 lines~~ — RESOLVED 2026-07-27
-**Where:** `agents/estimate/work_item_handlers.py:110`
-
-**Issue:** Grew from ~75 lines to 202 with the new sub-resource ops. Readable as a cascading if-chain but past the length threshold.
-
-**Closed as resolved 2026-07-27.** `_detect_work_item_op` is now **34 lines**
-and the whole detector chain sits under the threshold (largest: 44):
-
-| function | lines |
-|---|---|
-| `_detect_work_item_op` | 34 |
-| `_detect_sub_resource_op` | 34 |
-| `_detect_catalog_sub_op` | 29 |
-| `_detect_work_item_field_op` | 44 |
-| `_detect_inferred_material_op` | 15 |
-| `_detect_total_op` | 12 |
-| `_detect_legacy_work_item_op` | 21 |
-| `_detect_legacy_update_field` / `_rename` / `_add` / `_remove` | 22 / 13 / 18 / 11 |
-
-Went past the suggested fix in two places, both deliberate:
-
-- **Material and activity now share `_detect_catalog_sub_op`.** The two blocks
-  were structurally identical — list/count, then add / remove / update, then a
-  trailing what/how-many that also means list — differing only in keyword and
-  op suffix. Parameterized on `(keyword_pattern, singular, plural)`.
-- **The legacy cascade was split too**, against "keeps the legacy patterns
-  untouched". Extracting only the `has_wi` block left two functions still over
-  50 lines, i.e. **more** oversized functions in the file than before (6 → 7).
-  Splitting the legacy loops into four single-purpose detectors brought the
-  file to 6 → 5. The pattern tuples and their ordering comments are unchanged;
-  only the enclosing function boundaries moved.
-
-**Method — characterization tests first, and they earned their keep.**
-`TestDetectWorkItemOp` already asserted 17 of the 18 op shapes, but nothing
-pinned *precedence* or *fall-through*, which is exactly what an extraction
-breaks. New `TestDetectWorkItemOpPrecedence` (15 cases) records behavior
-captured from the pre-refactor implementation, including three results that are
-not obvious from reading the code:
-
-- `"add a material to the recurring work item"` → `recurring_enable`, not
-  `add_material` — recurring is checked first and wins outright.
-- `"set the total of work item 1 to 4200"` → `update_field` with
-  `field="total"`, **not** `set_total`. Neither total pattern matches, so it
-  falls through to the generic legacy update_field pattern. Recorded as-is; it
-  is behavior, not necessarily intent.
-- `"add a work item and list them"` → `add` with an empty name, not `list` —
-  the mutation-verb guard suppresses `list` and the nameless-add pattern claims
-  it.
-
-Both extractions were mutation-tested rather than assumed safe: forcing the
-`has_wi` block to swallow instead of fall through failed 12 tests, and swapping
-material/activity precedence failed 2. 423 tests pass across
-`test_maple_work_item_ops.py`, `test_estimate_agent.py` and
-`test_maple_crud_coverage.py`; ruff + mypy clean.
-
-**Not addressed:** the five `_handle_update_estimate_work_item_*` methods in
-this file are still over 50 lines (172 / 126 / 79 / 75 / 59). That is #305's
-territory, not this item's.
-
-### 307. [HIGH] ~~Full-catalog fetch for material/role lookup~~ — RESOLVED 2026-06-03
-**Severity**: HIGH (resolved)
-**Where:** `agents/estimate/work_item_field_handlers.py:531` and `:889`
-
-**Issue:** `Material.find(company==X).to_list()` and `Labour.find(company==X).to_list()` load the full company catalog into memory for Python-side substring matching. Acceptable at current scale (<1000 items) but degrades on larger catalogs.
-
-**Resolved 2026-06-03**: extracted two helpers — `_find_catalog_materials()`
-and `_find_catalog_roles()` — that push the name substring match into MongoDB
-via a case-insensitive `{"name": {"$regex": re.escape(hint), "$options": "i"}}`
-filter (alongside the existing `company ==` clause). The handlers now receive
-only matching documents instead of the whole catalog; the exact-match /
-ambiguity disambiguation logic stays in the handler on the (now-smaller) list.
-`re.escape` preserves literal-substring semantics for hints containing regex
-metacharacters. Dead inline `from models import Material/Labour` imports in the
-two handlers removed. New `tests/test_work_item_catalog_lookup.py`: 6 unit tests
-(query-shape + escaping + empty-hint short-circuit, `find` stubbed) plus 1 live
-test that exercises the real `$regex` against the test DB (match returns only
-the matching doc; non-match returns nothing). mypy clean; 102 related tests pass.
-
 ### 308. [MEDIUM] Duplicated work-item/help bypass in orchestrator
 **Where:** `agents/orchestrator/service.py:578` and `:2173`
 
@@ -3581,20 +2901,6 @@ the matching doc; non-match returns nothing). mypy clean; 102 related tests pass
 **Issue:** `RecurrenceSchedule` objects default to `start_year=2026`. After December 2026 this produces stale schedules.
 
 **Fix:** Use `datetime.now(timezone.utc).year` instead of the literal.
-
-### 310. [MEDIUM] `work_item_field_handlers.py` is 1286 lines
-**Where:** `agents/estimate/work_item_field_handlers.py`
-
-**Issue:** Above the 800-line threshold. Single mixin with 12 handlers following the same pattern.
-
-**Fix:** Addressed naturally when #305 extracts shared boilerplate — the file should drop below 800 lines after the helper extraction.
-
-### 311. [HIGH] `SettingsPage.tsx` is 2,541 lines
-**Where:** `portal/src/pages/SettingsPage.tsx`
-
-**Issue:** Well above the 800-line threshold. The team-invitation flow, seat-count display, billing gate logic, and numerous unrelated settings panels all live in one component.
-
-**Fix:** Extract the seat overage gate logic into a `useSeatsOverageGate` hook, the invitation form into an `InviteTeamSection` sub-component, and the billing display rows into `BillingUsageSection`. This PR touched this file — the debt is growing.
 
 ### 312. [LOW] `try_claim_estimate_slot` override path doesn't warn on missing document
 **Where:** `platform/services/estimate_quota.py:76`
@@ -3648,12 +2954,16 @@ of 400) plus its missing test coverage were **fixed in-session** (reordered
 `_DIMENSIONS_RE` ahead of `_VALUE_UNIT_RE`; added
 `test_dimensions_with_explicit_area_unit`). The items below were deferred.
 
-### 316. [MEDIUM] `_finalize_template_estimate` is ~100 lines with duplicated company-context resolution
-**Where:** `platform/routers/agent_helpers/template_estimate.py:94-197` (and the near-identical block in `begin_template_estimate:215-225`)
+### 316. [MEDIUM] Company-context resolution duplicated across both template-estimate entry points
+**Where:** `platform/routers/agent_helpers/template_estimate.py:106-126`, and
+the near-identical block in `begin_template_estimate:215-225`.
 
-**Issue:** Exceeds the 50-line guideline and mixes company-context validation, the quota gate, create/scale/save, audit logging, and three envelope constructions. The company-context resolution (lines 106-126) is duplicated almost verbatim in `begin_template_estimate`.
+**Issue:** The company-context validation is duplicated almost verbatim between
+the two entry points, so a change to the refusal shape has to be made twice.
+(The function's length is tracked under #4.)
 
-**Fix:** Extract a shared `_resolve_company_or_refuse(...)` used by both entry points, and lift the audit-log + success-envelope tail into a helper. Reduces both length and duplication.
+**Fix:** Extract a shared `_resolve_company_or_refuse(...)` used by both entry
+points, and lift the audit-log + success-envelope tail into a helper.
 
 ### 317. [MEDIUM] `recentEstimates.ts` reinvents archived-status normalization
 **Where:** `portal/src/lib/recentEstimates.ts:18`
@@ -3699,203 +3009,6 @@ of 400) plus its missing test coverage were **fixed in-session** (reordered
 
 ---
 
-## 2026-06-03 (ruff lint gate adoption)
-
-`ruff` was adopted as a hard lint gate for `platform/` on 2026-06-03, the same
-model as the mypy gate (#3). Config is pinned in `platform/ruff.toml`; run via
-`./run_ruff.sh`. Ruleset: `E, F, I, B, C4, SIM` — `E501` (line length) off, `UP`
-(pyupgrade) intentionally excluded (its annotation rewrites collide with the
-mypy.ini playbook). See CLAUDE.md "ruff is a Gate, Not a Suggestion" for the
-full policy + recurring playbook.
-
-On adoption the safe auto-fixable backlog (~287 fixes: import sorting + trivial
-simplifications, **no import deletions**) was applied across 186 files. The
-manual backlog below remains and must be worked down before the project is
-fully green. **Until then, scope `./run_ruff.sh` to the files you touch** so you
-gate your change without tripping over the legacy backlog.
-
-> **F401 is report-only by config** (`unfixable = ["F401"]`). Blanket
-> `ruff --fix` is **unsafe** in this codebase: it deletes (a) re-export-hub
-> imports — modules that import a symbol only to re-expose it (`routers/estimates.py`,
-> `routers/agents.py`, `agents/estimate/service.py`) — and (b) module-level
-> imports that tests monkeypatch via `setattr(module, "Name", ...)` (e.g.
-> `estimate_service.ChatOpenAI`). Both break imports/tests; the second isn't
-> caught by an `import main` smoke test. This was learned the hard way during
-> adoption (140 test failures from the first sweep, fully reverted). Triage each
-> F401 by hand: genuinely dead → delete; re-export → add to `__all__`;
-> monkeypatch target → keep with `# noqa: F401` + reason.
-
-### 323. [RESOLVED 2026-06-04] ruff manual backlog — fully cleared; `platform/` is at zero ruff errors
-Snapshot 2026-06-03 (`./run_ruff.sh`); **B904 slice closed 2026-06-03** (32 → 0);
-**style/simplify slice (E741/E712/SIM/C4/B007) closed 2026-06-04** (52 → 0);
-**E402 + F841 slices closed 2026-06-04** (56 + 52 → 0);
-**F401 slice closed 2026-06-04** (281 → 0). `./run_ruff.sh` is now clean
-project-wide — ruff is a fully-enforced zero-error gate, same as mypy.
-
-| Rule | Count | Category | Notes |
-|---|---|---|---|
-| ~~**B904** raise-without-`from`~~ | ~~32~~ → **0** | correctness | **RESOLVED 2026-06-03** — see progress note below |
-| ~~F401 unused-import~~ | ~~281~~ → **0** | dead code | **RESOLVED 2026-06-04** — see progress note below |
-| ~~E402 import-not-at-top~~ | ~~56~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
-| ~~F841 unused-variable~~ | ~~52~~ → **0** | dead code | **RESOLVED 2026-06-04** — see progress note below |
-| ~~E741 ambiguous-name (`l`/`I`/`O`)~~ | ~~24~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
-| ~~E712 `== True/False`~~ | ~~5~~ → **0** | style | **RESOLVED 2026-06-04** |
-| ~~SIM103/102/108/105~~ | ~~16~~ → **0** | simplify | **RESOLVED 2026-06-04** |
-| ~~C408/C401/C416~~ | ~~5~~ → **0** | simplify | **RESOLVED 2026-06-04** |
-| ~~B007 unused-loop-var~~ | ~~2~~ → **0** | style | **RESOLVED 2026-06-04** |
-
-**Recommended order:** (1) **B904** — the only correctness category; it matches
-CLAUDE.md's "don't leak/garble tracebacks" rule. Add `raise ... from err`
-(preserve cause) or `raise ... from None` (suppress). B904 sites by file:
-`services/google_drive_service.py` (12), `routers/agents.py` (6),
-`routers/estimate_helpers/doc_versions.py` (3), `routers/audit_logs.py` (3),
-`routers/templates.py` (2), `routers/stripe_webhooks.py` (2), `routers/auth.py`
-(2), `routers/materials.py` (1), `routers/billing.py` (1). (2) the mechanical
-style/simplify slices (E741/E712/SIM/C4/B007) — low risk. (3) E402 + F841 —
-case-by-case judgment. (4) F401 last — largest and needs the per-import triage
-above. **Slices (1)–(3) are now closed; only F401 (4) remains.**
-
-Work each slice as its own commit (`./run_ruff.sh --select B904` to scope a
-run). Update this entry's counts as slices close; mark RESOLVED when
-`./run_ruff.sh` is clean project-wide.
-
-**Progress 2026-06-03 — B904 slice closed (32 → 0).** All 32 raise-without-`from`
-sites now chain explicitly; `./run_ruff.sh --select B904` is clean project-wide.
-Cause-preservation split followed the playbook:
-- **`from e`** (preserve cause) where the exception was already bound *and* is a
-  genuine unexpected/internal failure worth chaining: `routers/stripe_webhooks.py`
-  (signature-verify 400, handler 500) and all 12 `services/google_drive_service.py`
-  sites (RuntimeError on credential/build failure + HTTPException 500s on Drive
-  HttpError — each `except ... as e`).
-- **`from None`** (suppress) where the re-raise is a deliberate boundary over
-  expected input or an already-logged error: input-validation conversions
-  (`routers/audit_logs.py` ×3 invalid enum 400, `routers/auth.py` ×2 invalid
-  role/industry 400, `routers/agents.py` ×2 invalid ObjectId 422), 409 conflict
-  conversions (`routers/templates.py` ×2 DuplicateKey), and 500/502 handlers that
-  already `logger.exception(...)` the full traceback (`routers/agents.py` ×4,
-  `routers/billing.py`, `routers/materials.py`, `routers/estimate_helpers/doc_versions.py` ×3).
-
-Verified: full-project `./run_mypy.sh` slice clean (`routers`, `services`); 155
-related tests pass (`test_stripe_webhooks`, `test_template_api`,
-`test_audit_logs_api`, `test_billing_enterprise_contact`, `test_google_drive_service`,
-`test_estimate_docs_api`, `test_orchestrator_endpoint`, `test_auth_api`). Next
-slice per the recommended order: the mechanical style/simplify batch
-(E741/E712/SIM/C4/B007).
-
-**Progress 2026-06-04 — style/simplify slice closed (52 → 0).**
-`./run_ruff.sh --select E741,E712,SIM,C4,B007` is clean project-wide. Breakdown:
-- **E741** (24) — every `l` ambiguous-name was the same idiom: a labour item in a
-  loop/comprehension. Renamed `l` → `lab` throughout each enclosing scope (renaming
-  *all* uses, not just the binding). Sites: `agents/cross_resource.py`,
-  `agents/estimate/{crud_handlers,llm_pipeline,service ×3,tools,work_item_field_handlers}.py`,
-  `agents/property/service.py`, `routers/estimate_helpers/{job_item_builders ×5,snapshots ×2}.py`,
-  `routers/estimates.py` ×3, `routers/labours.py`, and tests
-  (`test_cross_resource_joins.py`, `test_labour_api.py` ×2).
-- **E712** (5, all tests) — `== True/False` → truthiness / `not` in `test_google_drive_service.py`.
-- **SIM103** (6) — `if cond: return True / return False` → `return cond`; the regex
-  `.search()` cases wrapped in `bool(...)` to keep the `-> bool` return type honest
-  (`routers/agents.py` ×4, `routers/agent_helpers/pending_calculation.py`,
-  `routers/estimate_helpers/ai_generation.py`).
-- **SIM102** (5) — collapsed nested `if`s into a single `and` condition, verified each
-  outer `if` contained only the inner one (`routers/agents.py`, `routers/auth.py`,
-  `routers/agent_helpers/finalize_result.py`, `services/google_drive_service.py`,
-  `agents/estimate/crud_handlers.py`).
-- **SIM108** (3) — if/else assignment → ternary (`delegate_create_estimate.py`,
-  `services/address_service.py`, `tests/conftest.py`).
-- **SIM105** (2) — `try/except: pass` → `contextlib.suppress(...)`, adding a top-level
-  `import contextlib` to each (`routers/agent_helpers/delegate_get_estimate.py`,
-  `scripts/setup_stripe_webhook.py`).
-- **C416** (1) — redundant list comp → `list(_STATUS_ALIASES.items())` (`crud_helpers.py`).
-- **C401** (1) — `set(gen)` → set comprehension (`work_item_field_handlers.py`).
-- **C408** (3) — `dict(...)` → literal (`template_estimate.py` ×2, `tests/_cross_resource_fakes.py`).
-- **B007** (2) — unused loop var `i` → `_` (`services/google_drive_service.py`).
-
-Verified: `./run_mypy.sh agents routers services` clean (140 files); `compileall` clean;
-458 related tests pass across `test_estimate_agent`, `test_estimate_api`,
-`test_orchestrator_endpoint`, `test_labour_api`, `test_google_drive_service`,
-`test_auth_api`, `test_cross_resource_joins`, `test_address_service`,
-`test_agent_helpers_pending_calculation`, `test_estimate_snapshot_helpers`,
-`test_job_item_original_profit_margin`, `test_maple_work_item_ops`. Remaining backlog
-(390): F401 (282, needs per-import triage), E402 (56), F841 (52) — the case-by-case
-slices per the recommended order.
-
-**Progress 2026-06-04 — E402 + F841 slices closed (56 + 52 → 0).**
-`./run_ruff.sh --select E402,F841` is clean project-wide; the whole remaining
-backlog is now F401 only.
-
-*F841 (52)* — 3 production dead assignments deleted (`services/google_drive_service.py`
-unused `table`, `agents/property/service.py` unused `intent`,
-`agents/estimate/crud_handlers.py` unused `has_custom_window`). In tests: 43
-`agent = XAgent(use_llm=False)` constructions removed (the tests exercise module-level
-helpers, not the instance — construction is side-effect-free with `use_llm=False`); 3
-`result = asyncio.run(...)` cases kept the call but dropped the unused binding (asserts
-read `captured`, not `result`); `fake_est` (immediately reassigned before use) deleted;
-`second_owner = create_company_user(...)` kept the side-effecting call, dropped the
-binding; `audit_logs_query` (a never-executed lazy Beanie `.find()` for deferred audit
-verification) removed along with its now-orphaned `from models import ...` line.
-
-*E402 (56)* — split between config and reorder:
-- **`ruff.toml` per-file-ignores** for the two *structural* cases that cannot be
-  reordered: `scripts/**/*.py` (operational scripts must `sys.path.insert(project_root)`
-  before importing `database`/`models`/`config`) and `models/__init__.py` (interleaves
-  `model_rebuild()` between import groups so Beanie/Pydantic forward refs resolve in
-  dependency order). Cleared 33 findings.
-- **Reorders** for the rest: moved the `logger = logging.getLogger(__name__)` assignment
-  below the import block in `agents/orchestrator/service.py` (11); hoisted `import logging`
-  + `from pymongo.errors import DuplicateKeyError` to the top of `routers/agents.py` (2);
-  lifted co-located imports to the top in `tests/test_agents_api.py` (2),
-  `tests/test_template_create_routing.py` (1), `tests/test_agent_helpers_text_predicates.py` (1).
-- **Misplaced-noqa fix** in `agents/estimate/service.py` — the `# noqa: E402` sat on the
-  continuation line; moved it to the `from ... import (` statement line so ruff honors it.
-
-Verified: `./run_mypy.sh` clean on the 6 touched production files; full-project
-`./run_ruff.sh` reports **281 F401 and nothing else**; 436 related tests pass across
-`test_agents_api`, `test_audit_integration`, `test_user_api`, `test_estimate_agent`,
-`test_contact_agent`, `test_property_agent`, `test_labour_agent`, `test_equipment_agent`,
-`test_template_create_routing`, `test_agent_helpers_text_predicates`,
-`test_google_drive_service`. Next and final slice: F401 (281) — the per-import triage.
-
-**Progress 2026-06-04 — F401 slice closed (281 → 0). Backlog fully cleared.**
-`./run_ruff.sh` is now clean project-wide across all 317 files. The per-import
-triage was done with a classifier (built ad-hoc) that scans the whole repo for
-each unused name and labels it **DEAD** (referenced nowhere outside its own
-module), **REEXPORT** (another module does `from <mod> import <name>` or
-`<alias>.<name>`), or **MONKEYPATCH** (a test does `setattr(<mod-alias>, "<name>", …)`).
-
-- **Mechanized the safe deletion.** Protected every REEXPORT/MONKEYPATCH name
-  with an inline `# noqa: F401  # <reason>`, then ran
-  `ruff check --select F401 --fix --extend-fixable F401` (the `--extend-fixable`
-  overrides `ruff.toml`'s `unfixable = ["F401"]` *for that one run*). ruff then
-  removed only the genuinely-unused imports — including the multi-line paren-block
-  surgery — and left the noqa-protected names untouched. Followed by
-  `--select I --fix` to re-sort the import blocks. **174 dead imports removed.**
-- **Biggest hubs:** `agents/estimate/service.py` (90: 87 dead leftovers from the
-  service-split, +`ChatOpenAI` monkeypatch, +`ArchitectScope`/`DecomposedRequirement`
-  re-exports kept), `routers/agents.py` (42), `routers/estimates.py` (27 — a
-  documented re-export facade; kept the 8 consumed re-exports/monkeypatch targets,
-  deleted the 19 nothing consumes). `__init__.py` files were already F401-exempt,
-  so package re-exports were never at risk.
-- **Caught a classifier gap with the test suite.** Two monkeypatch targets on
-  `routers.agents` (`estimates_api_get_estimate`, `estimates_api_get_estimates`,
-  aliased imports patched via `setattr(agents_router, …)`) were mis-labeled DEAD and
-  removed; the orchestrator endpoint tests failed with `AttributeError: module
-  routers.agents has no attribute …`. Restored both with `# noqa: F401`. An
-  AST-based re-scan of every modified module then confirmed **0** remaining
-  test-accessed attributes were missing.
-
-Verified: full-project `./run_ruff.sh` clean (0 findings); `./run_mypy.sh` clean
-(317 files); `pytest --collect-only` clean (no import errors across 2874 tests);
-**full suite 2874 passed, 0 failures**.
-
-> **#323 is RESOLVED.** With B904 + style/simplify + E402 + F841 + F401 all closed,
-> `platform/` sits at zero ruff errors. ruff is now a fully-enforced gate (like
-> mypy): any new `./run_ruff.sh` finding in a PR is a regression to fix in-place,
-> not backlog. The legacy-backlog scoping caveat in CLAUDE.md's baseline note is no
-> longer needed — `./run_ruff.sh` can be run project-wide without tripping over
-> pre-existing findings.
-
----
-
 ## 2026-06-05 `/code-review` pass (Maple Spanish translation sandwich)
 
 Backend-only change: input→English / output→Spanish translation boundary
@@ -3934,25 +3047,19 @@ shortcut, and the router delegation predicate fix. Gates were zero (ruff, mypy)
 and ~700 related tests green at review time; both HIGHs are structural, not
 correctness/security. CRITICAL: 0.
 
-### 326. [HIGH] `handle_pending_optional_follow_up` is 259 lines with a duplicated delegation block
-`routers/agent_helpers/optional_follow_up.py` — the new one-turn confirm+value
+### 326. [HIGH] Duplicated delegation block in `handle_pending_optional_follow_up`
+`routers/agent_helpers/optional_follow_up.py` — the one-turn confirm+value
 shortcut hand-rolls a ~40-line processor-delegation + envelope that near-copies
 the two-turn path at the bottom of the same function. The shortcut deliberately
 omits `accuracy_suggestions` / `missing_fields` propagation (commented), but two
-envelope assemblies in one 259-line function WILL drift, and this is the shared
-state machine for ALL agents' follow-ups. Fix: extract a
-`_delegate_synthetic(pending, synthetic_message, processor_factory, context, *,
-propagate_extras)` helper used by both paths; behavior is pinned by the existing
-`test_agent_helpers_optional_follow_up.py` + `TestEstimateFollowUpConfirmStage`
-tests, so this is a pure refactor. Fold #335 into the same pass.
+envelope assemblies in one function WILL drift, and this is the shared state
+machine for ALL agents' follow-ups. (The function's length is tracked under #4.)
 
-### 327. [HIGH] `agents/estimate/crud_handlers.py` grew ~250 lines to 2,309
-Pre-existing giant (under the #4 file-size theme) but this change materially
-worsened it: the mixin now holds link/notes/description detectors + handlers,
-bare-title extraction, the shared resolver, and the get/update dispatchers.
-Next touch, split the estimate-level field-edit sub-ops (description / notes /
-property-link detectors + handlers) into an `estimate_field_handlers.py` mixin,
-mirroring the existing `work_item_field_handlers.py` precedent from §1.5.
+Fix: extract a `_delegate_synthetic(pending, synthetic_message,
+processor_factory, context, *, propagate_extras)` helper used by both paths;
+behavior is pinned by the existing `test_agent_helpers_optional_follow_up.py` +
+`TestEstimateFollowUpConfirmStage` tests, so this is a pure refactor. Fold #335
+into the same pass.
 
 ### 328. [MEDIUM] `_resolve_estimate_by_title` full-collection scan now on three more paths
 The (pre-existing) resolver does `Estimate.find(company == oid).to_list()` and
@@ -4083,14 +3190,6 @@ low. Fix (closes both call sites at once if ever wanted): add a unique
 `(company, name)` index to both models and catch `DuplicateKeyError` in the
 create helpers.
 
-### 343. [LOW] `bootstrap_company_materials` body is ~67 lines (over the 50-line heuristic)
-Added 2026-06-07. The 8-line auto-create wiring pushed
-`services/material_bootstrap.py::bootstrap_company_materials` past the 50-line
-guideline, though the bulk is docstring + comments and the new logic was already
-extracted into `_ensure_referenced_categories_and_units`. Cosmetic only. Fix if
-the function grows further: extract the category/unit pre-load and the
-group-and-insert loop into named helpers.
-
 ## 2026-06-09 `/code-review` pass (estimate title-vs-active-context refactor + status phrasing)
 
 Context: the `_resolve_update_estimate_code` seam refactor — all 7 estimate
@@ -4110,15 +3209,6 @@ unnamed-with-code → load) is the kind of logic that reads and tests better
 extracted. Fix: pull the named-target resolution+refuse block into a small
 helper (mirrors the `_resolve_update_estimate_code` seam this change
 introduced), leaving the handler to orchestrate the three branches.
-
-### 345. [MEDIUM] `crud_handlers.py` (2,495) and `work_item_field_handlers.py` (1,270) exceed the 800-line guideline
-Added 2026-06-09. Extends [#327](#327-agentsestimatecrud_handlerspy-grew-250-lines-to-2309)
-— `crud_handlers.py` was 2,309 there and is now 2,495 after this change. The
-estimate CRUD mixin keeps accreting; `work_item_field_handlers.py` is also over
-at 1,270. Pre-existing, not introduced by this refactor (the change is net
-behavior-neutral plumbing), but worsened. Fix (large, defer until the area is
-actively reworked): split the estimate handler mixins by sub-domain —
-list/analytics vs. get/update vs. work-items — into separate modules.
 
 ### 346. [LOW] Redundant double resolution in `apply_template`
 Added 2026-06-09. `agents/estimate/crud_handlers.py` (~L631): computing
@@ -4161,15 +3251,6 @@ to `conversation_contexts`) were fixed in the same change — handler is back to
 `_ELEVATED_ROLES` derived from `UserRole`, and `finalize_result.py` strips the
 per-request identity keys before persisting. The two remaining findings:
 
-### 347. [MEDIUM] `crud_handlers.py` now 2,724 lines — extends #345
-Added 2026-06-11. Extends [#345](#345-medium-crud_handlerspy-2495-and-work_item_field_handlerspy-1270-exceed-the-800-line-guideline)
-— 2,495 there, 2,724 after the status-transition enforcement work (+229 across
-the two 2026-06-11 changes). Same fix, same deferral: split the estimate
-handler mixins by sub-domain when the area is next actively reworked. The new
-`_refuse_illegal_status_transition` / `_authorize_status_transition` /
-`_load_estimate_for_update`-guard cluster is a ready-made seed for a
-`status_policy.py` (or similar) module in that split.
-
 ### 348. [LOW] Defensive `'Sent'` fallback in `_authorize_status_transition` is logically unreachable
 Added 2026-06-11. `agents/estimate/crud_handlers.py::_authorize_status_transition`:
 in the `involves_sent and not is_owner_or_admin` refusal, the
@@ -4188,60 +3269,6 @@ Context: Maple's chat edit guard was tightened from the PUT route's lock
 (Sent/Approved/Archived) to the portal's `isEditableStatus` rule — contents
 editable only in Draft or Review (`_EDITABLE_ESTIMATE_STATUSES` allowlist in
 `agents/estimate/crud_handlers.py`). UI and chat now agree; the API does not:
-
-### 349. [MEDIUM] ~~PUT `/estimates/{id}` allows content edits in statuses the UI and Maple treat as read-only~~ — RESOLVED 2026-07-26
-**Closed as resolved 2026-07-26**, taking the "better" option: the allowlist now
-lives in `models/estimate.py` as `EDITABLE_ESTIMATE_STATUSES` +
-`estimate_status_allows_content_edit(status)` (accepts the raw stored string or
-the enum; unrecognized/legacy values **fail open** so a retired status can't
-strand an estimate nobody can unlock). Three consumers now share that one
-definition:
-- `routers/estimates.py` — new `elif` after the Sent/Approved block: any
-  non-editable status rejects a payload carrying fields other than `status`,
-  with `400 "Cannot edit the contents of a {status} estimate. Estimates can
-  only be edited in Draft or Review."` Status-only payloads stay allowed, so
-  the status lane (Won → Scheduled, Generating → Draft) is untouched and the
-  transition itself is still policed by `_validate_status_transition_for_update`.
-- `agents/estimate/crud_handlers.py` — `_EDITABLE_ESTIMATE_STATUSES` is now an
-  alias of the model constant rather than a second definition.
-- portal `isEditableStatus` — unchanged; the backend now matches it.
-
-**FE coordination (the deferral's open question), resolved:** audited every
-`estimatesApi.update` caller. The estimate detail page already gates on
-`canEdit`, and `EstimatesPage` sends status-only payloads. The one real gap was
-`PropertyDialog` → `EstimatesPicker`, which PUT `{property: …}` on any estimate
-regardless of status — already 400ing today for Sent estimates, and would have
-newly 400'd for Won/Lost/etc. Locked rows now render **visible but disabled**
-(so a property's real links aren't hidden) with the reason inline. Tests:
-`portal/tests/EstimatesPicker.test.tsx` (5).
-
-Backend tests: `tests/test_estimate_api.py` — `TestEstimateContentEditability`
-(5, incl. a guard that the agent and model share one object) plus 3 router
-tests via the new `won_estimate` fixture: content edit rejected, content
-smuggled alongside a legal status change rejected, status-only transition still
-200. 425 passed across the estimate + billing + Maple surface; mypy/ruff clean.
-
-<details>
-<summary>Original body (preserved for history)</summary>
-
-### 349. [MEDIUM] PUT `/estimates/{id}` allows content edits in statuses the UI and Maple treat as read-only
-Added 2026-06-12. `routers/estimates.py` (PUT handler, ~L820): the route locks
-Archived and Sent/legacy-Approved, but still accepts content updates (notes,
-job_items, property, …) for Won / On Hold / Lost / Scheduled / Completed —
-statuses the portal renders read-only (`isEditableStatus`: Draft/Review only)
-and Maple now refuses to edit. Any direct API caller (integration, script,
-future mobile client) can bypass the editing rule the product presents as
-truth. Fix: add the same Draft/Review allowlist to the PUT route's lock block
-(keeping the existing unsend exception for status-only changes), mirroring the
-`_EDITABLE_ESTIMATE_STATUSES` constant — or, better, move the allowlist next to
-`ESTIMATE_STATUS_TRANSITIONS` in `models/estimate.py` so model, route, and
-agent share one definition. Coordinate with the FE before shipping: confirm no
-portal flow PUTs content for non-Draft/Review estimates (e.g. auto-save firing
-on a just-transitioned estimate).
-
-</details>
-
----
 
 ### 350. [HIGH] Live credentials render in plain text from any `Settings` repr — object-level masking landed 2026-07-27, `SecretStr` still open
 **Severity**: HIGH
@@ -4331,7 +3358,7 @@ Logged by `/fix-issues` — findings from the latest review (Maple status-transi
 routing + help answer-then-offer) not fixed in that pass. Selection fixed #1, #2,
 #3, #5; #4 deferred here because the fix is much larger than the finding describes.
 
-### [LOW] platform/agents/orchestrator/service.py:~1858 — status offer made without pre-validating legality/role
+### 354. [LOW] platform/agents/orchestrator/service.py:~1858 — status offer made without pre-validating legality/role
 `_maybe_attach_status_offer` offers "Yes — I can set {EST} to {Y}…" whenever an
 EST-code + recognized target status is present, without checking the estimate's
 current status or the user's role. A Member, or a request for an illegal edge, is
@@ -4347,7 +3374,7 @@ sync) help-lane offer path async and duplicating the state-machine/role checks t
 agent already performs on "yes". Only worth doing if the optimistic offer proves
 confusing in practice.
 
-### [INFO] tooling / regex — not actionable now
+### 355. [INFO] tooling / regex — not actionable now
 - `bandit` is not installed in `platform/.venv`, so the Step-3 security scan was
   skipped during review. `pip install bandit` (or add to dev requirements) to
   enable `bandit -r . -x tests/`. Manual review found no injection/secrets in the
@@ -4364,16 +3391,7 @@ confusing in practice.
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass
 (selection: none). All LOW / optional polish on the clarification-merge change.
 
-### [LOW] portal/src/lib/orchestratorReply.ts:39 — formatOrchestratorReply is now ~54 lines (just over the 50-line guideline)
-The added clarification-merge block pushes the function just past the 50-line
-guideline. It's still linear guard-clauses + a doc comment, so it reads fine, but
-the merge logic is a self-contained unit.
-**Suggested fix:** Optional — extract the needs_clarification block into a small
-pure helper, e.g. `mergeClarification(response, question): string`, and call it
-from formatOrchestratorReply. Improves readability and lets the merge/dedup be
-unit-tested directly.
-
-### [LOW] portal/src/lib/orchestratorReply.ts:80 — combine can stack two questions on distinct question-bearing refusals
+### 356. [LOW] portal/src/lib/orchestratorReply.ts:80 — combine can stack two questions on distinct question-bearing refusals
 When `response` and `clarifying_question` are distinct and neither contains the
 other, the result is `${response}\n\n${question}`. For the illegal-status-transition
 refusal — whose `response` already ends in its own question ("…want me to do one of
@@ -4384,7 +3402,7 @@ instead?" — the reply shows two stacked questions. Cosmetic; context is preser
 refine backend-side (drop the redundant clarifying_question on flows whose
 `response` is already self-contained) rather than adding heuristics in the portal.
 
-### [LOW] portal/src/lib/orchestratorReply.ts:74 — substring dedup could over-collapse a degenerate short question
+### 357. [LOW] portal/src/lib/orchestratorReply.ts:74 — substring dedup could over-collapse a degenerate short question
 `context.includes(question)` / `question.includes(context)` dedup on raw substring.
 If a `clarifying_question` were a short fragment that happens to appear mid-sentence
 in `response` (e.g. question "name" inside "Add a name."), the shorter field is
@@ -4400,7 +3418,7 @@ of the other. Not worth the complexity now.
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [LOW] platform/agents/calculator/text_helpers.py:195 — calculation_type string literals spread into a third location
+### 358. [LOW] platform/agents/calculator/text_helpers.py:195 — calculation_type string literals spread into a third location
 "aggregate_tons"/"mulch_bags" are now hardcoded in `text_helpers` in addition to the
 schema `Literal` and the registry keys (the Magic Strings smell). Risk is low — the
 `Literal` type makes a typo a mypy error and the registry drift test guards
@@ -4415,18 +3433,7 @@ the registry, and `text_helpers` so there is one source of truth.
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [MEDIUM] platform/services/material_bootstrap.py:179 — bootstrap_company_materials exceeds the 50-line guideline
-After adding the preload + partition + insert_many, the function is ~63 code lines and
-now juggles several responsibilities (resolve company id, load templates, preload
-categories, preload units, auto-create missing cats/units, group rows, preload existing
-materials, partition into update/insert, batched write). It's cohesive and readable, but
-crosses the review rubric's 50-line threshold and is getting hard to scan.
-**Suggested fix:** Extract the per-material partition loop (resolve → update-existing vs
-collect-to-insert) into a small private helper, e.g. `_partition_materials(grouped,
-existing_by_name, categories, units, company_id, result) -> list[Material]`. Pure
-mechanical extraction, no behavior change.
-
-### [LOW] platform/services/company_bootstrap.py:68 — (name, unit) lookup key assumes canonical unit casing
+### 359. [LOW] platform/services/company_bootstrap.py:68 — (name, unit) lookup key assumes canonical unit casing
 `existing_by_key` is keyed by `(doc.name, doc.unit)` where `doc.unit` is the LabourUnit
 str-enum, and looked up with the template's raw `unit` string. It works today only because
 default_labours.csv uses exactly "Hourly" (verified). If a future seed row used an
@@ -4437,7 +3444,7 @@ regression — but the in-memory key makes the casing assumption implicit.
 on `LabourUnit.from_string(template["unit"])` on both sides, so alias/case variants resolve
 to the same enum. (Or assert the seed CSV uses canonical unit values.)
 
-### [LOW] platform/services/material_bootstrap.py — insert_many is non-atomic on partial failure
+### 360. [LOW] platform/services/material_bootstrap.py — insert_many is non-atomic on partial failure
 `Material.insert_many(to_insert)` (and the labour equivalent) isn't transactional. A
 mid-batch failure (e.g. a duplicate-key race, validation) leaves some rows inserted, then
 raises up to the load-standard router as a 502 with `created` never set. The pre-existing
@@ -4453,7 +3460,7 @@ surface a partial "imported N of M" result instead of a bare 502.
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [LOW] portal/src/pages/OnboardingPage.tsx:140 — back-nav wiring isn't covered by a test
+### 361. [LOW] portal/src/pages/OnboardingPage.tsx:140 — back-nav wiring isn't covered by a test
 The new `onBack={() => goToStep(1)}` on the Contacts step and the
 `companyId`/`onCompanyUpdated` props are untested at the page level. The meaningful logic
 (create-vs-update, prefill) is covered in `CompanyStepEdit.test.tsx`; this is just one-line
@@ -4468,7 +3475,7 @@ covered.
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [LOW] portal/src/components/onboarding/CompletionStep.tsx:16 — decorative sparkle icon lacks aria-hidden
+### 362. [LOW] portal/src/components/onboarding/CompletionStep.tsx:16 — decorative sparkle icon lacks aria-hidden
 The `<Sparkles>` icon is purely decorative but has no `aria-hidden="true"`. Lucide renders a
 bare `<svg>` with no accessible name, so screen readers already skip it (hence LOW), and it
 matches the existing inline-icon pattern across the codebase.
@@ -4481,7 +3488,7 @@ stay consistent with the rest of the codebase, which omits it on decorative icon
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [MEDIUM] platform/prompts/role_catalog.py:55 — company-editable role text reaches the LLM prompt unsanitized for instruction-injection
+### 363. [MEDIUM] platform/prompts/role_catalog.py:55 — company-editable role text reaches the LLM prompt unsanitized for instruction-injection
 `render_labour_role_catalog` renders Labour `name` + `description` (company-editable) into both
 estimate prompts. Names are hardened (control-char/length drop) and descriptions are
 whitespace-collapsed + truncated, but description content is not scrubbed for injection text. A
@@ -4493,14 +3500,14 @@ a new trust boundary).
 a light injection scrub in the renderer or a system-prompt reminder that catalog text is data,
 not instructions. Not a blocker.
 
-### [LOW] platform/agents/estimate/llm_pipeline.py:951 — pre-existing print(formatted_prompt) now dumps role descriptions to stdout
+### 364. [LOW] platform/agents/estimate/llm_pipeline.py:951 — pre-existing print(formatted_prompt) now dumps role descriptions to stdout
 `_extract_estimate_with_llm` prints the full prompt (pre-existing debug code, not in this diff).
 This change enlarges what it dumps (role responsibility text). Not PII, but noisy debug output
 in a production path.
 **Suggested fix:** Out of scope here; downgrade `print(...)` → `logger.debug(...)` when next
 touching this file.
 
-### [LOW] platform/prompts/role_catalog.py — role resolution now leans on LLM prompt-adherence (conscious tradeoff)
+### 365. [LOW] platform/prompts/role_catalog.py — role resolution now leans on LLM prompt-adherence (conscious tradeoff)
 Activity-role correctness now depends on the model honoring "pick from the catalog." Intended
 design (live smokes confirm it works); deterministic `_resolve_labour_inventory_match` remains
 as fallback, so not Prompt Entanglement. Flagged only for record: prompt drift could regress
@@ -4515,17 +3522,7 @@ becomes critical.
 Logged by `/fix-issues` — findings from the orchestrator intent-first review not fixed in that
 pass (selection was `1, 3, 4`).
 
-### [HIGH] platform/agents/orchestrator/service.py:2508 — process() is a ~245-line god-method
-process() already exceeded the 50-line threshold; the intent-first change adds another inline
-fast-path block, worsening it. Pre-existing structural smell — not a defect in the new logic
-(the block mirrors the existing inline pre-checks). The DRY extraction in review-#3 (now applied,
-`_build_rule_match_result`) trims the duplicated dicts but does not shorten the method's branch
-count materially.
-**Suggested fix:** Decompose process()'s deterministic pre-check sequence into a table-driven
-dispatch (ordered list of `(matcher, builder)` pairs iterated in one loop) so each new pre-check
-is data, not another inline `if` block. Not a blocker on its own.
-
-### [LOW] platform/agents/orchestrator/service.py:2657 — `_classify_specific_phrasings` evaluated twice on the LLM-reconciliation path
+### 366. [LOW] platform/agents/orchestrator/service.py:2657 — `_classify_specific_phrasings` evaluated twice on the LLM-reconciliation path
 When the pre-LLM fast-path returns None, the LLM runs, then `_prefer_explicit_rule_match` →
 `_classify_with_rules` → `_match_unambiguous_command` re-invokes `_classify_specific_phrasings`.
 Same regexes run twice per ambiguous message. Cheap (regex only), no correctness impact.
@@ -4539,7 +3536,7 @@ of recomputing it.
 Logged by `/fix-issues` — findings from the Finance-page tooltip review not fixed in that pass
 (selection was `1`; #1 viewport-edge clipping was fixed).
 
-### [LOW] portal/src/components/settings/FinancialTab.tsx:44 — field descriptions duplicated from users_guide.md
+### 367. [LOW] portal/src/components/settings/FinancialTab.tsx:44 — field descriptions duplicated from users_guide.md
 The six tooltip description strings are copied from the platform glossary
 (`platform/user_guides/users_guide.md` lines 718-725). Two sources of truth can drift — a guide
 edit won't propagate to the UI. The frontend can't import the backend markdown, so this is a
@@ -4547,7 +3544,7 @@ conscious tradeoff, not a bug.
 **Suggested fix:** No action needed now. If these multiply, consider a shared copy module or
 surfacing them from an API. Note kept so a future guide edit remembers to update the UI strings too.
 
-### [LOW] portal/src/components/ui/InfoTooltip.tsx:92 — info button tap target is 16x16px
+### 368. [LOW] portal/src/components/ui/InfoTooltip.tsx:92 — info button tap target is 16x16px
 The trigger is `h-4 w-4` (16px), below the ~44px recommended touch target. Fine for a secondary
 info affordance, but slightly fiddly on touch.
 **Suggested fix:** Optional — add padding (e.g. `p-1` with `-m-1` to preserve visual size) to
@@ -4561,7 +3558,7 @@ Logged by `/fix-issues` — findings from the InfoTooltip portal/clamp/fade revi
 `none`). The 16px tap-target finding from this review is the same one already tracked above
 (2026-06-20 Finance-page InfoTooltip) — not re-logged to avoid a duplicate.
 
-### [LOW] portal/src/components/ui/InfoTooltip.tsx:78 — position clamped horizontally but not vertically
+### 369. [LOW] portal/src/components/ui/InfoTooltip.tsx:78 — position clamped horizontally but not vertically
 The portaled bubble always opens below the trigger (`top = triggerRect.bottom + 6`) and clamps only
 `left` to the viewport width. A field near the bottom of a short viewport can push the tooltip off
 the bottom edge — there is no flip-to-above or bottom clamp. Low impact: the Financial fields sit
@@ -4576,11 +3573,11 @@ limits the stale-position window).
 
 Logged by `/fix-issues` — findings from the latest review (numeric time windows for Maple headline metrics) not fixed in that pass. #1 (OverflowError → 500) was fixed in the same pass via a 1-year clamp.
 
-### [LOW] platform/agents/estimate/crud_handlers.py:1635 — canonical-span constants duplicated across two files
+### 370. [LOW] platform/agents/estimate/crud_handlers.py:1635 — canonical-span constants duplicated across two files
 The `named` dict keys {7, 30, 91, 365} in `_describe_date_window` mirror `days_per_unit` in `text_helpers.py` and must stay in lockstep. If `quarter` were ever retuned to 90 in the parser, the label would silently stop matching and fall back to "in the last 90 days". Latent drift coupling, not a current bug.
 **Suggested fix:** Acceptable as-is given the small surface; optionally derive both from one shared constant if these spans are touched again.
 
-### [LOW] platform/agents/estimate/text_helpers.py:589 — `_parse_estimate_date_filter` docstring not updated for numeric windows
+### 371. [LOW] platform/agents/estimate/text_helpers.py:589 — `_parse_estimate_date_filter` docstring not updated for numeric windows
 The docstring still enumerates only word-form phrasings ("from last week" / "this month" / "in the past year") and says it returns `None` "when no recognized qualifier appears" — it now also handles numeric windows ("last 90 days", "past 6 months"). The inline comment above the new regex documents it, but the function-level docstring is the public contract.
 **Suggested fix:** Add one line noting numeric windows are also recognized (and capped at one year).
 
@@ -4590,11 +3587,11 @@ The docstring still enumerates only word-form phrasings ("from last week" / "thi
 
 Logged by `/fix-issues` — findings from the review of the PYTHON-J fix (per-segment outbound translation in `services/translation.py`) not fixed in that pass. #2 (distinct clarifying_question test gap) was fixed in the same pass.
 
-### [LOW] platform/services/translation.py:712 — unbounded concurrency in `asyncio.gather`
+### 372. [LOW] platform/services/translation.py:712 — unbounded concurrency in `asyncio.gather`
 One LLM call is fired per segment with no concurrency cap. In practice `suggestions` is a small fixed UI set (~3-4 chips) so fan-out is caller-bounded, but there is no structural guard; a future caller passing a large `suggestions` list would launch that many simultaneous LLM calls (rate-limit / burst-cost risk).
 **Suggested fix:** Optional — bound it with a `Semaphore` or cap the number of translated chips if suggestion counts could ever grow. Not needed at current call sites.
 
-### [LOW] platform/services/translation.py:661 — `translate_response_bundle` length (~69 lines incl. docstring)
+### 373. [LOW] platform/services/translation.py:661 — `translate_response_bundle` length (~69 lines incl. docstring)
 By the mechanical >50-line rule the function is long. Mitigating context: the executable body is ~30 linear, branch-light lines, and this change reduced the function from ~90 lines (removed the batch/fallback block). Readability is fine.
 **Suggested fix:** None required. The segment-build block could be extracted to a helper if it grows.
 
@@ -4604,15 +3601,15 @@ By the mechanical >50-line rule the function is long. Mitigating context: the ex
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass. #1 (`_build_template` length) and #2 (date_range recurrence test) were fixed in the same pass.
 
-### [LOW] platform/services/template_bootstrap.py:241 — duplicate catalog names collapse silently (last-wins)
+### 374. [LOW] platform/services/template_bootstrap.py:241 — duplicate catalog names collapse silently (last-wins)
 `materials_by_name` / `labours_by_name` are dict comprehensions keyed by name. Material has a non-unique (company, name) index, so two same-name rows silently keep only the last — resolution could bind to an unexpected size/price with no signal.
 **Suggested fix:** Optional — log a warning when a name maps to >1 catalog doc.
 
-### [LOW] platform/services/template_bootstrap.py:152 — size label kept when requested size doesn't match
+### 375. [LOW] platform/services/template_bootstrap.py:152 — size label kept when requested size doesn't match
 When `size_str` is provided but matches no `MaterialSizeCost`, `_resolve_material_size` falls back to the first size for price/unit, yet the item stores the original `size_str`. Result: a line item whose size label and price/unit can disagree. (No current template hits this — all sizes match.)
 **Suggested fix:** Store `size.size` (the resolved label), or route a non-matching size to `unmatched_materials`. Document the chosen behavior in the helper docstring.
 
-### [LOW] portal/src/pages/SettingsPage.tsx:1208 — tablist orientation / keyboard semantics
+### 376. [LOW] portal/src/pages/SettingsPage.tsx:1208 — tablist orientation / keyboard semantics
 This change removed `aria-orientation="vertical"`; on the desktop vertical layout that now defaults to `horizontal` (minor SR regression), and it cannot be statically correct for both responsive layouts. Separately and pre-existing (unchanged by this diff): the roving `tabIndex={isActive ? 0 : -1}` follows the ARIA tabs pattern but there is no Arrow-key keydown handler, so keyboard users can't move between tabs — only the active tab is reachable via Tab.
 **Suggested fix:** If full correctness is wanted, drive `aria-orientation` from a `matchMedia('(min-width:768px)')` state and add an ArrowLeft/Right (and Up/Down) handler that moves focus + selection across `tabs`. Low practical impact today (orientation has no keyboard effect without arrow handling), so acceptable to defer.
 
@@ -4622,59 +3619,37 @@ This change removed `aria-orientation="vertical"`; on the desktop vertical layou
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass. #1 (`break-words` on the Work Items description cell) was fixed in the same pass.
 
-### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1213 — `key={idx}` on a deletable work-item list (pre-existing)
+### 377. [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1213 — `key={idx}` on a deletable work-item list (pre-existing)
 Work items can be deleted, so index keys can cause React to mis-associate row state on removal. Not introduced by this change — the line was only shifted — but it sits in the edited map.
 **Suggested fix:** Use a stable id if available (e.g. the work item's own id). Out of scope for the styling change; fold into a follow-up if desired.
 
-### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1211-1279 — narrow two-row layout relies on inline-block flow; needs an eyes-on check
+### 378. [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1211-1279 — narrow two-row layout relies on inline-block flow; needs an eyes-on check
 The "Description row 1, meta row 2" result depends on the Description inline-block filling row 1 so the meta cells wrap below. When a description is very short, the meta cells may sit beside it on row 1 (still readable, just not strictly two rows). No correctness impact; purely visual.
 **Suggested fix:** Verify across short/long descriptions at a narrow container width. If strict two-row behavior is required, force a break (e.g. `basis-full` on the Description cell under a flex `tr`, or a wrapper element for the meta trio).
 
 ---
 
-## 2026-06-23 deferred from /code-review (People page container-query + Unit column removal)
-
-Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
-
-### [LOW] portal/src/pages/PeoplePage.tsx:1 — file exceeds 800-line guideline (1128 lines)
-The file is over the 800-line HIGH threshold. PRE-EXISTING; this change does not worsen it (net -6 lines). Reported for awareness only.
-**Suggested fix:** Out of scope for this change. If addressed later, extract the create/edit Modal form, the CSV-upload Modal, and the card/table row renderers into child components.
-
----
-
-## 2026-06-23 deferred from /code-review (Role form rename + breakdown tooltips)
-
-Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
-
-### [LOW] portal/src/pages/PeoplePage.tsx:1 — file exceeds 800 lines (1168 lines)
-PeoplePage.tsx is 1168 lines. PRE-EXISTING; the Role-form rename/tooltip change added ~30 lines but did not create the size problem. Reported for awareness only (per the size heuristic).
-**Suggested fix:** No action needed for this change. If the page grows further, extract the Role form Modal and the list table into sub-components.
-
 ## 2026-06-28 deferred from /code-review (calculator open-math path)
 
 Logged by `/fix-issues` — `/fix-issues all` was requested, but these three were deliberately NOT force-applied because their correct fix would work against the approved design (#2, #3) or is tooling rather than a source change (#4). #1 (raw user message in the open-math exception log → PII risk) WAS fixed in the same pass.
 
-### [LOW] platform/agents/calculator/open_math.py:38 — whole-number rounding enforced only in the prompt
+### 379. [LOW] platform/agents/calculator/open_math.py:38 — whole-number rounding enforced only in the prompt
 "counts must be whole — wrap in floor/ceil" lives only in `_REASONING_SYSTEM_PROMPT`; neither `safe_eval` nor `format_open_math` enforces it, so a model slip can reproduce the fractional-count bug the feature targets (`_fmt_value` would render "6.67"). This is the residual modeling risk the design spec explicitly accepted (mitigated by the auditable `Working:` line + temperature 0).
 **Suggested fix:** A blanket floor is wrong — not every open-math result is a count (areas/weights are legitimately fractional). A correct guard needs count-vs-measurement unit classification or a re-prompt, i.e. a mini-feature, not a one-liner. Accept as documented residual risk unless it recurs in practice.
 
-### [LOW] platform/agents/calculator/service.py:236 — broad `except Exception` can mask genuine bugs
+### 380. [LOW] platform/agents/calculator/service.py:236 — broad `except Exception` can mask genuine bugs
 The fail-soft catch is intentional for LLM/parse failures but also swallows programming errors (e.g. a future KeyError) into a silent fallback. Mitigated by `logger.exception` preserving the trace.
 **Suggested fix:** Narrowing to specific LLM/validation exception types would let unanticipated error types (OpenAI timeouts, new LangChain exceptions) propagate and 500 the request — contradicting the spec's mandated fail-soft guarantee. Keep the broad catch; the existing `logger.exception` already surfaces masked bugs in logs. No change recommended.
-
-### [LOW] platform/.venv — bandit not installed; automated security scan skipped
-The `/code-review` bandit step could not run; only the manual security pass covered the diff. There is no dev-requirements split — adding `bandit` to the single runtime `requirements.txt` would ship a dev-only scanner to production.
-**Suggested fix:** Introduce a `requirements-dev.txt` (or a `[project.optional-dependencies] dev` group) and pin `bandit` there, then wire it into the review tooling. Tooling/process task, not a source fix.
 
 ## 2026-06-28 deferred from /code-review (reverse-calc classifier fix)
 
 Logged by `/fix-issues` — `/fix-issues none` was requested; both findings are LOW watch-points, not blockers.
 
-### [LOW] platform/tests/test_calculator_open_math_live.py:1 — classifier regression guard is opt-in only
+### 381. [LOW] platform/tests/test_calculator_open_math_live.py:1 — classifier regression guard is opt-in only
 The reverse→open_math and forward→curated routing is verified solely by `llm_e2e` tests, which are excluded from the default/CI run and need OPENAI_API_KEY. A future prompt edit could silently regress this routing without the default suite catching it. Coverage is also narrow (3 reverse + 5 forward phrasings), so untested phrasings could still mis-route.
 **Suggested fix:** Accept (live-LLM behavior can't run in default CI). Optionally run the live suite as a manual gate before promoting calculator-prompt changes, and broaden phrasings over time.
 
-### [LOW] platform/agents/calculator/service.py:88 — extraction prompt is accumulating routing rules
+### 382. [LOW] platform/agents/calculator/service.py:88 — extraction prompt is accumulating routing rules
 The open_math branch now spans spaced-layout + composite + orientation + reverse guidance plus 6 examples. Still clear, but classifier prompts that grow this way drift toward ambiguity and higher per-call token cost. Not a defect — a maintainability watch-point.
 **Suggested fix:** Periodically run /agent-prompt-review on the extraction prompt for clarity and token efficiency.
 
@@ -4682,15 +3657,15 @@ The open_math branch now spans spaced-layout + composite + orientation + reverse
 
 Logged by `/fix-issues` — `/fix-issues none` was requested; all three are LOW watch-points, not blockers.
 
-### [LOW] platform/agents/calculator/text_helpers.py:54 — "how long" is a broad gate trigger
+### 383. [LOW] platform/agents/calculator/text_helpers.py:54 — "how long" is a broad gate trigger
 `\bhow\s+long\b` routes any "how long … <spatial unit>" query to the Calculator. Mitigated by the measurement-unit requirement, CRUD-override precedence, and the no-unit negative test — but non-labor phrasings like "how long is a 10 ft board" now reach open-math too.
 **Suggested fix:** Accept — open-math handles such strays gracefully (trivial answer). Monitor; tighten only if a real misroute surfaces.
 
-### [LOW] platform/tests/test_calculator_open_math_live.py:95 — labor-time verified only by opt-in llm_e2e
+### 384. [LOW] platform/tests/test_calculator_open_math_live.py:95 — labor-time verified only by opt-in llm_e2e
 Routing + the answer are covered solely by `llm_e2e` tests (excluded from default CI, need a key). The answer test asserts on LLM-generated text ("hour"/"assumption"), which is mildly fragile.
 **Suggested fix:** Accept (live behavior can't run in default CI). Keep the assertions loose; run the live suite manually before promoting calculator-prompt changes.
 
-### [LOW] platform/agents/calculator/service.py:88 + open_math.py:43 — classifier + reasoner prompts still growing
+### 385. [LOW] platform/agents/calculator/service.py:88 + open_math.py:43 — classifier + reasoner prompts still growing
 Both prompts gained another rule (reverse + now labor-time). Still clear, but the trend warrants a periodic clarity/token pass.
 **Suggested fix:** Periodically run /agent-prompt-review on the extraction + reasoning prompts.
 
@@ -4698,23 +3673,15 @@ Both prompts gained another rule (reverse + now labor-time). Still clear, but th
 
 Logged by `/fix-issues` — findings #10–#13 from the Phase 1 support-system review; #1–#9 (all HIGHs + behavioral MEDIUMs) were fixed in the same pass.
 
-### [MEDIUM] platform/routers/support.py:~110 + platform/routers/slack_events.py:~250 — _send_flow (~85 lines) and _handle_resolve (~70 lines) exceed the 50-line guideline
-Both are cohesive top-to-bottom flows but exceed the repo's function-length guideline; Phase 2's live-availability gating lands directly in `_send_flow` and will stretch it further.
-**Suggested fix:** When Phase 2 touches these, extract helpers: conversation resolution (`_resolve_or_create`), Slack delivery (`_deliver_to_slack`), and the /resolve archive step.
-
-### [LOW] platform/routers/support.py — clear/seen/current endpoints lack per-user rate limits
+### 386. [LOW] platform/routers/support.py — clear/seen/current endpoints lack per-user rate limits
 Only the send endpoints are rate-limited. `clear` posts to Slack per call; abuse is bounded (requires an open conversation, archived after one call) but the guard is one line.
 **Suggested fix:** Apply `auth_rate_limiter` with modest limits (e.g. 10/min) to the three remaining endpoints.
 
-### [LOW] platform tooling — bandit not installed; /code-review's security scan skipped
-The one tool-assisted scan the pre-push hook doesn't perform couldn't run during the Phase 1 review.
-**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/` once over the support modules.
-
-### [LOW] portal/src/lib/supportFirestore.ts — console.error in listener error paths
+### 387. [LOW] portal/src/lib/supportFirestore.ts — console.error in listener error paths
 Error-path logging only (rules/App Check misconfiguration surfaces here) — arguably desirable during the dev-only rollout.
 **Suggested fix:** Keep for Phase 1; route to a proper client logger if one is adopted.
 
-### [MEDIUM] portal/src/components/common/SupportPanel.tsx — errored Firestore listeners stay dead until panel reopen
+### 388. [MEDIUM] portal/src/components/common/SupportPanel.tsx — errored Firestore listeners stay dead until panel reopen
 Found during 2026-07-01 manual dev testing: `onSnapshot` terminates permanently on `permission-denied` (no retry). A listener that errors during a transient misconfiguration leaves the panel empty — with no visible error — until the user switches tabs or refreshes. Reopening the panel re-attaches (effect on `[open, conversationId]`), so the blast radius is one stale view, but users won't know to do it.
 **Suggested fix:** Surface an error state in the panel when a listener errors ("Couldn't load messages — Retry") whose retry re-runs the subscribe effect; same for the layout-level badge listener.
 
@@ -4722,67 +3689,23 @@ Found during 2026-07-01 manual dev testing: `onSnapshot` terminates permanently 
 
 Logged by `/fix-issues` — findings #2–#4 from the panel-refinement review; #1 (AiPanel confirm-clear test) was added in that pass.
 
-### [LOW] portal/src/components/Layout/AiPanel.tsx — confirm dialog backdrop is full-viewport, unlike Support's panel-scoped one
+### 389. [LOW] portal/src/components/Layout/AiPanel.tsx — confirm dialog backdrop is full-viewport, unlike Support's panel-scoped one
 The Maple confirm uses `fixed inset-0` so its dark backdrop dims the entire app, whereas the Support confirm uses `absolute inset-0` and dims only the panel. Functionally identical; rendering once at the fragment level was a deliberate choice to avoid duplicating it across the mobile+desktop asides.
 **Suggested fix:** Accept the full-screen backdrop (common modal pattern), or scope it to the panel by rendering the dialog inside each aside's relative container like SupportPanel does.
 
-### [LOW] portal/src/components/common/SupportPanel.tsx — draft/attachment cleared on message-type dropdown switch, not only tab switch
+### 390. [LOW] portal/src/components/common/SupportPanel.tsx — draft/attachment cleared on message-type dropdown switch, not only tab switch
 The resolve-conversation effect (deps `[open, activeTab, activeType]`) clears draft + pendingFile on every `activeType` change, so switching the Feedback/Support dropdown mid-compose discards a half-typed message. Reasonable (separate conversation per type) but recorded as a behavior.
 **Suggested fix:** Accept, or preserve the draft across dropdown switches by keying the draft-clear on `activeTab` only.
-
-### [LOW] platform tooling — bandit not installed; security scan skipped
-/code-review's one tool-assisted scan (not covered by the pre-push hook) could not run.
-**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/` once over the support modules.
-
-## 2026-07-02 deferred from /code-review (support Phase 2 — Live Chat)
-
-Logged by `/fix-issues` — findings from the Phase 2 review not fixed in that pass. #1 (stale mirror reconcile), #2 (atomic upsert), and #3 (unknown-action test) were fixed in the pass.
-
-### [LOW] platform tooling — bandit not installed; security scan skipped
-Recurring gap (same as the UI-refinements section above): `/code-review`'s one tool-assisted scan couldn't run over the new Phase 2 support modules (`live_chat_availability.py`, `staff_availability.py`).
-**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/`.
-
----
-
-## 2026-07-02 deferred from /code-review (Slack mrkdwn decoder)
-
-Logged by `/fix-issues` — findings from the mrkdwn-decoder review not fixed in that pass. #1 (end-to-end webhook decode test) was added in that pass.
-
-### [LOW] platform tooling — bandit not installed; security scan skipped
-Recurring gap: `/code-review`'s one tool-assisted scan couldn't run over the changed support modules.
-**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/`.
-
----
-
-## 2026-07-02 deferred from /code-review (tooltips + New Session relocation)
-
-Logged by `/fix-issues` — findings from the button-tooltip / New-Session-relocation review not fixed in that pass (selection: none).
-
-### [LOW] platform tooling — bandit not installed; security scan skipped
-Recurring gap: `/code-review`'s one tool-assisted scan couldn't run. This batch (layout tweaks, tooltips, a constant rename) has no security surface, so the miss is immaterial — logged for consistency.
-**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/`.
-
----
-
-## 2026-07-02 deferred from /code-review (in-thread Resolve shortcut)
-
-Logged by `/fix-issues` — findings from the message-shortcut review not fixed in that pass. #1 (best-effort Firestore archive) was fixed in the pass.
-
-### [LOW] platform tooling — bandit not installed; security scan skipped
-Recurring gap: `/code-review`'s one tool-assisted scan couldn't run over the new interaction/shortcut modules.
-**Suggested fix:** `pip install bandit` (add to dev requirements) and run `bandit -r . -x tests/`.
-
----
 
 ## 2026-07-02 deferred from /code-review (Trello Feedback panel retirement)
 
 Logged by `/fix-issues` — findings from the Trello-retirement / tab-reorder review not fixed in that pass (selection: none).
 
-### [LOW] portal/src/components/Layout/PortalLayout.tsx:147 — flag-off environments now have NO in-app feedback entry point
+### 391. [LOW] portal/src/components/Layout/PortalLayout.tsx:147 — flag-off environments now have NO in-app feedback entry point
 The Support tab is still gated on `supportEnabled` (VITE_SUPPORT_PANEL_ENABLED), and the Trello Feedback tab — which was unconditional — is gone. In any build without the flag, the footer is just Maple | What's New: no way to contact support in-app at all. Prod has the flag on today, so no current impact — but the documented way to "turn the panel off" (empty the GitHub var + rebuild) now has a much bigger blast radius than before: it silently removes the only contact channel, not just a beta feature. The flag has effectively changed meaning from rollout gate to kill switch.
 **Suggested fix:** Either accept (flag stays permanently on) and note the kill-switch semantics in the workflow comment next to VITE_SUPPORT_PANEL_ENABLED — or drop the flag gating entirely now that Support is the production channel (remove isSupportPanelEnabled and render unconditionally).
 
-### [LOW] platform/routers/feedback.py — backend /feedback route + Trello service are now dead code
+### 392. [LOW] platform/routers/feedback.py — backend /feedback route + Trello service are now dead code
 With portal/src/api/feedback.ts deleted, nothing calls POST /feedback anymore. The feedback router, trello_service, and the TRELLO_* config keys (trello_api_key/secret/api_token + three list IDs in config.py) are dead code in platform — an unused authenticated route that still writes to Trello if hit, plus live Trello credentials in prod env for a retired feature.
 **Suggested fix:** Separate platform change: remove routers/feedback.py (+ main.py registration), trello_service, the TRELLO_* Settings fields (or keep them declared-but-unused like trello_secret if .env files still carry them), and their tests; then revoke the Trello API token. Also retire the golden-sprouting-adleman plan doc as superseded.
 
@@ -4792,7 +3715,7 @@ With portal/src/api/feedback.ts deleted, nothing calls POST /feedback anymore. T
 
 Logged by `/fix-issues` — finding from the App Check readiness-gate review not fixed in that pass (selection: none).
 
-### [LOW] portal/src/components/common/SupportPanel.tsx:156 — App Check gate covers only the message/doc listener
+### 393. [LOW] portal/src/components/common/SupportPanel.tsx:156 — App Check gate covers only the message/doc listener
 The `waitForAppCheckReady()` gate is applied to `subscribeToMessages` + `subscribeToConversationDoc` (the important one), but the panel's `subscribeToLiveAvailability` (SupportPanel.tsx:156) and the layout badge's `subscribeToUserConversations` (useSupportUnread.ts:37, gated on `waitForAuthReady` but NOT `waitForAppCheckReady`) attach without an App Check token primed. With enforcement on, a permission-denied on their first onSnapshot kills them permanently too (no auto-retry) — the same bug class the gate was added to fix. Impact is lower for these two: both have a REST fallback (getLiveAvailability seed for the pill; getUnread seed for the badge), so a dead listener degrades to "stale until refresh" rather than an empty transcript. That's why targeting the message listener first is reasonable — but the fix is incomplete for consistency.
 **Suggested fix:** Gate the availability effect's `subscribeToLiveAvailability` and the `subscribeToUserConversations` call in useSupportUnread on `waitForAppCheckReady` too (await it before attaching, same cancelled-flag pattern). Or, if the REST fallbacks are deemed sufficient for those two, add a one-line comment on each noting the deliberate choice so the asymmetry reads as intentional.
 
@@ -4802,97 +3725,55 @@ The `waitForAppCheckReady()` gate is applied to `subscribeToMessages` + `subscri
 
 Logged from the Operations UI final-review pass. Two gaps (staff/customer email invariant case-sensitivity + invitation bypass) were fixed directly in that pass; the items below were deferred.
 
-### [LOW] platform/dependencies.py — `resolve_active_staff` return annotation
+### 394. [LOW] platform/dependencies.py — `resolve_active_staff` return annotation
 Return type isn't precisely annotated for the staff/None resolution path. Tighten to the honest `StaffUser | None` per the mypy-playbook pattern.
 
-### [MEDIUM] platform/routers/ops.py — missing 409-path + status/pagination-edge tests
+### 395. [MEDIUM] platform/routers/ops.py — missing 409-path + status/pagination-edge tests
 No test coverage for the 409 conflict path, or for status-filter/pagination edge cases (empty page, out-of-range offset, invalid status value).
 
-### [LOW] platform/services/ops_verification.py — no Firebase-failure unit test
+### 396. [LOW] platform/services/ops_verification.py — no Firebase-failure unit test
 No test simulates a Firebase Admin SDK failure (e.g. `firebase_admin_auth.get_user_by_email` raising something other than `UserNotFoundError`) to verify the verification flow degrades safely.
 
-### [LOW] platform/services/staff_service.py — no email-failure provisioning branch test
+### 397. [LOW] platform/services/staff_service.py — no email-failure provisioning branch test
 `provision_staff_user` swallows `send_password_reset_email` failures (logs a warning, continues) but no test exercises that branch to confirm the staff record is still created.
 
-### [LOW] portal — duplicated staff-session persistence block in App.tsx + LoginPage.tsx
+### 398. [LOW] portal — duplicated staff-session persistence block in App.tsx + LoginPage.tsx
 Both `onIdTokenChanged` (App.tsx) and `handleLogin` (LoginPage.tsx) build the same staff `AuthUser` object and call `setCurrentUser` / session helpers inline. Extract a shared `persistStaffSession(authData)` helper (mirroring `resolvePostLoginRoute` in `src/lib/staffAuth.ts`) and wire both call sites through it.
 
-### [LOW] portal/src/pages/ops/OpsStaffPage.tsx — no per-row pending map
+### 399. [LOW] portal/src/pages/ops/OpsStaffPage.tsx — no per-row pending map
 Row actions share a single pending/loading flag; if parallel edits across rows ever matter, switch to a per-row pending map so one in-flight action doesn't disable controls on unrelated rows.
 
-### [LOW] portal/src/components/Layout/OpsLayout.tsx — mobile nav not addressed
+### 400. [LOW] portal/src/components/Layout/OpsLayout.tsx — mobile nav not addressed
 The ops layout's navigation hasn't been evaluated for small-viewport/mobile use; revisit if ops staff need mobile access.
 
-### [LOW] platform staff provisioning — email-format validation + DuplicateKeyError hardening
+### 401. [LOW] platform staff provisioning — email-format validation + DuplicateKeyError hardening
 `staff_service.py` / `routers/ops.py` don't validate email format before provisioning, and don't translate a Mongo `DuplicateKeyError` (race between the existence check and insert) into a clean 409 — it would currently surface as an unhandled 500.
 
-### [LOW] platform/routers/auth.py — invitation staff-email 403 could name the offending email
+### 402. [LOW] platform/routers/auth.py — invitation staff-email 403 could name the offending email
 The staff-email guard on `POST /auth/company-invitations` fails the whole batch with a generic "This email cannot be invited". For multi-email batches, include the offending email in the 403 detail (it is the inviter's own input, so no information leak). Keep the atomic-403 semantics — do not half-process the batch.
 
-### [LOW] portal/tests/onboardingResumeApply.test.ts — test name overstates
+### 403. [LOW] portal/tests/onboardingResumeApply.test.ts — test name overstates
 The test named "clears a stale in-progress flag and its saved step" only asserts the in-progress flag; `clearOnboardingInProgress()` leaves `portal.onboardingStep` behind (harmless — routing gates on the flag alone). Rename the test, or extend the helper to clear the step key too.
 
 ## 2026-07-04 deferred from /code-review (voice input Phase 1 — /agents/transcribe)
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [LOW] platform/routers/agents.py:759 — full-body buffering when UploadFile.size is None
+### 404. [LOW] platform/routers/agents.py:759 — full-body buffering when UploadFile.size is None
 The early size gate is skipped if `audio.size` is None, so `await audio.read()` buffers the whole part into memory before the validator's size check rejects it. Mirrors the accepted pattern in routers/support.py:270; Starlette normally knows the size, so this is completeness, not a regression.
 **Suggested fix:** None required now; if hardened, read in chunks with a running cap.
 
-### [LOW] platform/services/transcription.py — language/duration always None without verbose_json
+### 405. [LOW] platform/services/transcription.py — language/duration always None without verbose_json
 `transcriptions.create()` is called without `response_format`. `gpt-4o-mini-transcribe` never returns language/duration, and `whisper-1` only does with `response_format="verbose_json"`. Fields are nullable and unused by the planned frontend, so behavior is correct today.
 **Suggested fix:** Either request verbose_json when the model is whisper-1, or document that language/duration are best-effort and typically None.
-
-## 2026-07-04 deferred from /code-review (voice input Phases 1–4 full review)
-
-Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
-
-### [LOW] ~~portal/src/lib/voiceInputFlag.ts:5 — VITE_VOICE_INPUT_ENABLED=false evaluates as ON~~ — RESOLVED 2026-07-26
-**Closed as resolved 2026-07-26**, and widened: `supportPanelFlag` and
-`tasksFlag` carried the identical `Boolean(anyNonEmptyString)` bug, so rather
-than patching one and deferring the others, all three now delegate to a new
-`portal/src/lib/envFlag.ts` (`isEnvFlagEnabled` / `readEnvFlag`).
-
-The falsy set mirrors **pydantic v2's** bool coercion — `""`, `"false"`,
-`"0"`, `"off"`, `"no"`, `"n"`, `"f"`, trimmed and case-insensitive — rather
-than the narrower `"", "false", "0"` originally suggested, so the FE and the
-backend's `bool` settings agree on what "off" looks like. Unrecognized
-non-empty values still enable, preserving the old `VITE_X=enabled` behavior.
-
-**Shipping note — this change is behavior-neutral today.** Audited every
-configured value before landing it: `.env.local`, `.env.development`, and the
-GitHub Actions `production` + `development` environment variables all set
-`"true"`; nothing anywhere is set to `"false"`. No flag flips state on deploy.
-
-Tests: new `tests/envFlag.test.ts` (5) and `tests/supportPanelFlag.test.ts`
-(7, the module had none), plus falsy/truthy cases appended to the existing
-`voiceInputFlag` / `tasksFlag` suites — 32 across the four files. Full portal
-suite 1,357 passed; typecheck + lint clean.
-
----
 
 ## 2026-07-06 deferred from /code-review
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [MEDIUM] platform/routers/agent_helpers/delegate_create_estimate.py:143 — delegate_create_estimate grew further past the 50-line guideline
-Function was already ~215 lines; the property-resolution block adds ~20 more (pre-existing violation, worsened by the 2026-07-06 property auto-link change).
-**Suggested fix:** Extract the block into a helper, e.g. `_resolve_explicit_property(message, company_ctx) -> (property_id, label)`.
-
-### [LOW] platform/routers/agent_helpers/estimate_gathering.py:238 — gathering-path response never mentions the auto-linked property
+### 406. [LOW] platform/routers/agent_helpers/estimate_gathering.py:238 — gathering-path response never mentions the auto-linked property
 The one-shot path confirms "…and linked it to property '{label}'", but `_finalize_gathering` applies the stashed property silently (the stash's `label` field is unused) — inconsistent UX, no confirmation of the link.
 **Suggested fix:** Append "and linked it to property '{label}'" to the finalize response when the stash was applied.
-
----
-
-## 2026-07-09 deferred from /code-review
-
-Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
-
-### [LOW] platform/agents/estimate/crud_handlers.py:1 — file now ~2,950 lines (threshold: 800, pre-existing)
-The Maple analytics date-window change adds ~150 lines to an already very large mixin module; the analytics handlers are a coherent seam.
-**Suggested fix:** Next refactor, move the `_analytics_*` methods (headline, total-value, windowed summary, breakdown, comparison + the shared status-set constants and `_updated_at_bounds`) into an `agents/estimate/analytics_handlers.py` mixin.
 
 ---
 
@@ -4900,33 +3781,27 @@ The Maple analytics date-window change adds ~150 lines to an already very large 
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [LOW] portal/src/pages/PropertiesPage.tsx:714 — uploading the unmodified template creates real sample contacts
+### 407. [LOW] portal/src/pages/PropertiesPage.tsx:714 — uploading the unmodified template creates real sample contacts
 The property upload endpoint resolves contact1–contact5 by name and creates a contact when no match exists (platform/routers/properties.py:189). A user who uploads the sample template as-is gets a real "John Smith" / "Jane Doe" contact in their tenant. Pre-existing behavior for the onboarding sample; informational — sample files are meant to be edited before upload.
 **Suggested fix:** Optional: use obviously-placeholder contact names in sample rows (e.g. "Contact Name 1"), or leave as-is.
-
-### [LOW] portal/src/pages/ContactsPage.tsx:1 — pre-existing: files exceed 800-line guideline
-ContactsPage.tsx is ~1350 lines and PropertiesPage.tsx ~900; both exceed the 800-line review guideline. The CSV-copy change adds only a few lines and does not meaningfully worsen it.
-**Suggested fix:** When next doing substantive work on these pages, extract the near-identical CSV-upload modal into a reusable component.
-
----
 
 ## 2026-07-13 deferred from /code-review
 
 Logged by `/fix-issues` — findings from the latest review (dashboard per-chart periods + Upcoming Tasks card) not fixed in that pass.
 
-### [MEDIUM] portal/src/components/dashboard/UpcomingTasksCard.tsx:38 — completed tasks surface in "Upcoming Tasks"
+### 408. [MEDIUM] portal/src/components/dashboard/UpcomingTasksCard.tsx:38 — completed tasks surface in "Upcoming Tasks"
 The card lists tasks from every status column, including the terminal "Done" status. A finished task whose due date has passed will sit at the top of the card in red indefinitely, crowding out genuinely actionable tasks (the card only shows 5). Deferred pending a product decision on whether "Done" tasks belong in the card.
 **Suggested fix:** Fetch task statuses (taskStatusesApi.list), identify the final status column, and exclude tasks in it — or filter in selectDashboardTasks via a passed-in "done" status id.
 
-### [LOW] platform/routers/tasks.py — sort=due_date aggregation helper fields ride along on documents
+### 409. [LOW] platform/routers/tasks.py — sort=due_date aggregation helper fields ride along on documents
 `_undated` and `_sort_time` are computed by the pipeline and only dropped implicitly by pydantic at `Task.model_validate`; a future `extra="allow"` config change (or raw-dict return) would leak them to clients.
 **Suggested fix:** Append `{"$unset": ["_undated", "_sort_time"]}` (or a $project) as the final pipeline stage in `_find_tasks_by_due_date`.
 
-### [LOW] platform/routers/tasks.py — sort=due_date sorts in memory, unindexed
+### 410. [LOW] platform/routers/tasks.py — sort=due_date sorts in memory, unindexed
 The $sort runs on computed fields, so no index can serve it; Mongo sorts the company's matched tasks in memory (100MB stage cap). Fine at current volumes, and the dashboard passes limit=5, but it's O(company task count) per dashboard visit.
 **Suggested fix:** None needed now; if task volumes grow, maintain a stored "due-or-updated" sort field on write, indexed under the existing Settings.indexes convention.
 
-### [LOW] portal/src/pages/TasksPage.tsx — moveError now carries archive failures too
+### 411. [LOW] portal/src/pages/TasksPage.tsx — moveError now carries archive failures too
 handleArchive reports through the moveError state; the name no longer describes its role as the page's generic inline action alert, which invites misuse or confusion on the next edit.
 **Suggested fix:** Rename to actionError (state + setter + alert usage) on the next touch of this file.
 
@@ -4936,42 +3811,17 @@ handleArchive reports through the moveError state; the name no longer describes 
 
 Logged by `/fix-issues` — findings from the latest review (mobile swipe-to-open nav drawer: useSwipeGesture hook + PortalLayout wiring) not fixed in that pass.
 
-### [LOW] portal/src/components/Layout/useSwipeGesture.ts:72 — no touchcancel handling
+### 412. [LOW] portal/src/components/Layout/useSwipeGesture.ts:72 — no touchcancel handling
 A gesture interrupted by the system (incoming call, browser takeover) fires touchcancel, not touchend, leaving startPoint set. Harmless today because every new sequence begins with touchstart (which recomputes it), but it is one browser quirk away from a phantom swipe.
 **Suggested fix:** Return an `onTouchCancel` handler that clears startPoint, and spread it with the others.
 
-### [LOW] portal/src/index.css:39 — overscroll-behavior-x: none is global, not mobile-only
+### 413. [LOW] portal/src/index.css:39 — overscroll-behavior-x: none is global, not mobile-only
 Besides suppressing Chrome-on-Android overscroll navigation (the intent), this also disables two-finger trackpad back/forward swipe on desktop Chrome/Edge app-wide. Usually desirable in an SPA (prevents accidental back-nav losing form state), but it should be a deliberate UX decision, not a side effect.
 **Suggested fix:** Keep if intended (recommended); otherwise scope it inside an `@media (pointer: coarse)` block.
 
-### [LOW] portal/src/components/Layout/PortalLayout.tsx:509 — mobile drawer close button has no accessible name (pre-existing)
+### 414. [LOW] portal/src/components/Layout/PortalLayout.tsx:509 — mobile drawer close button has no accessible name (pre-existing)
 The drawer's X close button renders only an aria-hidden lucide icon, so screen readers announce an unnamed button. Pre-existing (not introduced by the swipe change), but adjacent to the reviewed code; the sibling collapse/expand buttons do have aria-labels.
 **Suggested fix:** Add `aria-label="Close menu"` to the button.
-
----
-
-## 2026-07-15 follow-up from the property-geocoding feature
-
-Logged manually — follow-up work identified while building property
-coordinates + task-title snap (not a review finding).
-
-### [MEDIUM] ~~platform/scripts — backfill coordinates for existing properties~~ — RESOLVED 2026-07-15
-**Closed as resolved 2026-07-15.** Built as one shared engine with two entry
-points (supersedes the earlier "skip CSV, backfill manually" decision):
-- `services/property_geocode.py::backfill_property_coordinates` — fills only
-  MISSING coordinates (idempotent), targeted `$set` writes, ~5 req/s
-  throttle, waits out a per-company 429 once then skips, dry-run support.
-- CSV bulk upload (`routers/properties.py::upload_properties_csv`) now
-  schedules a run scoped to the imported ids via FastAPI BackgroundTasks —
-  imports gain coordinates minutes after upload with no request latency.
-- `scripts/backfill_property_coordinates.py` (`--dry-run`, `--company`) for
-  the one-time legacy backfill and as the safety net after interrupted
-  background runs.
-Tests: `tests/test_property_geocode_backfill.py` (6) +
-`test_upload_properties_csv_geocodes_in_background`.
-**Remaining operational step:** run the script once against Dev, then once
-against production after the next platform promotion, to geocode
-pre-2026-07-15 properties.
 
 ---
 
@@ -4982,7 +3832,7 @@ Logged by `/fix-issues` — findings from the latest review not fixed in that pa
 guide chain, tenant-less public usage metering, researcher temperature removal,
 print→logger conversion, `get_pymongo_collection` rename.)
 
-### [LOW] platform/models/llm_usage_event.py:46 — no index for feature-filtered usage queries
+### 415. [LOW] platform/models/llm_usage_event.py:46 — no index for feature-filtered usage queries
 Public usage events all carry `company=None`. They're reachable efficiently via
 the existing `(company, created_at)` index (querying `company == None` uses it),
 but the natural ops query — filter by `feature == "maple_public"` over a date
@@ -4992,89 +3842,6 @@ grows.
 `Settings.indexes` when/if per-feature dashboards materialize; harmless to add
 now.
 
-### [LOW] ~~platform/routers/public_maple.py:70 — public endpoint has per-IP but no aggregate spend cap~~ — RESOLVED 2026-07-26 (different approach)
-**Closed as resolved 2026-07-26, deliberately NOT via the suggested spend cap.**
-Product decision (Simon, 2026-07-26): the public widget is a marketing
-surface and prospects using it freely is the *point*. A daily budget ceiling
-that silences Maple mid-campaign is the wrong failure mode for lead-gen — the
-requirement is "stop bots", not "cap spend". Both suggested fixes (global daily
-budget, per-IP daily cap) were dropped on those grounds.
-
-Shipped instead — two layers:
-
-**1. The rate-limit key was broken.** `client_host` came from
-`request.client.host`, which behind Render's load balancer is the *proxy's*
-address — so the "per-IP" 20/min was one global bucket shared by every visitor
-on Earth. A test reproduces it: two distinct visitors, second one 429s.
-`services/request_protection.client_ip_for_rate_limit` now resolves the caller
-properly, and is deliberately **not** the same as
-`audit_service._get_client_ip`: that one takes `X-Forwarded-For[0]`, which is
-whatever the *client* sent, so a bot rotating the header would mint itself a
-fresh bucket per request. Proxies append, so the real client sits
-`trusted_proxy_hops` from the RIGHT (new `trusted_proxy_hops` setting,
-default 1 for Render; 0 disables header trust entirely). Falls back to the
-unforgeable TCP peer whenever the chain is shorter than expected.
-Tests: `tests/test_request_protection_client_ip.py` (12) +
-2 endpoint tests (spoofed prefix shares a bucket; distinct visitors don't).
-
-**2. reCAPTCHA v3 bot filtering**, reusing the site key + secret already
-provisioned for the marketing contact form. Invisible (score-based, no
-challenge), so zero friction for prospects. New `services/recaptcha.py` is the
-Python counterpart to `website/functions/lib/recaptcha.js`.
-
-The policy is asymmetric on purpose:
-- **Confident bot signal** (low score, wrong action, replayed token, or — once
-  enforced — *no token at all*) → 403. A missing token is a bot signal, NOT a
-  verification error; failing open on it is exactly how this control ends up
-  decorative, since an attacker just omits the field.
-- **No verdict obtainable** (Google unreachable, non-JSON body) → allow. A
-  third-party outage must never silence the assistant.
-- No secret configured → check skipped entirely (local dev).
-
-Threshold is **0.3**, lower than the contact form's 0.5: a free question
-deserves less protection than a lead submission, and v3 scores are
-probabilistic, so borderline humans should still get answered.
-
-**Rollout is two-phase** — `maple_public_recaptcha_enforced` defaults to
-**False**, which verifies a token when present but allows a missing one. The
-platform and website deploy independently and visitors may hold a cached
-bundle, so flipping this to True before the widget ships would 403 real
-people. **Flip it only after the website deploy is live.**
-
-Browser side: `website/lib/recaptchaClient.js` extracted from
-`contact-modal/install.js` so both surfaces share one loader with a per-surface
-action (`contact` vs `maple_ask`). It exposes two minters, because the surfaces
-genuinely differ — `getRecaptchaToken` rejects on failure (contact form fails
-CLOSED, shows an error, skips the POST — behavior preserved, caught by its
-existing tests) and `getRecaptchaTokenSoft` resolves `''` (widget fails soft,
-matching the server's fail-open). Also added a 4s timeout: a blocked script tag
-fires neither `onload` nor `onerror`, so the old loader would hang the submit
-handler forever.
-
-Tests: `tests/test_recaptcha_service.py` (11), 8 endpoint tests in
-`TestPublicMapleRecaptcha`, `website/lib/__tests__/recaptchaClient.test.js`
-(11), `website/widget/__tests__/api.test.ts` (3).
-
-**Deploy checklist:** set `RECAPTCHA_V3_SECRET` on Render (same secret the
-Firebase function uses) → deploy platform → deploy website → set
-`MAPLE_PUBLIC_RECAPTCHA_ENFORCED=true`.
-
-<details>
-<summary>Original body (preserved for history)</summary>
-
-Now that public spend is measurable: each guide answer costs ~$0.014 (13.8k-token
-prompt), and the only guard is 20 req/min per IP — a single abusive IP can run
-~$17/hour, and a small botnet scales that linearly. Metering makes this visible
-but nothing bounds it.
-**Suggested fix:** Add a global daily budget guard for `feature="maple_public"`
-(count/sum today's events before answering; refuse with the canned unavailable
-message when over budget), or at minimum a per-IP daily cap alongside the
-per-minute one.
-
-</details>
-
----
-
 ## 2026-07-16 deferred from /code-review (mobile drawer swipe reveal)
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
@@ -5083,7 +3850,7 @@ Logged by `/fix-issues` — findings from the latest review not fixed in that pa
 pass; this one was deliberately deferred because its own recommendation was
 "ship and observe" and the real fix is a larger refactor.)
 
-### [MEDIUM] portal/src/components/Layout/PortalLayout.tsx:345 — setState per touchmove re-renders the whole layout tree
+### 416. [MEDIUM] portal/src/components/Layout/PortalLayout.tsx:345 — setState per touchmove re-renders the whole layout tree
 `onSwipeMove` calls `setDrawerDragPx` on every touchmove (~60Hz), re-rendering
 all of `PortalLayout` including the routed page (`Outlet`), desktop sidebar,
 and AiPanel on each drag frame. On low-end phones with heavy pages (dashboard
@@ -5104,7 +3871,7 @@ new Tasks tour, Dashboard tour v2 anchors, UpcomingTasksCard assignee filter.
 Finding #1 — the row-menu step's 8s dead wait on empty lists — was fixed in the
 pass via a per-step `stepTimeoutMs` override.)
 
-### [LOW] portal/src/components/dashboard/UpcomingTasksCard.tsx:53 — "Current User" filter silently shows all tasks when no stored email
+### 417. [LOW] portal/src/components/dashboard/UpcomingTasksCard.tsx:53 — "Current User" filter silently shows all tasks when no stored email
 `loadTasks` falls back to an unfiltered fetch when `getCurrentUser()?.email` is
 missing, while the select still displays "Current User" — the UI then
 misrepresents what the list contains. The fallback is deliberate (commented)
@@ -5112,7 +3879,7 @@ and the no-email state should be rare, so impact is minimal.
 **Suggested fix:** If the stored user has no email, hide the filter select or
 force the value to "all" so the label matches the data.
 
-### [LOW] workspace root — untracked files `temp data` (JSON) and `tooltips.csv`
+### 418. [LOW] workspace root — untracked files `temp data` (JSON) and `tooltips.csv`
 Carried over from the 2026-07-16 review; both files are still untracked at the
 workspace root. A grep found no credential patterns, but loose data files at
 the repo root risk accidental commit.
@@ -5130,7 +3897,7 @@ Billing-tab Tasks row, TasksPage gate + TaskLimitDialog. Findings #1 and #2 —
 failure-safe test cleanup and the missing billing mock in TasksPage.test.tsx —
 were fixed in the pass.)
 
-### [LOW] platform/services/task_quota.py:46 — accepted check-then-insert race (informational)
+### 419. [LOW] platform/services/task_quota.py:46 — accepted check-then-insert race (informational)
 Two concurrent creates at limit−1 can both pass `is_task_limit_reached` and land
 one over the cap. Deliberate and documented in the module docstring: overshoot
 is bounded by in-flight concurrency, nothing is billed, and the next create is
@@ -5139,7 +3906,7 @@ blocked.
 a denormalized counter (estimate-quota pattern) with decrements on both
 hard-delete paths.
 
-### [LOW] portal/src/pages/TasksPage.tsx:296 — gate not refreshed after convert-with-delete
+### 420. [LOW] portal/src/pages/TasksPage.tsx:296 — gate not refreshed after convert-with-delete
 `refreshSubscription()` runs after create and delete, but a convert-to-estimate
 that deletes the source task also frees a slot. Until the page remounts, the
 client-side gate can over-block (shows the limit dialog one click too long).
@@ -5147,7 +3914,7 @@ The backend 409 remains authoritative either way.
 **Suggested fix:** Call `refreshSubscription()` from the ConvertTaskDialog
 success/close path, same as `handleDelete`.
 
-### [LOW] portal/src/components/settings/BillingTab.tsx:133 — "0 / 0" Tasks row during mixed-version deploys
+### 421. [LOW] portal/src/components/settings/BillingTab.tsx:133 — "0 / 0" Tasks row during mixed-version deploys
 If the portal deploys before the platform, subscription responses lack
 `used_tasks`/`included_tasks`; strict `=== null` (correctly) refuses to treat
 `undefined` as unlimited, so the Tasks row renders "0 / 0" until the backend
@@ -5155,7 +3922,7 @@ ships. Transient and flag-gated.
 **Suggested fix:** Optionally skip the row when `state.included_tasks ===
 undefined`, or deploy platform before (or together with) portal.
 
-### [LOW] platform/tests/test_billing_plan_config.py:220 — duplicated TS block-parsing regex
+### 422. [LOW] platform/tests/test_billing_plan_config.py:220 — duplicated TS block-parsing regex
 `test_fe_included_tasks_matches_be` re-implements the plan-block regex parse
 instead of sharing it with the class fixture (necessary because the fixture is
 int-only, but the block-carving regex is now written twice).
@@ -5168,7 +3935,7 @@ helper used by both the fixture and the nullable-field test.
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [LOW] platform/routers/properties.py:295 — malformed property_id produces a 500 instead of 404
+### 423. [LOW] platform/routers/properties.py:295 — malformed property_id produces a 500 instead of 404
 `Property.get(property_id)` raises on a string that is not a valid ObjectId
 (e.g. `GET /properties/abc/map.png`), surfacing as a 500. Inherited verbatim
 from the existing `get_property` / `update_property` pattern in this router —
@@ -5177,20 +3944,11 @@ instance of the pattern.
 **Suggested fix:** A shared parse-or-404 helper applied router-wide (fixing
 only the new route would make it inconsistent with siblings).
 
-### [LOW] portal/src/pages/PropertiesPage.tsx:1 — file exceeds the 800-line guideline (pre-existing)
-The file was already ~900 lines before the map-thumbnail change (net +11 from
-it). The detail-panel JSX (address/contacts/map/estimates card) is now a
-natural extraction seam.
-**Suggested fix:** Extract the selected-property detail card into
-`components/properties/PropertyDetailCard.tsx`.
-
----
-
 ## 2026-07-20 deferred from /code-review (per-item area applicability)
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [LOW] platform/agents/estimate/conversation_guide.py:222 — vague quantifiers count as discrete evidence
+### 424. [LOW] platform/agents/estimate/conversation_guide.py:222 — vague quantifiers count as discrete evidence
 "few", "couple", "several" in `_DISCRETE_COUNT_WORDS` let "redo a few beds" pass
 the `is_discrete_item_job` guard even though bed work is area-based. Exposure is
 double-gated (the sufficiency prompt classifies beds-without-count as
@@ -5202,43 +3960,11 @@ one-line comment stating the trade-off is enough.
 
 ---
 
-## 2026-07-21 deferred from /code-review (Maple pending-flow escape + analytics window)
-
-Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
-
-### [LOW] platform/agents/estimate/text_helpers.py:613 — `_parse_estimate_date_filter` is 70 lines
-Sequential age → numeric → period-word → word matcher; the natural-window
-change added ~11 lines, pushing it past the 50-line guideline (it was already
-~59). Cohesive but growing.
-**Suggested fix:** If it grows further, extract the "match → (start, end)
-window" resolution into a small helper. Not urgent.
-
-### [LOW] platform/agents/orchestrator/service.py:1 — file exceeds the 800-line guideline (~2700 lines)
-Pre-existing; the analytics-detector change was net-neutral (moving the
-constants/detectors out to `intents.py` in the /fix-issues pass trimmed it
-slightly). Not introduced by this work.
-**Suggested fix:** Informational only. A future split of `OrchestratorAgent`'s
-matcher methods into a mixin would be the real remedy.
-
----
-
-## How to work through this
-
-1. Pick ONE HIGH item per work session. Don't batch.
-2. Write the failing test first (TDD per `CLAUDE.md`).
-3. Run the related test file, not the full suite.
-4. Commit each item as its own PR — easier to revert, easier to review.
-5. Delete the bullet from this file in the same PR.
-
-When this file is empty, delete it.
-
----
-
 ## 2026-07-25 deferred from /code-review (website hero carousel)
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [MEDIUM] website/index.html — carousel CSS still inline (remainder of finding #8)
+### 425. [MEDIUM] website/index.html — carousel CSS still inline (remainder of finding #8)
 The carousel JS was extracted to `src/hero/hero-carousel.ts` in this pass, taking
 index.html from 1486 back down to 1355 lines. The ~175 lines of `m3s-*` CSS are
 still inline, so the file remains above the 800-line guideline. Extraction was
@@ -5252,7 +3978,7 @@ the `m3s-*` block to `src/styles/hero-carousel.css` and link it from `<head>`
 directly (a plain `<link>`, not a JS-graph import) so there is no FOUC in either
 environment.
 
-### [LOW] website/public/screens/app-tasks.webp — placeholder copy visible in the capture
+### 426. [LOW] website/public/screens/app-tasks.webp — placeholder copy visible in the capture
 The tasks board screenshot shows "Test Task for scale" and "Task #10 / #11 / #13"
 as task names. This is open item 1 on the supplied DEVELOPER-HANDOFF.md launch
 checklist and reads as unfinished on a public landing page. Not fixable in code —
@@ -5268,34 +3994,7 @@ the new file in at the same path. The CSS crop is resolution-independent, so no
 Logged by `/fix-issues` — findings from the latest review Simon chose to defer.
 Findings #1, #2, #3, #6, #7, #8, #9, #10, #11 were fixed in that pass.
 
-### [HIGH] platform/agents/task/ — seven functions over the 50-line limit (finding #4)
-`_handle_update_task` 105 (service.py), `find_task_from_context_or_message` 128
-(resolver.py), `_resolve_create_title` 101 (create.py), `_handle_awaited_field_value`
-94 (field_flow.py), `_perform_conversion` 74 (operations.py), `_handle_delete_task`
-66, `process` 66 — plus `run_task_conversion` at 157 (services/task_convert.py),
-which is a verbatim lift from the router that was extracted without being split.
-
-Worth noting the pattern rather than just the numbers: `_handle_update_task` was
-cut to 71 lines in the first review pass and regrew with every subsequent
-smoke-test fix, because each fix added a branch to the existing function instead
-of extending the structure. The #1/#2/#3 fixes in this pass added to it again.
-**Suggested fix:** Extract the awaited-value preamble and the sub-op dispatch out
-of `_handle_update_task`; give the resolver's seven ordered resolution steps named
-helpers behind the dispatch; split `run_task_conversion` into claim / generate /
-finalize.
-
-### [HIGH] platform/tests/test_maple_task_operations.py — test file past the 800-line ceiling (finding #5)
-Now ~1,560 lines after this pass added the ReDoS-timing, awaited-value, and
-query-pushdown suites. It accreted a class per smoke-test round and spans routing,
-payload stripping, notes updates, the field-then-value flow, title derivation,
-status, assignee, archive, convert, concurrency, and performance.
-**Suggested fix:** Split on the seams that already exist —
-`test_maple_task_notes.py` (notes + field flow + dictated payloads),
-`test_maple_task_ops.py` (status/assignee/archive/convert),
-`test_maple_task_text_helpers.py` (the pure text-helper unit classes), and
-`test_maple_task_perf.py` (the pathological-input timing suite).
-
-### [LOW] platform/agents/orchestrator/intents.py — `is_anaphoric_add_request` has no direct unit test (finding #12)
+### 427. [LOW] platform/agents/orchestrator/intents.py — `is_anaphoric_add_request` has no direct unit test (finding #12)
 Exercised only through orchestrator behavior tests, so its own contract (which
 pronouns, which verbs, how it composes with `strip_dictated_payload`) is unpinned.
 It also now gates the #6 full-text fallback in `_classify_via_action_domain`,
@@ -5309,21 +4008,7 @@ Logged by `/fix-issues` — findings from the assumption-based-estimates review
 not fixed in that pass (selection was #1-#6; #7-#9 deferred), plus the residual
 of a partially-applied fix.
 
-### [MEDIUM] platform/agents/estimate/assumption_handlers.py:257,415 — the two assumption handlers remain over the 50-line guideline (residual of finding #2)
-Finding #2 was applied: `_handle_assumption_material_swap` went 128 → 79 lines
-and `_handle_assumption_size_adjustment` 105 → 62, by extracting
-`_resolve_swap_material`, `_swap_material_lines`, `_find_materials_assumption`,
-`_find_size_assumption`, `_parse_new_size`, and `_save_or_error`
-(`resolve_assumptions` in `assumption_defaults.py` also split into
-`_resolve_area_assumption` / `_resolve_material_assumption` and is now compliant).
-What remains in both is the declarative success envelope — a multi-line f-string
-response plus the `result` dict — not branching logic.
-**Suggested fix:** Only worth doing if the response shape gets reused elsewhere.
-Extracting it now would need a 7-8 parameter helper, which reads worse than the
-inline version; revisit if a third assumption sub-op lands and the envelope
-genuinely becomes shared.
-
-### [LOW] platform/agents/estimate/crud_handlers.py — file-length violation worsened (finding #7)
+### 428. [LOW] platform/agents/estimate/crud_handlers.py — file-length violation worsened (finding #7)
 Now 2,966 lines against the 800-line guideline. Pre-existing, but the
 assumption-adjustment dispatch and its TYPE_CHECKING stubs added 26 lines rather
 than reducing it.
@@ -5331,44 +4016,14 @@ than reducing it.
 — each `_detect_* → _handle_*` pair could move to its own module, the way the
 work-item handlers already did.
 
-### [LOW] platform/agents/estimate/llm_pipeline.py:92 — imports a private symbol across module boundaries (finding #8)
+### 429. [LOW] platform/agents/estimate/llm_pipeline.py:92 — imports a private symbol across module boundaries (finding #8)
 `from services.llm.factory import _is_gpt5_reasoning_family` — an
 underscore-prefixed function consumed by another package, so a change to the
 factory's internals breaks this silently.
 **Suggested fix:** Promote it to a public `is_gpt5_reasoning_family` in
 `services/llm/factory.py` (keeping a private alias if desired) and import that.
 
-### [LOW] ~~platform tooling — bandit not installed, so no automated security scan runs during /code-review (finding #9)~~ — RESOLVED 2026-07-27
-**Closed as resolved 2026-07-27.** bandit 1.9.4 installed into `platform/.venv`
-and pinned as `bandit>=1.8` in `requirements.txt`. Configuration follows the
-same convention as the other two gates — pinned config file, wrapper script,
-no ad-hoc flags:
-- `platform/bandit.yaml` — excludes `.venv` / `tests` / `scratch`.
-- `platform/run_bandit.sh` — mirrors `run_ruff.sh` / `run_mypy.sh` shape.
-
-**`B101` (assert_used) is skipped by deliberate decision.** bandit flags every
-`assert` because `python -O` strips them; CLAUDE.md's mypy playbook *mandates*
-`assert <x> is not None` for Beanie `.id` narrowing (~106 across
-agents/routers/services/models). Those are type-checker directives, not runtime
-security checks. The skip is documented in `bandit.yaml` with the caveat that
-it is **not** a licence to authorize with asserts — a security-guarding assert
-must be an `if ...: raise`.
-
-**bandit is advisory, NOT in the pre-push hook** (unlike ruff/mypy). It is a
-syntactic scanner: it catches shell injection, weak crypto, unsafe
-deserialization, missing HTTP timeouts, silent excepts. It cannot find logic or
-authorization flaws — nothing it does would have caught #349 or the public-Maple
-rate-limit key collapse. Treat a clean run as "no classic footguns", not
-"secure".
-
-First scan: 19 findings, all LOW severity, zero MEDIUM/HIGH. Six B105
-false positives cleared (3 by renaming a loop variable `token` → `word` in
-`agents/calculator/text_helpers.py` — they were number words, never
-credentials; 3 by `# nosec B105` on Stripe Price lookup keys in
-`services/billing/plan_config.py`). **Baseline is now 13 B110 findings**,
-tracked in the entry below.
-
-### [LOW] platform/agents/**, routers/agent_helpers/estimate_resolver.py — 13 bare `except Exception: pass` blocks (bandit B110)
+### 430. [LOW] platform/agents/**, routers/agent_helpers/estimate_resolver.py — 13 bare `except Exception: pass` blocks (bandit B110)
 Surfaced by the first bandit scan (2026-07-27) and left unfixed deliberately —
 all pre-existing, and each needs its intent understood rather than a blanket
 edit. Sites: `agents/contact/service.py` (2), `agents/equipment/service.py` (2),
@@ -5403,7 +4058,7 @@ reCAPTCHA v3. Selection fixed #1–#7; #8 was closed as a side effect of #2's
 `ipaddress` validation, since a parsed address cannot carry control
 characters.)
 
-### [LOW] portal/src/components/properties/EstimatesPicker.tsx:83 — the locked-row reason is conveyed only by a title attribute
+### 431. [LOW] portal/src/components/properties/EstimatesPicker.tsx:83 — the locked-row reason is conveyed only by a title attribute
 Locked rows set `title={LOCKED_HINT}` on the `<label>`, but the checkbox is
 `disabled` and therefore not focusable, so keyboard and screen-reader users may
 never surface the tooltip and just see an unexplained un-toggleable row. Partly
@@ -5414,16 +4069,7 @@ below the list.
 `title`. Same family as the icon-only-button a11y sweep in
 [#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name).
 
-### [LOW] ~~platform tooling — bandit is still not installed (recurring)~~ — RESOLVED 2026-07-27
-**Closed as resolved 2026-07-27** — installed and configured; see the resolved
-entry above for the config, the deliberate `B101` skip, and the 13-finding
-B110 baseline. The 2026-07-26 review's security-scan gap is now closed for
-future reviews (that review's own backend findings remain manual-inspection
-only). Note the older per-review "bandit not installed; security scan skipped"
-lines further up this file are historical records of individual passes, not
-open work — they need no action.
-
-### [LOW] CLAUDE.md — the bandit baseline is a hardcoded "13" and will drift
+### 432. [LOW] CLAUDE.md — the bandit baseline is a hardcoded "13" and will drift
 Logged 2026-07-27 from the second `/code-review` pass. The bandit section added
 to CLAUDE.md states "Known baseline: 13 B110 findings" and tells the reader a
 count above 13 means their change added one. As the B110 sweep (entry above)
@@ -5434,7 +4080,7 @@ the source of truth, or adopt `bandit -b baseline.json` so the tool tracks the
 delta itself instead of a human-maintained integer in prose. The second is
 better if the B110 sweep is going to be gradual.
 
-### [LOW] website — no tsconfig or typecheck script, so the new TS→JS import is unchecked
+### 433. [LOW] website — no tsconfig or typecheck script, so the new TS→JS import is unchecked
 `widget/api.ts` and `widget/MapleWidget.tsx` now import
 `../lib/recaptchaClient.js`, an untyped JavaScript module. The website has no
 `tsconfig.json` and no `typecheck`/`tsc` npm script — Vite transpiles without
@@ -5459,7 +4105,7 @@ pass. Selection fixed #1-#4 (the ValidationError leak path, the overclaiming
 code comment, the unverifiable incident-mechanism claim in #350, and the
 missing regression coverage); #5 deferred here as a latent-only edge case.
 
-### [LOW] platform/config.py — falsy non-string values render unmasked
+### 434. [LOW] platform/config.py — falsy non-string values render unmasked
 `Settings.__repr_args__` guards on truthiness (`if ... and value`), so a
 secret-classified field holding `0` or `False` renders as-is rather than
 masked. No current field is affected — every field the classifier matches is
@@ -5483,7 +4129,7 @@ armed no pending record) were fixed on the branch, as were two pre-merge items
 (a malformed-`candidates` 500 and the short-query substring trap). Everything
 below was adjudicated as defer, with rulings recorded in the execution ledger.
 
-### [MED] platform/routers/agent_helpers/pending_property_link.py — `_write_link` has no company scoping
+### 435. [MED] platform/routers/agent_helpers/pending_property_link.py — `_write_link` has no company scoping
 `_write_link` calls `Estimate.get(estimate_id)` and
 `parse_object_id(property_id, …)` on values read straight out of
 `context_payload`, which is populated from the client's request context. Neither
@@ -5498,7 +4144,7 @@ a reason to track it, not to stop noticing it.
 refuse rather than write when either lookup misses. Fix both call sites in one
 change, since they will otherwise drift.
 
-### [MED] platform/routers/agents.py — four pending state machines share one journey
+### 436. [MED] platform/routers/agents.py — four pending state machines share one journey
 `pending_estimate_follow_up` (legacy), `pending_optional_follow_up` (generic),
 `pending_estimate_fuzzy_confirmation`, and the new
 `pending_property_link_confirmation` are all live on the estimate→property
@@ -5512,7 +4158,7 @@ sibling's key). The ordering is currently correct and pinned by
 ownership explicitly, so precedence is data rather than statement order.
 Sizeable; worth doing before a fifth machine is added.
 
-### [LOW] platform/agents/estimate/crud_handlers.py — fuzzy disclosure dropped on sorted and aggregate list responses
+### 437. [LOW] platform/agents/estimate/crud_handlers.py — fuzzy disclosure dropped on sorted and aggregate list responses
 `_handle_list_estimates` names the fuzzily-matched property via
 `property_constraint_label`, but the `sort_field == "grand_total"` /
 `sort_field == "created_at"` branches and the `total_value` aggregate return all
@@ -5523,7 +4169,7 @@ apply to those phrasings.
 **Suggested fix:** thread the label into the sorted/aggregate lead-ins too, or
 hoist the disclosure ahead of the response-shape branch so it cannot be skipped.
 
-### [LOW] platform/routers/agent_helpers/pending_property_link.py — 0-match reply to a near-tie list re-asks about "that property"
+### 438. [LOW] platform/routers/agent_helpers/pending_property_link.py — 0-match reply to a near-tie list re-asks about "that property"
 A near-tie record carries no `property_label` (it holds `candidates` instead), so
 an unresolvable free-text reply falls into the 0-match branch and renders the
 generic fallback: *"I couldn't find a property matching 'Bogus'. I believe you
@@ -5533,7 +4179,7 @@ works — but the copy is confusing.
 **Suggested fix:** when the record carries `candidates`, re-render the numbered
 list in the 0-match branch instead of falling back to `property_label`.
 
-### [LOW] platform/routers/agent_helpers/pending_property_link.py — `_is_pivot` exempts any action on the `property` domain
+### 439. [LOW] platform/routers/agent_helpers/pending_property_link.py — `_is_pivot` exempts any action on the `property` domain
 The exemption exists so a property name ("the Downtown property") reads as an
 answer rather than a pivot. It is coarser than that: a genuine pivot such as
 *"create a new property at 42 Elm St"* mid-confirmation also fails to release the
@@ -5543,7 +4189,7 @@ a flow that can re-ask indefinitely.
 **Suggested fix:** exempt only a domain match with no action verb; tighten as
 part of the state-machine consolidation above.
 
-### [LOW] platform — untested branches and one simulated test premise
+### 440. [LOW] platform — untested branches and one simulated test premise
 Three small gaps, none behavioral: (a) the `resolution["error"]` path and the
 estimate-deleted branch of `_write_link` have no covering test — both are simple
 early returns with no state mutation; (b) there is no router-level end-to-end
@@ -5565,7 +4211,7 @@ pass. Selection fixed #1 (the stale coverage-matrix counts in `CLAUDE.md`) and
 #2 (the `.gitignore` rule that missed the review-ledger backup variants); #3 is
 deferred here.
 
-### [LOW] documentation/development/code-review-followups.md — append-only log at 5,552 lines
+### 441. [LOW] documentation/development/code-review-followups.md — append-only log at 5,552 lines
 The cross-cutting review heuristic flags files over 800 lines as HIGH, but that
 rule targets source files, where length signals tangled responsibility. This is
 an append-only ledger, so the heuristic does not transfer and it was
@@ -5582,7 +4228,7 @@ already uses.
 
 ## 2026-07-29 found while running the full suite
 
-### [LOW] agents/task/resolver.py:94 — `-updated_at` recency sort has no tiebreaker
+### 442. [LOW] agents/task/resolver.py:94 — `-updated_at` recency sort has no tiebreaker
 `_fetch_candidates` sorts on `.sort("-updated_at")` alone. BSON dates are
 millisecond-precision and `Task.update_timestamp` is a
 `@before_event([Replace, Insert])` hook that re-stamps `updated_at` to *now* on
@@ -5618,7 +4264,7 @@ migration step rather than bundled into unrelated work.
 Logged by `/fix-issues`. Selection fixed #1, #3, #4, #5, #6, #7, #8 and #9; the
 two below were not selected.
 
-### [MEDIUM] platform/routers/ops.py:200 — task counts aggregate the whole collection
+### 443. [MEDIUM] platform/routers/ops.py:200 — task counts aggregate the whole collection
 `_counts_by_company` runs `$group` with no `$match`, and is now called on `tasks`
 as well as `users` for the ops Companies list. The page needs counts for at most
 100 company ids, but the pipeline scans every task in the database on every load.
@@ -5630,7 +4276,7 @@ Harmless at present data size; the shape is the problem.
 `IndexModel([("company", 1), ...])` prefixes on Task serve it. Applies equally to
 the pre-existing users call.
 
-### [LOW] portal/tests/opsUsage.test.ts — assertions depend on the runtime locale
+### 444. [LOW] portal/tests/opsUsage.test.ts — assertions depend on the runtime locale
 `formatUsage` / `formatCreditsBalance` use `toLocaleString()`, and the tests
 assert `"1,200 / 100,000"` and `"49,876"`. Under a non-en ICU locale those become
 `"1.200"` / `"49 876"` and the suite fails for reasons unrelated to the code. Dev
@@ -5646,26 +4292,17 @@ follow-up pass the same day (`is_pronoun_targeted_edit` and
 `strip_dictated_payload` now live in `agents/text_utils.py`, with module-level
 imports in all four domain agents). The three below were not selected.
 
-### [MEDIUM] platform/agents/estimate/crud_handlers.py:2917 — handler exceeds the 50-line guideline; shared preamble duplicated
-`_handle_update_estimate_title` is 52 lines. Its first ~20 lines (resolve
-code-or-title → return clarify → ask-which-estimate envelope →
-`_load_estimate_for_update`) are near-identical to
-`_handle_update_estimate_description` and `_handle_update_estimate_property_link`.
-Related growth in the same change: `_handle_update_estimate` is now 140 lines,
-`_resolve_domain_from_history` 64, `_resolve_target_property` 68.
+### 445. [MEDIUM] platform/agents/estimate/crud_handlers.py:2917 — shared "resolve target estimate" preamble duplicated across three handlers
+The first ~20 lines of `_handle_update_estimate_title` (resolve code-or-title →
+return clarify → ask-which-estimate envelope → `_load_estimate_for_update`) are
+near-identical to `_handle_update_estimate_description` and
+`_handle_update_estimate_property_link`. (The handler lengths are tracked
+under #4.)
 **Suggested fix:** extract the shared "resolve target estimate or return an
-envelope" preamble into one helper and call it from all three handlers. Best done
-together with the file-split below.
+envelope" preamble into one helper and call it from all three handlers. Best
+done together with the crud_handlers.py file split.
 
-### [LOW] platform/agents/estimate/crud_handlers.py — file length 3216 lines (guideline: 800)
-Pre-existing violation, worsened by +123 lines when the estimate title rename
-landed. The new code is cohesive with its neighbours, so this is informational
-rather than a defect introduced by that change.
-**Suggested fix:** split the estimate-level field handlers (title / description /
-notes / property link) into their own module, mirroring how
-`work_item_handlers.py` was already carved out of this file.
-
-### [LOW] platform/agents/orchestrator/service.py:1815 — recency marker trusts a caller-supplied context key
+### 446. [LOW] platform/agents/orchestrator/service.py:1815 — recency marker trusts a caller-supplied context key
 `active_entity_domain` arrives in the request context, which the portal
 round-trips from the previous response. A client could set it to any of the six
 domain names to steer which resource a pronoun follow-up resolves against. Impact
@@ -5685,27 +4322,7 @@ shared ordinal-reply helper; its two HIGH findings (a `"the 2"` regression in th
 Task confirmation flow, and a widened `TypeError` surface on malformed
 `candidates`) were fixed in the same change.
 
-### [MEDIUM] platform/routers/agent_helpers/pending_property_link.py:141 — `handle_pending_property_link_confirmation` is 277 lines
-Well past the 50-line guideline. Pre-existing (~258 lines), worsened by ~19 when
-the word-ordinal support and the re-show-the-list branch landed. It is one linear
-state machine with eight independent return paths; the new no-match branch had to
-be inserted mid-function, and finding the right insertion point meant reading the
-whole body.
-**Suggested fix:** extract the reply-classification arms into named helpers
-(`_handle_ordinal_reply`, `_handle_corrected_identifier`) so the top-level
-function reads as a dispatch table.
-
-### [MEDIUM] platform/agents/text_utils.py:859 — file is now 1075 lines (guideline: 800)
-Pre-existing (1001 lines), worsened by +74 when `match_ordinal_reference` landed.
-The module is a grab-bag of unrelated shared parsers — field patterns, refusal
-copy, greeting detection, day windows, and now ordinals — and is the default
-dumping ground for anything two agents share.
-**Suggested fix:** split into focused modules (e.g. `agents/text/ordinals.py`,
-`agents/text/dates.py`) re-exported from `text_utils` for backwards
-compatibility. Coordinate with the `crud_handlers.py` split logged above, since
-both are "shared module grew too big" with the same remedy.
-
-### [LOW] platform/agents/task/text_helpers.py:117 — "add to the tasks: X" with no active task appends to an unrelated task
+### 447. [LOW] platform/agents/task/text_helpers.py:117 — "add to the tasks: X" with no active task appends to an unrelated task
 The plural now routes to a notes append. With no `active_task_id`, the resolver's
 step-7 recency fallback picks the most-recently-updated task in the company, so a
 user who meant "add an item to my task list" annotates whatever they last
@@ -5725,17 +4342,7 @@ Logged by `/fix-issues` — findings from the latest review (positional follow-u
 to a result list, §10.5 of the phrasing reference) not fixed in that pass.
 Findings #1–#8 of that review were fixed; these two were not.
 
-### [LOW] platform/agents/text_utils.py:1 — shared helper module now 1332 lines
-The listed-items work added ~260 lines to a module already past the 800-line
-guideline (~1080 before). The positional/listed-items block is a self-contained
-concern: the ordinal + positional matchers, the `last_listed_items` record, and
-the pick helpers.
-**Suggested fix:** split the listed-items + ordinal helpers into
-`agents/listed_items.py` and re-export from `text_utils` for backwards
-compatibility. This is the same remedy as the earlier "text_utils grew too big"
-entry above — do them together rather than twice.
-
-### [LOW] platform/agents/template/service.py:161 — full-collection load to resolve one id
+### 448. [LOW] platform/agents/template/service.py:161 — full-collection load to resolve one id
 `_template_from_listed_position` calls `_list_templates_db` and scans the result
 for the picked id; `Template.get(...)` plus a company check is one round trip
 instead of a full-collection load. It only runs when a positional reference
@@ -5746,31 +4353,13 @@ pattern, so this is consistency-vs-efficiency rather than a defect.
 for the `_resolve_target_*` id branches in Property / Contact / Material /
 Labour, which scan a full `_list_*_via_api` result for the same reason.
 
-## 2026-07-30 deferred from /code-review (portal — property estimates + Maple composer)
-
-Logged by `/fix-issues` — findings from the latest review (property-detail
-estimate list, Maple composer layout) not fixed in that pass. Findings #1–#5
-were fixed; this one was not.
-
-### [LOW] portal/src/components/Layout/AiPanel.tsx:387 — `renderAiComposer` is ~140 lines
-Pre-existing (~130 lines before the composer restructure; moving the buttons
-above the textbox and the disclaimer to the panel bottom added ~10). The helper
-now holds the voice-error banner, the mic/new-session/send button row, the
-textarea plus its voice-capture overlay, the auto-send countdown row, and the
-disclaimer — five separable concerns in one render function, well past the
-50-line guideline.
-**Suggested fix:** not introduced by that change, so no action was required
-then. If it grows again, split the button row into its own
-`renderComposerControls()` helper (and possibly the countdown/error rows into a
-`renderComposerStatus()`), keeping `renderAiComposer` as the layout shell.
-
 ## 2026-07-31 deferred from /code-review (portal — property label + Tasks tour Maple step)
 
 Logged by `/fix-issues` — findings from the latest review (read-only property
 label fix, Tasks tour Maple step) not fixed in that pass. Findings #1 and #2
 were fixed; #3 was reviewed and accepted as-is; #4 and #5 remain open.
 
-### [LOW] portal/src/tours/registry.ts:209 — Tasks tour can end with a full-viewport spotlight on mobile — ACCEPTED, NO ACTION
+### 449. [LOW] portal/src/tours/registry.ts:209 — Tasks tour can end with a full-viewport spotlight on mobile — ACCEPTED, NO ACTION
 The Tasks tour's final Maple step deliberately does not drive the Maple panel,
 so on a mobile viewport where the user already had Maple open, the resolved
 anchor is the full-screen sheet (`fixed inset-0`). `computePosition` finds no
@@ -5792,7 +4381,7 @@ three small elements — the floating button and each panel's header strip — s
 the step always spotlights something small, leaving the Dashboard tour's
 whole-panel `maple` anchor untouched.
 
-### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1083 — read-only property field can render a raw ObjectId
+### 450. [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1083 — read-only property field can render a raw ObjectId
 The fallback chain ends `... || property || "-"`, where `property` is the raw
 property id string. If both the fetched property and the list lookup miss
 (deleted property, failed fetch), a locked estimate shows the user a Mongo
@@ -5802,50 +4391,12 @@ it — but the line was touched.
 from `lib/propertyDisplay`, matching how `getEstimateProperty` handles a
 missing property.
 
-### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — file is 1838 lines
-Pre-existing and not worsened (the property-label fix adds two lines).
-Recorded because the file was in review scope.
-**Suggested fix:** out of scope on its own. If tackled, the natural seams are
-the sidebar computed values (~lines 410–465) and the work-items table.
-
-## 2026-07-31 deferred from /code-review (Team page — expired invitations)
-
-Logged by `/fix-issues` — the selection was `all`; this finding was the one
-fix that proved substantially larger than its ledger entry described, so it is
-recorded here rather than half-applied. Findings #2–#7 from that review were
-fixed in the same pass.
-
-### [HIGH] portal/src/pages/SettingsPage.tsx:1 — file is 2,605 lines (guideline 800)
-The Team tab is the only settings tab still living inline in `SettingsPage.tsx`.
-Every other tab is an extracted component under `components/settings/`
-(`RateCardsTab`, `DivisionsTab`, `MaterialUnitsTab`, `TaskStatusesTab`,
-`MaterialCategoriesTab`, `TemplatesTab`, `BillingTab`, `FinancialTab`). The
-expired-invitation work added ~130 lines of invitation logic to that inline
-mass, so the drift from the established pattern grew. Pre-existing condition,
-worsened rather than introduced.
-
-**Why it was deferred rather than fixed:** the extraction is not a move of the
-~320 lines of team JSX. It carries roughly 28 `useState` declarations, four
-dialogs (member role, member remove, leave company, invite) plus the overage
-and add-card modals, ~15 handlers, and three loaders — around 1,000 lines with
-`currentUser` / `isOwner` / `companyDetails` shared across other tabs. Test
-coverage over that surface is thin: `SettingsPageInvitationActions.test.tsx`
-exercises the invitation rows only, and member edit / member remove / leave
-company have no component tests at all, so a regression in the moved code would
-be silent.
-
-**Suggested fix:** extract `components/settings/TeamTab.tsx` as its own change,
-in two steps — first add component tests covering member role edit, member
-removal and leave-company so the move has a safety net, then move state,
-handlers and dialogs across with the tab's props limited to `currentUser` /
-`isOwner` / `companyDetails` and an `onCompanyChanged` callback.
-
 ## 2026-07-31 deferred from /code-review
 
 Logged by `/fix-issues` — the selection was `1,2,3,6` (division classification
 review). Those four were fixed in that pass; the three below were not.
 
-### [MEDIUM] platform/prompts/estimate_generation.py:100 — company-authored division description is a prompt-injection vector
+### 451. [MEDIUM] platform/prompts/estimate_generation.py:100 — company-authored division description is a prompt-injection vector
 `_safe_prompt_text` rejects control characters and caps length, but a
 single-line payload under 300 characters passes untouched into rule 4g of the
 generation prompt and rule 9 of the architect prompt. Verified:
@@ -5864,7 +4415,7 @@ data-not-instructions delimiter, and/or drop entries matching an
 instruction-shaped prefix (`ignore`, `disregard`, `system:`, `you must`).
 If neither is done, record this as an accepted risk.
 
-### [MEDIUM] platform/prompts/estimate_generation.py:82 — an over-long division description is silently dropped, not truncated
+### 452. [MEDIUM] platform/prompts/estimate_generation.py:82 — an over-long division description is silently dropped, not truncated
 `_MAX_DIVISION_DESCRIPTION_LEN = 300`; `_safe_prompt_text` returns `""` above
 that, so the coverage text a user wrote vanishes from the prompt entirely and
 the division either inherits the seeded description (if it kept a seeded name)
@@ -5878,56 +4429,11 @@ symptom is invisible: classification just quietly gets worse.
 is rejected for length. Consider surfacing the limit as a `maxLength` on the
 description input in `portal/src/components/settings/DivisionsTab.tsx`.
 
-### [LOW] platform/agents/estimate/work_item_handlers.py:851 — `_handle_update_estimate_work_item_update_field` is 176 lines
-Pre-existing length, worsened by ~8 lines when the division branch changed to
-validate against the company's own divisions. The function handles value
-extraction, three refusal gates, the description branch, division validation,
-estimate resolution, work-item matching, save, and response construction.
-
-**Suggested fix:** split the division branch into its own
-`_handle_work_item_division_update` when the file is next touched — not
-attributable to this change alone.
-
-## 2026-08-02 deferred from /code-review
-
-Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
-Review scope was the Brevo lifecycle-list feature, company-close detach, the
-reinstate flow, the ops Last Login column, and the ErrorBoundary crash fix.
-
-### [HIGH] platform/routers/auth.py — 1117 lines, exceeds the 800-line threshold
-Pre-existing (1030 lines at HEAD) but worsened by +87 in this change. The module
-now carries authentication, signup, verification email, password reset, the full
-invitation lifecycle (create / list / resend / revoke / accept), company
-onboarding, onboarding progress, and the Brevo member fan-out — the God Router
-smell. `accept_company_invitation` is 105 lines; `create_company_invitations` is
-160. Not attributable to this change, which is why it was deferred rather than
-fixed: splitting it is its own piece of work with its own test surface.
-
-**Suggested fix:** extract the invitation lifecycle into
-`platform/routers/invitations.py` (create / list / resend / revoke / accept plus
-their helpers `_hash_invitation_token`, `_generate_invitation_token`,
-`_get_effective_invitation_status`, `_is_actionable_invitation`,
-`_serialize_invitation`, `_find_pending_invitation`, `_find_invitation_by_token`).
-That alone moves roughly 400 lines and leaves `auth.py` close to the threshold.
-
-### [MEDIUM] long functions added by the Brevo lifecycle change
-`reinstate_company_account` (72 lines, `platform/routers/companies.py:111`),
-`detach_non_owner_members` (60, `platform/services/company_service.py:25`) and
-`sync_user_stage` (55, `platform/services/brevo_contacts.py:361`) all exceed the
-50-line guideline. Docstrings and explanatory comments dominate — the executable
-logic is roughly half of each — so this reads as borderline rather than genuinely
-dense, which is why it was deferred.
-
-**Suggested fix:** optional. `reinstate_company_account`'s guard chain (token
-email → user → owner role → has company → company exists) is the one worth
-extracting, into a `_require_owner_of_own_company()` helper mirroring the
-existing `_require_owner_company_access` in the same module.
-
 ## 2026-08-02 deferred from /code-review (ops archived-company fix)
 
 Logged by `/fix-issues` — findings from that review not fixed in the pass.
 
-### [LOW] platform/routers/ops.py:417 — company-detail payload carries stale membership fields
+### 453. [LOW] platform/routers/ops.py:417 — company-detail payload carries stale membership fields
 Reviewed and **accepted as-is** rather than deferred by omission. `list_company_users`
 calls `_serialize_user_summary(u, company.name)` with defaults, so the payload reports
 `membership_status="active"` and `company_archived=False` even for an archived company.
@@ -5947,56 +4453,6 @@ same time — `company` is already loaded on line 410, so it costs no extra quer
 `membership_status(u.company, ..., company_archived=_is_archived(company))` and
 `company_archived=_is_archived(company)`. Until then, no change.
 
-## 2026-08-02 deferred from /code-review (Team page — responsive layout + plan Tasks copy)
-
-Logged by `/fix-issues` — the selection was `1, 2, 4, 5, 6`; findings #1, #2, #4,
-#5 and #6 were fixed in that pass. One finding is deferred, and it is a
-recurrence rather than a new item.
-
-### [MEDIUM] portal/src/pages/SettingsPage.tsx:1 — file is 2,745 lines (guideline 800)
-**Duplicate of the 2026-07-31 entry above** (`SettingsPage.tsx:1 — file is 2,605
-lines`); recorded here only to update the count and confirm the trend. The
-responsive-layout work added ~45 lines to the same inline Team tab, taking it
-from 2,605 to 2,745 — the third consecutive review to flag this file.
-
-Raised at MEDIUM this time rather than HIGH: the risk belongs to the file's
-history, not to this diff, which is a copy change plus Tailwind class edits.
-
-**Suggested fix:** unchanged — see the 2026-07-31 entry for the full extraction
-plan (add component tests for member role edit / member removal / leave company
-first, then move state, handlers and dialogs into
-`components/settings/TeamTab.tsx`). Note that the stacked-table markup added on
-2026-08-02 moves with the tab and needs no rework; the new
-`SettingsPageTeamResponsive.test.tsx` covers part of the safety net that entry
-asks for, though the member-edit and leave-company paths are still untested.
-
-## 2026-08-05 deferred from /code-review (Team page — unverified-member pill)
-
-Logged by `/fix-issues` — the selection was `1, 2`; findings #1 and #2 were
-fixed in that pass. One finding is deferred, and it is again a recurrence
-rather than a new item.
-
-### [LOW] portal/src/pages/SettingsPage.tsx:1 — file is 2,766 lines (guideline 800)
-**Fourth consecutive flag on this file** — see the 2026-07-31 entry (2,605
-lines) for the full extraction plan and the 2026-08-02 entry (2,745 lines) for
-the previous recurrence. The count is now 2,766.
-
-Raised at LOW, a step down from the last two entries, because this diff is a
-net **+17** lines to the file (`git diff --numstat`: +28 / −11) and roughly
-half of that is offset work: the "Unverified" pill and its `isUnverifiedMember`
-helper add ~28 lines, while removing the dead "Accepted" invitation column
-takes 11 away. The drift from 2,745 to 2,766 is almost entirely this change,
-but the magnitude is small and the file's size problem is structural, not
-diff-driven.
-
-**Suggested fix:** unchanged — see the 2026-07-31 entry. Worth noting that the
-safety net that entry asks for has grown again: `SettingsPageTeamVerification.
-test.tsx` (new in this change, 8 tests) now covers the members-table row
-rendering and the invitations-table columns, on top of
-`SettingsPageTeamResponsive.test.tsx` and `SettingsPageInvitationActions.
-test.tsx`. Member role edit, member removal and leave-company remain the
-untested paths blocking a confident extraction.
-
 ## 2026-08-06 deferred from /code-review (website — footer social links + contact-modal waitlist removal)
 
 Logged by `/fix-issues` — the selection was `none`; no findings were fixed in
@@ -6004,7 +4460,7 @@ that pass. All seven are deferred. The review returned zero CRITICAL and zero
 HIGH and was recommended **Approve**, so nothing here blocks a commit; #1 and #2
 are cleanup debt created by the change itself and are the two worth closing.
 
-### [MEDIUM] website/contact-modal/install.js:297 — optional-field validation machinery is now inert
+### 454. [MEDIUM] website/contact-modal/install.js:297 — optional-field validation machinery is now inert
 Removing the pre-launch waitlist checkbox removed the only code path that could ever mark an
 optional field invalid. `optionalFieldWrappers` survives and is still iterated by
 `clearAllFieldErrors()` (line 316) and the input-listener loop (line 319), but both are now
@@ -6020,7 +4476,7 @@ and the dead error divs; or keep them deliberately and add a one-line comment sa
 wrappers exist only so optional fields share the "clear error as you type" wiring. Inline
 `wrappersToValidate` into the `forEach` either way.
 
-### [MEDIUM] website/functions/index.js:170 — server-side joinWaitlist path is now permanently dormant
+### 455. [MEDIUM] website/functions/index.js:170 — server-side joinWaitlist path is now permanently dormant
 The frontend no longer sends `joinWaitlist`, so `wantsWaitlist` is always false. Three
 consequences, none breaking but all misleading: (a) the 400 branch at line 170 ("A message is
 required when joining the pre-launch waitlist") is unreachable from the UI; (b) every ops
@@ -6035,7 +4491,7 @@ field from the handler, drop the email row and the unreachable 400, and retire
 `functions/brevoContactSync.test.js` cover this field and must move with it. If the list may
 return, leave the backend alone and note it in the changelog.
 
-### [MEDIUM] website/index.html:698 — footer icon block duplicated five ways
+### 456. [MEDIUM] website/index.html:698 — footer icon block duplicated five ways
 The social row adds ~13 lines of CSS and ~20 lines of SVG markup, copy-pasted verbatim into
 all five static pages (`index`, `pricing`, `faq`, `privacy`, `terms` — ~165 duplicated lines
 total). A future edit — one URL change, one glyph swap — has to land in five files or the
@@ -6047,7 +4503,7 @@ in sync, so the risk is contained rather than open-ended.
 is being outgrown, the fix is a shared partial injected at build time rather than a per-change
 workaround — that is a separate refactor covering the whole footer, not just the icons.
 
-### [LOW] website/index.html:1248 — `title` and `aria-label` carry different text on each icon link
+### 457. [LOW] website/index.html:1248 — `title` and `aria-label` carry different text on each icon link
 Each anchor has `aria-label="3Maples on LinkedIn"` and `title="LinkedIn"`. `aria-label` wins
 as the accessible name; some screen readers additionally announce `title` as the description,
 producing "3Maples on LinkedIn, LinkedIn". Harmless but redundant. Applies to all five pages.
@@ -6055,7 +4511,7 @@ producing "3Maples on LinkedIn, LinkedIn". Harmless but redundant. Applies to al
 **Suggested fix:** keep `title` for the sighted-user tooltip and accept the duplication, or
 drop `title` and rely on the accessible name alone.
 
-### [LOW] website/index.html:701 — icon links rely on the UA default focus ring
+### 458. [LOW] website/index.html:701 — icon links rely on the UA default focus ring
 The new anchors style `:hover` but not `:focus-visible`. There is no global outline reset, so
 keyboard focus is still visible via the browser default — not a WCAG 2.4.7 failure. It is
 however inconsistent with `.m3s-dot:focus-visible` (index.html:299), which defines an explicit
@@ -6064,7 +4520,7 @@ however inconsistent with `.m3s-dot:focus-visible` (index.html:299), which defin
 **Suggested fix:** add `.foot-col .foot-social a:focus-visible { outline: 2px solid
 var(--social-accent); outline-offset: 2px; }` to match the established treatment.
 
-### [LOW] website/index.html:700 — 34px touch targets
+### 459. [LOW] website/index.html:700 — 34px touch targets
 The icon tiles are 34x34 CSS px with an 8px gap. This clears WCAG 2.2 SC 2.5.8 Target Size
 (Minimum, AA = 24px) but sits under the 44px commonly recommended for comfortable thumb use,
 and these are the only touch targets in the mobile footer.
@@ -6072,7 +4528,7 @@ and these are the only touch targets in the mobile footer.
 **Suggested fix:** optional. Bumping to 40-44px would need the `repeat(3, 34px)` track and the
 `svg` sizing adjusted together; verify the 2-column mobile footer still fits at 320px.
 
-### [LOW] website/contact-modal/__tests__/install.test.js:135 — regex assertion spans the entire document body
+### 460. [LOW] website/contact-modal/__tests__/install.test.js:135 — regex assertion spans the entire document body
 `expect(document.body.innerHTML).not.toMatch(/pre-launch/i)` guards the whole body rather than
 the modal. In jsdom the body only holds the modal, so it passes today, but any unrelated
 fixture that ever mentions "pre-launch" would fail this test in a way that points at the wrong
@@ -6087,7 +4543,7 @@ Logged by `/fix-issues` — findings from the latest review not fixed in that pa
 Fixed in that pass: #1 (handleSubmit extraction), #2 (shared `isDeadActionCode`),
 #3 (action-code effect clobbering a login attempt).
 
-### [MEDIUM] portal/src/pages/auth/LoginPage.tsx:201 — terminal invitation failure silently dropped for unverified users
+### 461. [MEDIUM] portal/src/pages/auth/LoginPage.tsx:201 — terminal invitation failure silently dropped for unverified users
 When the sign-in is unverified AND the invitation accept failed, `inviteError` is discarded so
 the verify banner wins — deliberate, and commented in the code. But on a terminal status
 (403/404/409) the pending invitation is ALSO cleared, so the token is gone and the user was
@@ -6100,7 +4556,7 @@ change was written to unblock.
 banner ("Your invitation has expired — ask them to send a new one."). Turns a silent dead end
 into an actionable one. Needs a test in `tests/LoginPageInvitationOrdering.test.tsx`.
 
-### [MEDIUM] portal/src/pages/auth/LoginPage.tsx:330 — resend button unmounts from a live region, dropping focus
+### 462. [MEDIUM] portal/src/pages/auth/LoginPage.tsx:330 — resend button unmounts from a live region, dropping focus
 The Resend button renders inside `AuthBanner` (`role="status"` or `role="alert"`). On a
 successful resend — and on the 409 already-verified path — `resendToken` is cleared, so the
 button the user just activated unmounts while the banner swaps message. Focus falls to
@@ -6111,7 +4567,7 @@ expired-link `<Link>` does not share this problem: activating it navigates away.
 the banner container given `tabIndex={-1}` and `.focus()`, which also anchors the announcement
 of the new message.
 
-### [LOW] portal/src/pages/auth/LoginPage.tsx:330 — the two banner action blocks are duplicated markup
+### 463. [LOW] portal/src/pages/auth/LoginPage.tsx:330 — the two banner action blocks are duplicated markup
 The `resendToken` and `linkExpired` blocks are near-identical (`div.mt-1.5` wrapping an
 underlined action with the same utility classes) and are mutually exclusive by construction —
 `handleSubmit` clears `linkExpired`, and `resendToken` is only ever set inside it. Two copies
@@ -6120,7 +4576,7 @@ will drift.
 **Suggested fix:** render one action slot whose content is chosen by whichever state is set, or
 extract a small `BannerAction` wrapper carrying the shared classes.
 
-### [LOW] portal/src/pages/auth/LoginPage.tsx:303 — dismissBanner discards a still-valid resend token
+### 464. [LOW] portal/src/pages/auth/LoginPage.tsx:303 — dismissBanner discards a still-valid resend token
 `dismissBanner` clears `resendToken` along with the banner, so a user who closes it to re-read
 the form cannot get the resend back without submitting the whole login again, though the
 captured token is good for the best part of an hour.
@@ -6129,7 +4585,7 @@ captured token is good for the best part of an hour.
 `handleSubmit` and on the success/409 paths), or — better — surface the affordance outside the
 banner so dismissing the message does not dismiss the remedy.
 
-### [LOW] footer-desktop.png (repo root) — stray untracked binary
+### 465. [LOW] footer-desktop.png (repo root) — stray untracked binary
 An untracked PNG has sat in the workspace root since before the 2026-08-06 session, referenced
 by no tracked file. It will eventually be swept in by an unrelated `git add .`.
 
@@ -6142,7 +4598,7 @@ Logged by `/fix-issues` — findings from the latest review not fixed in that pa
 Fixed in that pass: #1 (release preflight now asserts `core.hooksPath`), #2 (timeout
 constants extracted to `tests/helpers/testTimeouts.ts`), #3 (vitest fork pool bounded).
 
-### [LOW] portal/tests/TaskDialog.test.tsx:105 — raised timeouts slow the failure of genuine hangs
+### 466. [LOW] portal/tests/TaskDialog.test.tsx:105 — raised timeouts slow the failure of genuine hangs
 A real infinite-await in a 20s-tier file now takes 20s to surface instead of 5s — up to
 43 tests in TaskDialog. This is the inherent cost of the fix and was a deliberate call:
 the rest of the suite was left at the 5s default specifically to confine the cost to nine
@@ -6151,7 +4607,7 @@ files rather than all ~176.
 **Suggested fix:** none — accept. Revisit only if the 20s tier grows, at which point the
 right move is probably to make the slow files faster rather than to widen the margin.
 
-### [LOW] portal/tests/ — tiers derive from a one-off measurement with no drift check
+### 467. [LOW] portal/tests/ — tiers derive from a one-off measurement with no drift check
 The tier assignment reflects timings taken once, on one idle machine. Nothing re-verifies
 that TaskDialog is still >= 2.0s, and nothing flags a newly-slow file that has no override.
 The tiering will go stale silently — which is exactly how the 5s default became wrong in
@@ -6162,7 +4618,7 @@ file exceeds the tier threshold would catch drift without manual re-measurement.
 
 ## 2026-08-07 — deferred during the Tasks readable-ID / dialog-rework change
 
-### [LOW] platform/routers/tasks.py — `POST`/`PUT /tasks/` still bind the raw `Task` Document
+### 468. [LOW] platform/routers/tasks.py — `POST`/`PUT /tasks/` still bind the raw `Task` Document
 There is no `TaskCreate`/`TaskUpdate` Pydantic schema, so PUT is a full-replace bind: every
 field a client omits resets to its model default. The exclude set at `routers/tasks.py`
 is now eight entries long (`readable_id`, `title`, `task_date`, `photos`, `estimate`,
@@ -6174,7 +4630,7 @@ server-owned field is added, and forgetting is silent data loss.
 **Suggested fix:** introduce explicit `TaskCreate` / `TaskUpdate` request models listing
 only the client-writable fields. Then a forgotten field is inert rather than destructive.
 
-### [LOW] portal/src/components/common/SearchableSelect.tsx — no keyboard navigation
+### 469. [LOW] portal/src/components/common/SearchableSelect.tsx — no keyboard navigation
 The component gained combobox/listbox/option roles and Escape-to-close in this change, but
 still has no arrow-key navigation or type-ahead focus movement: a keyboard user can open it
 and tab through the option buttons, which works but does not match the combobox pattern
@@ -6184,7 +4640,7 @@ screen readers announce.
 `aria-activedescendant`. Deferred because it touches all six consumers' focus behaviour and
 was out of scope for the Tasks work.
 
-### [LOW] platform/agents/task/create.py — Maple still asks "What should the task be called?"
+### 470. [LOW] platform/agents/task/create.py — Maple still asks "What should the task be called?"
 When a create message carries neither a title cue nor usable content, create falls through
 to asking for a title — a concept the portal no longer exposes. The answer is now folded
 into the note (so the behaviour is correct), but the wording still names a field the user
@@ -6203,41 +4659,7 @@ Escape interaction between SearchableSelect and Modal), #8 (a PUT omitting
 Waived by the user: #1, #4 (backfill scalability — there is little data to backfill,
 even in Prod).
 
-### [HIGH] platform/agents/orchestrator/service.py — 3,091 lines, well past the 800-line ceiling
-Selected for fixing, ATTEMPTED, and reverted. Recording what the attempt established so
-the next one starts informed rather than repeating it.
-
-The plan was to extract the rule tier into `agents/orchestrator/rules.py` as a mixin,
-matching the layering `agents/task/` already uses for exactly this reason. A static check
-looked encouraging: the 16 rule-tier methods are ~954 lines, and of the module constants
-they touch, **zero** are also referenced by the non-rule methods — no import cycle.
-
-The extraction was mechanically completed (service.py 3,051 → 1,528; rules.py ~1,200) and
-then reverted, for two reasons the constant analysis had not predicted:
-
-1. **The coupling is bidirectional.** mypy found **14** call-backs from the extracted tier
-   into methods that remain on `OrchestratorAgent` (`_ambiguity_fallback`,
-   `_resolve_action_from_history`, and others). A mixin can only express that with an
-   explicit seam — the `raise NotImplementedError` contract `agents/task/base.py` uses —
-   and that seam has to be *designed*, one declaration per crossing, not discovered by
-   moving code and seeing what breaks.
-2. **It does not actually clear the ceiling.** The result is a 1,528-line file and a
-   1,200-line file. Both still over 800. The split has to be finer than "rules vs. the
-   rest" to be worth doing at all.
-
-**Suggested fix:** treat this as its own change, not a rider on a feature commit. Start by
-listing the 14 crossings and deciding which are genuinely the rule tier's business versus
-which belong to the agent — that boundary, not the line count, is the thing to get right.
-Then split into more than two modules (candidates: action/domain resolution, the
-specific-phrasing overrides, entity-shape inference, history/anchor resolution).
-
-### [MEDIUM] platform/scripts/backfill_task_readable_ids.py:70 — `_run` is 53 lines
-Just over the 50-line guideline, mixing querying, the dry-run preview branch, and the
-apply branch with its own error tally.
-**Suggested fix:** extract `_preview(grouped)` and `_apply(grouped)`, leaving `_run` as
-orchestration plus the summary. Low priority — it is a one-off migration script.
-
-### [LOW] platform/agents/orchestrator/service.py — the domain name "task" is a magic string
+### 471. [LOW] platform/agents/orchestrator/service.py — the domain name "task" is a magic string
 `active_domain == "task"` is compared literally in two new places. The codebase has no
 Domain enum — `DOMAIN_HINTS` / `ACTIVE_ANCHOR_FIELD_BY_DOMAIN` are keyed by plain strings —
 so this matches existing convention and is not a regression.
@@ -6249,7 +4671,7 @@ sweep.
 Logged by `/fix-issues` — findings from the property activity panel review not
 fixed in that pass (#1–#7 were).
 
-### [LOW] portal/src/components/properties/PropertyActivityPanel.tsx:233 — redundant effect dependencies
+### 472. [LOW] portal/src/components/properties/PropertyActivityPanel.tsx:233 — redundant effect dependencies
 The fetch effect lists `activeFilter.length`, `estimateFilter` and `taskFilter`
 alongside `cacheKey`, which already encodes the active filter. Changing the inactive
 tab's filter re-runs the effect for no reason; it is harmless only because the cache
@@ -6257,26 +4679,26 @@ absorbs it.
 **Suggested fix:** depend on `cacheKey` alone (plus `propertyId`, `activeTab` and
 `reloadToken`), and read the filters through a ref or recompute them inside the effect.
 
-### [LOW] portal/src/components/properties/PropertyActivityPanel.tsx:152 — panel cache grows unbounded for the session
+### 473. [LOW] portal/src/components/properties/PropertyActivityPanel.tsx:152 — panel cache grows unbounded for the session
 Entries accumulate per property x tab x filter combination and are only ever cleared
 wholesale by the mutation event. A long session across many properties retains every
 result set.
 **Suggested fix:** cap it (a small LRU, or evict entries for other properties when
 `propertyId` changes).
 
-### [LOW] portal/src/components/common/StatusFilterDropdown.tsx:186 — reposition runs setState on every scroll event
+### 474. [LOW] portal/src/components/common/StatusFilterDropdown.tsx:186 — reposition runs setState on every scroll event
 The scroll listener is registered with `capture: true` and calls `setPosition` on each
 event, re-rendering the menu for every scroll frame while it is open.
 **Suggested fix:** throttle with `requestAnimationFrame`, or close the menu on scroll.
 
-### [LOW] portal/src/pages/TasksPage.tsx:199 — taskId param never clears when the list is empty
+### 475. [LOW] portal/src/pages/TasksPage.tsx:199 — taskId param never clears when the list is empty
 The effect returns early when `tasks.length === 0`, so `?taskId=` stays in the URL when
 the filtered list has no rows. A later filter change that produces rows can then open a
 dialog the user did not ask for.
 **Suggested fix:** clear the param whenever `requestedTaskId` is set and loading has
 completed, independent of the row count.
 
-### [LOW] portal/src/components/common/StatusFilterDropdown.tsx:196 — trigger has no accessible name beyond its summary
+### 476. [LOW] portal/src/components/common/StatusFilterDropdown.tsx:196 — trigger has no accessible name beyond its summary
 The button's accessible name is just the current summary ("8 statuses", "No statuses"),
 which does not say what it filters. `aria-haspopup="true"` also implies a menu rather
 than the checkbox group actually rendered. Pre-existing, but the control now appears in
@@ -6284,58 +4706,17 @@ more places.
 **Suggested fix:** give the trigger an `aria-label` such as "Filter by status, 8
 selected", and set `aria-haspopup` to match the rendered role.
 
-### [LOW] platform/tests/test_estimate_api.py:1 — test file well past the size guideline
-Now ~5,200 lines, against the 800-line guideline. Pre-existing; the panel work added
-~160.
-**Suggested fix:** split by concern (CRUD / status transitions / listing / docs) when
-next doing substantial work in it.
-
 ## 2026-08-12 deferred from /code-review
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 `/fix-issues 1,2,3,4,5,6,7,8` fixed the rest.
 
-### [MEDIUM] platform/agents/estimate/llm_pipeline.py:677 — functions grown past the 50-line rule by the per-scope-assumptions change
-`_step2_and_3_for_scope` went from ~20 to 64 lines; `_step3_research_for_scope` is 136,
-`_run_pipeline` 104, `search_similar_work_items` 94, `build_estimate_research_prompt` 107,
-`render_material_catalog` 66 (new). Much of the growth is comment prose rather than
-logic, but the per-scope orchestration in `_step2_and_3_for_scope` now does four distinct
-things (vector retrieval, area assumption, reuse decision, research dispatch).
-**Suggested fix:** extract the area-assumption resolution and the reuse decision from
-`_step2_and_3_for_scope` into named helpers.
-
-### [MEDIUM] platform/agents/estimate/catalog_matching.py:1 — file at 793 lines, 7 under the 800 threshold
-The fuzzy-matching rewrite added ~250 lines (scoring engine + module docstring). The next
-addition crosses the guideline. The module already has two unrelated halves: the scoring
-engine (module-level pure functions) and the mixin's measurement-unit / size-capacity /
-purchase-quantity helpers, which have nothing to do with matching.
-**Suggested fix:** split the measurement-unit and size-capacity helpers into their own
-module before the next substantial change to this file.
-
-### [LOW] platform/routers/estimates.py:983 — oversized file and function touched again
+### 477. [LOW] platform/routers/estimates.py:983 — oversized file and function touched again
 Pre-existing: the file is 1652 lines and `update_estimate` is 298. The work-item history
 change added the enter/leave hooks inline rather than in a helper, nudging both further
 past the guideline.
 **Suggested fix:** move the history-transition side effects into
 `routers/estimate_helpers/` alongside the other extracted update logic.
-
-## 2026-08-12 deferred from /code-review (dropdown placement + Create Estimate dialog)
-
-Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
-`/fix-issues 1,4,5,6,7` fixed the rest. #2 (panel can flip sides mid-scroll) was
-reviewed and **accepted as-is** by the user — deliberately not tracked here.
-
-### [MEDIUM] ~~portal/src/components/tasks/ConvertTaskDialog.tsx:75 — conversion failure is not announced to assistive tech~~ — RESOLVED 2026-08-12
-The error paragraph is rendered conditionally with no `role="alert"` or `aria-live`. A
-screen-reader user who triggers Create Estimate and hits a failure (e.g. estimate quota
-exhausted) gets no announcement — the button silently re-enables and focus never moves.
-The same applies to the "This can take a minute" busy line, which is the only signal that
-a long-running request is in flight. Pre-existing, but both messages moved into the footer
-in this change.
-**Suggested fix:** add `role="alert"` to the error paragraph and `aria-live="polite"` to
-the busy paragraph.
-**Resolved:** both applied, covered by two tests in `tests/ConvertTaskDialog.test.tsx`
-(failure is exposed as an `alert`; the busy line announces politely).
 
 ## 2026-08-12 deferred from /code-review (material unit column width)
 
@@ -6344,7 +4725,7 @@ Logged by `/fix-issues` — findings from the latest review not fixed in that pa
 dialog, full unit name exposed as a native tooltip on both unit selects, and the
 resolve dialog's sizes table made horizontally scrollable).
 
-### [LOW] portal/src/components/estimates/AddMaterialGapDialog.tsx:315 — the read-only sizes table in the same dialog keeps a 160px Unit column
+### 478. [LOW] portal/src/components/estimates/AddMaterialGapDialog.tsx:315 — the read-only sizes table in the same dialog keeps a 160px Unit column
 When the resolve dialog shows an *existing* material, the Unit cell renders plain
 `text-sm` text (line 355) in a `w-[160px]` column with no `whitespace-nowrap`. At 14px,
 "Cubic yards (cu yd)" needs ~157px including the `px-3` padding, so the longest names wrap
@@ -6354,7 +4735,7 @@ with the editable table's 240px.
 **Suggested fix:** widen this header to match the editable table (`w-[240px]`) so unit
 names stay on one line and both tables in the dialog line up.
 
-### [LOW] portal/src/components/estimates/AddMaterialGapDialog.tsx:435, portal/src/pages/MaterialsPage.tsx:923 — unit-column width is now a magic literal in three places
+### 479. [LOW] portal/src/components/estimates/AddMaterialGapDialog.tsx:435, portal/src/pages/MaterialsPage.tsx:923 — unit-column width is now a magic literal in three places
 The same conceptual column is sized `w-[240px]`, `w-[180px]`, and `w-[160px]` across three
 tables, each tuned by hand to a different font size. Nothing ties them together, so the
 next unit added to the catalog requires finding and re-deriving all three independently —
@@ -6374,7 +4755,7 @@ asserts the FAQ markers and the crawl-control invariant in both directions,
 the deploy date, and the page list collapsed to the single `PAGE_META` source of
 truth. Finding #6 (`.DS_Store` gitignore) was dismissed by Simon as a non-issue.
 
-### [MEDIUM] website/src/seo/pageMeta.ts:30 — comment points at a build script that does not exist
+### 480. [MEDIUM] website/src/seo/pageMeta.ts:30 — comment points at a build script that does not exist
 The `OG_IMAGE` docstring says the card is "generated by `scripts/build-og-image.mjs`". That
 file was never created — `scripts/` contains only `og-image-template.html` and
 `verify-bundles.mjs`. The image was produced by driving the template through a browser by
@@ -6386,7 +4767,7 @@ capture: load `scripts/og-image-template.html`, viewport 1200x630, screenshot to
 tagline or brand changes, and an undocumented manual step is one nobody repeats correctly.
 Correcting the comment to describe the manual procedure is the cheaper alternative.
 
-### [LOW] website/404.html:8 — two conflicting robots metas in non-prod builds
+### 481. [LOW] website/404.html:8 — two conflicting robots metas in non-prod builds
 The page hardcodes `<meta name="robots" content="noindex, follow">`, and in a non-production
 build `seoSiteEnvPlugin` prepends `noindex, nofollow`. The built 404 page then carries two
 robots directives. Crawlers resolve this by taking the most restrictive union, so behavior is
@@ -6395,7 +4776,7 @@ correct, but the output is confusing to read and the `follow` intent is silently
 `seoSiteEnvPlugin.transformIndexHtml` — it is already `noindex` by its own tag on every
 environment — keeping the page's declared `follow` semantics intact.
 
-### [LOW] website/src/content/__tests__/image-perf.test.ts:31 — the lazy-loading assertion skips both logos
+### 482. [LOW] website/src/content/__tests__/image-perf.test.ts:31 — the lazy-loading assertion skips both logos
 `ABOVE_THE_FOLD` excludes by `src`, and the header and footer logos share the same `src`
 (`/3Maples-logo-horizontal-black.png`). The exclusion intended for the header logo therefore
 also exempts the footer one, so the `loading="lazy"` added to the footer image is not covered
@@ -6404,7 +4785,7 @@ by any test and could be removed without failing anything.
 exempt only the first occurrence of that src in document order (the header logo) and require
 lazy on the rest.
 
-### [LOW] website/src/seo/siteEnv.ts:95 — `renderSitemap` does not XML-escape `<loc>` values
+### 483. [LOW] website/src/seo/siteEnv.ts:95 — `renderSitemap` does not XML-escape `<loc>` values
 Paths are interpolated straight into `<loc>`. Today every value comes from the hardcoded
 `PAGE_META` list and contains no `&`, `<` or `>`, so the output is valid. It is a latent trap
 rather than a live bug: the first page path with a query string or ampersand produces
@@ -6412,7 +4793,7 @@ malformed XML, and a malformed sitemap fails silently at Google rather than at b
 **Suggested fix:** escape `&`, `<` and `>` when building the `<loc>` value, and add a case to
 `robots-sitemap.test.ts` covering a path containing `&`.
 
-### [LOW] website/seo/ — vendor audit docs include a duplicate download artifact
+### 484. [LOW] website/seo/ — vendor audit docs include a duplicate download artifact
 `website/seo/` is untracked and about to be committed. It contains
 `3maples-wo-brevo-events (1).md`, byte-identical to `3maples-wo-brevo-events.md` — a browser
 download duplicate. The parenthesised filename is also awkward to reference from scripts or
@@ -6422,7 +4803,7 @@ these vendor documents belong in the `website/` repo at all or in `documentation
 the plan — `documentation/` is the better home, since they are process artifacts rather than
 site source, but that is a judgment call.
 
-### [LOW] website/package.json:6 — no type gate covers the `src/seo/` modules
+### 485. [LOW] website/package.json:6 — no type gate covers the `src/seo/` modules
 The SEO work added three TypeScript source modules under `src/seo/` and five TypeScript test
 files. The website project has no `tsconfig.json`, no `typecheck` script, and does not have
 `typescript` installed — vite and vitest transpile `.ts` via esbuild, which strips types
@@ -6441,7 +4822,7 @@ couple of DOM helpers — but it is scope beyond an SEO change.
 Logged by `/fix-issues` — findings from the Brevo lifecycle-events review not
 fixed in that pass. Findings #1–#5 (the HIGH plus four MEDIUMs) were fixed.
 
-### [LOW] platform/services/brevo_lifecycle.py:361 — a new httpx client per event
+### 486. [LOW] platform/services/brevo_lifecycle.py:361 — a new httpx client per event
 `emit` opens `httpx.AsyncClient()` per call, so the reconcile sweep builds and tears down a
 connection pool for every event of every user. Harmless in a request handler firing one
 event; wasteful in a sweep that may fire thousands.
@@ -6450,14 +4831,14 @@ has no deadline) or let `emit` take an optional client the sweep creates once an
 Leaning accept — consistency with the sibling module is worth more here than the connections
 saved on a nightly job. Logged so the choice is deliberate rather than inherited.
 
-### [LOW] platform/services/brevo_lifecycle_reconcile.py:184 — `dict[Any, Company]` where the key type is known
+### 487. [LOW] platform/services/brevo_lifecycle_reconcile.py:184 — `dict[Any, Company]` where the key type is known
 `_collect_companies` returns `dict[Any, Company]`. The key is `Company.id`, a
 `PydanticObjectId`. `Any` silently disables checking at every call site that indexes into it.
 **Suggested fix:** annotate `dict[PydanticObjectId, Company]` and import the type from
 beanie. If mypy then objects that `company.id` is `Optional`, the existing
 `if company.id is not None` filter already narrows it.
 
-### [LOW] platform/services/brevo_lifecycle.py:194 — `reset_cache` docstring claims a caller it does not have
+### 488. [LOW] platform/services/brevo_lifecycle.py:194 — `reset_cache` docstring claims a caller it does not have
 The docstring says "For tests and for the backfill", but the only callers are
 `tests/conftest.py` and `tests/test_brevo_estimate_hook.py`. The backfill never calls it. A
 future reader may preserve behaviour for a caller that isn't there.
@@ -6466,7 +4847,7 @@ actually call it — it arguably should, since it rewrites claims out from under
 Since the backfill only ever runs as a standalone script, the cache is cold anyway and the
 docstring is simply the thing to correct.
 
-### [LOW] platform/scripts/prime_brevo_events.py — no test coverage
+### 489. [LOW] platform/scripts/prime_brevo_events.py — no test coverage
 The one file in the change with no tests. It is an operational script in the same mould as
 `scripts/create_brevo_attributes.py`, which is also untested, so this is consistent rather
 than novel — but it posts to a live Brevo account.
@@ -6484,7 +4865,7 @@ fields both survive. See
 [`plans/2026-08-24-concurrent-update-sparse-writes.md`](plans/2026-08-24-concurrent-update-sparse-writes.md).
 These three were deliberately left out of that scope.
 
-### [MEDIUM] Same-field conflicts are still silent — the conflict-detection phase
+### 490. [MEDIUM] Same-field conflicts are still silent — the conflict-detection phase
 Two writers changing the **same** field still resolve to whoever saves last,
 with no detection and no signal to either user. Sparse writes shrink the
 exposure to genuinely overlapping edits; they do not remove it.
@@ -6497,7 +4878,7 @@ when the changed-field sets do not overlap, and a 409 naming the conflicting
 fields when they do. **Supersedes #59**, which proposed optimistic concurrency
 keyed on `estimate.updated_at` for the Drive-filename race.
 
-### [MEDIUM] `JobItem` has no stable id — work items are addressed positionally
+### 491. [MEDIUM] `JobItem` has no stable id — work items are addressed positionally
 `Estimate.job_items` is a list of `JobItem` (`models/estimate.py:439`) with no
 identity field, so items are addressed by list index. Consequences: any
 work-item edit rewrites the entire array, `WorkItemSummary` keys on
@@ -6515,7 +4896,7 @@ visible 409 rather than silent loss, but neither fixes the root cause.
 `WorkItemSummary` on it, and match by id rather than index in
 `workItemV2ToJobItemPayload`. Enables true per-work-item merging.
 
-### [LOW] Stripe webhooks replace the whole Company document
+### 492. [LOW] Stripe webhooks replace the whole Company document
 `services/billing/webhook_handlers.py` calls `await company.save()` at six sites
 (lines 75, 87, 102, 122, 142) on `customer.subscription.*`, `invoice.paid`,
 `invoice.payment_failed` and `payment_method.attached`. Each is a
@@ -6531,7 +4912,7 @@ resources the request named, and Company was not one of them.
 `routers/companies.py:220` plus `services/sparse_update.build_patch`/`finalize`,
 and targeted `.set()` calls in the webhook handlers instead of `.save()`.
 
-### [LOW] The estimate builder never refetches while open
+### 493. [LOW] The estimate builder never refetches while open
 `NewEstimateWithActivityPage`'s load effect depends only on `[estimateId]`, and
 the page does not listen to the `portal:estimates:changed` bus that every list
 page already subscribes to (`src/components/Layout/agentMutationEvents.ts:13`).
@@ -6548,7 +4929,7 @@ when the page is not dirty, or show a "this estimate changed" prompt when it is.
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
 
-### [MEDIUM] portal/src/pages/EquipmentsPage.tsx:166 — plan committed to including EquipmentsPage; it was skipped, and naive inclusion would break saves
+### 494. [MEDIUM] portal/src/pages/EquipmentsPage.tsx:166 — plan committed to including EquipmentsPage; it was skipped, and naive inclusion would break saves
 The approved sparse-writes plan's Step 5 lists EquipmentsPage "for consistency", but it still
 sends the whole object. Note the trap: the equipments *router* still binds the full
 `Equipment` document (it was outside the 7-resource backend scope), so wiring `diffPayload`
@@ -6560,14 +4941,14 @@ consistent, ~30 min; or (b) drop EquipmentsPage from the plan doc explicitly. Op
 preferred: Equipment is a catalog resource identical in shape to Material/Labour, and leaving
 one full-bind PUT invites the old bug class back.
 
-### [LOW] platform/agents/material/service.py:1899 — `narrow_to_changes` call lacks `always=fields.keys()`, unlike every sibling agent
+### 495. [LOW] platform/agents/material/service.py:1899 — `narrow_to_changes` call lacks `always=fields.keys()`, unlike every sibling agent
 Contact, labour, and property agents force-keep explicitly-requested fields so an idempotent
 "set cost to 14" (already 14) still writes; the material agent drops it. Harmless today
 (response is still correct), but the asymmetry will surprise the next reader and diverges the
 audit trail.
 **Suggested fix:** pass `always=fields.keys()` to match the siblings.
 
-### [LOW] platform/routers/properties.py:418 — `changed()` gate lost the old whitespace/None normalization
+### 496. [LOW] platform/routers/properties.py:418 — `changed()` gate lost the old whitespace/None normalization
 The old comparison normalized with `str(x or "").strip()`; the new `changed()` compares raw
 values, so `"Toronto "` vs `"Toronto"`, or `""` sent for a stored `None`, counts as an address
 change and spends a geocode round-trip (fail-open, so cost only).
@@ -6575,14 +4956,14 @@ change and spends a geocode round-trip (fail-open, so cost only).
 strings, coerce `""`/`None` equivalence) — three lines — or accept the occasional spurious
 geocode and note it in the comment.
 
-### [LOW] platform/services/sparse_update.py:68 — `merge_onto` is unused by production code
+### 497. [LOW] platform/services/sparse_update.py:68 — `merge_onto` is unused by production code
 The routers use `existing.model_copy(update=...)` directly; `merge_onto` exists only in the
 module docstring and its unit tests. Dead public API invites drift between the documented
 recipe and the real one.
 **Suggested fix:** use `merge_onto` at the three call sites that inline `model_copy`
 (materials, labours, properties), or delete the helper and update the docstring example.
 
-### [LOW] portal — empty-patch behavior is inconsistent across the five edit surfaces
+### 498. [LOW] portal — empty-patch behavior is inconsistent across the five edit surfaces
 MaterialsPage, PeoplePage, and PropertyDialog skip the API call when the diff is empty;
 ContactsPage and TaskDialog still send `{}` (a server round-trip that only bumps
 `updated_at`). Both are safe; the inconsistency is the issue.

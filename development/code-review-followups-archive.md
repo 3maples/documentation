@@ -2899,3 +2899,1877 @@ fake-model classes moved into a small `conftest_cross_resource.py` helper
 imported by both. Could also fold under #4 as another file-size instance.
 
 </details>
+
+---
+
+## Consolidation pass — 2026-08-25
+
+Relocated out of the live tracker by the consolidation pass. Nothing was
+discarded except seven duplicate "bandit not installed" entries, which the
+2026-07-27 bandit adoption made obsolete (one representative kept below).
+
+### Resolved entries relocated from the live tracker
+
+### 3. [HIGH] ~~mypy baseline — themed gaps (271 errors across 38 files)~~ — RESOLVED 2026-05-22
+**Closed as resolved 2026-05-22.** mypy now reports **`Success: no issues found in 265 source files`** on the full project. From 271 errors at the original 2026-04-26 baseline → 0 errors across 265 files. All themed sub-entries (#86 union-attr, #87 boundary arg-type, #88 implicit-Optional, #89 resource-narrowing arg-type, #90 Optional[int] arithmetic, #91 ChatOpenAI signature, #92 call-arg, #93 BlockingPortal, #124 / #183 / #256 misc) are closed. Pre-fix CI gate is now viable; suggested follow-up tracked separately if a CI step is desired.
+
+Final session (2026-05-22) cleared the residual 77 errors via:
+- `routers/materials.py` (10) — `assert` narrowings on `find_one().id` / `insert().id`, explicit `Dict[str, Any]` annotations, renamed shadowed `existing` variable.
+- `routers/agents.py` (7) — `Dict[str, Any]` annotation on `detail`; `set_llm_context` widened to accept `Optional[PydanticObjectId]` with internal `None` short-circuit (more honest about the `User.company` model); replaced `[{"description": ...}]` dict literals with explicit `JobItemCreate(description=...)`; guarded `release_estimate_slot(company_doc)` calls with `if company_doc is not None`.
+- `services/audit_service.py` (6) — `sanitized: Dict[str, Any]` and `changes: Dict[str, Dict[str, Any]]` annotations.
+- `routers/billing.py` (6) — `assert company.id is not None` at all 6 `assert_company_access(decoded_token, company.id)` sites (replace_all on the canonical line).
+- `routers/estimate_helpers/ai_generation.py` (4) — return-type annotations tightened from `Optional[Tuple[…]]` to `Tuple[…]` (functions actually never return None); `assert company_obj_id is not None` after the `if not company: raise` guard.
+- `routers/auth.py` (4) — `# type: ignore[arg-type]` on the `float(value: object)` cast (TypeError caught below for non-floatable), `# type: ignore[operator]` on Beanie unary-minus sort, `results: List[Dict[str, Any]]` annotation.
+- `user_guides/content.py` (3) — bind `guide.get("tips")` / `.get("notes")` / `.get("related_topics")` to locals before the truthy check.
+- `routers/audit_logs.py` (3) — two `# type: ignore[operator]` on Beanie sort idioms, `Optional[PydanticObjectId]` annotation for the user-fallback branch.
+- `scripts/setup_stripe_webhook.py` (3) — `cast(Any, ...)` on `enabled_events` / `api_version` to bypass Stripe SDK Literal stubs.
+- `routers/companies.py` (2), `routers/properties.py` (2), `routers/change_logs.py` (1), `services/brevo_email.py` (2), `services/company_service.py` (1), `services/google_drive_service.py` (2), `services/trello_service.py` (2), `services/estimate_doc_generator.py` (1), `routers/agent_helpers/estimate_update.py` (1), `routers/estimate_helpers/job_item_builders.py` (1), `agents/contact/service.py` (3), `agents/material/service.py` (2), `firebase_auth.py` (2), `config.py` (2), `scripts/db/backfill_divisions.py` (1), `scripts/seed_stripe_products.py` (2), `tests/test_billing_plan_config.py` (1), `tests/test_estimate_agent.py` (1), `tests/test_maple_crud_coverage.py` (1), `scratch/test_owner_leave.py` (1) — same playbook variations (assert narrowing, dict[str, Any] annotation, type: ignore on third-party Literal/operator stubs).
+
+Verified: 245 tests pass across `test_material_api.py`, `test_audit_service.py`, `test_billing_*`, `test_orchestrator_endpoint.py`, `test_estimate_agent.py`, `test_recurrence_model.py` (most likely-affected test surface).
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+### 3. [HIGH] mypy baseline — themed gaps (271 errors across 38 files)
+Generated 2026-04-26 via `mypy . --ignore-missing-imports --explicit-package-bases`
+after fixing the 7 implicit-Optional `http_request: Request = None` router
+sites (the only mechanically safe category — `Optional[Request]` breaks
+FastAPI's request injection, so the kept-default + `# type: ignore[assignment]`
+form is the canonical fix). Remaining errors split into the themed entries
+below; see [#86](#86-mypy-no_implicit_optional-defaults-on-agentestimateservicepy)
+through [#90](#90-models-estimate-arithmetic-on-optional-int-fields) for
+specific scopes.
+
+Pre-fix CI gate is **not** recommended yet — too many false positives from
+LangChain/Beanie type erasure. The right next move is one of:
+- enable `mypy --strict` only on `services/` (the smallest, most type-clean
+  package), or
+- add a `mypy.ini` with the noisy categories disabled (e.g. `disable_error_code = union-attr,arg-type` while the agents are refactored).
+
+Categories below are sorted by error count.
+
+Specific instances:
+- #84 — `_coerce_company_oid` returns `Optional[Any]` to keep beanie lazy-import.
+- #86 — `union-attr` on `dict.get(...)` chains across agent services (92 errors).
+- #87 — `arg-type` on `PydanticObjectId | None` → required at router/service boundaries (~25 errors).
+- #88 — `assignment` implicit-Optional defaults across agents / prompts (~50 errors).
+- #89 — `arg-type` on agent services — `Material | None` → `Material` (~30 errors).
+- #90 — `models/estimate.py` arithmetic on `Optional[int]` fields (16 errors).
+- #91 — `call-arg` on `ChatOpenAI(openai_api_key=...)` signature drift (5 errors).
+- #92 — `call-arg` on agent → router calls missing `http_request` (5 errors).
+- #93 — `BlockingPortal | None` errors in tests (12 errors).
+- #124 — `openai_api_key=` keyword on ChatOpenAI flags mypy in maple_guide / maple_public.
+- #183 — `change_logs.py` `.sort()` tuple type mismatch (pre-existing).
+- #256 — `detail` lacks an explicit type annotation in the orchestrate credits-gate try/except.
+
+**Absorbed:** #84, #86, #87, #88, #89, #90, #91, #92, #93, #124, #183, #256 — themed mypy gaps surfaced in later review passes. See `## Closed` for original bodies.
+
+Progress 2026-05-20: cleared all `union-attr` errors from `agents/property/service.py` (15 → 0 in file; total mypy errors 384 → 365 globally — the assert-on-`target_property` added for union-attr coverage also collapsed three `arg-type` errors on `_property_to_dict` calls). Closes the `union-attr` portion of #86 for this file; the `Property | None` → `Property` arg-type slice of #89 also drops 3 errors. Fixes were pure type narrowing via `assert` (LLM guarded by callers, `target_property` guaranteed non-None after `if resolve_error: return`, `active_pending_intent` guaranteed non-None inside `should_fallback_to_pending`) plus tightening two `if active_pending_intent_id and ...` conditions to also check `active_pending_intent is not None`. No real null-deref bugs surfaced — all 15 were narrowing gaps.
+
+Progress 2026-05-20: applied the same playbook to `agents/contact/service.py` (21 → 2 in file; total mypy errors 365 → 346 globally). Cleared 15 `union-attr` + 4 `arg-type` errors via 6 narrowing edits: 2 `assert self.llm is not None` on the `_classify_with_llm` / `_extract_entities_with_llm` paths (callers gate on `self.use_llm and self.llm is not None`), 1 `assert active_pending_intent is not None` inside `should_fallback_to_pending`, 1 `assert target_contact is not None` after the `if resolve_error: return` early-bail, and 2 pending-delete conditions tightened with `and active_pending_intent is not None`. Closes the `union-attr` portion of #86 for contact; the `Contact | None` → `Contact` arg-type slice of #89 also drops 4 errors. Remaining 2 errors in this file (`no-redef` at L1794, `assignment` at L2014) are unrelated — separate categories from #3. Verified with `tests/test_contact_agent.py` + `test_contact_api.py` + `test_contact_model.py` + `test_cross_resource_envelope_contact.py` (99 tests passing).
+
+Progress 2026-05-20: applied the same playbook to `agents/material/service.py` (17 → 4 in file; total mypy errors 346 → 333 globally). Cleared 10 `union-attr` + 3 `arg-type` errors via 5 narrowing edits: 2 `assert self.llm is not None` on `_classify_with_llm` / `_extract_entities_with_llm`, 1 `assert active_pending_intent is not None` inside `should_fallback_to_pending`, 1 `assert target_material is not None` after the `if resolve_error: return` early-bail (collapses 3 `arg-type` errors on `_handle_get_material` / `_handle_delete_material` / `_material_to_dict` calls plus 3 `.name`/`.id` union-attrs), and 1 pending-delete condition tightened with `and active_pending_intent is not None`. Closes the `union-attr` portion of #86 for material; the `Material | None` → `Material` arg-type slice of #89 also drops 3 errors. Remaining 4 errors in this file are out of scope (390: `_parse_cost(Any | None)` arg-type; 1227, 1230: `call-arg` missing `http_request` — part of #92; 1356: `len(Any | list[Any] | None)`). Verified with `tests/test_material_agent.py` + `test_maple_material_size_operations.py` + `test_material_response_envelope.py` (88 tests passing).
+
+Progress 2026-05-20: applied the same playbook to `agents/labour/service.py` (15 → 2 in file; total mypy errors 333 → 320 globally). Cleared 10 `union-attr` + 3 `arg-type` errors via 6 narrowing edits: 2 `assert self.llm is not None` on `_classify_with_llm` / `_extract_entities_with_llm`, 1 `assert active_pending_intent is not None` inside `should_fallback_to_pending`, 1 `assert target_labour is not None` after the `if resolve_error: return` early-bail (collapses 3 `arg-type` errors on `_labour_to_dict` calls plus 2 `.id` union-attrs), and 2 pending-delete conditions tightened with `and active_pending_intent is not None`. Closes the `union-attr` portion of #86 for labour; the `Labour | None` → `Labour` arg-type slice of #89 also drops 3 errors. Remaining 2 errors in this file (721, 724: `call-arg` missing `http_request`) are part of #92. Verified with `tests/test_labour_agent.py` + `test_labour_api.py` (40 tests passing).
+
+Progress 2026-05-20: applied the same playbook to `agents/equipment/service.py` (16 → 3 in file; total mypy errors 320 → 307 globally). Cleared 10 `union-attr` + 3 `arg-type` errors via 6 narrowing edits: 2 `assert self.llm is not None` on `_classify_with_llm` / `_extract_entities_with_llm`, 1 `assert active_pending_intent is not None` inside `should_fallback_to_pending`, 1 `assert target_equipment is not None` after the `if resolve_error: return` early-bail (collapses 3 `arg-type` errors on `_equipment_to_dict` calls plus 2 `.id` union-attrs), and 2 pending-delete conditions tightened with `and active_pending_intent is not None`. Closes the `union-attr` portion of #86 for equipment; the `Equipment | None` → `Equipment` arg-type slice of #89 also drops 3 errors. **All four agent services (property/contact/material/labour/equipment) are now union-attr-clean — the `dict[str, Any] | None` and `<Resource> | None` slices of #86 are closed for this resource cluster.** Remaining 3 errors in this file (574, 586, 589: `call-arg` missing `request`/`http_request`) are part of #92. Verified with `tests/test_equipment_agent.py` + `test_equipment_api.py` (20 tests passing). Cumulative #3 progress this session: 384 → 307 mypy errors (-77 across the four agent services).
+
+Progress 2026-05-20: cleared the remaining 4 errors in `agents/orchestrator/service.py` (4 → 0 in file; total mypy errors 271 → 267 globally on the `mypy agents/ routers/ models/` slice). Three targeted edits: (1) renamed the inner-loop variable `domain` → `hint_match` at line 1269 so the `str | None` return from `_match_first_hint` doesn't clash with the outer `str`-typed `domain` from the `for domain in domain_priority:` loop (cleared the `assignment` error); (2) added `assert self.llm is not None  # Callers gate on self.use_llm and self.llm is not None.` before the `prompt | self.llm.with_structured_output(...)` chain in `_classify_with_llm` (caller at line 1902 already gates on `self.use_llm and self.llm is not None`); (3) annotated `normalized_matches: List[Dict[str, Any]] = [...]` in `_normalize_llm_result` so the downstream `float(match.get("probability") or 0.0)` and `', '.join(match['intent'] for match in delegate_matches)` calls stop tripping `arg-type`/`misc` on the inferred `dict[str, object]`. Verified with `tests/test_orchestrator_intents.py` (185 passing) + `tests/test_orchestrator_bare_entity_helpers.py` + `tests/test_orchestrator_endpoint.py` (94 passing) — 279 total green. Closes the union-attr/arg-type slice of #86 for orchestrator; the file now has zero open mypy errors.
+
+Progress 2026-05-20: closed **#92** (agent → router `call-arg` cluster). Cleared all 7 errors by applying the canonical implicit-Optional pattern (already used by `create_material`, `delete_all_materials`, `create_labour`, etc.) to 7 router sites: `update_material` and `delete_material` in `routers/materials.py`, `update_labour` and `delete_labour` in `routers/labours.py`, and `create_equipment` / `update_equipment` / `delete_equipment` in `routers/equipments.py`. Each was `http_request: Request,` (or `request: Request,` for equipment-create) made into `http_request: Request = None,  # type: ignore[assignment]` — the form documented in #3's preamble as "the only mechanically safe category" (`Optional[Request]` would break FastAPI's request injection). Behavioral check: all three audit-log call sites pass `request=http_request` directly to `create_audit_log`, which already accepts `Optional[Request] = None` (see `services/audit_service.py:101`) — when called via HTTP, FastAPI still injects the real Request; when called directly from an agent service (the path that previously raised `TypeError: missing positional argument`), audit logging still runs but without client_ip / user_agent metadata. Total mypy errors 267 → 260 globally. Verified with `tests/test_material_api.py` + `test_material_agent.py` + `test_labour_api.py` + `test_labour_agent.py` + `test_equipment_api.py` + `test_equipment_agent.py` (125 tests passing). The 2 remaining `call-arg` errors in `config.py:86` are unrelated (Pydantic Settings construction — `mongodb_url` / `openai_api_key` validated at runtime via env vars but not visible to mypy).
+
+Progress 2026-05-20: cleared the 4 residual errors in `agents/property/service.py` (4 → 0 in file; total mypy errors 260 → 256 globally). Three edits: (1) added `assert linked_property is not None  # _resolve_estimate_linked_property guarantees non-None when error_message is None.` before `self._property_to_dict(linked_property)` in the estimate-code cross-resource handler (line ~1171) — the resolver's contract returns `(None, message)` on any failure and `(Property, None)` on success; (2) annotated `pending_record: Dict[str, Any] = {...}` at line 1804 (the `create_property` missing-fields branch) so the subsequent `dict["confirm_delete"] = False` reassignment at line 1967 (in the fuzzy-match `delete_property` branch — both paths share the variable via the outer `process()` scope) doesn't trip the inferred `dict[str, Collection[str]]` from the `"fields": dict[Any, Any]` value; (3) renamed the inner-loop `options = [str, ...]` at line 2167 → `contact_options` to avoid clashing with the outer-scope `options` from `_resolve_target_property`'s tuple unpack at line 1923 (which is `list[dict[str, Any]]`). Verified with `tests/test_property_agent.py` + `test_property_api.py` (57 tests passing). All `union-attr` / `arg-type` / `assignment` / `misc` errors in this file are now closed.
+
+Progress 2026-05-20: cleared 2 errors in `prompts/estimate_react.py` and `prompts/estimate_architect.py` (total mypy errors 256 → 254 globally). Both `build_estimate_*_prompt(industry: str = None)` signatures used the implicit-Optional pattern. Fix: changed to `industry: Optional[str] = None` and added `from typing import Optional` to each file. These are pure-Python helper functions (not FastAPI routes), so the standard `Optional[str]` form is correct — the `# type: ignore[assignment]` shim is only needed for `Request` parameters where FastAPI's dependency injection breaks if the annotation is widened to `Optional[Request]`. No behavior change; both functions already test `if industry:` against falsy.
+
+**This-session running totals**: 384 → 254 mypy errors (-130 across `agents/`, `routers/`, `models/`, `prompts/`). Closed in full: `#92` (call-arg cluster), `union-attr`/`arg-type` slice of `#86`/`#89` for property/contact/material/labour/equipment/orchestrator. Next candidate batches (require user approval — substantial scope): `agents/estimate/*` cluster (133 errors across crud_handlers.py / service.py / work_item_handlers.py / llm_helpers.py / conversation_guide.py / catalog_matching.py — these are mostly `#88` implicit-Optional defaults and `WorkItemHandlersMixin` attr-defined errors from the mixin pattern, not the resolve-error narrowing playbook); `models/estimate.py` arithmetic on Optional[int] fields (13 errors, `#90`); `routers/estimates.py` boundary `PydanticObjectId | None` → required (17 errors, `#87`).
+
+Progress 2026-05-20: cleared the 17 errors in `routers/estimates.py` (17 → 0 in file; total mypy errors 254 → 237 globally). Seven edits: (1) `assert company_obj_id is not None` after `parse_object_id(company, ...)` at the top of `create_estimate` (line 295) — the `if not company: raise` check above guarantees the parse returns a real OID; cascades to clear errors at L296 (`assert_company_access`) and L324 (`get_company_defaults`); (2) `# type: ignore[operator]  # Beanie descriptor unary-minus sort idiom.` on `query.sort(-Estimate.created_at).limit(limit)` at L426 — Beanie's negate-field syntax is correct at runtime but unmodellable in mypy stubs; (3) annotated `update_data: Dict[str, Any] = {}` in `update_estimate` (L801) — was being inferred as `dict[str, str]` from the first `update_data["title"] = payload.title` assignment, breaking subsequent assigns of `description`/`property`/`status`/`job_items`/`grand_total`/`updated_at` (clears 7 errors at L809–1020); (4) `effort_card_items=[EffortCardItem(**ci.model_dump()) for ci in a.effort_card_items]` at L962 — explicit `EffortCardItemCreate → EffortCardItem` conversion via Pydantic constructor instead of relying on auto-coercion of `dict` payloads (mypy can't see Pydantic's runtime coercion); (5–7) four `assert <reload> is not None` after `await Estimate.get(estimate_id)` re-reads following a `.set(...)` mutation — archive (L1207), unarchive (L1285), generate-doc (L1362), delete-doc-version (L1410). Each reload is on the same estimate_id that was just mutated, so a None return would indicate a concurrent delete race or DB outage — `assert` is correct since the route has already authenticated and the prior mutation succeeded. Closes the bulk of `#87` for this file. Tests verified: 107 passing in `tests/test_estimate_api.py` + `test_estimate_docs_api.py` + `test_estimate_quota.py`. 3 pre-existing test-isolation flakes (`test_archive_estimate_as_non_creator_member_fails`, `test_docs_versions_sorted_by_version_desc`, `test_docs_versions_empty`) all pass in isolation and exercise code paths untouched by these edits (403 auth path and GET routes); flagged but not introduced by this change.
+
+Progress 2026-05-21: closed the **`agents/estimate/*` cluster** — the single largest remaining batch flagged in the 2026-05-20 "next candidates" line (133 errors across 6 files in the original estimate; the actual surface was 180 errors across 6 files at the start of this work). Total mypy errors 217 → 77 globally (-140). All 12 source files under `agents/estimate/` now show `Success: no issues found in 12 source files`.
+
+The work split into three patterns matching the file shapes:
+
+1. **Mixin attr-defined cluster (#88-adjacent)** — `crud_handlers.py` (64 errors) and `work_item_handlers.py` (32 errors) were both 100% `attr-defined` from the mixin pattern: methods called via MRO from sibling mixins (`CrudParsingMixin`, `WorkItemHandlersMixin`, etc.) but invisible to mypy at the call site. Fix: added a `if TYPE_CHECKING:` stub block at the top of each mixin class declaring the sibling-resolved methods (`_crud_envelope`, `_resolve_estimate_code`, `_estimate_status_from_text`, `_estimate_summary_payload`, `_load_estimate_for_*`, the work-item handler quintet, etc.). 19 stub declarations in `crud_handlers.py`, 4 in `work_item_handlers.py` — all signatures lifted verbatim from the real implementations in `crud_helpers.py` and `work_item_handlers.py`. The `if TYPE_CHECKING:` guard means zero runtime cost — these stubs only exist during mypy's pass. Also added one `assert code is not None` after `_load_estimate_for_read` in `work_item_handlers.py:_handle_get_work_item` (resolver contract: code is non-None when error is None).
+
+2. **`#88` implicit-Optional defaults in `service.py`** — 23 errors, all `param: X = None` where `X` was non-Optional. Canonical fix: widened each to `Optional[X] = None`. Touched signatures: `_merge_duplicate_line_items` (carry_fields), `_step1_architect` / `_step2_and_3_for_scope` / `_step3_research_single_scope` (industry, tokens), `_run_pipeline` / `_run_react_loop` (company_id, industry, max_iterations, tokens), `_generate_estimate` / `_score_with_inventory_check` (tokens), `process` / `analyze_project` / `answer_question` (company, property, context, estimate_data), `generate_estimate` (job_items). Also propagated the Optional widening down to `_step2_vector_retrieval(company_id)` and the `create_estimate_tools(company_id)` factory in `tools.py`. None of these required runtime guards added — the function bodies already handle the None case.
+
+3. **Inference fixes** — handful of one-off shape issues: (a) split three sites where `payload.get("X") if isinstance(payload.get("X"), list) else []` was tripping `Any | list[Any] | None` (the same `.get()` called twice can't narrow); bound the value to a local first then narrowed (`_base_raw = base.get(...); base_items: List[Any] = _base_raw if isinstance(_base_raw, list) else []`); same pattern applied to three `dict(working_context.get(KEY))` sites; (b) `messages: List[Any] = [SystemMessage(...)]` to allow `HumanMessage` appends (langchain doesn't expose a `BaseMessage` union convenient for the local annotation); (c) `final_summary = str(msg.content)` to coerce langchain's `str | list[str | dict]` content union to a flat string for log use; (d) `context: Dict[str, Any] = {"project_description": ...}` in `generate_estimate` to allow the later `context["job_items"] = job_items` assignment; (e) widened `_score_catalog_match(requested_value: Any, candidate_values: List[Any])` + `_canonicalize_text(text: Any)` + `_find_best_catalog_match(requested_value: Any, ...)` in `catalog_matching.py` — the functions already coerce via `_normalize_catalog_text(value: Any)` so the strict `str` annotations were over-specified; (f) `ESTIMATE_DETAILS: List[Dict[str, Any]] = [...]` in `conversation_guide.py` to stop mypy inferring `object` for the heterogeneous dict values; (g) removed the dead `try/except ImportError → fallback to ()` block in `llm_helpers.py:format_llm_error` — both `openai` and `httpx` are hard deps in `requirements.txt` so the import fallback never fires, and the `if AuthenticationError and isinstance(...)` truthy guards became always-True after the cleanup.
+
+Verified with `tests/test_estimate_agent.py` (112 passing) + `test_estimate_tools.py` + `test_estimate_crud_handler_helpers.py` (137 passing across those + `test_estimate_agent.py` re-run) + recurrence/analytics tests already covered in earlier #90 work. **This-session running totals**: 276 → 77 mypy errors (-199), closing #90, #93, and the `agents/estimate/*` cluster — the three remaining named batches from the 2026-05-20 candidate line are now done.
+
+Progress 2026-05-21: closed **#93** (`BlockingPortal | None` errors in tests). Cleared all 29 errors across 10 test files (note: original entry estimated 12 errors across 5 files; the actual surface grew to 29 sites across 10 files as more API tests adopted the `client.portal.call(...)` pattern). Total mypy errors 263 → 234 globally. Pattern: 17 added `assert client.portal is not None  # TestClient context manager guarantees a portal (mypy hygiene)` calls — one per function/helper that invokes `.portal.call(...)`; mypy's flow analysis narrows the union for the rest of the function scope so a single assert covers multiple `.portal.call` sites in the same function. Files touched: `test_rate_card_bootstrap.py` (5 asserts for 9 sites: 2 helpers + 3 tests), `test_change_logs_api.py` (2: 1 fixture + 1 helper), `test_audit_integration.py` (2: 2 tests), `test_feedback_anonymous.py` (2: 2 tests), and one assert each in `test_template_api.py`, `test_resources_rbac.py`, `test_property_api.py`, `test_divisions_api.py`, `test_feedback_api.py`, `test_company_api.py`. Rejected the alternative "thin `_get_portal()` helper" suggested in the original entry — would have required touching every `.call` site in 10 files plus changes to test function signatures; the per-function `assert` matches the playbook used in earlier #3 progress notes (`assert self.llm is not None`, `assert target_<resource> is not None`) and is the minimum-touch fix. Verified by re-running mypy: 0 BlockingPortal-related errors remain.
+
+Progress 2026-05-21: closed **#90** (`models/estimate.py` arithmetic on `Optional[int]` fields). Cleared all 13 errors in this file (13 → 0; total mypy errors 276 → 263 globally). Two edits in `RecurrenceSchedule`: (1) added `assert month_val is not None` inside the `for month_val in [self.start_month, self.end_month]:` loop in `validate_end_type_fields` — guaranteed non-None by the preceding `if any(v is None ...)` guard inside the `DATE_RANGE` branch; (2) added per-branch `assert <field> is not None` block at the top of each `if/elif` in `calculate_occurrences()` — `end_year`/`start_year`/`end_month`/`start_month` for `DATE_RANGE`, `total_occurrences` for `TOTAL_OCCURRENCES`, `end_year`/`start_year`/`specific_months` for `SPECIFIC_MONTHS`. All asserts reference the `@model_validator(mode="after")` contract that fires on construction (covered by `tests/test_recurrence_model.py` with explicit `pytest.raises(ValidationError)` cases for each branch's required-field shape). Tightening the model declarations to `int = 0` was rejected — the fields are conditionally required *based on `end_type`*, so the Optional typing is correct at the field level; narrowing belongs in the methods. Verified with `tests/test_recurrence_model.py` + `test_estimate_api.py` + `test_estimates_analytics.py` (133 passing). No behavior change.
+
+Progress 2026-05-20: closed the audit-log channel-provenance gap surfaced during the `/code-review` of the `#92` fix. The implicit-Optional widening of `http_request: Request` on 7 router signatures means agent → router calls now succeed silently with `request=None`, dropping `ip_address` / `user_agent` / `method` / `path` from those audit log rows. Without a channel marker, downstream consumers can't distinguish Maple-initiated mutations from a misconfigured Portal request that lost its Request context. **Fix**: added `_audit_source_ctx: ContextVar[Optional[str]]` + `audit_source(source: str)` context manager in `services/audit_service.py`, and modified `create_audit_log` to merge `{"source": ctx_source}` into `metadata` when the var is set (caller-supplied `metadata["source"]` wins). Then wrapped the 7 previously-untagged agent → router callsites with `with audit_source("<resource>_agent"):` — `_update_material_via_api` + `_delete_material_via_api` (material), `_update_labour_via_api` + `_delete_labour_via_api` (labour), and `_create_equipment_via_api` + `_update_equipment_via_api` + `_delete_equipment_via_api` (equipment). The existing `_create_material_via_api` / `_create_labour_via_api` already tagged `metadata={"source": "<resource>_agent"}` directly (they bypass the router) — now the entire CRUD-via-Maple surface is consistently provenance-tagged. **Tests**: added 6 new tests in `tests/test_audit_service.py` — 3 unit tests for the ContextVar (set/reset/nesting/exception-safety), and 3 integration tests that mock the router call and assert the context var resolves to the expected source mid-call (`material_agent` / `labour_agent` / `equipment_agent`). All 132 tests pass across `test_audit_service.py` + `test_material_*` + `test_labour_*` + `test_equipment_*` + `test_audit_integration.py`. Closed independently of `#3` — this was a side-effect of the `#92` resolution, not a pre-existing mypy gap.
+
+</details>
+
+
+### 175. [MEDIUM] ~~`JobItemCreate` margin/tax fields accept unbounded floats~~ — RESOLVED 2026-07-27
+**Severity**: MEDIUM
+`platform/routers/estimates.py:609–614` — `original_profit_margin`,
+`profit_margin`, `overhead_allocation`, `labor_burden`, and `tax` are all
+`Optional[float] = None` with no bounds. Pydantic accepts NaN, ±Infinity,
+and arbitrarily large/negative values. A malicious or buggy client could
+persist garbage. Pre-existing pattern across the model — I added one more
+field with the same loose typing rather than tightening it.
+
+**Closed as resolved 2026-07-27.** New `models/numeric_fields.py` defines
+`PercentField` / `MoneyField` (+ `Optional*` variants) as
+`Annotated[float, Field(allow_inf_nan=False, ge=…, le=…)]`, applied across
+`JobItemCreate` and every child `*ItemCreate` model. Three decisions worth
+recording, because each is a deliberate departure from the original suggestion:
+
+- **Scope widened to the money fields.** `price` / `cost` / `quantity` /
+  `rate` / `effort` / `sub_total` carry the identical defect, and a NaN price
+  makes every downstream total NaN just as surely as a NaN margin does.
+  Fixing only the percentages would have left the same hole with a wider
+  entry point. Same one-line-per-field mechanism, so it was folded in.
+- **Bounds are wide, and percentages are NOT clamped to `[0, 100]`.** The
+  portal's "Adjust Work Item Total" back-solves a margin from a user-supplied
+  total (`backCalculateProfitMargin` in
+  `portal/src/utils/estimateCalculations.ts`), which legitimately yields a
+  **negative** margin when the total is set below subtotal, and margins in the
+  thousands for a small subtotal. Clamping to `[0, 100]` would have broken a
+  shipped feature. Limits are ±1,000,000% for percentages and ±1e12 for money
+  — enough to reject garbage and keep the compound
+  `(1 + p/100) × (1 + o/100)` product far from overflow, without rejecting any
+  plausible business input. Money is likewise not floored at zero (credits and
+  discounts are real line items).
+- **Stored models are not constrained**, against the original suggestion to
+  apply the aliases to `JobItem` too. Adding bounds to a stored model would
+  make any pre-existing document holding a bad value permanently unreadable (a
+  500 on every read of that estimate), which is a strictly worse failure than
+  the one being fixed. Stored values are kept clean by sanitizing at
+  construction instead — see the parsed pipeline below.
+
+**Two ingresses, not one.** The `*ItemCreate` request models only cover the
+hand-edit path (portal PUT/POST). The **AI-generation path — the primary way
+estimates are created here — never touches them**: `job_item_builders.py`
+constructs the stored `MaterialItem` / `LabourItem` / `ActivityItem` straight
+from LLM-parsed dicts. That path was left open by the first pass of this fix
+and closed by a follow-up `/code-review`; it is the more important of the two.
+
+Every numeric read out of a parsed dict now routes through
+`coerce_finite_float` (via a module-local `_finite()` in
+`job_item_builders.py`), covering `job_item_builders.py` (materials, labours,
+unmatched variants, activities, `sub_total`, `labor_burden`, `tax`),
+`calculations.py` (`parse_profit_margin`, `parse_overhead_allocation`, and the
+three line-item total loops), and `job_item_merge.py` (both builder functions).
+Three properties this buys, none of which the old bare `float()` had:
+
+- `json.loads` accepts bare `NaN` / `Infinity` literals and `float("nan")`
+  accepts the string form — both now degrade to a default.
+- A non-numeric token like `"abc"` used to *raise* `ValueError`, turning one
+  bad LLM value into a 500 for the whole estimate. It now degrades one field.
+- **`tax` degrades to `None`, not `0.0`** — via the separate `finite_or_none`
+  helper. `None` means "unset, apply the company default"; `0.0` asserts
+  *tax-exempt*. Collapsing garbage onto `0.0` would invent a tax claim on the
+  customer's behalf. This distinction is the reason there are two helpers.
+
+`_build_parsed_effort_cards` replaced an `EffortCardItem(**ci)` splat of the
+raw LLM dict in the same pass. The splat was fragile beyond the NaN issue:
+`EffortCardItem` declares no `extra="ignore"` and four of its fields are
+required, so a single unexpected or missing key from the model raised and 500'd
+the whole estimate. It now builds field by field with defaults. (The sibling
+splat in `_build_request_activities` is fine — it dumps an already-validated
+`EffortCardItemCreate`.)
+
+`grand_total` is bounded on both `CreateEstimateRequest` and
+`UpdateEstimateRequest`: the update handler writes `payload.grand_total`
+straight to the document when `job_items` is absent, with no recomputation on
+that branch, so the request model is the only thing between a client value and
+the DB.
+
+Tests: `tests/test_estimate_numeric_validation.py` (181 cases — non-finite
+floats and their string forms, non-numeric strings, absurd magnitudes, the
+parsed-builder pipeline end-to-end, the `tax`-stays-`None` rule, plus explicit
+accepts-negative-margin / accepts-margin-above-100 cases pinning the bounds
+that must stay loose).
+
+---
+
+
+### 221. [MEDIUM] ~~`meter_events.report_seat_count` atomic update inside broad `except` swallows DB errors~~ — RESOLVED 2026-07-26
+**Closed as resolved 2026-07-26.** `report_seat_count` now has two separate try
+blocks with distinct failure policies:
+- **Stripe post** — unchanged best-effort semantics (log + swallow), then
+  `return`. The early return is the load-bearing part: bumping the high-water
+  mark for a value Stripe never received would permanently suppress the repost,
+  because every later snapshot at that count short-circuits on the `<=` guard.
+- **High-water write** — `logger.exception("Failed to persist the seat-count
+  high-water mark for company %s (the meter event was accepted by Stripe)")`
+  then re-raises. `snapshot_all_seat_counts` (the only caller) already
+  try/excepts per company, so the error lands in its `errors` counter and the
+  loop continues — no behavior change for the cron beyond accurate accounting.
+
+Tests: `tests/test_billing_meter_events.py::TestReportSeatCountAtomicHighWater`
+— `test_db_failure_is_not_reported_as_a_stripe_meter_failure` (asserts the
+meter event was posted, the Stripe-shaped message is absent, and a high-water
+message is present) and
+`test_stripe_failure_leaves_high_water_unbumped_and_does_not_raise`. 19 passed;
+mypy/ruff clean.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+**File**: [platform/services/billing/meter_events.py:99-122](../../platform/services/billing/meter_events.py)
+**Severity**: MEDIUM
+
+The atomic `find_one_and_update` added by [#200](#200-atomic-high-water-update-in-meter_eventspy)
+lives inside the same `try / except Exception` block originally meant
+to catch Stripe failures. A pymongo error from the conditional update
+gets logged with `"Failed to report seat-count meter event"` —
+misleading because the meter event already succeeded by that point.
+Worse, the silent swallow means the next `report_seat_count` call
+sees a stale local `company.seat_count_period_high_water` and may
+re-post the same value to Stripe (which is harmless thanks to the
+date-keyed idempotency key, but still wastes a round trip).
+
+Fix: split into two try blocks (Stripe → log+continue, DB → propagate
+or log via a distinct error path), OR tighten the except to
+`(stripe_sdk.error.StripeError,)` so DB errors surface, matching the
+narrow-except pattern landed in `customer.py` ([#199](#199-narrow-the-except-in-customerpy67)).
+
+</details>
+
+
+### 293. [HIGH] ~~Frontend test for `resolveRecaptchaSiteKey` blocked by current architecture~~ — RESOLVED 2026-05-21
+**Closed as resolved 2026-05-21.** Contact modal moved out of `website/public/` into a proper Vite entry. New layout:
+- `website/contact-modal/install.js` — extracted from `public/contact-modal.js`; named-exports `install`, `resolveRecaptchaSiteKey`, `loadRecaptcha`, `getRecaptchaToken`. No top-level side effects so vitest can import without triggering DOM injection.
+- `website/contact-modal/index.js` — 16-line build entry that imports `install` and runs it on DOMContentLoaded.
+- `website/contact-modal/__tests__/resolveSiteKey.test.js` — 4 tests (real key → returned, empty → empty string, unsubstituted Vite placeholder → empty string, whitespace trim).
+- `vite.config.ts` — added `'contact-modal'` to `rollupOptions.input` so prod build emits `dist/contact-modal.js`; added a `contactModalDevRewrite()` middleware that serves a `import('/contact-modal/index.js')` shim when the dev server receives `GET /contact-modal.js` (HTML pages already use `<script src="/contact-modal.js" defer>` — no HTML changes needed).
+- `vitest.config.ts` — extended `include` glob to `contact-modal/**/*.test.{js,ts}`.
+- `public/contact-modal.js` — deleted (was 491 lines).
+
+Also closed **#298** as a side-effect — the heuristic placeholder check became `trimmed === '%VITE_RECAPTCHA_V3_SITE_KEY%'` while editing the file. Verified: vitest 42/42 green; `vite build` emits `dist/contact-modal.js` cleanly; dev server smoke-test confirms `/contact-modal.js` returns the dynamic-import shim and `/contact-modal/index.js` serves the source.
+
+The follow-on opportunity (#296, the ~120-line `install()` split) is now unblocked — `install` is exported and could be unit-tested or split further.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+**Where:** `website/public/contact-modal.js`.
+
+**Why blocked:** `contact-modal.js` lives in `public/` and is served verbatim by Vite/Hosting. It's wrapped in an IIFE (no exports), so its helpers can't be imported by vitest. To test `resolveRecaptchaSiteKey` (the Vite-substitution-detection logic), the file needs to become a proper Vite/Rollup entry — same pattern as `widget/index.tsx` / `maple-widget.js`.
+
+**Suggested move:**
+1. Create `website/contact-modal/index.ts` (or `.js`) with the modal logic, exporting helpers like `resolveRecaptchaSiteKey` for tests.
+2. Add the entry to `vite.config.ts` `rollupOptions.input` and `entryFileNames` rules so the build emits `dist/contact-modal.js` at the same path.
+3. Drop `website/public/contact-modal.js`.
+4. Add `website/contact-modal/__tests__/resolveSiteKey.test.ts` covering: real key → returned, empty → empty string, raw `%VITE_RECAPTCHA_V3_SITE_KEY%` placeholder → empty string.
+
+This refactor also unlocks unit-testing the submit handler, the captcha load promise, and the form validation helper.
+
+</details>
+
+
+### 295. [MEDIUM] ~~Tighten CORS~~ — RESOLVED 2026-07-26
+**Closed as resolved 2026-07-26.** `cors: true` → a named `ALLOWED_ORIGINS`
+constant in `website/functions/index.js`. Kept `cors` rather than dropping it
+(the second option) so the Firebase-provided domains and the local emulator
+keep working; production traffic is same-origin through the Hosting rewrite
+either way.
+
+The suggested list needed one correction: it named only the **dev** hosting
+site. Per `.firebaserc` the prod target `website` maps to site
+`maples-website`, so the shipped allowlist adds
+`https://maples-website.web.app` and `https://maples-website.firebaseapp.com`
+alongside the apex/www custom domain, the two dev domains, and
+`http://localhost:5050` (matching `firebase.json` → `emulators.hosting.port`).
+
+Tests: new `website/functions/corsConfig.test.js` (5) captures the config
+object from the `onRequest` mock and asserts the allowlist shape — no wildcard,
+prod + dev domains present, emulator port present, arbitrary origin absent.
+33 function tests pass; full website suite 186 passed; build clean.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+**Where:** `website/functions/index.js:26` — currently `cors: true` (wildcard).
+
+**Why:** The contact form is served via Hosting rewrite, so traffic to `/api/contact` is same-origin and doesn't need CORS at all. Wildcard CORS lets any origin POST to the endpoint; reCAPTCHA mitigates abuse but tightening costs nothing.
+
+**Suggested fix:**
+
+```js
+cors: [
+  'https://3maples.ai',
+  'https://www.3maples.ai',
+  'https://maples-website-dev.web.app',
+  'https://maples-website-dev.firebaseapp.com',
+  'http://localhost:5050', // hosting emulator
+],
+```
+
+Or drop `cors` entirely and rely on same-origin Hosting rewrites for prod traffic; only add CORS when explicit cross-origin support is needed.
+
+</details>
+
+
+### 298. [LOW] ~~Replace placeholder heuristic with explicit equality~~ — RESOLVED 2026-05-21
+**Closed as resolved 2026-05-21** as a side-effect of #293. Now `trimmed === '%VITE_RECAPTCHA_V3_SITE_KEY%'` in `website/contact-modal/install.js:resolveRecaptchaSiteKey`. Covered by the new vitest case at `contact-modal/__tests__/resolveSiteKey.test.js`.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+**Where:** `website/public/contact-modal.js:5-11` — `resolveRecaptchaSiteKey`.
+
+**Why:** Current check rejects values containing `%` or starting with `VITE_`. Functional but heuristic. An explicit check on the literal placeholder is clearer:
+
+```js
+if (!trimmed || trimmed === '%VITE_RECAPTCHA_V3_SITE_KEY%') return '';
+return trimmed;
+```
+
+</details>
+
+
+### 303. [HIGH] ~~Unit tests missing for the 9 new `routers/agent_helpers/` modules~~ — RESOLVED 2026-06-03
+**Severity**: HIGH (resolved)
+
+**Resolved 2026-06-03**: 8 module-level unit-test files added (103 tests), one
+per untested helper — `estimate_gathering.py` already had
+`tests/test_estimate_gathering.py`, so the original "9" was 8 in practice:
+
+| Module | Test file | Tests |
+|---|---|---|
+| `finalize_result.py` | `tests/test_agent_helpers_finalize_result.py` | 17 |
+| `estimate_resolver.py` | `tests/test_agent_helpers_estimate_resolver.py` | 9 |
+| `delegate_generic.py` | `tests/test_agent_helpers_delegate_generic.py` | 7 |
+| `pending_estimate_follow_up.py` | `tests/test_agent_helpers_pending_estimate_follow_up.py` | 24 |
+| `optional_follow_up.py` | `tests/test_agent_helpers_optional_follow_up.py` | 21 |
+| `delegate_get_estimate.py` | `tests/test_agent_helpers_delegate_get_estimate.py` | 11 |
+| `delegate_estimate_ops.py` | `tests/test_agent_helpers_delegate_estimate_ops.py` | 14 |
+| `delegate_create_estimate.py` | `tests/test_agent_helpers_delegate_create_estimate.py` | 7 |
+
+Each file covers every envelope return path / state-machine branch via
+injected fakes + `monkeypatch` (no DB or LLM). All 103 pass; mypy clean.
+A latent matcher quirk surfaced and was characterized (not fixed —
+tracked as a new LOW below): `find_property_by_name_or_address` treats a
+property with a **blank `street`** as a contains-match for *any* query
+(`"" in query` is always true), so such a property auto-links. See
+`test_find_property_blank_street_contains_matches_any_query`.
+
+**Where:** `routers/agent_helpers/pending_estimate_follow_up.py`, `optional_follow_up.py`, `estimate_gathering.py`, `delegate_create_estimate.py`, `delegate_estimate_ops.py`, `delegate_get_estimate.py`, `delegate_generic.py`, `finalize_result.py`, `estimate_resolver.py` (all landed 2026-05-22).
+
+**Issue:** All 9 helper modules extracted from `orchestrate_agent_endpoint` lack module-level unit tests. Behavior is exercised through `tests/test_orchestrator_endpoint.py` integration tests (52 passing), so no regression risk today — but each helper is a state machine with multiple return paths (`handle_pending_estimate_follow_up` has 9 envelope returns spanning `confirm`/`select_property`/`negative`/`list-properties`/`no-properties`/`escape-hatch`/`resolve-error`/`success` shapes) and the integration tests don't necessarily cover every branch. Per `CLAUDE.md` "tests are mandatory after any code change" — extraction without unit-test backfill leaves the per-branch behavior implicit in the endpoint tests.
+
+**Fix:** Add per-helper unit-test files (`tests/test_pending_estimate_follow_up.py`, etc.) with one test per return path. Each test constructs a `context_payload` matching the entry state, asserts the returned envelope's `intent` / `response` / `result.operation` / `needs_clarification` flags. Use the existing fixtures (`monkeypatch` for `Estimate.get`, `properties_api_get_properties`, etc.) — same shape as the integration tests but scoped to one helper. Estimated 6-9 tests per module = ~60-80 new tests total.
+
+
+### 306. [HIGH] ~~`_detect_work_item_op()` is 202 lines~~ — RESOLVED 2026-07-27
+**Where:** `agents/estimate/work_item_handlers.py:110`
+
+**Issue:** Grew from ~75 lines to 202 with the new sub-resource ops. Readable as a cascading if-chain but past the length threshold.
+
+**Closed as resolved 2026-07-27.** `_detect_work_item_op` is now **34 lines**
+and the whole detector chain sits under the threshold (largest: 44):
+
+| function | lines |
+|---|---|
+| `_detect_work_item_op` | 34 |
+| `_detect_sub_resource_op` | 34 |
+| `_detect_catalog_sub_op` | 29 |
+| `_detect_work_item_field_op` | 44 |
+| `_detect_inferred_material_op` | 15 |
+| `_detect_total_op` | 12 |
+| `_detect_legacy_work_item_op` | 21 |
+| `_detect_legacy_update_field` / `_rename` / `_add` / `_remove` | 22 / 13 / 18 / 11 |
+
+Went past the suggested fix in two places, both deliberate:
+
+- **Material and activity now share `_detect_catalog_sub_op`.** The two blocks
+  were structurally identical — list/count, then add / remove / update, then a
+  trailing what/how-many that also means list — differing only in keyword and
+  op suffix. Parameterized on `(keyword_pattern, singular, plural)`.
+- **The legacy cascade was split too**, against "keeps the legacy patterns
+  untouched". Extracting only the `has_wi` block left two functions still over
+  50 lines, i.e. **more** oversized functions in the file than before (6 → 7).
+  Splitting the legacy loops into four single-purpose detectors brought the
+  file to 6 → 5. The pattern tuples and their ordering comments are unchanged;
+  only the enclosing function boundaries moved.
+
+**Method — characterization tests first, and they earned their keep.**
+`TestDetectWorkItemOp` already asserted 17 of the 18 op shapes, but nothing
+pinned *precedence* or *fall-through*, which is exactly what an extraction
+breaks. New `TestDetectWorkItemOpPrecedence` (15 cases) records behavior
+captured from the pre-refactor implementation, including three results that are
+not obvious from reading the code:
+
+- `"add a material to the recurring work item"` → `recurring_enable`, not
+  `add_material` — recurring is checked first and wins outright.
+- `"set the total of work item 1 to 4200"` → `update_field` with
+  `field="total"`, **not** `set_total`. Neither total pattern matches, so it
+  falls through to the generic legacy update_field pattern. Recorded as-is; it
+  is behavior, not necessarily intent.
+- `"add a work item and list them"` → `add` with an empty name, not `list` —
+  the mutation-verb guard suppresses `list` and the nameless-add pattern claims
+  it.
+
+Both extractions were mutation-tested rather than assumed safe: forcing the
+`has_wi` block to swallow instead of fall through failed 12 tests, and swapping
+material/activity precedence failed 2. 423 tests pass across
+`test_maple_work_item_ops.py`, `test_estimate_agent.py` and
+`test_maple_crud_coverage.py`; ruff + mypy clean.
+
+**Not addressed:** the five `_handle_update_estimate_work_item_*` methods in
+this file are still over 50 lines (172 / 126 / 79 / 75 / 59). That is #305's
+territory, not this item's.
+
+
+### 307. [HIGH] ~~Full-catalog fetch for material/role lookup~~ — RESOLVED 2026-06-03
+**Severity**: HIGH (resolved)
+**Where:** `agents/estimate/work_item_field_handlers.py:531` and `:889`
+
+**Issue:** `Material.find(company==X).to_list()` and `Labour.find(company==X).to_list()` load the full company catalog into memory for Python-side substring matching. Acceptable at current scale (<1000 items) but degrades on larger catalogs.
+
+**Resolved 2026-06-03**: extracted two helpers — `_find_catalog_materials()`
+and `_find_catalog_roles()` — that push the name substring match into MongoDB
+via a case-insensitive `{"name": {"$regex": re.escape(hint), "$options": "i"}}`
+filter (alongside the existing `company ==` clause). The handlers now receive
+only matching documents instead of the whole catalog; the exact-match /
+ambiguity disambiguation logic stays in the handler on the (now-smaller) list.
+`re.escape` preserves literal-substring semantics for hints containing regex
+metacharacters. Dead inline `from models import Material/Labour` imports in the
+two handlers removed. New `tests/test_work_item_catalog_lookup.py`: 6 unit tests
+(query-shape + escaping + empty-hint short-circuit, `find` stubbed) plus 1 live
+test that exercises the real `$regex` against the test DB (match returns only
+the matching doc; non-match returns nothing). mypy clean; 102 related tests pass.
+
+
+### 323. [RESOLVED 2026-06-04] ruff manual backlog — fully cleared; `platform/` is at zero ruff errors
+Snapshot 2026-06-03 (`./run_ruff.sh`); **B904 slice closed 2026-06-03** (32 → 0);
+**style/simplify slice (E741/E712/SIM/C4/B007) closed 2026-06-04** (52 → 0);
+**E402 + F841 slices closed 2026-06-04** (56 + 52 → 0);
+**F401 slice closed 2026-06-04** (281 → 0). `./run_ruff.sh` is now clean
+project-wide — ruff is a fully-enforced zero-error gate, same as mypy.
+
+| Rule | Count | Category | Notes |
+|---|---|---|---|
+| ~~**B904** raise-without-`from`~~ | ~~32~~ → **0** | correctness | **RESOLVED 2026-06-03** — see progress note below |
+| ~~F401 unused-import~~ | ~~281~~ → **0** | dead code | **RESOLVED 2026-06-04** — see progress note below |
+| ~~E402 import-not-at-top~~ | ~~56~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
+| ~~F841 unused-variable~~ | ~~52~~ → **0** | dead code | **RESOLVED 2026-06-04** — see progress note below |
+| ~~E741 ambiguous-name (`l`/`I`/`O`)~~ | ~~24~~ → **0** | style | **RESOLVED 2026-06-04** — see progress note below |
+| ~~E712 `== True/False`~~ | ~~5~~ → **0** | style | **RESOLVED 2026-06-04** |
+| ~~SIM103/102/108/105~~ | ~~16~~ → **0** | simplify | **RESOLVED 2026-06-04** |
+| ~~C408/C401/C416~~ | ~~5~~ → **0** | simplify | **RESOLVED 2026-06-04** |
+| ~~B007 unused-loop-var~~ | ~~2~~ → **0** | style | **RESOLVED 2026-06-04** |
+
+**Recommended order:** (1) **B904** — the only correctness category; it matches
+CLAUDE.md's "don't leak/garble tracebacks" rule. Add `raise ... from err`
+(preserve cause) or `raise ... from None` (suppress). B904 sites by file:
+`services/google_drive_service.py` (12), `routers/agents.py` (6),
+`routers/estimate_helpers/doc_versions.py` (3), `routers/audit_logs.py` (3),
+`routers/templates.py` (2), `routers/stripe_webhooks.py` (2), `routers/auth.py`
+(2), `routers/materials.py` (1), `routers/billing.py` (1). (2) the mechanical
+style/simplify slices (E741/E712/SIM/C4/B007) — low risk. (3) E402 + F841 —
+case-by-case judgment. (4) F401 last — largest and needs the per-import triage
+above. **Slices (1)–(3) are now closed; only F401 (4) remains.**
+
+Work each slice as its own commit (`./run_ruff.sh --select B904` to scope a
+run). Update this entry's counts as slices close; mark RESOLVED when
+`./run_ruff.sh` is clean project-wide.
+
+**Progress 2026-06-03 — B904 slice closed (32 → 0).** All 32 raise-without-`from`
+sites now chain explicitly; `./run_ruff.sh --select B904` is clean project-wide.
+Cause-preservation split followed the playbook:
+- **`from e`** (preserve cause) where the exception was already bound *and* is a
+  genuine unexpected/internal failure worth chaining: `routers/stripe_webhooks.py`
+  (signature-verify 400, handler 500) and all 12 `services/google_drive_service.py`
+  sites (RuntimeError on credential/build failure + HTTPException 500s on Drive
+  HttpError — each `except ... as e`).
+- **`from None`** (suppress) where the re-raise is a deliberate boundary over
+  expected input or an already-logged error: input-validation conversions
+  (`routers/audit_logs.py` ×3 invalid enum 400, `routers/auth.py` ×2 invalid
+  role/industry 400, `routers/agents.py` ×2 invalid ObjectId 422), 409 conflict
+  conversions (`routers/templates.py` ×2 DuplicateKey), and 500/502 handlers that
+  already `logger.exception(...)` the full traceback (`routers/agents.py` ×4,
+  `routers/billing.py`, `routers/materials.py`, `routers/estimate_helpers/doc_versions.py` ×3).
+
+Verified: full-project `./run_mypy.sh` slice clean (`routers`, `services`); 155
+related tests pass (`test_stripe_webhooks`, `test_template_api`,
+`test_audit_logs_api`, `test_billing_enterprise_contact`, `test_google_drive_service`,
+`test_estimate_docs_api`, `test_orchestrator_endpoint`, `test_auth_api`). Next
+slice per the recommended order: the mechanical style/simplify batch
+(E741/E712/SIM/C4/B007).
+
+**Progress 2026-06-04 — style/simplify slice closed (52 → 0).**
+`./run_ruff.sh --select E741,E712,SIM,C4,B007` is clean project-wide. Breakdown:
+- **E741** (24) — every `l` ambiguous-name was the same idiom: a labour item in a
+  loop/comprehension. Renamed `l` → `lab` throughout each enclosing scope (renaming
+  *all* uses, not just the binding). Sites: `agents/cross_resource.py`,
+  `agents/estimate/{crud_handlers,llm_pipeline,service ×3,tools,work_item_field_handlers}.py`,
+  `agents/property/service.py`, `routers/estimate_helpers/{job_item_builders ×5,snapshots ×2}.py`,
+  `routers/estimates.py` ×3, `routers/labours.py`, and tests
+  (`test_cross_resource_joins.py`, `test_labour_api.py` ×2).
+- **E712** (5, all tests) — `== True/False` → truthiness / `not` in `test_google_drive_service.py`.
+- **SIM103** (6) — `if cond: return True / return False` → `return cond`; the regex
+  `.search()` cases wrapped in `bool(...)` to keep the `-> bool` return type honest
+  (`routers/agents.py` ×4, `routers/agent_helpers/pending_calculation.py`,
+  `routers/estimate_helpers/ai_generation.py`).
+- **SIM102** (5) — collapsed nested `if`s into a single `and` condition, verified each
+  outer `if` contained only the inner one (`routers/agents.py`, `routers/auth.py`,
+  `routers/agent_helpers/finalize_result.py`, `services/google_drive_service.py`,
+  `agents/estimate/crud_handlers.py`).
+- **SIM108** (3) — if/else assignment → ternary (`delegate_create_estimate.py`,
+  `services/address_service.py`, `tests/conftest.py`).
+- **SIM105** (2) — `try/except: pass` → `contextlib.suppress(...)`, adding a top-level
+  `import contextlib` to each (`routers/agent_helpers/delegate_get_estimate.py`,
+  `scripts/setup_stripe_webhook.py`).
+- **C416** (1) — redundant list comp → `list(_STATUS_ALIASES.items())` (`crud_helpers.py`).
+- **C401** (1) — `set(gen)` → set comprehension (`work_item_field_handlers.py`).
+- **C408** (3) — `dict(...)` → literal (`template_estimate.py` ×2, `tests/_cross_resource_fakes.py`).
+- **B007** (2) — unused loop var `i` → `_` (`services/google_drive_service.py`).
+
+Verified: `./run_mypy.sh agents routers services` clean (140 files); `compileall` clean;
+458 related tests pass across `test_estimate_agent`, `test_estimate_api`,
+`test_orchestrator_endpoint`, `test_labour_api`, `test_google_drive_service`,
+`test_auth_api`, `test_cross_resource_joins`, `test_address_service`,
+`test_agent_helpers_pending_calculation`, `test_estimate_snapshot_helpers`,
+`test_job_item_original_profit_margin`, `test_maple_work_item_ops`. Remaining backlog
+(390): F401 (282, needs per-import triage), E402 (56), F841 (52) — the case-by-case
+slices per the recommended order.
+
+**Progress 2026-06-04 — E402 + F841 slices closed (56 + 52 → 0).**
+`./run_ruff.sh --select E402,F841` is clean project-wide; the whole remaining
+backlog is now F401 only.
+
+*F841 (52)* — 3 production dead assignments deleted (`services/google_drive_service.py`
+unused `table`, `agents/property/service.py` unused `intent`,
+`agents/estimate/crud_handlers.py` unused `has_custom_window`). In tests: 43
+`agent = XAgent(use_llm=False)` constructions removed (the tests exercise module-level
+helpers, not the instance — construction is side-effect-free with `use_llm=False`); 3
+`result = asyncio.run(...)` cases kept the call but dropped the unused binding (asserts
+read `captured`, not `result`); `fake_est` (immediately reassigned before use) deleted;
+`second_owner = create_company_user(...)` kept the side-effecting call, dropped the
+binding; `audit_logs_query` (a never-executed lazy Beanie `.find()` for deferred audit
+verification) removed along with its now-orphaned `from models import ...` line.
+
+*E402 (56)* — split between config and reorder:
+- **`ruff.toml` per-file-ignores** for the two *structural* cases that cannot be
+  reordered: `scripts/**/*.py` (operational scripts must `sys.path.insert(project_root)`
+  before importing `database`/`models`/`config`) and `models/__init__.py` (interleaves
+  `model_rebuild()` between import groups so Beanie/Pydantic forward refs resolve in
+  dependency order). Cleared 33 findings.
+- **Reorders** for the rest: moved the `logger = logging.getLogger(__name__)` assignment
+  below the import block in `agents/orchestrator/service.py` (11); hoisted `import logging`
+  + `from pymongo.errors import DuplicateKeyError` to the top of `routers/agents.py` (2);
+  lifted co-located imports to the top in `tests/test_agents_api.py` (2),
+  `tests/test_template_create_routing.py` (1), `tests/test_agent_helpers_text_predicates.py` (1).
+- **Misplaced-noqa fix** in `agents/estimate/service.py` — the `# noqa: E402` sat on the
+  continuation line; moved it to the `from ... import (` statement line so ruff honors it.
+
+Verified: `./run_mypy.sh` clean on the 6 touched production files; full-project
+`./run_ruff.sh` reports **281 F401 and nothing else**; 436 related tests pass across
+`test_agents_api`, `test_audit_integration`, `test_user_api`, `test_estimate_agent`,
+`test_contact_agent`, `test_property_agent`, `test_labour_agent`, `test_equipment_agent`,
+`test_template_create_routing`, `test_agent_helpers_text_predicates`,
+`test_google_drive_service`. Next and final slice: F401 (281) — the per-import triage.
+
+**Progress 2026-06-04 — F401 slice closed (281 → 0). Backlog fully cleared.**
+`./run_ruff.sh` is now clean project-wide across all 317 files. The per-import
+triage was done with a classifier (built ad-hoc) that scans the whole repo for
+each unused name and labels it **DEAD** (referenced nowhere outside its own
+module), **REEXPORT** (another module does `from <mod> import <name>` or
+`<alias>.<name>`), or **MONKEYPATCH** (a test does `setattr(<mod-alias>, "<name>", …)`).
+
+- **Mechanized the safe deletion.** Protected every REEXPORT/MONKEYPATCH name
+  with an inline `# noqa: F401  # <reason>`, then ran
+  `ruff check --select F401 --fix --extend-fixable F401` (the `--extend-fixable`
+  overrides `ruff.toml`'s `unfixable = ["F401"]` *for that one run*). ruff then
+  removed only the genuinely-unused imports — including the multi-line paren-block
+  surgery — and left the noqa-protected names untouched. Followed by
+  `--select I --fix` to re-sort the import blocks. **174 dead imports removed.**
+- **Biggest hubs:** `agents/estimate/service.py` (90: 87 dead leftovers from the
+  service-split, +`ChatOpenAI` monkeypatch, +`ArchitectScope`/`DecomposedRequirement`
+  re-exports kept), `routers/agents.py` (42), `routers/estimates.py` (27 — a
+  documented re-export facade; kept the 8 consumed re-exports/monkeypatch targets,
+  deleted the 19 nothing consumes). `__init__.py` files were already F401-exempt,
+  so package re-exports were never at risk.
+- **Caught a classifier gap with the test suite.** Two monkeypatch targets on
+  `routers.agents` (`estimates_api_get_estimate`, `estimates_api_get_estimates`,
+  aliased imports patched via `setattr(agents_router, …)`) were mis-labeled DEAD and
+  removed; the orchestrator endpoint tests failed with `AttributeError: module
+  routers.agents has no attribute …`. Restored both with `# noqa: F401`. An
+  AST-based re-scan of every modified module then confirmed **0** remaining
+  test-accessed attributes were missing.
+
+Verified: full-project `./run_ruff.sh` clean (0 findings); `./run_mypy.sh` clean
+(317 files); `pytest --collect-only` clean (no import errors across 2874 tests);
+**full suite 2874 passed, 0 failures**.
+
+> **#323 is RESOLVED.** With B904 + style/simplify + E402 + F841 + F401 all closed,
+> `platform/` sits at zero ruff errors. ruff is now a fully-enforced gate (like
+> mypy): any new `./run_ruff.sh` finding in a PR is a regression to fix in-place,
+> not backlog. The legacy-backlog scoping caveat in CLAUDE.md's baseline note is no
+> longer needed — `./run_ruff.sh` can be run project-wide without tripping over
+> pre-existing findings.
+
+---
+
+
+### 349. [MEDIUM] ~~PUT `/estimates/{id}` allows content edits in statuses the UI and Maple treat as read-only~~ — RESOLVED 2026-07-26
+**Closed as resolved 2026-07-26**, taking the "better" option: the allowlist now
+lives in `models/estimate.py` as `EDITABLE_ESTIMATE_STATUSES` +
+`estimate_status_allows_content_edit(status)` (accepts the raw stored string or
+the enum; unrecognized/legacy values **fail open** so a retired status can't
+strand an estimate nobody can unlock). Three consumers now share that one
+definition:
+- `routers/estimates.py` — new `elif` after the Sent/Approved block: any
+  non-editable status rejects a payload carrying fields other than `status`,
+  with `400 "Cannot edit the contents of a {status} estimate. Estimates can
+  only be edited in Draft or Review."` Status-only payloads stay allowed, so
+  the status lane (Won → Scheduled, Generating → Draft) is untouched and the
+  transition itself is still policed by `_validate_status_transition_for_update`.
+- `agents/estimate/crud_handlers.py` — `_EDITABLE_ESTIMATE_STATUSES` is now an
+  alias of the model constant rather than a second definition.
+- portal `isEditableStatus` — unchanged; the backend now matches it.
+
+**FE coordination (the deferral's open question), resolved:** audited every
+`estimatesApi.update` caller. The estimate detail page already gates on
+`canEdit`, and `EstimatesPage` sends status-only payloads. The one real gap was
+`PropertyDialog` → `EstimatesPicker`, which PUT `{property: …}` on any estimate
+regardless of status — already 400ing today for Sent estimates, and would have
+newly 400'd for Won/Lost/etc. Locked rows now render **visible but disabled**
+(so a property's real links aren't hidden) with the reason inline. Tests:
+`portal/tests/EstimatesPicker.test.tsx` (5).
+
+Backend tests: `tests/test_estimate_api.py` — `TestEstimateContentEditability`
+(5, incl. a guard that the agent and model share one object) plus 3 router
+tests via the new `won_estimate` fixture: content edit rejected, content
+smuggled alongside a legal status change rejected, status-only transition still
+200. 425 passed across the estimate + billing + Maple surface; mypy/ruff clean.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+### 349. [MEDIUM] PUT `/estimates/{id}` allows content edits in statuses the UI and Maple treat as read-only
+Added 2026-06-12. `routers/estimates.py` (PUT handler, ~L820): the route locks
+Archived and Sent/legacy-Approved, but still accepts content updates (notes,
+job_items, property, …) for Won / On Hold / Lost / Scheduled / Completed —
+statuses the portal renders read-only (`isEditableStatus`: Draft/Review only)
+and Maple now refuses to edit. Any direct API caller (integration, script,
+future mobile client) can bypass the editing rule the product presents as
+truth. Fix: add the same Draft/Review allowlist to the PUT route's lock block
+(keeping the existing unsend exception for status-only changes), mirroring the
+`_EDITABLE_ESTIMATE_STATUSES` constant — or, better, move the allowlist next to
+`ESTIMATE_STATUS_TRANSITIONS` in `models/estimate.py` so model, route, and
+agent share one definition. Coordinate with the FE before shipping: confirm no
+portal flow PUTs content for non-Draft/Review estimates (e.g. auto-save firing
+on a just-transitioned estimate).
+
+</details>
+
+---
+
+
+### [LOW] ~~portal/src/lib/voiceInputFlag.ts:5 — VITE_VOICE_INPUT_ENABLED=false evaluates as ON~~ — RESOLVED 2026-07-26
+**Closed as resolved 2026-07-26**, and widened: `supportPanelFlag` and
+`tasksFlag` carried the identical `Boolean(anyNonEmptyString)` bug, so rather
+than patching one and deferring the others, all three now delegate to a new
+`portal/src/lib/envFlag.ts` (`isEnvFlagEnabled` / `readEnvFlag`).
+
+The falsy set mirrors **pydantic v2's** bool coercion — `""`, `"false"`,
+`"0"`, `"off"`, `"no"`, `"n"`, `"f"`, trimmed and case-insensitive — rather
+than the narrower `"", "false", "0"` originally suggested, so the FE and the
+backend's `bool` settings agree on what "off" looks like. Unrecognized
+non-empty values still enable, preserving the old `VITE_X=enabled` behavior.
+
+**Shipping note — this change is behavior-neutral today.** Audited every
+configured value before landing it: `.env.local`, `.env.development`, and the
+GitHub Actions `production` + `development` environment variables all set
+`"true"`; nothing anywhere is set to `"false"`. No flag flips state on deploy.
+
+Tests: new `tests/envFlag.test.ts` (5) and `tests/supportPanelFlag.test.ts`
+(7, the module had none), plus falsy/truthy cases appended to the existing
+`voiceInputFlag` / `tasksFlag` suites — 32 across the four files. Full portal
+suite 1,357 passed; typecheck + lint clean.
+
+---
+
+
+### [MEDIUM] ~~platform/scripts — backfill coordinates for existing properties~~ — RESOLVED 2026-07-15
+**Closed as resolved 2026-07-15.** Built as one shared engine with two entry
+points (supersedes the earlier "skip CSV, backfill manually" decision):
+- `services/property_geocode.py::backfill_property_coordinates` — fills only
+  MISSING coordinates (idempotent), targeted `$set` writes, ~5 req/s
+  throttle, waits out a per-company 429 once then skips, dry-run support.
+- CSV bulk upload (`routers/properties.py::upload_properties_csv`) now
+  schedules a run scoped to the imported ids via FastAPI BackgroundTasks —
+  imports gain coordinates minutes after upload with no request latency.
+- `scripts/backfill_property_coordinates.py` (`--dry-run`, `--company`) for
+  the one-time legacy backfill and as the safety net after interrupted
+  background runs.
+Tests: `tests/test_property_geocode_backfill.py` (6) +
+`test_upload_properties_csv_geocodes_in_background`.
+**Remaining operational step:** run the script once against Dev, then once
+against production after the next platform promotion, to geocode
+pre-2026-07-15 properties.
+
+---
+
+
+### [LOW] ~~platform/routers/public_maple.py:70 — public endpoint has per-IP but no aggregate spend cap~~ — RESOLVED 2026-07-26 (different approach)
+**Closed as resolved 2026-07-26, deliberately NOT via the suggested spend cap.**
+Product decision (Simon, 2026-07-26): the public widget is a marketing
+surface and prospects using it freely is the *point*. A daily budget ceiling
+that silences Maple mid-campaign is the wrong failure mode for lead-gen — the
+requirement is "stop bots", not "cap spend". Both suggested fixes (global daily
+budget, per-IP daily cap) were dropped on those grounds.
+
+Shipped instead — two layers:
+
+**1. The rate-limit key was broken.** `client_host` came from
+`request.client.host`, which behind Render's load balancer is the *proxy's*
+address — so the "per-IP" 20/min was one global bucket shared by every visitor
+on Earth. A test reproduces it: two distinct visitors, second one 429s.
+`services/request_protection.client_ip_for_rate_limit` now resolves the caller
+properly, and is deliberately **not** the same as
+`audit_service._get_client_ip`: that one takes `X-Forwarded-For[0]`, which is
+whatever the *client* sent, so a bot rotating the header would mint itself a
+fresh bucket per request. Proxies append, so the real client sits
+`trusted_proxy_hops` from the RIGHT (new `trusted_proxy_hops` setting,
+default 1 for Render; 0 disables header trust entirely). Falls back to the
+unforgeable TCP peer whenever the chain is shorter than expected.
+Tests: `tests/test_request_protection_client_ip.py` (12) +
+2 endpoint tests (spoofed prefix shares a bucket; distinct visitors don't).
+
+**2. reCAPTCHA v3 bot filtering**, reusing the site key + secret already
+provisioned for the marketing contact form. Invisible (score-based, no
+challenge), so zero friction for prospects. New `services/recaptcha.py` is the
+Python counterpart to `website/functions/lib/recaptcha.js`.
+
+The policy is asymmetric on purpose:
+- **Confident bot signal** (low score, wrong action, replayed token, or — once
+  enforced — *no token at all*) → 403. A missing token is a bot signal, NOT a
+  verification error; failing open on it is exactly how this control ends up
+  decorative, since an attacker just omits the field.
+- **No verdict obtainable** (Google unreachable, non-JSON body) → allow. A
+  third-party outage must never silence the assistant.
+- No secret configured → check skipped entirely (local dev).
+
+Threshold is **0.3**, lower than the contact form's 0.5: a free question
+deserves less protection than a lead submission, and v3 scores are
+probabilistic, so borderline humans should still get answered.
+
+**Rollout is two-phase** — `maple_public_recaptcha_enforced` defaults to
+**False**, which verifies a token when present but allows a missing one. The
+platform and website deploy independently and visitors may hold a cached
+bundle, so flipping this to True before the widget ships would 403 real
+people. **Flip it only after the website deploy is live.**
+
+Browser side: `website/lib/recaptchaClient.js` extracted from
+`contact-modal/install.js` so both surfaces share one loader with a per-surface
+action (`contact` vs `maple_ask`). It exposes two minters, because the surfaces
+genuinely differ — `getRecaptchaToken` rejects on failure (contact form fails
+CLOSED, shows an error, skips the POST — behavior preserved, caught by its
+existing tests) and `getRecaptchaTokenSoft` resolves `''` (widget fails soft,
+matching the server's fail-open). Also added a 4s timeout: a blocked script tag
+fires neither `onload` nor `onerror`, so the old loader would hang the submit
+handler forever.
+
+Tests: `tests/test_recaptcha_service.py` (11), 8 endpoint tests in
+`TestPublicMapleRecaptcha`, `website/lib/__tests__/recaptchaClient.test.js`
+(11), `website/widget/__tests__/api.test.ts` (3).
+
+**Deploy checklist:** set `RECAPTCHA_V3_SECRET` on Render (same secret the
+Firebase function uses) → deploy platform → deploy website → set
+`MAPLE_PUBLIC_RECAPTCHA_ENFORCED=true`.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+Now that public spend is measurable: each guide answer costs ~$0.014 (13.8k-token
+prompt), and the only guard is 20 req/min per IP — a single abusive IP can run
+~$17/hour, and a small botnet scales that linearly. Metering makes this visible
+but nothing bounds it.
+**Suggested fix:** Add a global daily budget guard for `feature="maple_public"`
+(count/sum today's events before answering; refuse with the canned unavailable
+message when over budget), or at minimum a per-IP daily cap alongside the
+per-minute one.
+
+</details>
+
+---
+
+
+### [LOW] ~~platform tooling — bandit not installed, so no automated security scan runs during /code-review (finding #9)~~ — RESOLVED 2026-07-27
+**Closed as resolved 2026-07-27.** bandit 1.9.4 installed into `platform/.venv`
+and pinned as `bandit>=1.8` in `requirements.txt`. Configuration follows the
+same convention as the other two gates — pinned config file, wrapper script,
+no ad-hoc flags:
+- `platform/bandit.yaml` — excludes `.venv` / `tests` / `scratch`.
+- `platform/run_bandit.sh` — mirrors `run_ruff.sh` / `run_mypy.sh` shape.
+
+**`B101` (assert_used) is skipped by deliberate decision.** bandit flags every
+`assert` because `python -O` strips them; CLAUDE.md's mypy playbook *mandates*
+`assert <x> is not None` for Beanie `.id` narrowing (~106 across
+agents/routers/services/models). Those are type-checker directives, not runtime
+security checks. The skip is documented in `bandit.yaml` with the caveat that
+it is **not** a licence to authorize with asserts — a security-guarding assert
+must be an `if ...: raise`.
+
+**bandit is advisory, NOT in the pre-push hook** (unlike ruff/mypy). It is a
+syntactic scanner: it catches shell injection, weak crypto, unsafe
+deserialization, missing HTTP timeouts, silent excepts. It cannot find logic or
+authorization flaws — nothing it does would have caught #349 or the public-Maple
+rate-limit key collapse. Treat a clean run as "no classic footguns", not
+"secure".
+
+First scan: 19 findings, all LOW severity, zero MEDIUM/HIGH. Six B105
+false positives cleared (3 by renaming a loop variable `token` → `word` in
+`agents/calculator/text_helpers.py` — they were number words, never
+credentials; 3 by `# nosec B105` on Stripe Price lookup keys in
+`services/billing/plan_config.py`). **Baseline is now 13 B110 findings**,
+tracked in the entry below.
+
+
+### [LOW] ~~platform tooling — bandit is still not installed (recurring)~~ — RESOLVED 2026-07-27
+**Closed as resolved 2026-07-27** — installed and configured; see the resolved
+entry above for the config, the deliberate `B101` skip, and the 13-finding
+B110 baseline. The 2026-07-26 review's security-scan gap is now closed for
+future reviews (that review's own backend findings remain manual-inspection
+only). Note the older per-review "bandit not installed; security scan skipped"
+lines further up this file are historical records of individual passes, not
+open work — they need no action.
+
+
+### [MEDIUM] ~~portal/src/components/tasks/ConvertTaskDialog.tsx:75 — conversion failure is not announced to assistive tech~~ — RESOLVED 2026-08-12
+The error paragraph is rendered conditionally with no `role="alert"` or `aria-live`. A
+screen-reader user who triggers Create Estimate and hits a failure (e.g. estimate quota
+exhausted) gets no announcement — the button silently re-enables and focus never moves.
+The same applies to the "This can take a minute" busy line, which is the only signal that
+a long-running request is in flight. Pre-existing, but both messages moved into the footer
+in this change.
+**Suggested fix:** add `role="alert"` to the error paragraph and `aria-live="polite"` to
+the busy paragraph.
+**Resolved:** both applied, covered by two tests in `tests/ConvertTaskDialog.test.tsx`
+(failure is exposed as an `alert`; the busy line announces politely).
+
+
+---
+
+## 4 — folded file/function-size entries
+
+Forty-four entries folded into #4 on 2026-08-25. Bodies preserved here
+because several carry a specific suggested split worth keeping. Line counts
+quoted inside are historical — #4 in the live tracker holds current numbers.
+
+### 4 — extraction history (original body, superseded by the table in the live tracker)
+
+The running log of every extraction done under #4 between 2026-04-26 and
+2026-05-23 — `routers/agent_helpers/` splits, the material-service helper
+moves, `_handle_update_material`. Preserved because it records *how* each
+seam was chosen. Line counts are historical.
+
+<details>
+<summary>Original #4 body</summary>
+
+Files over the 800-line HIGH threshold (line counts refreshed 2026-04-26):
+- `routers/agents.py` — 1360 lines (2026-05-22 refresh; was 1407
+  before the delegate-generic extraction this session, 1642 before the
+  delegate-get/update/delete-estimate extractions, 1821 before the
+  delegate-create-estimate extraction, 1905 before the estimate-resolver
+  extraction, 1977 before the finalize-result extraction, 2203 before
+  the estimate-gathering extraction, 2478 before the optional-follow-up
+  extraction, 2772 before the pending-estimate-follow-up extraction,
+  2917 before 2026-04-26). **53% reduction from the 2026-04-26
+  baseline.** Recent extractions landed under `routers/agent_helpers/`:
+  - `text_helpers.py` — `is_affirmative_text` / `is_negative_text` (50 lines).
+  - `estimate_update.py` — `run_update_estimate` add-items flow (175 lines).
+  - `fuzzy_confirmation.py` — `handle_estimate_fuzzy_confirmation` +
+    `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY` (180 lines).
+  - `pending_estimate_follow_up.py` — landed 2026-05-22 (377 lines).
+    Lifted the `_handle_pending_estimate_follow_up` closure (294 lines)
+    plus its five property-lookup helpers (`_property_name_of`,
+    `_property_address_of`, `_property_label_of`, `_property_full_address_of`,
+    `_find_property_by_name_or_address`) out of `orchestrate_agent_endpoint`
+    into a module-level helper. Owns `PENDING_ESTIMATE_FOLLOW_UP_KEY` and
+    the `ESTIMATE_FOLLOW_UP_STAGE_CONFIRM` / `_SELECT_PROPERTY` constants
+    (re-exported from `routers/agents.py` for the existing test imports).
+    All 9 return paths now go through a small `_envelope()` helper instead
+    of inline 11-key dicts; signature reduced to
+    `handle_pending_estimate_follow_up(message, context_payload)`. Tests:
+    52 passing in `test_orchestrator_endpoint.py`; `properties_api_get_properties`
+    mocks moved from `agents_router` to the helper module via string-form
+    `monkeypatch.setattr(...)` (4 sites + 1 contract assertion). The now-dead
+    `from routers.properties import fetch_properties as properties_api_get_properties`
+    alias was removed from `routers/agents.py`.
+  - `optional_follow_up.py` — landed 2026-05-22 (356 lines). Lifted the
+    `_handle_pending_optional_follow_up` closure (~195 lines) plus its
+    three builders (`_build_optional_follow_up_prompt`,
+    `_build_optional_follow_up_update_message`, `_get_optional_follow_up_spec`)
+    and the three closure-level constants (`PENDING_OPTIONAL_FOLLOW_UP_KEY`,
+    `OPTIONAL_FOLLOW_UP_STAGE_CONFIRM`, `OPTIONAL_FOLLOW_UP_STAGE_COLLECT_VALUE`)
+    out of `orchestrate_agent_endpoint`. The closure-level `_get_processor`
+    factory (used in 4 sites — only one of which moves into the helper)
+    was lifted to module-level in `routers/agents.py` and passed in as a
+    `processor_factory: ProcessorFactory` parameter. Five return paths in
+    the handler now go through a single `_envelope()` helper. Re-exported
+    from `routers/agents.py` so the existing test imports
+    (`OPTIONAL_FOLLOW_UP_STAGE_CONFIRM`, etc.) still resolve unchanged.
+    Tests: 52 passing in `test_orchestrator_endpoint.py`; no mock-target
+    changes needed because no FastAPI-helper aliases were moved.
+  - `delegate_generic.py` — landed 2026-05-22 (100 lines). Lifted the
+    generic non-Estimate-Agent delegate-and-shape tail (~54 lines) used
+    by every agent that isn't routed through one of the Estimate-Agent
+    specialized branches (Contact / Property / Labour / Material, plus
+    intents Estimate-Agent doesn't claim). Calls
+    `processor.process(message, context=...)`, merges the agent-surfaced
+    `optional_follow_up` question and stashes a pending follow-up record
+    (reusing `get_optional_follow_up_spec` from the existing optional-
+    follow-up module), then backfills `completion_ready` /
+    `missing_fields` / `accuracy_suggestions` and re-packages as the
+    standard 11-key orchestrator envelope. Companion to
+    `optional_follow_up.handle_pending_optional_follow_up`, which uses
+    the same shape but with slightly different fallback behavior — kept
+    separate to avoid parameter explosion. Tests: 52 passing; no mock
+    changes needed (`processor.process` is mocked at the agent-instance
+    level via `get_<agent>_agent` factory replacements).
+  - `delegate_get_estimate.py` — landed 2026-05-22 (145 lines). Lifted
+    the `get_estimate` sub-branch (~93 lines) of `_delegate_to_agent`'s
+    Estimate Agent block. Pure read path — no Beanie mutations, no
+    quota gate, no audit log. The stop-word regex and ObjectId-extraction
+    regex moved to module-level constants. Three tests
+    (`test_orchestrate_get_estimate_*`) updated with string-form
+    `monkeypatch.setattr` on the helper's `estimates_api_get_estimates`.
+  - `delegate_estimate_ops.py` — landed 2026-05-22 (226 lines).
+    Bundled `delegate_update_estimate` + `delegate_delete_estimate`
+    (~82 + ~91 lines of the closure body) since they share the
+    `find_estimate_from_context_or_message` resolver, the
+    `fuzzy_disclaimer` copy, and the `PENDING_ESTIMATE_FUZZY_CONFIRMATION_KEY`
+    stash record. Closure-only predicates
+    (`_should_delegate_update_estimate_to_agent`,
+    `_is_work_item_op_message`) are passed in as callables to avoid a
+    circular import on `routers/agents.py`. SAFETY GUARDS preserved
+    verbatim: update_estimate routes property-link / status-transition
+    phrasings straight to the agent BEFORE the fuzzy-resolver; delete
+    always requires confirmation regardless of exact vs fuzzy match, and
+    refuses the most-recent fallback (destructive callers can't guess).
+    All existing delete tests continue to pass via the already-redirected
+    resolver mocks from the earlier `estimate_resolver` extraction.
+  - `delegate_create_estimate.py` — landed 2026-05-22 (275 lines).
+    Lifted the create_estimate sub-branch (~192 lines) of the
+    `_delegate_to_agent` closure's Estimate Agent block into a
+    module-level helper. Same shape as `estimate_gathering._finalize_gathering`
+    — sufficiency check → either enter gathering OR proceed with quota
+    gate + estimate generation + audit log + optional follow-up record.
+    Closure dependencies passed in: `processor`, `current_user_name`,
+    `decoded_token`, and the `_check_estimate_limit_or_refuse` callable
+    (latter would be a circular import). Three return paths go through
+    a small `_envelope()` helper. Tests: 52 passing; one test
+    (`test_orchestrate_endpoint_delegates_to_estimate_agent`) updated to
+    also patch `routers.agent_helpers.delegate_create_estimate.prepare_generated_estimate`
+    and `save_generated_estimate` via string-form `monkeypatch.setattr`
+    (the existing `agents_router` patches stay because the aliases are
+    still used in the remaining `_delegate_to_agent` branches).
+  - `estimate_resolver.py` — landed 2026-05-22 (119 lines). Lifted the
+    `_find_estimate_from_context_or_message` closure (~85 lines) into a
+    module-level helper. Resolves the user's target estimate via the
+    five-step ladder: active-context → estimate_id code → MongoDB _id
+    → fuzzy title match → most-recent fallback. The two regex constants
+    are now module-level (`_ESTIMATE_SEARCH_STOP_WORDS`, `_MONGO_OBJECT_ID`).
+    Tests: 52 passing; two delete-estimate tests updated to also patch
+    `routers.agent_helpers.estimate_resolver.estimates_api_get_estimate{s}`
+    via string-form `monkeypatch.setattr` (the existing `agents_router`
+    patches stay because the aliases are still used in two other call
+    sites inside `_delegate_to_agent`).
+  - `finalize_result.py` — landed 2026-05-22 (119 lines). Lifted the
+    82-line `_finalize_result` closure body (chat-history append + active-
+    entity coreference + suggestions enrichment + conversation persistence)
+    into a module-level `finalize_orchestrate_result(...)` helper.
+    `_finalize_result` closure remains in `routers/agents.py` as a 9-line
+    thin wrapper that calls the helper and wraps the resulting dict in
+    `OrchestratorAgentResponse` (the Pydantic response model stays in
+    `routers/agents.py` to avoid a circular import). The 5-way entity-key
+    scan was extracted into a small `_resolve_entity_reference()`
+    private helper inside the new module. All 6 existing call sites are
+    untouched — they still call the closure wrapper. Dependencies passed
+    in: `delegate_context`, `merged_context`, `user_id`, and the
+    `_save_conversation_context` callable. Tests: 52 passing in
+    `test_orchestrator_endpoint.py`.
+  - `estimate_gathering.py` — landed 2026-05-22 (315 lines). Lifted the
+    `_handle_pending_estimate_gathering` closure (236 lines) plus the
+    three state-key constants (`ESTIMATE_GATHERING_STATE_KEY`,
+    `ESTIMATE_GATHERED_DETAILS_KEY`, `ESTIMATE_NEXT_QUESTION_KEY`) out of
+    `orchestrate_agent_endpoint`. The closure captured `message`,
+    `decoded_token`, and `current_user_name` from request scope and
+    called the module-level `_check_estimate_limit_or_refuse` (a
+    circular import if pulled into the helper); these now flow through
+    keyword parameters (`decoded_token`, `current_user_name`,
+    `estimate_agent`, `check_estimate_limit_or_refuse`). Internal split:
+    the per-turn step is the public `handle_pending_estimate_gathering`,
+    and the all-details-collected path lives in a private
+    `_finalize_gathering` so the main entry stays well under the 50-line
+    ceiling. Five return paths go through a single `_envelope()` helper.
+    Tests: 75 passing across `test_orchestrator_endpoint.py` +
+    `test_estimate_gathering.py`. No mock surgery — no test directly
+    exercises the closure-level call path.
+
+  Candidates for the next extraction round:
+  - `_finalize_result` and the orchestrate-endpoint epilogue (chat-history
+    persistence + suggestion enrichment + response shaping). Still inline
+    in `orchestrate_agent_endpoint`.
+  - The orchestrate-endpoint's main classification + delegate loop
+    (~700 lines after this extraction round). Largest remaining inline
+    block in `routers/agents.py`.
+- `agents/material/service.py` — 2874 lines (2026-05-22 refresh; was 2875
+  pre-extraction this session; doc's earlier "2560" baseline preceded the
+  cost/size-guard helpers and accuracy-suggestion code that landed in the
+  intervening weeks). `process()` is a mega-switch that inserts a new
+  50-line inline handler per intent. ~~Easiest extraction target: the
+  `list_material_categories` block~~ landed 2026-04-26 as
+  `_handle_list_material_categories()` (44 lines) plus a static
+  `_format_material_categories_response()` helper. Follow-up extractions
+  landed 2026-04-26: `_handle_create_material`, `_handle_get_material`
+  (incl. size-scoped lookup), `_handle_delete_material` (post-resolve
+  confirmation flow), and `_handle_list_materials` (count + category-filter
+  + name-hint dispatch). `_handle_update_material` landed 2026-05-22:
+  the ~246-line inline `update_material` block (multi-turn field-then-value
+  state, add-size cost+unit guard, remove-last-size refusal, per-size
+  unit-OID resolution, and the final merge/update via
+  `_update_material_via_api`) was lifted into a dedicated method that
+  reuses `_build_response_envelope` for all 5 return shapes. `process()`
+  call site collapses from 246 inline lines to a 14-line kwargs call
+  mirroring the `_handle_create_material` / `_handle_delete_material`
+  pattern. Verified: 78 tests pass across `test_material_agent.py` +
+  `test_material_api.py` + `test_maple_material_size_operations.py`;
+  full-project mypy stays at `Success: no issues found in 265 source files`.
+  Remaining inline block: the `delete_material` early-confirm shortcut
+  that fires before `_resolve_target_material` (small; pre-resolve so it
+  can't easily share the post-resolve `_handle_delete_material` signature).
+
+  Pure-helper extraction landed 2026-05-23 in four steps, all into a new `agents/material/text_helpers.py` (375 lines) modeled on `agents/estimate/text_helpers.py`. `agents/material/service.py` dropped from 2,874 → 2,541 lines (**-333, -11.6%**) across the session. Steps:
+  - **Step 1**: four leaf-level methods with no `self.*` dependencies (`_is_confirm_text`, `_explicit_intent_from_message`, `_normalize_unit`, `_normalize_size_text`) lifted from instance methods to module-level functions, following the existing pattern set by `_parse_price_range_filter` / `_material_matches_price_filter` / `_format_amount`. 17 callsites rewritten across the file (`self._foo(x)` → `_foo(x)`).
+  - **Step 2**: moved Step-1 helpers into a dedicated `agents/material/text_helpers.py` module (76 lines initially).
+  - **Step 3**: moved the three pre-existing module-level helpers (`_parse_price_range_filter`, `_material_matches_price_filter`, `_format_amount`) plus the `_PRICE_RANGE_PATTERN` / `_PRICE_RANGE_OP_DIRECTION` constants into `text_helpers.py`. (-75 lines from service.py; 4 internal callsites already module-level so no `self.` rewrites needed.)
+  - **Step 4**: moved seven instance methods plus four module-level constants. Methods: `_match_intent_rules`, `_extract_name_from_message`, `_normalize_material_name`, `_parse_cost`, `_has_explicit_cost_field`, `_should_default_cost_to_price`, `_normalize_sizes_field`. Constants: `MATERIAL_ACTION_HINTS`, `NAME_STOPWORDS`, `NAME_LEADING_PREPOSITIONS`, `NAME_TRAILING_NOISE`. 41 `self._foo(x)` → `_foo(x)` callsites rewritten via `replace_all`. (-205 lines from service.py.) All seven methods were transitively pure (chain: `_normalize_sizes_field` uses `_parse_cost` + `_normalize_size_text`; `_extract_name_from_message` uses `_normalize_material_name`; `_has_explicit_cost_field` uses `_parse_cost`); moving them en bloc kept the import dependency one-way (service.py → text_helpers.py).
+
+  The structural win: every helper in `text_helpers.py` is callable and unit-testable without instantiating `MaterialAgent`. Backwards-compat for tests is preserved by the `from agents.material.text_helpers import ...` line at the top of `service.py` — names imported into service.py's namespace are still resolvable via `from agents.material.service import <name>` (used by `tests/test_material_agent.py` for `_material_matches_price_filter` and `_parse_price_range_filter`). Verified: 119 tests pass across `test_material_agent.py` + `test_material_api.py` + `test_maple_material_size_operations.py` + `test_material_response_envelope.py` + `test_audit_service.py`; full-project mypy clean at 275 source files.
+
+  `_handle_update_material` refactor landed 2026-05-23: split 234 → 120 lines (**-49%**) across the orchestration shell, with four new helpers:
+  - `_request_update_fields_clarification` (78 lines — bare-field-name selection vs. generic "which fields?" prompt; both terminal)
+  - `_check_add_size_guard` (65 lines — refuse add-size when cost or unit missing; returns `Optional[envelope]`)
+  - `_check_remove_last_size_refusal` (31 lines — refuse removing the last size; returns `Optional[envelope]`)
+  - `_finalize_update_material` (61 lines — merge fields → `_update_material_via_api` → accuracy suggestions → envelope)
+
+  Shell now reads as a linear pipeline: derive state → fields-clarification → add-size guard → remove-size guard → per-size unit-OID resolution → finalize. File-size cost on that single refactor: service.py +121 lines from helper signatures and docstrings — an honest tradeoff where per-function readability wins.
+
+  **`_extract_fields_from_message` and `_build_sizes_from_fields` lifted to `text_helpers.py`** (2026-05-23). Both were pure functions despite being methods — neither used `self.*`. Combined ~278 lines moved out of service.py. Two test callsites updated to use the module-level function (`agent._extract_fields_from_message(...)` → `_extract_fields_from_message(...)` plus an import). text_helpers.py grew to 656 lines (12 pure helpers + 6 constants); service.py dropped from 2,662 → 2,384 (-278).
+
+  **`process()` refactor landed 2026-05-23**: split 457 → **138 lines (-70%)** in two passes via six helper extractions:
+  - `_dispatch_intent_to_handler` (147 lines) — the intent-routing mega-switch
+  - `_maybe_confirm_pending_delete` (~55 lines) — pending-delete confirmation fast-path
+  - `_run_llm_classification` (86 lines) — LLM classify + entity-extraction pipeline; returns ``(parsed, llm_error)``
+  - `_apply_post_classify_fallbacks` (~75 lines) — explicit-intent override + name normalization + regex fallback; mutates parsed in place, returns explicit_intent
+  - `_apply_pending_intent_fallback` (~66 lines) — pending-intent merge for low-confidence intents; returns `(intent, probability, fields, pending_override_applied)`
+  - `_check_pre_dispatch_refusals` (~78 lines) — three pre-dispatch refusal guards (unsupported intent, missing company_id, invalid company_id shape); returns `Optional[envelope]`
+
+  Shell `process()` now reads as a linear pipeline: bulk-delete refusal → context setup → LLM classification → post-classify fallbacks → derive intent/probability/fields → pending-intent fallback → secondary pending-intent merge → pre-dispatch refusals → `_dispatch_intent_to_handler(...)`.
+
+  Session totals for `agents/material/service.py`: **2,874 → 2,568 lines (-306, -10.6%)** across the full session, with `text_helpers.py` at 656 lines (16 pure helpers + 6 constants). The file got bigger than the post-extraction count because each new helper added ~10–15 lines of signature + docstring overhead — function-size is the primary HIGH-issue target so this is a net win even when file-size ticks up. 97 material tests + 22 audit tests pass; full-project mypy clean at 275 source files.
+
+  **`_dispatch_intent_to_handler` refactor landed 2026-05-23**: split 147 → 75 lines (-49%) via one extraction:
+  - `_resolve_and_dispatch_target_op` (112 lines) — pending-delete fast-path → `_resolve_target_material` → per-intent handler for the `update_material` / `delete_material` / `get_material` cluster (the only branch that needed target-material resolution). Stashes a pending-update intent on resolve-error and returns the clarification envelope with optional candidate suggestions.
+
+  The dispatcher shell now reads as: `create` branch → `update/delete/get` branch (delegates to `_resolve_and_dispatch_target_op`) → `list_material_categories` branch → fall-through `list_materials`.
+
+  Session totals for `agents/material/service.py`: **2,874 → 2,608 lines (-266, -9.3%)** with `text_helpers.py` at 656 lines (16 pure helpers + 6 constants). Top-N method sizes after this round: `process` (138), `_handle_update_material` (120), `_resolve_and_dispatch_target_op` (112), `_handle_list_materials` (97), `_handle_delete_material` (90), `_run_llm_classification` (86), `_handle_create_material` (85), `_check_pre_dispatch_refusals` (78), `_request_update_fields_clarification` (78), `_handle_list_materials_for_estimate` (76), `_dispatch_intent_to_handler` (75). No method now exceeds 140 lines (was 457 at session start). 97 material tests + 22 audit tests pass; full-project mypy clean at 275 source files.
+- `agents/estimate/service.py` — 5685 lines after the 2026-04-26 #80
+  refactor. Similar split: prompt-building / inventory fetch / LLM
+  extraction / totals calc / CRUD read handlers are each their own concern.
+  Cleanest first cut: move the new CRUD methods
+  (`_handle_list_estimates`, `_handle_get_estimate`, `_crud_envelope`, plus
+  the small parsing helpers) into `agents/estimate/crud.py` as a mixin.
+- `agents/labour/service.py` — **1,732 → 1,474 lines (-258, -15%)** across 2026-05-24. Same playbook:
+  - **Pure-helper lift to new `agents/labour/text_helpers.py`** (370 lines): 10 leaf-level methods (`_is_confirm_text`, `_match_intent_rules`, `_explicit_intent_from_message`, `_extract_name_from_message`, `_normalize_role_text`, `_parse_cost`, `_normalize_unit`, `_is_bare_rate_reference`, `_match_bare_field_name`, `_extract_fields_from_message`) plus 4 constants (`LABOUR_ACTION_HINTS`, `NAME_STOPWORDS`, `NAME_LEADING_PREPOSITIONS`, `ROLE_TRAILING_NOISE`), class-level `_BARE_FIELD_ALIASES` / `_BARE_RATE_PHRASES`, and the module-level `_format_amount`. Three test sites updated (4 `agent._extract_name_from_message(...)` and 1 `agent._extract_fields_from_message(...)` → module-level + import), plus two `monkeypatch.setattr(LabourAgent, "_extract_*", ...)` rewritten to target the import location.
+  - **`process()` dispatch extraction**: lifted the 531-line try-body into `_dispatch_intent_to_handler` (554 lines). `process()` is now **286 lines (-64% from 803 starting point)**.
+
+  40 labour tests pass.
+
+- `agents/equipment/service.py` — **1,343 → 1,151 lines (-192, -14%)** across 2026-05-24. Same playbook:
+  - **Pure-helper lift to new `agents/equipment/text_helpers.py`** (284 lines): 8 leaf-level methods (`_is_confirm_text`, `_match_intent_rules`, `_explicit_intent_from_message`, `_extract_name_from_message`, `_normalize_equipment_name`, `_parse_cost`, `_normalize_unit`, `_extract_fields_from_message`) plus 4 constants (`EQUIPMENT_ACTION_HINTS`, `NAME_STOPWORDS`, `NAME_LEADING_PREPOSITIONS`, `NAME_TRAILING_NOISE`) and `_format_amount`. Two test sites updated (1 each of `agent._extract_name_from_message(...)` and `agent._extract_fields_from_message(...)` → module-level).
+  - **`process()` dispatch extraction**: lifted the 382-line try-body into `_dispatch_intent_to_handler` (405 lines). `process()` is now **264 lines (-58% from 632 starting point)**.
+
+  20 equipment tests pass.
+
+- `agents/contact/service.py` — **2,412 → 1,928 lines (-484, -20%)** across 2026-05-24. Same playbook as property/material:
+  - **Pure-helper lift to new `agents/contact/text_helpers.py`** (593 lines): 17 leaf-level methods moved out of `ContactAgent` as module-level functions, plus 6 constants (`CONTACT_ACTION_HINTS`, `SUPPORTED_CONTACT_ROLES`, `CONTACT_ROLE_ALIASES`, `CONTACT_ENUM_FIELD_OPTIONS`, `_BARE_FIELD_ALIASES`) and the module-level enum-extraction helper (`_extract_contact_enum_field_options`). Migrated helpers: `_is_confirm_text`, `_match_intent_rules`, `_explicit_intent_from_message`, `_extract_name_from_message`, `_split_name_parts`, `_normalize_phone_token`, `_normalize_postal_zip_token`, `_normalize_country_token`, `_normalize_prov_state_token`, `_normalize_role_token`, `_field_name_variants`, `_extract_value_like_phrase`, `_normalize_enum_field_value`, `_detect_enum_help_field`, `_infer_single_missing_field_value`, `_match_bare_field_name`, `_extract_fields_from_message`. Callsites rewritten via `sed`. Three test sites updated: 10 `agent._extract_name_from_message(...)` → module-level, 10 `agent._extract_fields_from_message(...)` → module-level, 7 `agent._normalize_phone_token(...)` → module-level (the test's `agent = ContactAgent(use_llm=False)` line still works but isn't needed), and two `monkeypatch.setattr(ContactAgent, "_extract_*", ...)` rewritten to target the import location in `agents.contact.service`. (Initial deletion was too aggressive — also stripped the 4 module constants `CONTACT_AGENT_LABEL` / `PENDING_INTENTS_CONTEXT_KEY` / `ACTIVE_CONTACT_ID_CONTEXT_KEY` / `ACTIVE_CONTACT_NAME_CONTEXT_KEY`; restored in a follow-up edit.)
+  - **`process()` dispatch extraction**: lifted the 641-line try-body dispatch into `_dispatch_intent_to_handler` (665 lines). `process()` is now **407 lines (-61% from 1,040 starting point)**. Also lifted the inline `_response` closure to a module-level `_finalize_response_envelope` (16 callsites + 2 `response_wrapper=` references rewritten via `sed`).
+
+  82 contact tests pass; full-project mypy clean at 277 source files. The remaining `process()` (407 lines) still has post-classify-fallbacks, pending-intent merges, enum-help-field early-return, and pre-dispatch refusals all inline — natural follow-up extractions matching the material/property phase pattern. `_dispatch_intent_to_handler` (665 lines) is itself well over the ceiling — could split the create-contact / resolve-then-dispatch / list-contacts branches further.
+
+  **`_dispatch_intent_to_handler` split landed 2026-05-25**: the 382-line update/delete/get cluster lifted into `_resolve_and_dispatch_target_op` following the property playbook (line-for-line port of property's helper, minus the property-specific `contact_name` / `owner_name` params; the contact dispatcher's `active_contact_id` param turned out to be unused inside the body and was left untouched on the original method's signature for minimum-touch). `_dispatch_intent_to_handler` dropped from 665 → 299 lines (-55%); new helper at 412 lines (vs. property's 468). Net file size: 1,928 → 1,974 lines (+46 from new method header + the `return None` tail; the size cost is an honest tradeoff — per-function readability is the HIGH-issue target, not file-size minimization). Two `pending_record: Dict[str, Any] = {...}` annotations added to the lifted scope to keep mypy happy (the cluster's narrowest dict literal mixed with a downstream `pending_record["confirm_delete"] = False` mutation tripped `Collection[str]` inference). 99 contact tests pass across `test_contact_agent.py` + `test_contact_api.py` + `test_contact_model.py` + `test_cross_resource_envelope_contact.py`; full-project mypy clean at 279 source files. Natural next splits target the new helper's internal branches (delete-confirm fast-path / fuzzy-confirmation / get / update / delete) — same per-intent split that property's helper still needs.
+
+  **`_handle_update_target_contact` extraction landed 2026-05-25**: the 152-line `if intent == "update_contact":` branch lifted out of `_resolve_and_dispatch_target_op` into a dedicated `_handle_update_target_contact` method. Covers the three sub-flows the branch already had inline: (a) multi-turn ``awaiting_value_for`` re-entry (the prior turn stashed a field-name → this turn supplies the value), (b) bare-field-name selection + ``awaiting_value_for`` stash + ``no-fields`` clarification stash, and (c) the field-merge → Google address enrichment → ``_update_contact_via_api`` → accuracy-suggestions pipeline. `_resolve_and_dispatch_target_op` dropped from 412 → 276 lines (-33%); new helper at 177 lines. File: 1,974 → 2,015 lines (+41). 99 contact tests pass; full-project mypy clean at 279 source files.
+
+  **`_handle_delete_target_contact` extraction landed 2026-05-25**: the 79-line implicit-fall-through delete branch (reachable only when ``intent == "delete_contact"`` after update / get returned) lifted into its own method. Two-step shape preserved: first hit stashes ``pending_delete_*`` + the active-contact context keys and returns the confirmation envelope; second hit (with ``parsed.confirm_delete`` truthy or ``_is_confirm_text(message)``) hits ``_delete_contact_via_api`` and clears pending state. Signature deliberately narrower than `_handle_update_target_contact` — drops the unused ``fields`` / ``company_id`` / ``pending_override_applied`` params (delete uses ``target_contact.id`` and never enriches address fields). `_resolve_and_dispatch_target_op` dropped from 276 → 210 lines (-24%); new helper at 102 lines. File: 2,015 → 2,051 lines (+36). 99 contact tests pass; full-project mypy clean at 279 source files.
+
+  **`_handle_create_contact` extraction landed 2026-05-25**: the 160-line `if intent == "create_contact":` branch lifted out of `_dispatch_intent_to_handler` into a dedicated `_handle_create_contact` method. Covers the three sub-flows the branch already had inline: (a) name-token reconciliation between ``parsed`` and the active pending intent's first/last name slots (the "name is X" with a prior pending first-name case is preserved), (b) single-missing-field inference from the prior turn's pending ``missing_fields`` list (only fires when exactly one required field was missing), and (c) Google address enrichment → required-field check → either stash-and-ask-for-missing or ``_create_contact_via_api`` → accuracy-suggestions + optional post-create follow-up question for any of ``phone`` / ``email`` / ``street`` not supplied. Cleaned up the stale ``# noqa - re-binding ... (line 1682)`` comment on the `pending_missing_fields` initializer — the prior-line reference was already wrong after the earlier extractions, and the variable is now scoped to the helper so no shadowing exists. Replaced with a clean ``pending_missing_fields: List[str] = []`` annotation. `_dispatch_intent_to_handler` dropped from 299 → 153 lines (-49%); new helper at 188 lines. File: 2,051 → 2,093 lines (+42).
+
+  **`_handle_list_contacts` extraction landed 2026-05-25**: the 61-line list-contacts fall-through (name-hint normalization via ``parsed.full_name`` → ``first_name + last_name``; count-query / generic-words filtering against the inline ``_GENERIC_WORDS`` set; ``find_contacts_by_name`` vs. full-catalog ``_list_contacts_via_api`` dispatch; response shaping for count / empty / list cases) lifted out of `_dispatch_intent_to_handler` into a dedicated `_handle_list_contacts` method. Body moved verbatim (no dedent needed — already at method-body indent). Also fixed a pre-existing missing blank line between `_dispatch_intent_to_handler` and `process` left over from the first extraction round. `_dispatch_intent_to_handler` dropped from 153 → 101 lines (-34%); new helper at 82 lines. File: 2,093 → 2,123 lines (+30).
+
+  Session totals for `agents/contact/service.py`: 1,928 → 2,123 lines (+195 from sig+docstring overhead across the five new methods). Top-N method sizes after this round: `_resolve_and_dispatch_target_op` (210), `_handle_create_contact` (188), `_handle_update_target_contact` (177), `_handle_delete_target_contact` (102), `_dispatch_intent_to_handler` (101), `_handle_list_contacts` (82), `_classify_with_llm` (72), `_list_contacts_at_property` (71). No method now exceeds 210 lines (was 665 at session start) — every method reduced by at least 51%, the worst single function reduced by 68%. `_dispatch_intent_to_handler` is now a clean three-branch router: `create_contact` → helper, `update/delete/get` → resolve-then-dispatch helper, cross-resource filter (~34 lines, the only branch still inline since both sub-shapes are already in `_list_contacts_at_property` / `_list_contacts_for_estimate`), then `list_contacts` → helper. 99 contact tests pass; full-project mypy clean at 279 source files.
+
+- `agents/property/service.py` — **2,418 → 2,027 lines (-391, -16.2%)** across 2026-05-24. Two-pronged refactor following the material-agent playbook:
+  - **Pure-helper lift to new `agents/property/text_helpers.py`** (572 lines): 19 leaf-level methods moved out of `PropertyAgent` as module-level functions, plus 3 constants (`PROPERTY_ACTION_HINTS`, `_BARE_FIELD_ALIASES`, `_LABEL_PATTERNS`). Migrated helpers: `_is_confirm_text`, `_explicit_intent_from_message`, `_match_intent_rules`, `_sanitize_property_reference`, `_extract_name_from_message`, `_extract_contact_name_from_message`, `_extract_explicit_property_name_from_message`, `_extract_owner_name_from_message`, `_normalize_postal_zip_token`, `_normalize_country_token`, `_normalize_prov_state_token`, `_match_bare_field_name`, `_extract_label_fields`, `_try_canadian_full_address`, `_try_us_zip_address`, `_try_chunked_address`, `_try_partial_address`, `_try_at_prefix_canadian_address`, `_extract_fields_from_message`. 27 `self._foo(x)` callsites rewritten via `sed`. Three test sites updated (`agent._extract_fields_from_message(...)` → `_extract_fields_from_message(...)` plus an import) and one `monkeypatch.setattr(PropertyAgent, "_extract_name_from_message", ...)` rewritten to target the import location in `agents.property.service`.
+  - **`process()` refactor**: split 936 → 750 lines (-20%) via three helper extractions matching the material pattern: `_run_llm_classification` (88 lines — LLM classify + entity-extraction; returns `(parsed, llm_error)`), `_apply_post_classify_fallbacks` (77 lines — explicit-intent override + name normalization + regex fallback; returns explicit_intent), `_apply_pending_intent_fallback` (91 lines — pending-intent merge for low-confidence intents; returns 6-tuple `(intent, probability, fields, contact_name, owner_name, pending_override_applied)`), `_check_pre_dispatch_refusals` (~50 lines — unsupported-intent + missing-company-id guards).
+
+  58 property tests pass; full-project mypy clean at 276 source files.
+
+  **`process()` dispatch extraction landed 2026-05-24**: lifted the 610-line try-body intent dispatch into `_dispatch_intent_to_handler` (636 lines initially). `process()` is now **150 lines (-84% from 936 starting point)** and reads as a linear pipeline: bulk-delete refusal → context setup → LLM classification → post-classify fallbacks → derive intent/probability/fields → pending-intent fallback → secondary pending-intent merge → active-property fallback → pre-dispatch refusals → `_dispatch_intent_to_handler(...)`. Also lifted the inline `_response` closure to a module-level `_finalize_response_envelope` (20 callsites rewritten via `sed`) so the dispatch helper has independent access to the envelope-defaults logic.
+
+  **`_dispatch_intent_to_handler` split landed 2026-05-24**: the 438-line update/delete/get cluster lifted into `_resolve_and_dispatch_target_op`. `_dispatch_intent_to_handler` dropped from 636 → 216 lines (-66%). The new helper handles pending-delete confirmation, fuzzy-match resolve flow with stash-on-resolve-error, and the per-intent (update/delete/get) handler dispatch. Returns `Optional[Dict[str, Any]]` so the caller can fall through to the create / list / list-by-cross-resource branches when the intent isn't a resolved-target op. (The first run of the extraction script had a dedent bug — the cluster body was already at the right method-body indent and didn't need stripping. Reverted via `awk` to add the 4 spaces back, then fixed a fresh `Dict[str, Any]` annotation gap on `pending_record` exposed by mypy.)
+
+  Updated `agents/property/service.py` line count: 2,418 → 2,123 (-295, -12.2%). Top-N method sizes after this round: `_resolve_and_dispatch_target_op` (468), `_dispatch_intent_to_handler` (216), `process` (150), `_apply_pending_intent_fallback` (91), `_list_properties_by_cross_resource` (90), `_run_llm_classification` (88), `_apply_post_classify_fallbacks` (77), `_classify_with_llm` (69). Two methods still well over the 50-line ceiling — natural next splits target the create-property branch (~90 lines) and the resolve-then-dispatch internals (delete-confirm path, fuzzy-match stash, per-intent handlers).
+
+  **`_dispatch_intent_to_handler` create-property extraction landed 2026-05-28**: lifted the 92-line `if intent == "create_property":` branch into a dedicated `_handle_create_property` helper (107 lines). The dispatcher now delegates with an 11-line call site, leaving only the resolve-then-dispatch passthrough, the cross-resource filter shortcut, and the `list_properties` fall-through inline. `_dispatch_intent_to_handler` dropped from 216 → 138 lines (-36%). The new helper accepts the create-flow-specific subset of parameters (no `intent`, `active_pending_intent`, `contact_name`, or `owner_name`) and hardcodes `intent = "create_property"` internally. File grew slightly (2,123 → 2,152, +29) due to method-signature/docstring boilerplate, but per-method sizes are now more focused. Top-N method sizes after this round: `_resolve_and_dispatch_target_op` (468), `process` (150), `_dispatch_intent_to_handler` (138), `_handle_create_property` (107), `_apply_pending_intent_fallback` (91), `_list_properties_by_cross_resource` (90), `_run_llm_classification` (88), `_apply_post_classify_fallbacks` (77). Verified: 46 tests pass in `test_property_agent.py`; 52 pass in `test_orchestrator_endpoint.py`; mypy clean on `agents/property/`. The new helper is still over the 50-line ceiling — a future sub-split could separate the missing-fields stash branch (28 lines) from the post-create assembly (~70 lines), but each is one coherent code path so the value is marginal.
+
+  **`_resolve_and_dispatch_target_op` per-intent handler split landed 2026-05-28**: lifted the three per-intent handlers out of the 468-line resolve-then-dispatch parent: `_handle_get_property` (43 lines), `_handle_update_property` (244 lines), `_handle_delete_property` (93 lines). The parent now reads as a linear pipeline — pending-delete early-exit → `_resolve_target_property(...)` → fuzzy-match confirmation stash → per-intent delegate — and drops from **468 → 169 lines (-64%)**. `_handle_get_property` is the only new helper under the 50-line ceiling; `_handle_update_property` is now the largest method in the file (244 lines) but is isolated, and its natural future split is the awaiting-value/bare-field-name clarification stash (~110 lines) vs. the merge-and-update body (~130 lines). All three new helpers hardcode `intent = "<op>"` internally rather than taking it as a parameter. File grew 2,152 → 2,233 (+81) for method-signature boilerplate. Top-N method sizes after this round: `_handle_update_property` (244), `_resolve_and_dispatch_target_op` (169), `process` (150), `_dispatch_intent_to_handler` (138), `_handle_create_property` (107), `_handle_delete_property` (93), `_apply_pending_intent_fallback` (91), `_list_properties_by_cross_resource` (90), `_run_llm_classification` (88), `_apply_post_classify_fallbacks` (77), `_classify_with_llm` (69). Verified: 46 tests pass in `test_property_agent.py`; 52 pass in `test_orchestrator_endpoint.py`; mypy clean on `agents/property/`.
+
+  **`_handle_update_property` sub-block split landed 2026-05-28**: the 244-line update handler split into two sub-helpers along its natural seam — the `if not fields and not contact_name:` clarification stash → `_maybe_stash_update_clarification` (116 lines, returns `Optional[Dict[str, Any]]` so the parent falls through on `None`), and the merge-and-update body → `_merge_and_update_property` (139 lines, async; owns the existing-payload merge, address enrichment, contact lookup/disambiguation, update API call, and response assembly). `_handle_update_property` is now **62 lines** (-75%): the awaiting-value unwrap (~12 lines) plus two delegate calls. The clarification-stash helper is sync (no awaits) — kept as a method rather than a module-level function because it touches `self._upsert_pending_intent` / `self._persist_pending_intents`. File grew 2,233 → 2,306 (+73) for method-signature boilerplate. Top-N method sizes after this round: `_resolve_and_dispatch_target_op` (169), `process` (150), `_merge_and_update_property` (139), `_dispatch_intent_to_handler` (138), `_maybe_stash_update_clarification` (116), `_handle_create_property` (107), `_handle_delete_property` (93), `_apply_pending_intent_fallback` (91), `_list_properties_by_cross_resource` (90), `_run_llm_classification` (88), `_apply_post_classify_fallbacks` (77), `_classify_with_llm` (69), `_handle_update_property` (62). Verified: 98 tests pass across `test_property_agent.py` + `test_orchestrator_endpoint.py`; mypy clean on `agents/property/`.
+
+  **Property-agent chain paused 2026-05-28** — diminishing returns. The largest remaining method is `_resolve_and_dispatch_target_op` (169 lines), a linear pipeline whose sub-steps don't decompose cleanly without obscuring the flow. Pivoting to `agents/estimate/service.py` (#235), the largest file in the repo.
+
+- `agents/estimate/service.py` — **2,600 → 2,451 → 2,344 lines (-256, -9.8% total)** across two 2026-05-28 passes:
+  - Calc-cluster lift to new `agents/estimate/calc_helpers.py` (127 lines, 5 module-level functions: `get_material_default_price`, `get_material_default_cost`, `merge_duplicate_line_items`, `merge_resolved_material_items`, `merge_resolved_labour_items`). The cluster had eight methods total — three (`_calculate_material_cost`, `_estimate_labour_hours`, `_calculate_total_estimate`) were dead (zero call sites across `platform/`, `tests/`) and deleted outright. The remaining five didn't read `self` or call sibling methods, so they lifted cleanly as module-level functions. Six `self._foo(...)` call sites rewritten. Verified: 112 tests pass in `test_estimate_agent.py`.
+  - Gathering sync-helpers lift to existing `agents/estimate/text_helpers.py` (643 → 759 lines, +116). The 2026-05-11 remaining-targets list called this the "gathering/sufficiency cluster (~200 lines)", but on inspection the cluster split into two surfaces: the two async LLM methods (`assess_sufficiency`, `extract_detail_from_reply`) are public — called by `routers/agent_helpers/delegate_create_estimate.py` and `routers/agent_helpers/estimate_gathering.py` — so they stay on the agent. The 5 sync helpers (`_field_name_variants`, `_normalize_enum_value`, `_extract_value_like_phrase`, `_detect_enum_help_field`, `_infer_single_pending_field_value`) are call-only-from-`service.py` pure functions that directly parallel the same names already lifted to `agents/contact/text_helpers.py` — matched the contact pattern and appended them as module-level functions. Five `self._foo(...)` call sites rewritten via `sed`. `text_helpers.py` grew to 759 lines, still under the 800-line HIGH threshold. Stale doc note from 2026-05-11 corrected: LLM error / JSON parsing helpers (`format_llm_error`, `build_json_parse_diagnostic`, `strip_json_comments`) were **already lifted** to `llm_helpers.py` in the same 2026-05-11 pass — that list entry was outdated, no work needed there.
+  - Combined verification: 135 tests pass across `test_estimate_agent.py` + `test_estimate_gathering.py`; mypy clean on `agents/estimate/` (14 source files).
+  - Extraction normalization cluster lifted to new `agents/estimate/extraction_helpers.py` (342 lines, 7 module-level functions: `normalize_extracted_estimate`, `has_meaningful_value`, `merge_job_item_payloads`, `merge_with_pending_estimate`, `build_optional_follow_up`, `collect_missing_required_fields`, `build_clarifying_question`). All 7 are pure data transformations — none touch `self` state, only intra-cluster method calls (which become bare function calls in the module). The module imports `_normalize_enum_value` from `text_helpers` and `ExtractedEstimate` from `schemas`. Five `self._foo(...)` call sites in `service.py` rewritten via `sed`. No external callers (grep across `platform/`, `tests/`). Verified: 135 tests pass; mypy clean (now 15 source files in `agents/estimate/`).
+  - `agents/estimate/service.py` net session reduction: **2,600 → 2,055 lines (-545, -21.0%)** across the calc, gathering-sync, and extraction-normalization passes.
+  - LangChain research/architect pipeline cluster lifted to new `agents/estimate/llm_pipeline.py` as a `LlmPipelineMixin` (1,089 lines). 17 methods moved as-is: `_build_research_input`, `_collect_research_sources`, `_normalize_research_result`, `_decompose_requirement`, `_step1_architect`, `_step2_vector_retrieval`, `_step3_research_for_scope`, `_reuse_past_work_item`, `_step2_and_3_for_scope`, `_run_pipeline`, `_run_react_loop`, `_run_estimate_research`, `_estimate_has_no_line_items`, `_build_estimate_from_research`, `_extract_estimate_with_llm`, `_fallback_accuracy_suggestions`, `_generate_accuracy_suggestions`. **Mixin pattern (not module-level)** because tests + `agents/estimate/tools.py` call these as `agent._step1_architect(...)` / `monkeypatch.setattr(EstimateAgent, "_step1_architect", ...)` — preserving the agent-method surface keeps all callers unchanged. `EstimateAgent` inheritance is now: `(CatalogMatchingMixin, CrudParsingMixin, WorkItemHandlersMixin, WorkItemFieldHandlersMixin, CrudHandlersMixin, LlmPipelineMixin)`.
+  - Test patches updated: `monkeypatch.setattr(estimate_service, "search_similar_work_items", ...)` (2 sites) rewritten to target the new module (`estimate_llm_pipeline`). The `ChatOpenAI` patches at module level were unaffected because the mixin doesn't import `ChatOpenAI` directly — `self.llm` is set on the agent.
+  - TYPE_CHECKING stub block added inside `LlmPipelineMixin` declaring the host-instance attrs the mixin touches: `llm`, `architect_llm`, `responses_client`, `architect_prompt`, `research_prompt`, `web_research_enabled`, `vector_search_enabled`, `react_max_iterations`, plus `_fill_prices_and_calculate_totals` (the only sibling method called that lives outside the mixin chain). Matches the established pattern in `CrudHandlersMixin` and `WorkItemHandlersMixin`.
+  - **`agents/estimate/service.py` final session size: 2,055 → 1,089 lines (-966, -47% from this final pass; -1,511 total from session start of 2,600, -58.1%).** Cluster split out cleanly without disturbing any of the in-place CRUD / process / response-shaping logic.
+  - Verified: 144 tests pass across `test_estimate_agent.py` + `test_estimate_gathering.py` + `test_estimate_tools.py`; mypy clean across all 16 source files in `agents/estimate/`. 3 pre-existing failures in `test_agents_api.py::test_*_estimate_*_requires_confirmation` (event-loop / "Future attached to a different loop" Beanie cursor issue) reproduce on HEAD without these changes — unrelated to this refactor.
+  - **`_fetch_inventory_items` split landed 2026-05-29**: the 106-line method split into a thin orchestrator (18 lines) plus two sub-helpers — `_fetch_materials_inventory` (56 lines) and `_fetch_labour_inventory` (35 lines). The orchestrator wraps both sub-calls in a single try/except (the only Beanie failure mode worth catching), defaulting to module-level `_empty_materials_inventory()` / `_empty_labour_inventory()` sentinels on error. The `_size_price` inner closure was promoted to a module-level `_size_unit_price(size)` helper (5 lines) and is now reused inside `_fetch_materials_inventory` (was duplicated inline twice in the original). Both sub-helpers raise on error — only the orchestrator catches — which is honest about the failure mode. All 15 `monkeypatch.setattr(EstimateAgent, "_fetch_inventory_items", fake)` test sites unaffected because they replace the orchestrator wholesale (sub-helpers aren't called when patched). `_fetch_materials_inventory` is 56 lines — just over the 50-line ceiling, kept as one coherent fetch+build flow. Verified: 144 tests pass; mypy clean. After this round, `_fetch_inventory_items` is no longer on the 2026-05-11 list. `agents/estimate/service.py` final size: 1,089 → 1,118 lines (+29 for signature/docstring boilerplate, but the largest method shrunk from 106 → 56).
+  - **Session-wide summary on `agents/estimate/service.py`: 2,600 → 1,118 lines (-1,482, -57%).** Remaining over-50-line methods: `process` (333 lines — main entry orchestrator, the natural next target), `_fill_prices_and_calculate_totals` (224 lines — already on the 2026-05-11 list as "single function that should split into helper steps"), `_fetch_materials_inventory` (56 lines, just over). Top-of-funnel `process()` is the last big chunk left.
+
+- `agents/orchestrator/service.py` — 1990 lines (file-level). `_classify_with_rules` reduced 2026-05-22/23 from 238 → 76 lines via five helper extractions:
+  - `_classify_specific_phrasings` (52 lines — link/work-item/EST-code-total overrides)
+  - `_classify_via_action_domain` (47 lines — standard ACTION+DOMAIN orchestration shell)
+  - `_resolve_action_and_domain` (22 lines — ACTION + DOMAIN match with plural-aware get→list override)
+  - `_apply_add_set_update_override` (36 lines — "add/set a <field> to <entity>" create→update rewrite)
+  - `_ambiguity_fallback` (36 lines — three ambiguity clarification shapes)
+
+  All five new helpers are under the 50-line ceiling. Main shell now reads as a linear sequence of `if (result := stage(...)) is not None: return result` short-circuits. Only the shell itself (76 lines, mostly comments) and `_classify_specific_phrasings` (52 lines) remain over the soft ceiling. `process()` still duplicates the same short-circuit patterns (see MEDIUM #12). Verified: 279 tests pass across `test_orchestrator_intents.py` + `test_orchestrator_endpoint.py` + `test_orchestrator_bare_entity_helpers.py`; mypy clean on `agents/orchestrator/`.
+
+No function in this repo should exceed 50 lines. Grep for long bodies with
+a line-count tool after each refactor pass.
+
+Specific instances:
+- #18 — `agents/estimate/service.py` at 5,098 lines (2026-04-22 refresh).
+- #94 — New material handlers all exceed the 50-line ceiling.
+- #125 — `agents/orchestrator/service.py` at 1,358 lines (file-size note).
+- #137 — `NewEstimateWithActivityPage.tsx` extractions partial (1,733 lines).
+- #165 — `_list_properties_by_cross_resource` still 88 lines after #155.
+- #166 — `_list_contacts_for_estimate` still 91 lines after #156.
+- #167 — `_resolve_cross_resource_properties` at 62 lines (accepted).
+- #235 — `agents/estimate/service.py` at 6,066 lines (largest file in repo).
+- #236 — `portal/src/pages/SettingsPage.tsx` is 2,496 lines.
+- #237 — `agents/material/service.py` at 2,745 lines (file-level).
+- #238 — `routers/agents.py` at 2,640 lines.
+- #240 — `agents/property/service.py` at 2,386 lines.
+- #241 — `agents/contact/service.py` at 2,378 lines.
+- #242 — `NewEstimateWithActivityPage.tsx` at 1,814 lines.
+- #243 — `agents/orchestrator/service.py` at 1,970 lines.
+- #244 — `agents/labour/service.py` at 1,732 lines.
+- #245 — `portal/src/pages/MaterialsPage.tsx` at 1,421 lines.
+- #246 — `agents/equipment/service.py` at 1,343 lines.
+- #247 — `portal/src/pages/ContactsPage.tsx` at 1,324 lines.
+- #248 — `portal/src/pages/PeoplePage.tsx` at 1,024 lines.
+- #249 — `portal/src/pages/PropertiesPage.tsx` at 878 lines.
+- #250 — `platform/routers/auth.py` at 892 lines.
+- #257 — `routers/agents.py` grew to 2,810 lines post-gate-helpers PR.
+- #260 — `routers/estimates.py` over the 800-line soft cap (1,294 lines).
+
+**Absorbed:** #18, #94, #125, #137, #165, #166, #167, #235, #236, #237, #238, #240, #241, #242, #243, #244, #245, #246, #247, #248, #249, #250, #257, #260 — specific file/function-size instances surfaced in later review passes. See `## Closed` for original bodies.
+
+</details>
+
+---
+
+### 163. [MEDIUM] Wave 3 file growth — three large agent files grew further
+**Files**:
+- [platform/agents/material/service.py](../../platform/agents/material/service.py) — 2,560 → 2,659 lines
+- [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) — 5,719 → 5,873 lines
+- [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) — 1,712 → 1,830 lines
+
+**Severity**: MEDIUM
+
+Pre-existing condition (all three were already far above the 800-line
+CLAUDE.md guideline before Wave 3); this change does not make it
+materially worse but contributes ~370 lines across the three files.
+Tracked here so the pressure stays visible.
+
+Fix: one of three options for each file —
+- Material: extract `_handle_list_materials_for_estimate`, `_handle_get_material`, `_handle_list_materials` into a `material/handlers/` package.
+- Estimate: split the 5,873-line file by phase (generation / extraction / CRUD / status-transitions are natural seams).
+- Orchestrator: extract `_match_size_scoped_material_op`, `_match_possessive_or_field_targeted`, `_match_cross_resource_query` into `orchestrator/matchers/` modules.
+
+Out of scope for any single feature commit; would warrant its own refactor PR.
+
+
+### 229. [LOW] Submit handler is ~60 lines after this change
+**File**: [website/public/contact-modal.js:316-386](../../website/public/contact-modal.js)
+**Severity**: LOW
+
+The inline `form.addEventListener('submit', async (e) => { … })`
+body is long enough to be hard to scan. Pre-existing issue; this
+change adds one line so it's not regressing meaningfully.
+
+Fix: extract the body into a named function (`handleSubmit`) in a
+follow-up if/when the file is touched again. No action needed for
+this commit.
+
+---
+
+
+### 276. [MEDIUM] Long test functions in #7 backfill tests
+Five test functions across two files exceed the 50-line guideline:
+
+- `test_generate_google_doc_router.py:128` — `test_generate_google_doc_batches_contact_fetch` (118 lines)
+- `test_generate_google_doc_router.py:252` — `test_generate_google_doc_zero_contacts_succeeds` (86 lines)
+- `test_generate_google_doc_router.py:404` — `test_fetch_estimate_doc_context_issues_single_batched_contact_find` (78 lines)
+- `test_feedback_anonymous.py:133` — `test_feedback_registered_user_uses_real_name` (54 lines)
+- `test_feedback_anonymous.py:189` — `test_feedback_blank_first_last_name_falls_back_to_unknown_user` (56 lines)
+
+Body bulk is fixture setup (multi-contact estimates for the doc tests,
+firebase-token + user-record scaffolding for the feedback tests), not
+assertion logic. Hard to scan.
+
+Fix: extract the multi-contact estimate scaffold into a `pytest.fixture`
+in a module-level setup so the assertion is the bulk of the test body;
+parameterize contact-count for the two related variants in
+`test_generate_google_doc_router.py`. Could also fold under #4 as
+function-size instances.
+
+
+### 281. [MEDIUM] `assert_token_quota` is ~77 lines (4 sequential 402 gates)
+
+`platform/services/llm/quota.py:assert_token_quota` crossed the 50-line HIGH
+threshold after the hard-cap branch landed. The function is still cohesive — a
+flat top-to-bottom policy of hard-cap → over-quota+no-card → over-quota+no-ack
+→ pass — and splitting now would fragment a policy that benefits from being
+read in one place.
+
+Fix when it grows another gate: extract a `_raise_quota_402(code, message)`
+helper to collapse the four near-identical `raise HTTPException(...)` blocks.
+Not worth doing today.
+
+
+### 284. [LOW] `compute_analytics` is ~115 lines
+
+`platform/routers/estimates.py:507` — pre-existing length, not introduced by
+the 2026-05-20 pipeline-window/updated_at change. The four-way
+`asyncio.gather` plus per-bucket reshape (headline → by_division → by_status)
+keeps everything in one function. The `/code-review` HIGH rule flags >50
+lines, so worth splitting next time the function grows further.
+
+Fix: extract `_compute_headline`, `_compute_by_division`, `_compute_by_status`
+helpers. Defer until the next behavioural change in this function — splitting
+purely for length without a behavioural driver is churn.
+
+---
+
+
+### 296. [MEDIUM] `install()` in `contact-modal.js` is ~120 lines
+**Where:** `website/public/contact-modal.js:240-360`.
+
+**Why:** Mixes DOM creation, ref binding, captcha setup, open/close handlers, and submit logic. Hard to follow at a glance.
+
+**Suggested fix:** Split into `renderModal()`, `bindOpenClose(refs)`, `bindSubmit(refs, captcha)`. Cleanest after the file is moved out of `public/` (see #293), since the helpers can then be unit-tested with injected refs.
+
+
+### 310. [MEDIUM] `work_item_field_handlers.py` is 1286 lines
+**Where:** `agents/estimate/work_item_field_handlers.py`
+
+**Issue:** Above the 800-line threshold. Single mixin with 12 handlers following the same pattern.
+
+**Fix:** Addressed naturally when #305 extracts shared boilerplate — the file should drop below 800 lines after the helper extraction.
+
+
+### 311. [HIGH] `SettingsPage.tsx` is 2,541 lines
+**Where:** `portal/src/pages/SettingsPage.tsx`
+
+**Issue:** Well above the 800-line threshold. The team-invitation flow, seat-count display, billing gate logic, and numerous unrelated settings panels all live in one component.
+
+**Fix:** Extract the seat overage gate logic into a `useSeatsOverageGate` hook, the invitation form into an `InviteTeamSection` sub-component, and the billing display rows into `BillingUsageSection`. This PR touched this file — the debt is growing.
+
+
+### 327. [HIGH] `agents/estimate/crud_handlers.py` grew ~250 lines to 2,309
+Pre-existing giant (under the #4 file-size theme) but this change materially
+worsened it: the mixin now holds link/notes/description detectors + handlers,
+bare-title extraction, the shared resolver, and the get/update dispatchers.
+Next touch, split the estimate-level field-edit sub-ops (description / notes /
+property-link detectors + handlers) into an `estimate_field_handlers.py` mixin,
+mirroring the existing `work_item_field_handlers.py` precedent from §1.5.
+
+
+### 343. [LOW] `bootstrap_company_materials` body is ~67 lines (over the 50-line heuristic)
+Added 2026-06-07. The 8-line auto-create wiring pushed
+`services/material_bootstrap.py::bootstrap_company_materials` past the 50-line
+guideline, though the bulk is docstring + comments and the new logic was already
+extracted into `_ensure_referenced_categories_and_units`. Cosmetic only. Fix if
+the function grows further: extract the category/unit pre-load and the
+group-and-insert loop into named helpers.
+
+
+### 345. [MEDIUM] `crud_handlers.py` (2,495) and `work_item_field_handlers.py` (1,270) exceed the 800-line guideline
+Added 2026-06-09. Extends [#327](#327-agentsestimatecrud_handlerspy-grew-250-lines-to-2309)
+— `crud_handlers.py` was 2,309 there and is now 2,495 after this change. The
+estimate CRUD mixin keeps accreting; `work_item_field_handlers.py` is also over
+at 1,270. Pre-existing, not introduced by this refactor (the change is net
+behavior-neutral plumbing), but worsened. Fix (large, defer until the area is
+actively reworked): split the estimate handler mixins by sub-domain —
+list/analytics vs. get/update vs. work-items — into separate modules.
+
+
+### 347. [MEDIUM] `crud_handlers.py` now 2,724 lines — extends #345
+Added 2026-06-11. Extends [#345](#345-medium-crud_handlerspy-2495-and-work_item_field_handlerspy-1270-exceed-the-800-line-guideline)
+— 2,495 there, 2,724 after the status-transition enforcement work (+229 across
+the two 2026-06-11 changes). Same fix, same deferral: split the estimate
+handler mixins by sub-domain when the area is next actively reworked. The new
+`_refuse_illegal_status_transition` / `_authorize_status_transition` /
+`_load_estimate_for_update`-guard cluster is a ready-made seed for a
+`status_policy.py` (or similar) module in that split.
+
+
+### [LOW] portal/src/lib/orchestratorReply.ts:39 — formatOrchestratorReply is now ~54 lines (just over the 50-line guideline)
+The added clarification-merge block pushes the function just past the 50-line
+guideline. It's still linear guard-clauses + a doc comment, so it reads fine, but
+the merge logic is a self-contained unit.
+**Suggested fix:** Optional — extract the needs_clarification block into a small
+pure helper, e.g. `mergeClarification(response, question): string`, and call it
+from formatOrchestratorReply. Improves readability and lets the merge/dedup be
+unit-tested directly.
+
+
+### [MEDIUM] platform/services/material_bootstrap.py:179 — bootstrap_company_materials exceeds the 50-line guideline
+After adding the preload + partition + insert_many, the function is ~63 code lines and
+now juggles several responsibilities (resolve company id, load templates, preload
+categories, preload units, auto-create missing cats/units, group rows, preload existing
+materials, partition into update/insert, batched write). It's cohesive and readable, but
+crosses the review rubric's 50-line threshold and is getting hard to scan.
+**Suggested fix:** Extract the per-material partition loop (resolve → update-existing vs
+collect-to-insert) into a small private helper, e.g. `_partition_materials(grouped,
+existing_by_name, categories, units, company_id, result) -> list[Material]`. Pure
+mechanical extraction, no behavior change.
+
+
+### [HIGH] platform/agents/orchestrator/service.py:2508 — process() is a ~245-line god-method
+process() already exceeded the 50-line threshold; the intent-first change adds another inline
+fast-path block, worsening it. Pre-existing structural smell — not a defect in the new logic
+(the block mirrors the existing inline pre-checks). The DRY extraction in review-#3 (now applied,
+`_build_rule_match_result`) trims the duplicated dicts but does not shorten the method's branch
+count materially.
+**Suggested fix:** Decompose process()'s deterministic pre-check sequence into a table-driven
+dispatch (ordered list of `(matcher, builder)` pairs iterated in one loop) so each new pre-check
+is data, not another inline `if` block. Not a blocker on its own.
+
+
+### [LOW] portal/src/pages/PeoplePage.tsx:1 — file exceeds 800-line guideline (1128 lines)
+The file is over the 800-line HIGH threshold. PRE-EXISTING; this change does not worsen it (net -6 lines). Reported for awareness only.
+**Suggested fix:** Out of scope for this change. If addressed later, extract the create/edit Modal form, the CSV-upload Modal, and the card/table row renderers into child components.
+
+---
+
+
+### [LOW] portal/src/pages/PeoplePage.tsx:1 — file exceeds 800 lines (1168 lines)
+PeoplePage.tsx is 1168 lines. PRE-EXISTING; the Role-form rename/tooltip change added ~30 lines but did not create the size problem. Reported for awareness only (per the size heuristic).
+**Suggested fix:** No action needed for this change. If the page grows further, extract the Role form Modal and the list table into sub-components.
+
+
+### [MEDIUM] platform/routers/support.py:~110 + platform/routers/slack_events.py:~250 — _send_flow (~85 lines) and _handle_resolve (~70 lines) exceed the 50-line guideline
+Both are cohesive top-to-bottom flows but exceed the repo's function-length guideline; Phase 2's live-availability gating lands directly in `_send_flow` and will stretch it further.
+**Suggested fix:** When Phase 2 touches these, extract helpers: conversation resolution (`_resolve_or_create`), Slack delivery (`_deliver_to_slack`), and the /resolve archive step.
+
+
+### [MEDIUM] platform/routers/agent_helpers/delegate_create_estimate.py:143 — delegate_create_estimate grew further past the 50-line guideline
+Function was already ~215 lines; the property-resolution block adds ~20 more (pre-existing violation, worsened by the 2026-07-06 property auto-link change).
+**Suggested fix:** Extract the block into a helper, e.g. `_resolve_explicit_property(message, company_ctx) -> (property_id, label)`.
+
+
+### [LOW] platform/agents/estimate/crud_handlers.py:1 — file now ~2,950 lines (threshold: 800, pre-existing)
+The Maple analytics date-window change adds ~150 lines to an already very large mixin module; the analytics handlers are a coherent seam.
+**Suggested fix:** Next refactor, move the `_analytics_*` methods (headline, total-value, windowed summary, breakdown, comparison + the shared status-set constants and `_updated_at_bounds`) into an `agents/estimate/analytics_handlers.py` mixin.
+
+---
+
+
+### [LOW] portal/src/pages/ContactsPage.tsx:1 — pre-existing: files exceed 800-line guideline
+ContactsPage.tsx is ~1350 lines and PropertiesPage.tsx ~900; both exceed the 800-line review guideline. The CSV-copy change adds only a few lines and does not meaningfully worsen it.
+**Suggested fix:** When next doing substantive work on these pages, extract the near-identical CSV-upload modal into a reusable component.
+
+---
+
+
+### [LOW] portal/src/pages/PropertiesPage.tsx:1 — file exceeds the 800-line guideline (pre-existing)
+The file was already ~900 lines before the map-thumbnail change (net +11 from
+it). The detail-panel JSX (address/contacts/map/estimates card) is now a
+natural extraction seam.
+**Suggested fix:** Extract the selected-property detail card into
+`components/properties/PropertyDetailCard.tsx`.
+
+---
+
+
+### [LOW] platform/agents/estimate/text_helpers.py:613 — `_parse_estimate_date_filter` is 70 lines
+Sequential age → numeric → period-word → word matcher; the natural-window
+change added ~11 lines, pushing it past the 50-line guideline (it was already
+~59). Cohesive but growing.
+**Suggested fix:** If it grows further, extract the "match → (start, end)
+window" resolution into a small helper. Not urgent.
+
+
+### [LOW] platform/agents/orchestrator/service.py:1 — file exceeds the 800-line guideline (~2700 lines)
+Pre-existing; the analytics-detector change was net-neutral (moving the
+constants/detectors out to `intents.py` in the /fix-issues pass trimmed it
+slightly). Not introduced by this work.
+**Suggested fix:** Informational only. A future split of `OrchestratorAgent`'s
+matcher methods into a mixin would be the real remedy.
+
+---
+
+
+### [HIGH] platform/agents/task/ — seven functions over the 50-line limit (finding #4)
+`_handle_update_task` 105 (service.py), `find_task_from_context_or_message` 128
+(resolver.py), `_resolve_create_title` 101 (create.py), `_handle_awaited_field_value`
+94 (field_flow.py), `_perform_conversion` 74 (operations.py), `_handle_delete_task`
+66, `process` 66 — plus `run_task_conversion` at 157 (services/task_convert.py),
+which is a verbatim lift from the router that was extracted without being split.
+
+Worth noting the pattern rather than just the numbers: `_handle_update_task` was
+cut to 71 lines in the first review pass and regrew with every subsequent
+smoke-test fix, because each fix added a branch to the existing function instead
+of extending the structure. The #1/#2/#3 fixes in this pass added to it again.
+**Suggested fix:** Extract the awaited-value preamble and the sub-op dispatch out
+of `_handle_update_task`; give the resolver's seven ordered resolution steps named
+helpers behind the dispatch; split `run_task_conversion` into claim / generate /
+finalize.
+
+
+### [HIGH] platform/tests/test_maple_task_operations.py — test file past the 800-line ceiling (finding #5)
+Now ~1,560 lines after this pass added the ReDoS-timing, awaited-value, and
+query-pushdown suites. It accreted a class per smoke-test round and spans routing,
+payload stripping, notes updates, the field-then-value flow, title derivation,
+status, assignee, archive, convert, concurrency, and performance.
+**Suggested fix:** Split on the seams that already exist —
+`test_maple_task_notes.py` (notes + field flow + dictated payloads),
+`test_maple_task_ops.py` (status/assignee/archive/convert),
+`test_maple_task_text_helpers.py` (the pure text-helper unit classes), and
+`test_maple_task_perf.py` (the pathological-input timing suite).
+
+
+### [MEDIUM] platform/agents/estimate/assumption_handlers.py:257,415 — the two assumption handlers remain over the 50-line guideline (residual of finding #2)
+Finding #2 was applied: `_handle_assumption_material_swap` went 128 → 79 lines
+and `_handle_assumption_size_adjustment` 105 → 62, by extracting
+`_resolve_swap_material`, `_swap_material_lines`, `_find_materials_assumption`,
+`_find_size_assumption`, `_parse_new_size`, and `_save_or_error`
+(`resolve_assumptions` in `assumption_defaults.py` also split into
+`_resolve_area_assumption` / `_resolve_material_assumption` and is now compliant).
+What remains in both is the declarative success envelope — a multi-line f-string
+response plus the `result` dict — not branching logic.
+**Suggested fix:** Only worth doing if the response shape gets reused elsewhere.
+Extracting it now would need a 7-8 parameter helper, which reads worse than the
+inline version; revisit if a third assumption sub-op lands and the envelope
+genuinely becomes shared.
+
+
+### [LOW] platform/agents/estimate/crud_handlers.py — file length 3216 lines (guideline: 800)
+Pre-existing violation, worsened by +123 lines when the estimate title rename
+landed. The new code is cohesive with its neighbours, so this is informational
+rather than a defect introduced by that change.
+**Suggested fix:** split the estimate-level field handlers (title / description /
+notes / property link) into their own module, mirroring how
+`work_item_handlers.py` was already carved out of this file.
+
+
+### [MEDIUM] platform/routers/agent_helpers/pending_property_link.py:141 — `handle_pending_property_link_confirmation` is 277 lines
+Well past the 50-line guideline. Pre-existing (~258 lines), worsened by ~19 when
+the word-ordinal support and the re-show-the-list branch landed. It is one linear
+state machine with eight independent return paths; the new no-match branch had to
+be inserted mid-function, and finding the right insertion point meant reading the
+whole body.
+**Suggested fix:** extract the reply-classification arms into named helpers
+(`_handle_ordinal_reply`, `_handle_corrected_identifier`) so the top-level
+function reads as a dispatch table.
+
+
+### [MEDIUM] platform/agents/text_utils.py:859 — file is now 1075 lines (guideline: 800)
+Pre-existing (1001 lines), worsened by +74 when `match_ordinal_reference` landed.
+The module is a grab-bag of unrelated shared parsers — field patterns, refusal
+copy, greeting detection, day windows, and now ordinals — and is the default
+dumping ground for anything two agents share.
+**Suggested fix:** split into focused modules (e.g. `agents/text/ordinals.py`,
+`agents/text/dates.py`) re-exported from `text_utils` for backwards
+compatibility. Coordinate with the `crud_handlers.py` split logged above, since
+both are "shared module grew too big" with the same remedy.
+
+
+### [LOW] platform/agents/text_utils.py:1 — shared helper module now 1332 lines
+The listed-items work added ~260 lines to a module already past the 800-line
+guideline (~1080 before). The positional/listed-items block is a self-contained
+concern: the ordinal + positional matchers, the `last_listed_items` record, and
+the pick helpers.
+**Suggested fix:** split the listed-items + ordinal helpers into
+`agents/listed_items.py` and re-export from `text_utils` for backwards
+compatibility. This is the same remedy as the earlier "text_utils grew too big"
+entry above — do them together rather than twice.
+
+
+### [LOW] portal/src/components/Layout/AiPanel.tsx:387 — `renderAiComposer` is ~140 lines
+Pre-existing (~130 lines before the composer restructure; moving the buttons
+above the textbox and the disclaimer to the panel bottom added ~10). The helper
+now holds the voice-error banner, the mic/new-session/send button row, the
+textarea plus its voice-capture overlay, the auto-send countdown row, and the
+disclaimer — five separable concerns in one render function, well past the
+50-line guideline.
+**Suggested fix:** not introduced by that change, so no action was required
+then. If it grows again, split the button row into its own
+`renderComposerControls()` helper (and possibly the countdown/error rows into a
+`renderComposerStatus()`), keeping `renderAiComposer` as the layout shell.
+
+
+### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — file is 1838 lines
+Pre-existing and not worsened (the property-label fix adds two lines).
+Recorded because the file was in review scope.
+**Suggested fix:** out of scope on its own. If tackled, the natural seams are
+the sidebar computed values (~lines 410–465) and the work-items table.
+
+
+### [HIGH] portal/src/pages/SettingsPage.tsx:1 — file is 2,605 lines (guideline 800)
+The Team tab is the only settings tab still living inline in `SettingsPage.tsx`.
+Every other tab is an extracted component under `components/settings/`
+(`RateCardsTab`, `DivisionsTab`, `MaterialUnitsTab`, `TaskStatusesTab`,
+`MaterialCategoriesTab`, `TemplatesTab`, `BillingTab`, `FinancialTab`). The
+expired-invitation work added ~130 lines of invitation logic to that inline
+mass, so the drift from the established pattern grew. Pre-existing condition,
+worsened rather than introduced.
+
+**Why it was deferred rather than fixed:** the extraction is not a move of the
+~320 lines of team JSX. It carries roughly 28 `useState` declarations, four
+dialogs (member role, member remove, leave company, invite) plus the overage
+and add-card modals, ~15 handlers, and three loaders — around 1,000 lines with
+`currentUser` / `isOwner` / `companyDetails` shared across other tabs. Test
+coverage over that surface is thin: `SettingsPageInvitationActions.test.tsx`
+exercises the invitation rows only, and member edit / member remove / leave
+company have no component tests at all, so a regression in the moved code would
+be silent.
+
+**Suggested fix:** extract `components/settings/TeamTab.tsx` as its own change,
+in two steps — first add component tests covering member role edit, member
+removal and leave-company so the move has a safety net, then move state,
+handlers and dialogs across with the tab's props limited to `currentUser` /
+`isOwner` / `companyDetails` and an `onCompanyChanged` callback.
+
+
+### [LOW] platform/agents/estimate/work_item_handlers.py:851 — `_handle_update_estimate_work_item_update_field` is 176 lines
+Pre-existing length, worsened by ~8 lines when the division branch changed to
+validate against the company's own divisions. The function handles value
+extraction, three refusal gates, the description branch, division validation,
+estimate resolution, work-item matching, save, and response construction.
+
+**Suggested fix:** split the division branch into its own
+`_handle_work_item_division_update` when the file is next touched — not
+attributable to this change alone.
+
+
+### [HIGH] platform/routers/auth.py — 1117 lines, exceeds the 800-line threshold
+Pre-existing (1030 lines at HEAD) but worsened by +87 in this change. The module
+now carries authentication, signup, verification email, password reset, the full
+invitation lifecycle (create / list / resend / revoke / accept), company
+onboarding, onboarding progress, and the Brevo member fan-out — the God Router
+smell. `accept_company_invitation` is 105 lines; `create_company_invitations` is
+160. Not attributable to this change, which is why it was deferred rather than
+fixed: splitting it is its own piece of work with its own test surface.
+
+**Suggested fix:** extract the invitation lifecycle into
+`platform/routers/invitations.py` (create / list / resend / revoke / accept plus
+their helpers `_hash_invitation_token`, `_generate_invitation_token`,
+`_get_effective_invitation_status`, `_is_actionable_invitation`,
+`_serialize_invitation`, `_find_pending_invitation`, `_find_invitation_by_token`).
+That alone moves roughly 400 lines and leaves `auth.py` close to the threshold.
+
+
+### [MEDIUM] long functions added by the Brevo lifecycle change
+`reinstate_company_account` (72 lines, `platform/routers/companies.py:111`),
+`detach_non_owner_members` (60, `platform/services/company_service.py:25`) and
+`sync_user_stage` (55, `platform/services/brevo_contacts.py:361`) all exceed the
+50-line guideline. Docstrings and explanatory comments dominate — the executable
+logic is roughly half of each — so this reads as borderline rather than genuinely
+dense, which is why it was deferred.
+
+**Suggested fix:** optional. `reinstate_company_account`'s guard chain (token
+email → user → owner role → has company → company exists) is the one worth
+extracting, into a `_require_owner_of_own_company()` helper mirroring the
+existing `_require_owner_company_access` in the same module.
+
+
+### [MEDIUM] portal/src/pages/SettingsPage.tsx:1 — file is 2,745 lines (guideline 800)
+**Duplicate of the 2026-07-31 entry above** (`SettingsPage.tsx:1 — file is 2,605
+lines`); recorded here only to update the count and confirm the trend. The
+responsive-layout work added ~45 lines to the same inline Team tab, taking it
+from 2,605 to 2,745 — the third consecutive review to flag this file.
+
+Raised at MEDIUM this time rather than HIGH: the risk belongs to the file's
+history, not to this diff, which is a copy change plus Tailwind class edits.
+
+**Suggested fix:** unchanged — see the 2026-07-31 entry for the full extraction
+plan (add component tests for member role edit / member removal / leave company
+first, then move state, handlers and dialogs into
+`components/settings/TeamTab.tsx`). Note that the stacked-table markup added on
+2026-08-02 moves with the tab and needs no rework; the new
+`SettingsPageTeamResponsive.test.tsx` covers part of the safety net that entry
+asks for, though the member-edit and leave-company paths are still untested.
+
+
+### [LOW] portal/src/pages/SettingsPage.tsx:1 — file is 2,766 lines (guideline 800)
+**Fourth consecutive flag on this file** — see the 2026-07-31 entry (2,605
+lines) for the full extraction plan and the 2026-08-02 entry (2,745 lines) for
+the previous recurrence. The count is now 2,766.
+
+Raised at LOW, a step down from the last two entries, because this diff is a
+net **+17** lines to the file (`git diff --numstat`: +28 / −11) and roughly
+half of that is offset work: the "Unverified" pill and its `isUnverifiedMember`
+helper add ~28 lines, while removing the dead "Accepted" invitation column
+takes 11 away. The drift from 2,745 to 2,766 is almost entirely this change,
+but the magnitude is small and the file's size problem is structural, not
+diff-driven.
+
+**Suggested fix:** unchanged — see the 2026-07-31 entry. Worth noting that the
+safety net that entry asks for has grown again: `SettingsPageTeamVerification.
+test.tsx` (new in this change, 8 tests) now covers the members-table row
+rendering and the invitations-table columns, on top of
+`SettingsPageTeamResponsive.test.tsx` and `SettingsPageInvitationActions.
+test.tsx`. Member role edit, member removal and leave-company remain the
+untested paths blocking a confident extraction.
+
+
+### [HIGH] platform/agents/orchestrator/service.py — 3,091 lines, well past the 800-line ceiling
+Selected for fixing, ATTEMPTED, and reverted. Recording what the attempt established so
+the next one starts informed rather than repeating it.
+
+The plan was to extract the rule tier into `agents/orchestrator/rules.py` as a mixin,
+matching the layering `agents/task/` already uses for exactly this reason. A static check
+looked encouraging: the 16 rule-tier methods are ~954 lines, and of the module constants
+they touch, **zero** are also referenced by the non-rule methods — no import cycle.
+
+The extraction was mechanically completed (service.py 3,051 → 1,528; rules.py ~1,200) and
+then reverted, for two reasons the constant analysis had not predicted:
+
+1. **The coupling is bidirectional.** mypy found **14** call-backs from the extracted tier
+   into methods that remain on `OrchestratorAgent` (`_ambiguity_fallback`,
+   `_resolve_action_from_history`, and others). A mixin can only express that with an
+   explicit seam — the `raise NotImplementedError` contract `agents/task/base.py` uses —
+   and that seam has to be *designed*, one declaration per crossing, not discovered by
+   moving code and seeing what breaks.
+2. **It does not actually clear the ceiling.** The result is a 1,528-line file and a
+   1,200-line file. Both still over 800. The split has to be finer than "rules vs. the
+   rest" to be worth doing at all.
+
+**Suggested fix:** treat this as its own change, not a rider on a feature commit. Start by
+listing the 14 crossings and deciding which are genuinely the rule tier's business versus
+which belong to the agent — that boundary, not the line count, is the thing to get right.
+Then split into more than two modules (candidates: action/domain resolution, the
+specific-phrasing overrides, entity-shape inference, history/anchor resolution).
+
+
+### [MEDIUM] platform/scripts/backfill_task_readable_ids.py:70 — `_run` is 53 lines
+Just over the 50-line guideline, mixing querying, the dry-run preview branch, and the
+apply branch with its own error tally.
+**Suggested fix:** extract `_preview(grouped)` and `_apply(grouped)`, leaving `_run` as
+orchestration plus the summary. Low priority — it is a one-off migration script.
+
+
+### [LOW] platform/tests/test_estimate_api.py:1 — test file well past the size guideline
+Now ~5,200 lines, against the 800-line guideline. Pre-existing; the panel work added
+~160.
+**Suggested fix:** split by concern (CRUD / status transitions / listing / docs) when
+next doing substantial work in it.
+
+
+### [MEDIUM] platform/agents/estimate/llm_pipeline.py:677 — functions grown past the 50-line rule by the per-scope-assumptions change
+`_step2_and_3_for_scope` went from ~20 to 64 lines; `_step3_research_for_scope` is 136,
+`_run_pipeline` 104, `search_similar_work_items` 94, `build_estimate_research_prompt` 107,
+`render_material_catalog` 66 (new). Much of the growth is comment prose rather than
+logic, but the per-scope orchestration in `_step2_and_3_for_scope` now does four distinct
+things (vector retrieval, area assumption, reuse decision, research dispatch).
+**Suggested fix:** extract the area-assumption resolution and the reuse decision from
+`_step2_and_3_for_scope` into named helpers.
+
+
+### [MEDIUM] platform/agents/estimate/catalog_matching.py:1 — file at 793 lines, 7 under the 800 threshold
+The fuzzy-matching rewrite added ~250 lines (scoring engine + module docstring). The next
+addition crosses the guideline. The module already has two unrelated halves: the scoring
+engine (module-level pure functions) and the mixin's measurement-unit / size-capacity /
+purchase-quantity helpers, which have nothing to do with matching.
+**Suggested fix:** split the measurement-unit and size-capacity helpers into their own
+module before the next substantial change to this file.
+
+
+---
+
+## Section context for relocated entries
+
+Review-pass headers whose every finding was relocated above. Kept because the
+preamble records what each pass covered. Note that any procedural advice in
+these is superseded — the ruff note's "scope `./run_ruff.sh` to the files you
+touch" workaround, in particular, ended when the backlog cleared 2026-06-04.
+
+## 2026-05-20 review (dashboard analytics window change)
+
+
+## 2026-06-03 (ruff lint gate adoption)
+
+`ruff` was adopted as a hard lint gate for `platform/` on 2026-06-03, the same
+model as the mypy gate (#3). Config is pinned in `platform/ruff.toml`; run via
+`./run_ruff.sh`. Ruleset: `E, F, I, B, C4, SIM` — `E501` (line length) off, `UP`
+(pyupgrade) intentionally excluded (its annotation rewrites collide with the
+mypy.ini playbook). See CLAUDE.md "ruff is a Gate, Not a Suggestion" for the
+full policy + recurring playbook.
+
+On adoption the safe auto-fixable backlog (~287 fixes: import sorting + trivial
+simplifications, **no import deletions**) was applied across 186 files. The
+manual backlog below remains and must be worked down before the project is
+fully green. **Until then, scope `./run_ruff.sh` to the files you touch** so you
+gate your change without tripping over the legacy backlog.
+
+> **F401 is report-only by config** (`unfixable = ["F401"]`). Blanket
+> `ruff --fix` is **unsafe** in this codebase: it deletes (a) re-export-hub
+> imports — modules that import a symbol only to re-expose it (`routers/estimates.py`,
+> `routers/agents.py`, `agents/estimate/service.py`) — and (b) module-level
+> imports that tests monkeypatch via `setattr(module, "Name", ...)` (e.g.
+> `estimate_service.ChatOpenAI`). Both break imports/tests; the second isn't
+> caught by an `import main` smoke test. This was learned the hard way during
+> adoption (140 test failures from the first sweep, fully reverted). Triage each
+> F401 by hand: genuinely dead → delete; re-export → add to `__all__`;
+> monkeypatch target → keep with `# noqa: F401` + reason.
+
+
+## 2026-06-23 deferred from /code-review (People page container-query + Unit column removal)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+
+## 2026-06-23 deferred from /code-review (Role form rename + breakdown tooltips)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+
+## 2026-07-02 deferred from /code-review (support Phase 2 — Live Chat)
+
+Logged by `/fix-issues` — findings from the Phase 2 review not fixed in that pass. #1 (stale mirror reconcile), #2 (atomic upsert), and #3 (unknown-action test) were fixed in the pass.
+
+
+## 2026-07-02 deferred from /code-review (Slack mrkdwn decoder)
+
+Logged by `/fix-issues` — findings from the mrkdwn-decoder review not fixed in that pass. #1 (end-to-end webhook decode test) was added in that pass.
+
+
+## 2026-07-02 deferred from /code-review (tooltips + New Session relocation)
+
+Logged by `/fix-issues` — findings from the button-tooltip / New-Session-relocation review not fixed in that pass (selection: none).
+
+
+## 2026-07-02 deferred from /code-review (in-thread Resolve shortcut)
+
+Logged by `/fix-issues` — findings from the message-shortcut review not fixed in that pass. #1 (best-effort Firestore archive) was fixed in the pass.
+
+
+## 2026-07-04 deferred from /code-review (voice input Phases 1–4 full review)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+
+## 2026-07-09 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+
+## 2026-07-15 follow-up from the property-geocoding feature
+
+Logged manually — follow-up work identified while building property
+coordinates + task-title snap (not a review finding).
+
+
+## 2026-07-21 deferred from /code-review (Maple pending-flow escape + analytics window)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+
+## How to work through this
+
+1. Pick ONE HIGH item per work session. Don't batch.
+2. Write the failing test first (TDD per `CLAUDE.md`).
+3. Run the related test file, not the full suite.
+4. Commit each item as its own PR — easier to revert, easier to review.
+5. Delete the bullet from this file in the same PR.
+
+When this file is empty, delete it.
+
+---
+
+
+## 2026-07-30 deferred from /code-review (portal — property estimates + Maple composer)
+
+Logged by `/fix-issues` — findings from the latest review (property-detail
+estimate list, Maple composer layout) not fixed in that pass. Findings #1–#5
+were fixed; this one was not.
+
+
+## 2026-07-31 deferred from /code-review (Team page — expired invitations)
+
+Logged by `/fix-issues` — the selection was `all`; this finding was the one
+fix that proved substantially larger than its ledger entry described, so it is
+recorded here rather than half-applied. Findings #2–#7 from that review were
+fixed in the same pass.
+
+
+## 2026-08-02 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+Review scope was the Brevo lifecycle-list feature, company-close detach, the
+reinstate flow, the ops Last Login column, and the ErrorBoundary crash fix.
+
+
+## 2026-08-02 deferred from /code-review (Team page — responsive layout + plan Tasks copy)
+
+Logged by `/fix-issues` — the selection was `1, 2, 4, 5, 6`; findings #1, #2, #4,
+#5 and #6 were fixed in that pass. One finding is deferred, and it is a
+recurrence rather than a new item.
+
+
+## 2026-08-05 deferred from /code-review (Team page — unverified-member pill)
+
+Logged by `/fix-issues` — the selection was `1, 2`; findings #1 and #2 were
+fixed in that pass. One finding is deferred, and it is again a recurrence
+rather than a new item.
+
+
+## 2026-08-12 deferred from /code-review (dropdown placement + Create Estimate dialog)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+`/fix-issues 1,4,5,6,7` fixed the rest. #2 (panel can flip sides mid-scroll) was
+reviewed and **accepted as-is** by the user — deliberately not tracked here.
+
+
+---
+
+## Obsolete — "bandit not installed" (7 duplicates removed)
+
+Seven byte-identical LOW entries were logged by consecutive `/code-review`
+runs between 2026-06-28 and 2026-07-02 while bandit was missing from the venv.
+bandit was adopted 2026-07-27 and is documented in CLAUDE.md. One kept as a
+record:
+
+### [LOW] platform/.venv — bandit not installed; automated security scan skipped
+The `/code-review` bandit step could not run; only the manual security pass covered the diff. There is no dev-requirements split — adding `bandit` to the single runtime `requirements.txt` would ship a dev-only scanner to production.
+**Suggested fix:** Introduce a `requirements-dev.txt` (or a `[project.optional-dependencies] dev` group) and pin `bandit` there, then wire it into the review tooling. Tooling/process task, not a source fix.
+
+
