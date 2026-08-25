@@ -12,7 +12,7 @@ touching the affected area.
 Set by the 2026-08-25 consolidation pass — 418 entries down to 350 by
 relocating what was already closed and merging what was already tracked.
 
-- **Every entry is numbered and unique.** Next free number: **499**. Numbers are
+- **Every entry is numbered and unique.** Next free number: **502**. Numbers are
   permanent — the archive preserves them for cross-references, so never reuse or
   reassign one. Include the number when adding an entry; `/fix-issues` selects
   by it.
@@ -4129,7 +4129,33 @@ armed no pending record) were fixed on the branch, as were two pre-merge items
 (a malformed-`candidates` 500 and the short-query substring trap). Everything
 below was adjudicated as defer, with rulings recorded in the execution ledger.
 
-### 435. [MED] platform/routers/agent_helpers/pending_property_link.py — `_write_link` has no company scoping
+### 435. [MED] ~~platform/routers/agent_helpers/pending_property_link.py — `_write_link` has no company scoping~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** Both copies of the unscoped write are now
+tenant-scoped, fixed together as the entry warned they would otherwise drift.
+
+- `pending_property_link._write_link` takes the caller's `company_oid` and reads
+  *both* documents, refusing unless each one's `company` matches — the same
+  comparison `dependencies.assert_company_access` makes at the HTTP boundary.
+  Malformed or missing ids, and a missing or unparseable `company_id`, all
+  refuse rather than write.
+- `pending_estimate_follow_up.py:364` scopes its `Estimate.get` the same way.
+  Its property side was already safe (resolved out of the company's own list).
+- The three duplicated "couldn't find estimate" envelopes collapsed into one
+  `_link_failed_envelope`. "Estimate gone", "property gone" and "not yours" are
+  deliberately indistinguishable — distinguishing them would confirm to a
+  crafted request that an id exists.
+- `company_oid_from_context` replaces the inline parse that existed on only the
+  correction path, so all three write paths share one resolution.
+
+Tests: 10 new cross-tenant cases across the two handlers (every write path,
+both documents, plus missing/malformed company). Three pre-existing test fakes
+had to start declaring an owner and using ObjectId-shaped ids — they had been
+modeling a world without tenancy. 402 passing across the related surface;
+scoped ruff + mypy clean.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
 `_write_link` calls `Estimate.get(estimate_id)` and
 `parse_object_id(property_id, …)` on values read straight out of
 `context_payload`, which is populated from the client's request context. Neither
@@ -4143,6 +4169,8 @@ a reason to track it, not to stop noticing it.
 (`Estimate.find_one(Estimate.id == oid, Estimate.company == company_oid)`) and
 refuse rather than write when either lookup misses. Fix both call sites in one
 change, since they will otherwise drift.
+
+</details>
 
 ### 436. [MED] platform/routers/agents.py — four pending state machines share one journey
 `pending_estimate_follow_up` (legacy), `pending_optional_follow_up` (generic),
@@ -4969,3 +4997,54 @@ ContactsPage and TaskDialog still send `{}` (a server round-trip that only bumps
 `updated_at`). Both are safe; the inconsistency is the issue.
 **Suggested fix:** pick one convention (skipping is better — no spurious `updated_at` bump for
 a no-op save) and apply it to ContactsPage and TaskDialog.
+
+---
+
+## 2026-08-25 surfaced while fixing #435
+
+### 499. [LOW] platform/routers/agent_helpers/pending_estimate_follow_up.py:364 — a failed link still reports `linked: True`
+When `Estimate.get` returns nothing the handler does not refuse — it synthesizes
+an `updated_payload` from the pending record and returns
+*"Linked estimate 'X' to property 'Y'."* with `linked: True`, having written
+nothing. The user is told a link happened that did not. Pre-existing and pinned
+by `test_select_property_link_falls_back_when_estimate_gone`, so it was
+deliberately left alone by the #435 fix; that fix routes the new "estimate
+belongs to another company" case down the same branch, which is correct for
+non-disclosure but inherits the same false success.
+
+Contrast `pending_property_link.py`, which returns a real refusal envelope
+(`success: False`) for the identical condition — the two handlers disagree about
+what a failed link looks like.
+
+**Suggested fix:** return a refusal envelope mirroring
+`pending_property_link._link_failed_envelope` and update the fallback test to
+assert the refusal. Keep the message identical for "gone" and "not yours".
+
+---
+
+## 2026-08-25 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that
+pass. Selection was `1 2 5 6 7`; the two below were deferred.
+
+### 500. [LOW] platform/routers/agent_helpers/pending_property_link.py:172 — two independent reads run sequentially, and a whole Property document is loaded to check one field
+`Property.get` and `Estimate.get` are awaited one after the other although
+neither depends on the other, and the property document is discarded immediately
+after reading `.company`. This is on a Maple chat turn that is already LLM-bound,
+so the wall-clock cost is negligible — it is a shape issue, not a performance
+problem today.
+**Suggested fix:** `asyncio.gather(Property.get(property_oid),
+Estimate.get(estimate_oid))` and check both results afterwards. Optionally
+project to `company` only. Low value; take it only if this file is open for
+another reason.
+
+### 501. [LOW] platform/routers/agent_helpers/pending_property_link.py:173 — `getattr(doc, "company", None)` on models that always declare `company`
+Both `Estimate` and `Property` declare `company: PydanticObjectId` as a required
+field, so the attribute always exists. The `getattr` guard exists only because
+the test fakes are `SimpleNamespace`-shaped, which is production code bending to
+accommodate test scaffolding. It also silently converts a future model rename
+into "not yours" (refuse everything) rather than a loud AttributeError. The same
+shape is now in `pending_estimate_follow_up.py` for the same reason.
+**Suggested fix:** use `target_property.company != company_oid` and
+`estimate.company != company_oid` directly. The test fakes already set
+`company`, so no test changes are needed. Fix both files together.
