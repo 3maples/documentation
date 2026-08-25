@@ -12,7 +12,7 @@ touching the affected area.
 Set by the 2026-08-25 consolidation pass — 418 entries down to 350 by
 relocating what was already closed and merging what was already tracked.
 
-- **Every entry is numbered and unique.** Next free number: **502**. Numbers are
+- **Every entry is numbered and unique.** Next free number: **503**. Numbers are
   permanent — the archive preserves them for cross-references, so never reuse or
   reassign one. Include the number when adding an entry; `/fix-issues` selects
   by it.
@@ -5002,7 +5002,27 @@ a no-op save) and apply it to ContactsPage and TaskDialog.
 
 ## 2026-08-25 surfaced while fixing #435
 
-### 499. [LOW] platform/routers/agent_helpers/pending_estimate_follow_up.py:364 — a failed link still reports `linked: True`
+### 499. [LOW] ~~platform/routers/agent_helpers/pending_estimate_follow_up.py:364 — a failed link still reports `linked: True`~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** The handler now returns a refusal envelope
+(`success: False`, `linked: False`, "I couldn't link estimate 'X' — I can't find
+it anymore") instead of synthesizing a payload from the pending record, and no
+longer sets `property_id` / `active_property_id` / `active_property_name` for a
+link that never happened. Every cause here is estimate-side and terminal — the
+property was just resolved out of the company's own list — so the pending record
+is dropped rather than re-asked, unlike the sibling handler where "property
+gone" is recoverable. One wording still covers "gone" and "not yours".
+
+**The false success was masking a real regression.** The #435 tenant check had
+already broken the end-to-end path in
+`test_orchestrate_endpoint_estimate_property_follow_up_links_property` — its
+`FakeEstimateDoc` declares no `company`, so the write was being refused — and
+the fabricated payload kept every assertion green. Fixing #499 surfaced it; the
+fake now declares its owner. Worth remembering: a handler that reports success
+unconditionally cannot fail a test.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
 When `Estimate.get` returns nothing the handler does not refuse — it synthesizes
 an `updated_payload` from the pending record and returns
 *"Linked estimate 'X' to property 'Y'."* with `linked: True`, having written
@@ -5019,6 +5039,8 @@ what a failed link looks like.
 **Suggested fix:** return a refusal envelope mirroring
 `pending_property_link._link_failed_envelope` and update the fallback test to
 assert the refusal. Keep the message identical for "gone" and "not yours".
+
+</details>
 
 ---
 
@@ -5048,3 +5070,21 @@ shape is now in `pending_estimate_follow_up.py` for the same reason.
 **Suggested fix:** use `target_property.company != company_oid` and
 `estimate.company != company_oid` directly. The test fakes already set
 `company`, so no test changes are needed. Fix both files together.
+
+---
+
+## 2026-08-25 deferred from /code-review (second pass)
+
+Logged by `/fix-issues` — the selection was `1 2 3 4`; the one below was
+deferred.
+
+### 502. [LOW] platform/tests/test_orchestrator_endpoint.py:1125 — the company OID is hardcoded twice in one test
+`FakeEstimateDoc` hardcodes `"507f1f77bcf86cd799439011"` as its `company`,
+duplicating the `company_id` passed to `OrchestratorAgentRequest` about twenty
+lines below. Changing one without the other makes the test exercise the refusal
+path instead of the link path. It now fails loudly if they diverge — which is
+only true because #499 was fixed; before that, the same mismatch failed silently
+and hid a real regression for a full commit.
+**Suggested fix:** bind the value to a local
+(`company_oid = "507f1f77bcf86cd799439011"`) at the top of the test and use it in
+both places.
