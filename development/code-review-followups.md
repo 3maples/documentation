@@ -12,7 +12,7 @@ touching the affected area.
 Set by the 2026-08-25 consolidation pass — 418 entries down to 350 by
 relocating what was already closed and merging what was already tracked.
 
-- **Every entry is numbered and unique.** Next free number: **503**. Numbers are
+- **Every entry is numbered and unique.** Next free number: **504**. Numbers are
   permanent — the archive preserves them for cross-references, so never reuse or
   reassign one. Include the number when adding an entry; `/fix-issues` selects
   by it.
@@ -5049,7 +5049,20 @@ assert the refusal. Keep the message identical for "gone" and "not yours".
 Logged by `/fix-issues` — findings from the latest review not fixed in that
 pass. Selection was `1 2 5 6 7`; the two below were deferred.
 
-### 500. [LOW] platform/routers/agent_helpers/pending_property_link.py:172 — two independent reads run sequentially, and a whole Property document is loaded to check one field
+### 500. [LOW] ~~platform/routers/agent_helpers/pending_property_link.py:172 — two independent reads run sequentially~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** The two ownership reads now go through one
+`asyncio.gather`. Note the deliberate trade recorded in the code: both documents
+are always fetched, so a missing property no longer short-circuits the estimate
+read — one wasted lookup on a failure in exchange for a faster success, which is
+the common case. The test that documented the old short-circuit was flipped to
+document the new behavior rather than deleted.
+
+The projection half of this entry was **not** done: reading only `company` would
+need a dedicated Beanie projection model, which is more machinery than the gain
+justifies on an LLM-bound turn.
+
+<details>
+<summary>Original body (preserved for history)</summary>
 `Property.get` and `Estimate.get` are awaited one after the other although
 neither depends on the other, and the property document is discarded immediately
 after reading `.company`. This is on a Maple chat turn that is already LLM-bound,
@@ -5060,7 +5073,17 @@ Estimate.get(estimate_oid))` and check both results afterwards. Optionally
 project to `company` only. Low value; take it only if this file is open for
 another reason.
 
-### 501. [LOW] platform/routers/agent_helpers/pending_property_link.py:173 — `getattr(doc, "company", None)` on models that always declare `company`
+</details>
+
+### 501. [LOW] ~~platform/routers/agent_helpers/pending_property_link.py:173 — `getattr(doc, "company", None)` on models that always declare `company`~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** All three sites across the two handlers now
+read `.company` directly, so a future model rename fails loudly instead of
+silently refusing every link. Verified first that every test fake on these paths
+declares `company` — the four corrected during the #435 and #499 work — so the
+change needed no further test edits.
+
+<details>
+<summary>Original body (preserved for history)</summary>
 Both `Estimate` and `Property` declare `company: PydanticObjectId` as a required
 field, so the attribute always exists. The `getattr` guard exists only because
 the test fakes are `SimpleNamespace`-shaped, which is production code bending to
@@ -5071,6 +5094,8 @@ shape is now in `pending_estimate_follow_up.py` for the same reason.
 `estimate.company != company_oid` directly. The test fakes already set
 `company`, so no test changes are needed. Fix both files together.
 
+</details>
+
 ---
 
 ## 2026-08-25 deferred from /code-review (second pass)
@@ -5078,7 +5103,14 @@ shape is now in `pending_estimate_follow_up.py` for the same reason.
 Logged by `/fix-issues` — the selection was `1 2 3 4`; the one below was
 deferred.
 
-### 502. [LOW] platform/tests/test_orchestrator_endpoint.py:1125 — the company OID is hardcoded twice in one test
+### 502. [LOW] ~~platform/tests/test_orchestrator_endpoint.py:1125 — the company OID is hardcoded twice in one test~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** Bound to a `company_oid` local at the top of
+the test. There turned out to be a **third** occurrence, not two: the
+`fake_get_properties` stub asserted the same literal. All three now reference the
+local.
+
+<details>
+<summary>Original body (preserved for history)</summary>
 `FakeEstimateDoc` hardcodes `"507f1f77bcf86cd799439011"` as its `company`,
 duplicating the `company_id` passed to `OrchestratorAgentRequest` about twenty
 lines below. Changing one without the other makes the test exercise the refusal
@@ -5088,3 +5120,30 @@ and hid a real regression for a full commit.
 **Suggested fix:** bind the value to a local
 (`company_oid = "507f1f77bcf86cd799439011"`) at the top of the test and use it in
 both places.
+
+</details>
+
+---
+
+## 2026-08-25 found while reviewing the pending-link work
+
+### 503. [LOW] platform/tests/ — `asyncio.run` in unit tests runs on a different loop than Beanie's client
+`tests/conftest.py` initializes Beanie through the session-scoped TestClient, so
+the Motor client is bound to that client's portal loop. Any test that drives an
+endpoint with `asyncio.run(...)` creates a fresh loop, and every DB call from it
+fails with "Future attached to a different loop". Two files were affected
+(`test_orchestrator_endpoint.py`, `test_agents_api.py`) and both are now stubbed
+at the persistence boundary, which is the right answer for *those* tests — they
+are unit tests of routing, and real coverage lives in `test_conversation_api.py`.
+
+The general trap remains: any future test that reaches for the DB through
+`asyncio.run` will fail silently or noisily depending on whether the caller logs,
+and the failure looks like a product bug rather than a harness one. Note that
+tests using `portal_call(client, ...)` are fine — they run on the right loop, and
+`TestReadableIdEndToEnd` genuinely exercises persistence that way.
+
+**Suggested fix:** either a conftest guard that fails loudly when a Beanie call
+is made from a loop other than the client's, or a documented `portal_call`
+convention for any test that needs the DB. The guard is more work but catches it
+at the point of the mistake; a note in `CLAUDE.md`'s testing section is the cheap
+version.
