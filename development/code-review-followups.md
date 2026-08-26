@@ -12,7 +12,7 @@ touching the affected area.
 Set by the 2026-08-25 consolidation pass — 418 entries down to 350 by
 relocating what was already closed and merging what was already tracked.
 
-- **Every entry is numbered and unique.** Next free number: **504**. Numbers are
+- **Every entry is numbered and unique.** Next free number: **505**. Numbers are
   permanent — the archive preserves them for cross-references, so never reuse or
   reassign one. Include the number when adding an entry; `/fix-issues` selects
   by it.
@@ -5147,3 +5147,43 @@ is made from a loop other than the client's, or a documented `portal_call`
 convention for any test that needs the DB. The guard is more work but catches it
 at the point of the mistake; a note in `CLAUDE.md`'s testing section is the cheap
 version.
+
+## 2026-08-26 raised while designing estimate readable IDs
+
+### 504. [LOW] platform/services/readable_id.py — Tasks and Estimates use two different readable-ID schemes
+Estimates adopt `E` + four **decimal** digits (`E0042`) in the readable-ID work
+planned in
+[`plans/2026-08-26-estimate-readable-ids.md`](plans/2026-08-26-estimate-readable-ids.md),
+while Tasks keep `T` + four **Crockford Base32** characters (`T4K7Q`). Two
+schemes in one app is a real inconsistency and it was accepted deliberately, not
+overlooked: Tasks have already been renumbered once, and aligning them would
+mean a second backfill, a second pass over the task regexes, and a second round
+of test churn for users who have started quoting task IDs.
+
+The case for eventually moving Tasks to decimal is the same one that moved
+Estimates:
+
+- **The displayed code diverges from the count.** Task #10 displays as `T000A`
+  and #42 as `T001A`, so "task ten" names nothing. A decimal body makes the
+  number a user counts and the code they read the same object.
+- **Crockford's benefit is visual, not aural.** It drops I/L/O/U because they
+  *look* confusable; it does nothing about B/D/E/G/P/T/V/Z, which are the ASR
+  and over-the-radio confusion set. For a field crew speaking IDs aloud that is
+  the cost without the benefit.
+- **It would delete the false-positive machinery.** `(?-i:T[0-9A-HJKMNP-TV-Z]{4,7})`
+  exists because lowercase `tasks` parses as `T`+`ASKS` and `trees` as
+  `T`+`REES`. No English word contains a digit, so a decimal body removes the
+  uppercase-only rule, the cue-word requirement on the lowercase form, and the
+  reason `resolver.py` must fall through on a DB miss.
+
+**Suggested fix:** if Tasks ever migrate, reuse the estimate pieces —
+`format_estimate_readable_id` / `normalize_estimate_readable_id` in
+`services/readable_id.py` and the "not already in the new format" backfill
+selector in `scripts/backfill_estimate_readable_ids.py` are both written to be
+copied. Capacity is the only thing to re-check: four decimal digits is 9,999 per
+company, and tasks are created at a higher rate than estimates, so Tasks may
+want five digits rather than four.
+
+**Do not do this on its own.** It is only worth the second renumber if it rides
+along with other Task work that is already touching the resolver and the
+orchestrator regexes.
