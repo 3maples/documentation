@@ -2,9 +2,102 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-08-26
+**Last updated:** 2026-08-27
 
 ### Change log
+
+**2026-08-27 — task ids became `T0042`: decimal, not Crockford (#504)**
+
+Tasks and estimates carried two different readable-id schemes. Estimates use
+`E` + a decimal counter; tasks used `T` + four Crockford Base32 characters
+(`T4K7Q`). Tasks now match estimates.
+
+**The displayed code is the count again.** Task ten used to display as `T000A`,
+so "task ten" named nothing. It is `T0010` now.
+
+**What this deleted.** Three pieces of machinery existed only because the body
+carried letters:
+
+- the **uppercase-only rule** on the bare form (lowercased, `tasks` is
+  `T`+`ASKS`);
+- the **"must contain a digit" rule** #505 added the day before to make bare
+  lowercase safe;
+- the **338,250-task edge**, past which an all-letter body would still have
+  needed uppercase.
+
+No English word contains a digit, so a decimal body cannot collide with prose
+in either case, and all three are gone. `agents/task/text_helpers.py` went from
+two target branches back to one.
+
+**The spoken form now resolves** (`archive T 0 0 4 2`), for the first time.
+Crockford drops I/L/O/U because they are *visually* confusable and does nothing
+about B/D/E/G/P/T/V/Z, which is the speech-recognition set — so spoken ids were
+never worth supporting on a letter-bearing body. `T-0042` rides the same
+pattern.
+
+**Existing ids were re-rendered, not renumbered.** `Company.next_task_seq` was
+already a per-company counter and a Crockford body decodes straight back to it,
+so every task kept its sequence number — `T000A` became `T0010`, the tenth task
+either way. Gaps left by deleted tasks survive, the job is re-runnable, and the
+counter was never written. `scripts/migrate_task_readable_ids_to_decimal.py`.
+
+**No grace period:** `T4K7Q` no longer resolves at all.
+
+**The id must be quoted in full**, everywhere it is read — the bare-id
+shortcut, `GET /tasks?search=`, Maple's task list, and the portal search box.
+**Estimates adopted the identical rule the same day**, so `E42` is refused too.
+`T42` is refused rather than padded to `T0042`, because padding guesses between
+`T0042`, `T0420` and `T4200`, and the id is the one field someone types when
+they already know exactly which task they want. Decorations are still forgiven,
+since `#T0042` and `T-0042` change presentation, not which task is named.
+
+**Portal:** `portal/src/lib/taskCode.ts` mirrors the backend normalizer, and
+task search matches the id **in full** rather than as a substring — with a
+decimal body, "42" would otherwise hit `T0042`, `T0421` and `T1042` alike. The
+server half is `services/task_search.py`, shared by the REST route and Maple's
+task list so the two cannot drift.
+
+Tests: `tests/test_readable_id.py`, `tests/test_task_code_pattern.py` (30
+cases), `tests/test_migrate_task_readable_ids_to_decimal.py` (13),
+`portal/tests/taskCode.test.ts` (11), plus the TasksPage search cases.
+
+**2026-08-27 — every layer that reads a task id now shares one reader (#505)**
+
+Task ids had four independent readers — the orchestrator's routing gate, the
+intent grammar's `TASK_REFERENCE`, the update grammar's target, and the
+resolver's own pair of regexes — and they had drifted. The consequences were
+the kind that look like a product bug rather than a parser one:
+
+- **`T-0042` was a silent dead end.** `normalize_task_readable_id` stripped the
+  hyphen and would have resolved it, but no pattern accepted the form, so the
+  message never reached the reader that could have handled it. It routed to
+  `None` — no domain at all. Now ✅ at every layer.
+- **The gate disagreed with the resolver on cued lowercase.** The resolver
+  accepted `task t0042`; the gate did not, and neither did the update grammar,
+  so `rename task t0042 to X` parsed its way to "What would you like to
+  update?". Now ✅.
+
+All five sites call `task_code_in_text` / `task_codes_in_text`
+(`services/readable_id.py`), the same shape estimates use. The plural form
+exists because the cue word can front an ordinary word that is also a valid id
+(`task tasks` reads as `T`+`ASKS`), so the resolver must be able to walk past a
+false positive to a real id later in the message.
+
+**Bare lowercase now works too** (`archive t0042`). It had been refused
+wholesale, but the real constraint is narrower than "lowercase": 728 words in
+the system dictionary are structurally valid lowercase ids — `tasks` is
+`T`+`ASKS`, `trees` is `T`+`REES`, and so are `tabby` and `tacca` — and **not
+one of them contains a digit**. No task id lacks one either until sequence
+338,250 renders as `TAAAA`. So the digit, not the capital letter, is what
+separates an id from a word, and `t0042` reads while `trims` does not. An
+all-letter body still resolves in uppercase.
+
+**Superseded the next day:** the spoken form was refused here because a
+Crockford body read aloud is unreliable regardless of the parser. #504 moved
+the body to decimal, and `T 0 0 4 2` now resolves — see the entry above.
+
+Tests: `tests/test_task_code_pattern.py` (22 cases across gate, both grammars
+and the shared reader).
 
 **2026-08-26 — estimate codes became `E0042`, and the id must be given in full (§1.2)**
 
@@ -66,10 +159,10 @@ Tests: `test_scope_assumptions.py`, `test_assumption_adjustment_targeting.py`, `
 
 Two changes to how a task is referred to, both driven by the portal's task dialog losing its Title field.
 
-- **New: `show me task T0042`.** Every task now carries a short, human-quotable id — `T` plus four Crockford Base32 characters, sequential per company (`services/readable_id.py`). It resolves as **step 1a** of `agents/task/resolver.py`, ahead of the positional step, because an explicit id should beat "the second one". Two shapes are accepted: the bare form is **uppercase-only** (every capitalized T-word is valid Crockford — `TRIMS` parses as `T`+`RIMS`), while a lowercase id needs a `task`/`#` lead-in. Either way a **DB miss falls through** to the title/fuzzy steps rather than swallowing the turn. The id also joins the search `$or` in both `GET /tasks?search=` and the agent's task list, and leads the `- ID:` line of the task-details block.
+- **New: `show me task T0042`.** Every task now carries a short, human-quotable id — `T` plus four Crockford Base32 characters, sequential per company (`services/readable_id.py`). It resolves as **step 1a** of `agents/task/resolver.py`, ahead of the positional step, because an explicit id should beat "the second one". ~~Two shapes are accepted: the bare form is **uppercase-only** (every capitalized T-word is valid Crockford — `TRIMS` parses as `T`+`RIMS`), while a lowercase id needs a `task`/`#` lead-in.~~ **Superseded 2026-08-27 (#504):** the body is decimal, so one case-insensitive shape covers everything. A **DB miss falls through** to the title/fuzzy steps rather than swallowing the turn. The id also joins the search `$or` in both `GET /tasks?search=` and the agent's task list, and leads the `- ID:` line of the task-details block.
 - **Removed: rename-by-title as a direct title write.** A task's title is now derived from the first line of its description on every save, so `changes = {"title": …}` would be silently reverted by the user's next portal edit. `rename the {task} task to {new}` **still works** and is still supported — it now rewrites the note's first line (`services/task_title.py::retitle_note`), which is the thing the title is read from. Chat-created tasks fold a nominated title into the note the same way, so `create a task called Fix the fence gate` stores that text as the note and derives the same title back out.
 
-- **New: acting on a task by id, not just finding one.** Resolution alone wasn't enough — the update phrasings parse their target with `_TARGET_OR_PRONOUN`, which accepted only `"{title} task"`, a positional, or a pronoun. So `rename task T0042 to X` resolved the id and then still asked "What would you like to update?". A readable-id branch now leads that alternation, covering `T0042`, `task T0042` and `#T0042` across **every** sub-op that shares it: rename, set-description, add-notes, mark/move/set status, assign, and archive. `the T0042 task` already worked (the id matched as a title fragment) and still does. The id branch is deliberately **case-sensitive** via `(?-i:…)`: lowercased, `tasks` is itself a valid Crockford id (`T`+`ASKS`), so a case-insensitive target would hijack `archive the tasks` and every other plural phrasing.
+- **New: acting on a task by id, not just finding one.** Resolution alone wasn't enough — the update phrasings parse their target with `_TARGET_OR_PRONOUN`, which accepted only `"{title} task"`, a positional, or a pronoun. So `rename task T0042 to X` resolved the id and then still asked "What would you like to update?". A readable-id branch now leads that alternation, covering `T0042`, `task T0042` and `#T0042` across **every** sub-op that shares it: rename, set-description, add-notes, mark/move/set status, assign, and archive. `the T0042 task` already worked (the id matched as a title fragment) and still does. ~~The id branch is deliberately **case-sensitive** via `(?-i:…)`: lowercased, `tasks` is itself a valid Crockford id (`T`+`ASKS`), so a case-insensitive target would hijack `archive the tasks` and every other plural phrasing.~~ **Superseded 2026-08-27 (#504):** a decimal body can't collide with prose, so the branch is case-insensitive and the two-branch target collapsed back to one.
 
 - **New: the ORCHESTRATOR now routes an id-only message.** Making the agent act on an id wasn't enough — an id-only message ("archive T0042") carried no domain signal at all, so the rule tier scored `unknown` and never reached the Task agent. Three places assumed the literal word: the entity-signal domain supplement, the status/assign/archive sub-op block, and the notes-update + convert detectors. All now accept a readable id, plus a bare id on its own (`T0042`, `#T0042`) resolves to `get_task` — unlike a bare title, an id names exactly one thing, so it needs no verb. **23 id-only phrasings** now route at the rule tier that previously did not. The worst of them was `add to T0042: …`, which resolved to **`create_task`** and would have silently made a second task — "add" is a create hint, and the notes-update detector that exists to prevent exactly that required `\btask\b`.
 
@@ -427,7 +520,8 @@ Token conventions used throughout:
 | `{role}` | `Landscaper` |
 | `{template}` | `Driveway Maintenance` |
 | `{task}` | `fix the fence gate` (a task title) |
-| `{EST}` | `E0042` — the prefix plus 4-7 digits (`E[0-9]{4,7}`). Case-insensitive; `#E0042`, `E-0042` and the spoken `E 0 0 4 2` all resolve. A bare number is **not** an id. |
+| `{EST}` | `E0042` — the prefix plus 4-7 digits (`E[0-9]{4,7}`). Case-insensitive; `#E0042`, `E-0042` and the spoken `E 0 0 4 2` all resolve. The id must be given **in full**: a partial body (`E42`) is refused rather than padded, and a bare number is not an id. Same rule as `{TASK}`. |
+| `{TASK}` | `T0042` — the prefix plus 4-7 **digits** (`T[0-9]{4,7}`). Case-insensitive; `#T0042`, `T-0042`, `task t0042` and the spoken `T 0 0 4 2` all resolve. The id must be given **in full**: a partial body (`T42`) is refused rather than padded, and a bare number is not an id at all. |
 | `{size}` | `12x12` |
 | `{unit}` | `each`, `sq ft`, `linear ft` |
 

@@ -5150,7 +5150,46 @@ version.
 
 ## 2026-08-26 raised while designing estimate readable IDs
 
-### 504. [LOW] platform/services/readable_id.py — Tasks and Estimates use two different readable-ID schemes
+### 504. ~~[LOW] platform/services/readable_id.py — Tasks and Estimates use two different readable-ID schemes~~ — RESOLVED 2026-08-27
+**Closed as resolved 2026-08-27.** Tasks now carry `T` + a decimal counter,
+matching estimates. Plan and phase breakdown:
+[`plans/2026-08-27-task-decimal-readable-ids.md`](plans/2026-08-27-task-decimal-readable-ids.md).
+
+**Re-render, not renumber**, as decided below: every task kept its sequence
+number, so `T000A` became `T0010` — the tenth task either way. Gaps left by
+deleted tasks survive, the job is re-runnable, and `Company.next_task_seq` was
+never written, so there was no race against live creates.
+`scripts/migrate_task_readable_ids_to_decimal.py` — run it with `--apply` per
+environment **before** the decimal codec ships. Both schemes are 4-7 characters
+of `[0-9A-Z]` and the sequence is untouched, so the unique index holds
+throughout and a task created mid-run is cosmetically inconsistent rather than
+corrupting.
+
+**What the decimal body deleted**, which was most of the argument for doing it:
+
+- the **uppercase-only rule** on the bare form;
+- the **"must contain a digit" rule** #505 added the day before;
+- the **338,250-task edge** where an all-letter body still needed uppercase;
+- one of the two target branches in `agents/task/text_helpers.py`.
+
+**The spoken form now resolves** (`T 0 0 4 2`), for the first time — it was
+deliberately out of scope for #505 because a Crockford body read aloud is
+unreliable no matter how good the parser is. `T-0042` rides the same pattern.
+
+**The Crockford codec is out of production code.** `decode_crockford_base32`
+moved *into* the migration script, its only remaining caller; when every
+environment has run the job, delete the file and the alphabet goes with it.
+`encode_crockford_base32` is gone outright.
+
+**Portal:** `portal/src/lib/taskCode.ts` mirrors the backend normalizer, and
+task search matches the id in full rather than as a substring — with a decimal
+body "42" would otherwise hit `T0042`, `T0421` and `T1042` alike.
+
+**Capacity:** four digits is a floor. `format_task_readable_id` widens past
+9,999 rather than failing.
+
+<details>
+<summary>Original body (preserved for history)</summary>
 Estimates adopt `E` + four **decimal** digits (`E0042`) in the readable-ID work
 planned in
 [`plans/2026-08-26-estimate-readable-ids.md`](plans/2026-08-26-estimate-readable-ids.md),
@@ -5170,6 +5209,11 @@ Estimates:
   *look* confusable; it does nothing about B/D/E/G/P/T/V/Z, which are the ASR
   and over-the-radio confusion set. For a field crew speaking IDs aloud that is
   the cost without the benefit.
+- **It would delete the digit rule too.** #505 made bare lowercase readable by
+  requiring a digit in the body, because 728 dictionary words are otherwise
+  valid lowercase ids. A decimal body makes every id digit-bearing by
+  construction, so the rule — and the 338,250-task edge where an all-letter
+  body would still need uppercase — both disappear.
 - **It would delete the false-positive machinery.** `(?-i:T[0-9A-HJKMNP-TV-Z]{4,7})`
   exists because lowercase `tasks` parses as `T`+`ASKS` and `trees` as
   `T`+`REES`. No English word contains a digit, so a decimal body removes the
@@ -5184,20 +5228,100 @@ copied. Capacity is the only thing to re-check: four decimal digits is 9,999 per
 company, and tasks are created at a higher rate than estimates, so Tasks may
 want five digits rather than four.
 
-**Do not do this on its own.** It is only worth the second renumber if it rides
-along with other Task work that is already touching the resolver and the
-orchestrator regexes.
+**Do not do this on its own.** It is only worth the change if it rides along
+with other Task work that is already touching the resolver and the orchestrator
+regexes.
 
-**Pairs with #505**, which audits the task *readers* (four of them, with
-measured divergences) the way the estimate work audited its own. #505 is the
-better first move: it is a correctness fix and does not renumber anyone's ids.
-Doing #504 afterwards is what makes spoken task ids ("T 0 0 4 2") worth
-supporting at all — a Crockford body read aloud lands in the B/D/E/G/P/T/V/Z
-confusion set no matter how good the parser is.
+**Decisions taken 2026-08-27** (open questions the entry above left unanswered):
+
+- **Width: 4 digits, as a floor.** `format_estimate_readable_id` widens rather
+  than failing, so a company past 9,999 gets `T10000` and nothing breaks. The
+  "tasks may want five digits" worry in the entry above is moot — this is
+  cosmetic padding, not capacity.
+- **Re-render, not renumber.** The entry calls this a "second renumber"; it
+  need not be one. `Company.next_task_seq` is already a sequential per-company
+  counter and Crockford decodes straight back to it (`000A` → 10 → `T0010`), so
+  each task's new id is a pure function of its old one. That is strictly safer
+  than assigning fresh numbers: it preserves the gaps a deletion leaves (the
+  counter counts allocations, not survivors), it keeps the job re-runnable
+  because the target id doesn't depend on position in an ordered set, and it
+  touches `next_task_seq` not at all — no racy counter reset against live
+  creates. **The counter must not be re-advanced.**
+- **No grace period for old ids.** `normalize_task_readable_id` should stop
+  accepting Crockford bodies at the cutover rather than resolving both.
+- **The portal gets a task equivalent** of `portal/src/lib/estimateCode.ts` for
+  search normalization. There is none today — the portal only renders
+  `readableId`.
+- **The Crockford codec goes** once the backfill has run.
+  `encode_crockford_base32` / `decode_crockford_base32` are needed *by* the
+  backfill (to recover each task's sequence number) and dead immediately after.
+- **No index work.** Tasks already carry the unique `(company, readable_id)`
+  partial index (`models/task.py`), unlike estimates where the backfill had to
+  precede the index deploy.
+
+**#505 is done (2026-08-27)**, which was the prerequisite: every layer that
+reads a task id now funnels through `task_code_in_text` /
+`task_codes_in_text` in `services/readable_id.py`, so this migration changes
+the body in one place instead of five. It also means spoken task ids
+("T 0 0 4 2") become worth supporting the moment the body is decimal — a
+Crockford body read aloud lands in the B/D/E/G/P/T/V/Z confusion set no matter
+how good the parser is, which is why the spoken row was left out of #505.
+
+</details>
 
 ## 2026-08-26 raised while finishing the estimate readable-id work
 
-### 505. [MEDIUM] platform/agents/task/ + orchestrator — task-id reading never got the estimate review; four readers, no shared entry point
+### 505. ~~[MEDIUM] platform/agents/task/ + orchestrator — task-id reading never got the estimate review; four readers, no shared entry point~~ — RESOLVED 2026-08-27
+**Closed as resolved 2026-08-27.** All five readers (the fourth listed below
+plus `_BARE_TASK_CODE_RE`, missed by the original audit) now go through
+`task_code_in_text` / `task_codes_in_text` in `services/readable_id.py`, built
+on shared `TASK_CODE_BODY` / `TASK_CODE_REF` / `TASK_CODE_CUED` fragments.
+`_TASK_CODE_PATTERN` is gone — it had no callers left once the three
+orchestrator sites moved onto the reader.
+
+Both defects the entry named are closed, and a third was found while wiring it:
+
+1. **Hyphenated (`T-0042`)** — accepted at every layer. Verified beforehand
+   that it routed to `None`, exactly as described.
+2. **Cued lowercase (`task t0042`)** — the gate agrees with the resolver now.
+   The update grammar carried the same divergence, which the entry did not
+   name: `rename task t0042 to X` parsed to "What would you like to update?".
+   Fixed with a separate cued branch (`target_code_cued`) rather than by
+   relaxing the bare form, since Python forbids reusing a group name.
+3. **New:** the domain-from-slot comparison at `service.py` compared raw
+   matched text against the captured slot, so `T-0042` in the message and
+   `t0042` in the slot looked like different tasks. Both sides are
+   canonicalized now.
+
+The reader is **plural-first** (`task_codes_in_text`) with the singular built on
+top. The resolver deliberately tries every candidate: the cue word can front an
+ordinary word that is also a valid id (`task tasks` is `T`+`ASKS`), and
+returning only the leading match would let that swallow a real id later in the
+same message — a regression the original single-return sketch would have
+introduced.
+
+**Item 3 of the original body was wrong, and is now fixed.** It said bare
+lowercase "is correctly rejected and must stay that way — do not fix this". The
+premise is right (lowercase `tasks` is `T`+`ASKS`) but the conclusion was too
+broad: measured against `/usr/share/dict/words`, 728 words are structurally
+valid lowercase ids and **none contains a digit**, while no id lacks one below
+sequence 338,250 (`TAAAA`). The digit — not the capital — is the separator. So
+`t0042` and `t-0042` now read, `trims` still does not, and an all-letter body
+still resolves in uppercase.
+
+Scanning also moved from "first match" to every occurrence, because an
+uppercase word is itself a valid id: `archive TASKS t0042` offered only `TASKS`
+before, and a DB miss on it ended the turn with nothing.
+
+**Not done, by design:** the spoken form stays refused, still sequenced behind
+#504.
+
+Tests: `tests/test_task_code_pattern.py` — 22 cases across the gate, both
+grammars, and the shared reader. `documentation/development/maple-phrasing-reference.md`
+updated (new `{TASK}` token in the legend + change-log entry).
+
+<details>
+<summary>Original body (preserved for history)</summary>
 The estimate readable-id work (`plans/2026-08-26-estimate-readable-ids.md`) ended
 by auditing every layer that reads a code out of a user message. That audit found
 a real defect — the routing gate was narrower than the reader behind it, so a
@@ -5265,6 +5389,8 @@ decimal body (#504), spoken support becomes worthwhile and nearly free; until
 then it is polish on an unreliable channel.** Sequence this after #504, or drop
 the spoken row from scope.
 
+</details>
+
 ## 2026-08-26 deferred from /code-review
 
 Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
@@ -5306,3 +5432,80 @@ against is that it couples a portal unit suite to a running backend. If the
 answer is no, close this entry — the mirrored suites plus the comments are a
 reasonable resting place.
 
+## 2026-08-27 deferred from /code-review
+
+Logged by `/fix-issues` — the selection was `1 2 3 4 5 6 7 8 9 10`; the four
+below were deferred. All are LOW, and two carry an explicit product decision.
+
+### [LOW] platform/services/readable_id.py — `ESTIMATE_CODE_CAPTURE` has no callers
+Defined but never imported anywhere in the codebase. Pre-existing, not
+introduced by the task-id work, but the `TASK_CODE_CAPTURE` added alongside it
+**is** used (by `_TASK_CODE_PATTERNS`), so the dead one is now conspicuous
+sitting next to a live twin.
+**Suggested fix:** delete it, or annotate it as an intentional public constant.
+Deleting is safer — it is trivially re-addable, and the estimate half of the
+file otherwise mirrors the task half exactly.
+
+### [LOW] portal/src/pages/TasksPage.tsx — partial-id search no longer matches
+Typing `004` or `42` in the task search box previously substring-matched
+`readable_id`; it now matches nothing, because the id is full-match only and a
+bare number is not an id.
+**Closed as intended by decision 2026-08-27:** "no need to support partial id
+search". Recorded here so the behavior change is traceable rather than
+rediscovered as a bug — it matches `GET /estimates?search=`, which made the same
+call. No code change wanted.
+
+### [LOW] platform/services/readable_id.py — sibling readers have different shapes
+`estimate_code_in_text` returns the first match via `.search`, while
+`task_codes_in_text` returns every match (ordered by position) and
+`task_code_in_text` wraps it. Two readers with the same job and different
+contracts is a milder form of the drift #505 was about — and the task side now
+carries a positional-ordering fix the estimate side does not.
+**Suggested fix:** add `estimate_codes_in_text` and define
+`estimate_code_in_text` on top of it, mirroring the task pair. Cheap, and it
+keeps the two halves of the file symmetrical. Worth doing next time the estimate
+half of that file is touched.
+
+### [LOW] platform/services/readable_id.py — the spoken pattern can emit a spurious longer candidate
+`TASK_CODE_SPOKEN` spans separators, so `"T0042 5"` yields both `T0042` (typed)
+and `T00425` (spoken, swallowing the trailing number). The typed candidate now
+sorts first by position, so the resolver reaches the right task; a wrong
+candidate costs one database miss on a message shaped like "T0042 5 hours".
+**Suggested fix:** low priority. If tightened, require a spoken match to contain
+at least one internal separator, so it cannot re-read a contiguous typed code
+plus a following number. `ESTIMATE_CODE_SPOKEN` carries the identical behavior —
+fix both or neither.
+
+## 2026-08-27 raised by the full-id decision
+
+### ~~[LOW] platform/services/readable_id.py — tasks require a full id, estimates still pad~~ — RESOLVED 2026-08-27
+**Closed as resolved 2026-08-27, taking option (a).** Estimates now apply the
+identical rule: `normalize_estimate_readable_id("E42")` returns "" rather than
+`E0042`. `_ESTIMATE_READABLE_ID_RE` requires the full 4-7 digit width, the
+`zfill` is gone, and `portal/src/lib/estimateCode.ts` mirrors it. The two
+resources agree again — the divergence lasted about an hour.
+
+**Decision 2026-08-27:** a task id must be quoted in full. `normalize_task_readable_id("T42")`
+returns "" rather than `T0042`, because padding guesses between `T0042`,
+`T0420` and `T4200`. This holds at every reader: the orchestrator's bare-id
+shortcut, `services/task_search.py` (so both `GET /tasks?search=` and Maple's
+task list), and `portal/src/lib/taskCode.ts`.
+
+**`normalize_estimate_readable_id` still pads** — `E42` resolves to `E0042`,
+pinned by `test_pads_an_unpadded_body` and the matching portal case. So the two
+resources now disagree on what a partial id means, three weeks after #504
+aligned them on everything else. The divergence is small and only affects
+partial input, but it is the same class of inconsistency #504 existed to remove,
+so it should be a decision rather than an accident.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+**Suggested fix:** needs a product call. Options: (a) apply the full-id rule to
+estimates too, which makes the two identical again and is what I would pick —
+the reasoning that motivated it for tasks (padding guesses which record the user
+meant) applies verbatim to estimates; (b) keep estimates padding and record the
+divergence as intentional, on the grounds that estimate volumes are lower so the
+guess is less likely to be wrong.
+
+</details>
