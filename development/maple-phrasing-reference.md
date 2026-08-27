@@ -2,9 +2,51 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-08-10
+**Last updated:** 2026-08-26
 
 ### Change log
+
+**2026-08-26 — estimate codes became `E0042`, and the id must be given in full (§1.2)**
+
+`EST-4E73F7BB` was a uuid4 hex slice: unreadable aloud, unindexed, and not
+unique. Estimates now carry `E` plus a per-company decimal counter, server-owned
+and backfilled over the whole back catalogue. Decimal rather than the Crockford
+Base32 behind task ids, because it is the *sequence number* that gets encoded —
+Crockford would render the tenth estimate `E000A`, so "estimate ten" would name
+nothing.
+
+- **Every pattern that reads a code moved to `E[0-9]{4,7}`** — the two
+  previously divergent `_ESTIMATE_CODE_PATTERN` definitions (the estimate
+  agent's was case-sensitive, the orchestrator's was not) now derive from one
+  shared fragment, along with `_ESTIMATE_REF_PATTERN` and ~25 inline
+  alternatives. A decimal body cannot collide with prose, so none of the
+  uppercase-only guarding the task patterns need is required here.
+- **The spoken form is supported**: `archive E 0 0 4 2`, which is how
+  speech-to-text renders a user reading the digits out one at a time. All four
+  readers share `estimate_code_in_text`.
+- **A bare "estimate 42" is deliberately NOT supported** 🛑 — matching
+  `(?:estimate|quote)\s+#?\d+` would read a quantity as an identifier, so
+  "estimate 3 hours of labor" would offer `E0003`. Requiring the prefix keeps
+  every candidate an unambiguous statement of intent.
+- **A well-formed code that doesn't exist now stops** rather than falling
+  through to the fuzzy title match and the most-recent fallback. Tasks must
+  fall through because `TRIMS` parses as a task id; an `E`-code cannot come
+  from prose, so guessing a *different* estimate is worse than saying so. This
+  is a deliberate divergence from the task resolver.
+- **Search requires the full id.** `GET /estimates?search=` matches title and
+  description as substrings, but the id as an anchored equality: over a decimal
+  space "42" would hit E0042, E0421, E4200 and E1042 alike.
+- Lookup by code is now an indexed point lookup on `(company, estimate_id)`.
+  The estimate agent, the orchestrator's resolver and `cross_resource` all used
+  to scan; `find_estimate_by_code` loaded the company's entire estimate
+  collection and compared in Python.
+
+Net effect on §12.3's counts: **none** — the code *format* changed, not the
+coverage matrix, and `tests/test_maple_crud_coverage.py` is untouched at
+163/174. Design: [`plans/2026-08-26-estimate-readable-ids.md`](plans/2026-08-26-estimate-readable-ids.md).
+Tests: `test_estimate_code_pattern.py`, `test_estimate_readable_id.py`,
+`test_backfill_estimate_readable_ids.py`, `test_readable_id.py`.
+
 
 **2026-08-10 — assumed sizes became per work item, and adjustments target one of them (§1.3, §1.3.1)**
 
@@ -82,7 +124,7 @@ Reported live: a generated work item reading "Assumes a 500 sq ft standard concr
 
 Reported live: Maple listed eight tasks, and every positional follow-up came back with row one. Nothing recorded which rows had been rendered, so "the fourth one" wasn't a reference at all — the message carried no title, id, or date, and resolution fell through to the recency fallback, which *is* row one (lists are sorted most-recently-updated first). §10.4's ordinal matcher didn't help: it is anchored at both ends because it reads replies to a numbered *menu*, and this pick arrives inside a sentence.
 
-- **Lists now remember what they rendered.** `record_listed_items` / `format_and_record_list_response` (`agents/text_utils.py`) store the `(id, label)` rows under `last_listed_items`; one slice feeds both the renderer and the record, so a truncated page can't leave positions pointing at rows the user never saw. Wired into all seven list-producing resources (Task, Property, Contact, Material, People, Template, Estimate); estimates record EST- codes.
+- **Lists now remember what they rendered.** `record_listed_items` / `format_and_record_list_response` (`agents/text_utils.py`) store the `(id, label)` rows under `last_listed_items`; one slice feeds both the renderer and the record, so a truncated page can't leave positions pointing at rows the user never saw. Wired into all seven list-producing resources (Task, Property, Contact, Material, People, Template, Estimate); estimates record their E-codes.
 - **`match_positional_reference`** extends the menu matcher to embedded ordinals, tail-anchored with a small clause-boundary set so `rename the second one to X` resolves while `put on the first coat of paint` doesn't.
 - **Routing was the other half.** A positional follow-up names no domain: the rule classifier read `show me the fourth one` as a *material* lookup and bare `the second one` as `unknown`. `_match_listed_positional_follow_up` routes it to the resource that was listed (verb picks read/update/delete) and stands down for domain-naming messages and armed `pending_*` flows, which §10.4 already owns.
 - **Out-of-range re-asks** ("I only listed 3 tasks — which one did you mean?") instead of falling through — falling through is what produced the wrong row. A row deleted between turns re-asks in the user's words rather than quoting back the internal id it picked.
@@ -385,7 +427,7 @@ Token conventions used throughout:
 | `{role}` | `Landscaper` |
 | `{template}` | `Driveway Maintenance` |
 | `{task}` | `fix the fence gate` (a task title) |
-| `{EST}` | `EST-0042`, `EST-4E73F7BB`, `EST-2026-001` (alphanumeric — anything matching `EST[-_][A-Za-z0-9\-_]*`) |
+| `{EST}` | `E0042` — the prefix plus 4-7 digits (`E[0-9]{4,7}`). Case-insensitive; `#E0042`, `E-0042` and the spoken `E 0 0 4 2` all resolve. A bare number is **not** an id. |
 | `{size}` | `12x12` |
 | `{unit}` | `each`, `sq ft`, `linear ft` |
 
@@ -454,7 +496,7 @@ Estimate is not in the CRUD coverage matrix — its generation is multi-turn and
 
 Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads the response with the dollar amount.
 
-**Title-based lookup** *(May expansion)*: when no EST-code is found in the query, `_resolve_estimate_by_title` extracts a title from quoted text (`"Untitled Estimate"`) or `title/called/named X` phrasings and searches by substring match. Single match → returns the estimate. Multiple matches → lists them and asks the user to pick by code.
+**Title-based lookup** *(May expansion)*: when no estimate code is found in the query, `_resolve_estimate_by_title` extracts a title from quoted text (`"Untitled Estimate"`) or `title/called/named X` phrasings and searches by substring match. Single match → returns the estimate. Multiple matches → lists them and asks the user to pick by code.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
@@ -1733,7 +1775,7 @@ A **result list** ("Here are your tasks:\n- …") invites the same pick a number
 
 Both halves are now shared (`agents/text_utils.py`):
 
-- **`record_listed_items` / `format_and_record_list_response`** — every list handler records the `(id, label)` rows it *renders* under `last_listed_items` (resource + ids + labels). One slice feeds the renderer and the record, so a truncated page can't leave positions pointing at rows the user never saw. Wired into Task, Property (incl. cross-resource), Contact (incl. contacts-at-property / estimate drilldown), Material, People, Template, and Estimate list responses. Estimates record their **EST- codes**, the handle every estimate path resolves by.
+- **`record_listed_items` / `format_and_record_list_response`** — every list handler records the `(id, label)` rows it *renders* under `last_listed_items` (resource + ids + labels). One slice feeds the renderer and the record, so a truncated page can't leave positions pointing at rows the user never saw. Wired into Task, Property (incl. cross-resource), Contact (incl. contacts-at-property / estimate drilldown), Material, People, Template, and Estimate list responses. Estimates record their **E-codes**, the handle every estimate path resolves by.
 - **`match_positional_reference` / `resolve_listed_reference`** — a superset of `match_ordinal_reference`: bare menu replies still resolve, plus the ordinal embedded in a request. Tail-anchored, with a small clause-boundary set (`to` / `and` / `with` / `as` / `into` / `'s` / punctuation) so an edit that names the row and then the new value still resolves while ordinals inside content don't. `resolve_listed_reference` also stands down for **estimate line-item numbering** — `#2` names a work item as readily as a listed row, and reading one as the other retargets the op at an estimate the user never opened.
 
 Routing is part of the fix: a positional follow-up names no domain, so the rule classifier read `show me the fourth one` as a **material** lookup and bare `the second one` as `unknown`. `OrchestratorAgent._match_listed_positional_follow_up` now routes it to the resource that was listed, picking read / update / delete from the verb. It stands down when the message names a domain of its own or when any `pending_*` flow is armed — a numbered confirmation (§10.4) already owns "the second one".

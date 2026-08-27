@@ -12,7 +12,7 @@ touching the affected area.
 Set by the 2026-08-25 consolidation pass — 418 entries down to 350 by
 relocating what was already closed and merging what was already tracked.
 
-- **Every entry is numbered and unique.** Next free number: **505**. Numbers are
+- **Every entry is numbered and unique.** Next free number: **506**. Numbers are
   permanent — the archive preserves them for cross-references, so never reuse or
   reassign one. Include the number when adding an entry; `/fix-issues` selects
   by it.
@@ -5187,3 +5187,122 @@ want five digits rather than four.
 **Do not do this on its own.** It is only worth the second renumber if it rides
 along with other Task work that is already touching the resolver and the
 orchestrator regexes.
+
+**Pairs with #505**, which audits the task *readers* (four of them, with
+measured divergences) the way the estimate work audited its own. #505 is the
+better first move: it is a correctness fix and does not renumber anyone's ids.
+Doing #504 afterwards is what makes spoken task ids ("T 0 0 4 2") worth
+supporting at all — a Crockford body read aloud lands in the B/D/E/G/P/T/V/Z
+confusion set no matter how good the parser is.
+
+## 2026-08-26 raised while finishing the estimate readable-id work
+
+### 505. [MEDIUM] platform/agents/task/ + orchestrator — task-id reading never got the estimate review; four readers, no shared entry point
+The estimate readable-id work (`plans/2026-08-26-estimate-readable-ids.md`) ended
+by auditing every layer that reads a code out of a user message. That audit found
+a real defect — the routing gate was narrower than the reader behind it, so a
+form the reader understood was rejected before anything could call it. **The same
+audit has not been done for task ids, and a probe says the same class of gap is
+present.**
+
+**Measured on the current code** (`archive …`, rules only):
+
+| form | routing gate | resolver bare | resolver cued | orchestrator | `normalize_task_readable_id` |
+|---|---|---|---|---|---|
+| `T0042` | ✅ | ✅ | – | ✅ | `T0042` |
+| `#T0042` | ✅ | ✅ | ✅ | ✅ | `T0042` |
+| `T4K7Q` | ✅ | ✅ | – | ✅ | `T4K7Q` |
+| `task t0042` (cued lowercase) | ✅ | – | ✅ | **❌** | `T0042` |
+| `T-0042` (hyphenated) | **❌** | **❌** | **❌** | **❌** | `T0042` |
+| `T 0 0 4 2` (spoken) | **❌** | **❌** | **❌** | **❌** | – |
+| `t0042` (bare lowercase) | ❌ | ❌ | ❌ | ❌ | `T0042` |
+
+Two of those are defects, one is correct-by-design, and the last is a judgement
+call:
+
+1. **Hyphenated is a genuine gap.** `normalize_task_readable_id("T-0042")`
+   returns `T0042` — the normalizer strips hyphens — but no pattern accepts the
+   form, so the message never reaches the resolver that would have normalized
+   it. This is exactly the estimate defect: *a reader that can resolve a code
+   the gate has already rejected is a silent dead end, not an error.*
+2. **The orchestrator disagrees with the resolver on cued lowercase.**
+   `agents/task/resolver.py`'s `_READABLE_ID_CUED_RE` accepts `task t0042`;
+   `orchestrator/service.py`'s `_TASK_CODE_PATTERN` does not. Estimates had the
+   identical divergence (one pattern case-sensitive, one not) and it was fixed by
+   collapsing onto a single reader.
+3. **Bare lowercase is correctly rejected** and must stay that way — lowercase
+   `tasks` parses as `T`+`ASKS` and `trees` as `T`+`REES`. Do not "fix" this.
+4. **Spoken support is a judgement call, not an obvious gap** — see below.
+
+**Root cause: there are four independent readers and no shared entry point.**
+`_READABLE_ID_RE` / `_READABLE_ID_CUED_RE` (`agents/task/resolver.py:51-55`),
+`_TASK_CODE_PATTERN` (`agents/orchestrator/service.py:180-182`),
+`_TASK_CODE_REF` / `TASK_REFERENCE` (`agents/orchestrator/intents.py:550-552`),
+and `_READABLE_ID_TARGET` (`agents/task/text_helpers.py:100`). Estimates now
+funnel every one of these through `services/readable_id.py::estimate_code_in_text`,
+which is what makes a divergence impossible rather than merely unlikely.
+
+**Suggested fix:** add `task_code_in_text()` beside `estimate_code_in_text()`,
+have all four sites call it, and keep the uppercase-only rule *inside* it (tasks
+need it; estimates do not, because a decimal body cannot come from prose). Pin
+the forms with a parametrized "every form is understood" test across gate,
+reader, and end-to-end routing, mirroring
+`tests/test_estimate_code_pattern.py`.
+
+**What is already right, and should NOT be changed:** task routing is tested
+against the *real* classifier — `OrchestratorAgent(use_llm=False)`
+(`tests/test_maple_task_routing.py:35`). The estimate bug was concealed by a test
+that stubbed the orchestrator and so never exercised the gate at all; the task
+suite does not have that blind spot. Only the *coverage of forms* is missing, not
+the harness.
+
+**On the spoken form, and its link to #504:** `T 4 K 7 Q` is unsupported, and
+adding it is worth less for tasks than it was for estimates. Crockford drops
+I/L/O/U because they are *visually* confusable; it does nothing about B/D/E/G/P/T/V/Z,
+which are the speech-recognition confusion set — so a letter-bearing body spoken
+aloud is unreliable no matter what the parser accepts. **If tasks migrate to a
+decimal body (#504), spoken support becomes worthwhile and nearly free; until
+then it is polish on an unreliable channel.** Sequence this after #504, or drop
+the spoken row from scope.
+
+## 2026-08-26 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [MEDIUM] platform/routers/estimates.py:444 — search runs an unindexed regex over title/description
+`_search_condition` builds `{"$regex": ..., "$options": "i"}` clauses on `title`
+and `description`. A case-insensitive unanchored regex cannot use a B-tree
+index, so each search scans the company's estimates. The `company` equality lets
+Mongo enter through `company_updated_at_status` first, which bounds the scan to
+one tenant — acceptable at current volumes (62 estimates on Dev, a 100-per-period
+plan cap) but it degrades linearly with tenant size.
+
+**Selected for fixing but deliberately not fixed:** the finding's own remediation
+is "no code change today", and the real fix — an Atlas Search index on
+(title, description) — is substantially larger than the finding describes and
+premature at these volumes. The repo already runs `mongodb-atlas-local` for
+`$vectorSearch` parity, so the capability exists when it is needed.
+
+**Suggested fix:** revisit when a tenant's estimate count makes search latency
+visible; add an Atlas Search index rather than a B-tree one. The same reasoning
+applies to `GET /tasks?search=`, which has the identical shape.
+
+### [MEDIUM] portal/src/lib/estimateCode.ts + platform/services/readable_id.py — a cross-language contract test was not added
+`normalizeEstimateCode` reimplements `normalize_estimate_readable_id` in a second
+language. The drift-detection half of the review finding **was** applied: both
+files now carry a comment naming the other's test file, and the two suites
+(`portal/tests/estimateCode.test.ts`, `platform/tests/test_readable_id.py`)
+deliberately mirror each other's cases.
+
+The other half needs a product call that was not made: whether to add a single
+API contract test that posts each decorated form (`e0042`, `#E0042`, `E-0042`,
+`E 0 0 4 2`) to `GET /estimates?search=` and asserts the same row comes back —
+so that one test fails when *either* side moves, instead of relying on a human
+noticing the paired comments.
+
+**Suggested fix:** decide whether that test is worth an API round-trip in CI. It
+is the only mechanism that makes the duplication self-policing; the argument
+against is that it couples a portal unit suite to a running backend. If the
+answer is no, close this entry — the mirrored suites plus the comments are a
+reasonable resting place.
+

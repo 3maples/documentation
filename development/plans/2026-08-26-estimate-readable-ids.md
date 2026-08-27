@@ -66,15 +66,31 @@ runs ~1,200/year — roughly eight years of headroom. Past that the encoder
 
 **No legacy alias.** Renumbering without keeping the old code means the
 `EST-4E73F7BB` strings already printed into generated Google Docs, into
-`audit.metadata.duplicated_from`, and into persisted `chat_history` stop
-resolving. Accepted knowingly: an alias field plus its index is real permanent
+`audit.metadata.duplicated_from`, and into persisted `chat_history` stop working
+**as a lookup handle**: a customer holding an emailed estimate that quotes the
+old code can't have it found by that string, by Maple or by the search box.
+Staff find it by title, property or date instead, then read the new code off the
+estimate. Accepted knowingly: an alias field plus its index is real permanent
 weight to carry for references that are read by humans, not by the app.
 
-**Existing Drive files are not renamed.** `routers/estimates.py:1578` names each
-generated doc `Estimate-{estimate_id}-V{n}`. New versions will be named
-`Estimate-E0042-V3`; the `Estimate-EST-4E73F7BB-V1` files already sitting in
-Drive keep their names forever. Renaming them would mean a Drive write per
-historical version for a cosmetic gain.
+**To be clear about what this does NOT break: every generated document stays
+reachable.** `GoogleDocsVersion` stores `doc_id`, `doc_url` and `drive_file_id`
+per version (models/estimate.py:487), the backfill touches none of them, and the
+portal opens `doc_url` directly (`DocumentsBar.tsx:69`,
+`NewEstimateWithActivityPage.tsx:552`) rather than reconstructing a link from the
+code. Every "Open" link keeps working.
+
+**What goes stale is snapshot text, not links.** Two places, both written at
+generation time and never re-read by the app:
+
+- The code printed *inside* an already-generated doc —
+  `{{ESTIMATE_ID}}` (services/estimate_doc_generator.py:247) and the
+  "Estimate ID" row (:334). A doc generated before the renumber says the old
+  code forever.
+- The Drive file name, `Estimate-{estimate_id}-V{n}`
+  (routers/estimates.py:1571). Existing files are not renamed — that would mean
+  a Drive write per historical version for a cosmetic gain — so a folder ends up
+  holding `Estimate-EST-4E73F7BB-V1` next to a later `Estimate-E0042-V3`.
 
 **Routes stay on the Mongo `_id`.** `getEstimateDetailsPath` and every
 `/estimates/:id/with-activity` link keep using the ObjectId, exactly as Tasks
@@ -294,6 +310,32 @@ gates estimate routing on `est[-_]…|estimate|quote|bid|proposal`; a message li
 estimate agent. Tasks needed the equivalent fix
 (`agents/orchestrator/intents.py:550-552`) and it was found late.
 
+It must use **`ESTIMATE_CODE_SPOKEN`, not `ESTIMATE_CODE_REF`**. The spoken
+pattern's separators are optional, so it is a superset covering the typed
+`E0042`, the hyphenated `E-0042` and the spoken `E 0 0 4 2` alike. Gating on the
+narrow form leaves the reader able to resolve a code the gate has already
+rejected — a silent dead end, not an error.
+
+### The routing gate is not testable through a stub
+
+This risk materialized during implementation, and the mitigation originally
+written here — "add an `archive E0042` end-to-end orchestrator test" — is what
+concealed it.
+
+That test installs a `StubOrchestratorAgent` returning the intent directly, so
+it exercises the estimate agent but never the gate. It passed for
+`archive E 0 0 4 2` while the spoken form was routing nowhere: the shared reader
+resolved it to `E0042`, and the gate rejected the message before anything could
+call the reader. The failure is invisible from inside the agent, because the
+agent is never reached.
+
+Any test that claims to cover routing must construct the real classifier —
+`OrchestratorAgent(use_llm=False)`, the same rules-only harness
+`tests/test_maple_crud_coverage.py` uses — and assert on the resolved agent and
+intent. `tests/test_estimate_code_pattern.py::TestIdOnlyRoutingEndToEnd` does
+this across all five equivalent forms; the stubbed test remains, but only as
+coverage of the agent.
+
 Resolution changes:
 
 - `agents/estimate/crud_helpers.py:253-258` — `_estimate_code_from_text` runs
@@ -358,9 +400,25 @@ prefix-anchored, so it names exactly one estimate rather than a family of them.
 
 Property name stays out of the server-side query: it lives on a linked
 `Property` document, not on the estimate, and joining it would mean an
-aggregation. `EstimatesPage`'s client-side filter keeps matching on the
-already-resolved property label, so property search is unchanged in behavior —
-it is simply still limited to loaded rows, as it is today.
+aggregation.
+
+**Correction, found during implementation: `EstimatesPage` is NOT wired to this
+endpoint, and should not be.** The original rationale here — that the
+client-side filter "silently misses anything past the first page" — was wrong.
+`estimatesApi.list` sends no `limit`, so the page already loads every estimate
+in the company and its filter is complete.
+
+Wiring the page to the server would have *removed* function. Property name is
+the one field only the client can match, because it lives on the linked
+document; once the server narrows the fetch, a search for "Main St" returns
+nothing for the client to filter, and property search breaks.
+
+So the page keeps filtering client-side, with its id rule aligned to the
+server's (full-id only, via `portal/src/lib/estimateCode.ts`, which mirrors
+`normalize_estimate_readable_id` so the two surfaces cannot disagree about what
+counts as an id). The endpoint still earns its place — it is what API consumers
+and any future paginated view need — it simply isn't what this page should
+call today. Revisit if the estimates list ever gains pagination.
 
 ### Backfill
 
@@ -478,11 +536,15 @@ Phase 4.**
 `Estimate.Settings.indexes`. Verify boot against backfilled data first.
 
 **Phase 5 — search, portal, docs.** `GET /estimates?search=` with the anchored
-full-ID clause; wire `EstimatesPage` to it; `font-mono` styling on the ID chips;
-drop `estimate_id` from the create payload type; update the phrasing reference
-and the user guide. Tests: `E0042` returns exactly that estimate; a bare `42`
-returns title matches only and **not** `E0042`, `E0421` or `E4200`; the
-decorated forms (`e0042`, `#E0042`, `E 0 0 4 2`) all reach the same result.
+full-ID clause; align the portal's client-side filters to the same id rule (see
+the correction above — the page is deliberately *not* wired to the endpoint);
+`font-mono` styling on the ID chips; drop `estimate_id` from the create payload
+type; update the phrasing reference and the user guide. Tests: `E0042` returns
+exactly that estimate; a bare `42` returns title matches only and **not**
+`E0042`, `E0421` or `E4200`; the decorated forms (`e0042`, `#E0042`,
+`E 0 0 4 2`) all reach the same result; and the portal filter is pinned by
+`EstimatesPageSearch.test.tsx` + `estimateCode.test.ts`, whose cases mirror the
+backend's normalization tests so the two can't drift.
 
 ---
 
@@ -494,8 +556,8 @@ decorated forms (`e0042`, `#E0042`, `E 0 0 4 2`) all reach the same result.
 | Maple can't resolve `EST-` codes between the Phase 2 deploy and the backfill | Ship Phases 2 and 3 back-to-back; run the backfill immediately after deploy |
 | Estimate resolution diverges from Task resolution (short-circuit vs fall-through) | Deliberate; justified by digits removing prose collisions. Documented in "Miss behavior" |
 | A missed inline `est[-_]` regex silently drops a phrasing | The full change list is enumerated above; the Maple CRUD coverage matrix is the backstop |
-| `_ESTIMATE_REF_PATTERN` missed → ID-only messages never route to the estimate agent | Called out explicitly; add an "archive E0042" end-to-end orchestrator test |
-| Old `EST-` codes in generated Google Docs stop resolving | Accepted; documented above under "What this deliberately does not do" |
+| `_ESTIMATE_REF_PATTERN` missed → ID-only messages never route to the estimate agent | **This happened.** See "The routing gate is not testable through a stub" below |
+| A customer quoting an old `EST-` code off a printed estimate can't be looked up by it | Accepted. The document itself still opens — only the code as a search handle is lost; staff find it by title/property/date. Documented above |
 | A create path bypassing the helper persists `estimate_id: ""` | The unique partial index rejects the second one in a company — a loud failure |
 | Two ID schemes in one app (`T4K7Q` vs `E0042`) | Accepted; rationale and the case for eventually aligning Tasks tracked as follow-up #504 |
 | 9,999 estimates exhausted in one company | Widens to `E10000`; ~8 years of headroom at the heaviest plan tier |
