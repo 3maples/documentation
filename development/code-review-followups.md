@@ -5509,3 +5509,40 @@ divergence as intentional, on the grounds that estimate volumes are lower so the
 guess is less likely to be wrong.
 
 </details>
+
+## 2026-08-27 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the replayed-date review not fixed in
+that pass. Findings #1–#3 were fixed.
+
+### [RESOLVED — no action] operational — the DEV backfill already ran with backfill-day dates
+`backfill_lifecycle_state` shares `_sweep`, so it now writes historical dates too. But it had
+already been applied in DEV, which means those contacts carry backfill-day values for
+`ESTIMATE_STARTED_AT`, `FIRST_ESTIMATE_AT` and `DOCUMENT_GENERATED_AT` — and their claims are
+recorded, so neither a re-run nor the nightly sweep corrects them.
+
+**Closed 2026-08-27: accepted.** DEV holds test contacts whose dates nobody reads, so the
+stale values cost nothing and a repair script would be pure overhead.
+
+**The live constraint this leaves behind:** PROD has *not* run
+`scripts/backfill_brevo_lifecycle.py` yet, and this fix must ship before it does — that is
+the difference between PROD's `FIRST_ESTIMATE_AT` recording real activation dates and
+recording the day the backfill happened to run. There is no second chance: once the claims
+are written, the sweep skips those users forever. Ordering, not a task.
+
+### [LOW] platform/tests/test_brevo_lifecycle_reconcile.py — function-level imports break the file's convention
+The DB-backed replay-date tests import `datetime`, `GoogleDocsVersion` and
+`collect_estimate_facts` inside the test body, while every other test in the file relies on
+module-level imports at the top. Nothing is circular, so the local imports have no reason
+beyond how they were written. (`GoogleDocsVersion` is in fact already imported at module
+level, so that one is redundant as well as inconsistent.)
+**Suggested fix:** move them to the module header alongside the existing imports.
+
+### [LOW] platform/services/brevo_lifecycle_reconcile.py:70 — `EstimateFacts` can represent an incoherent state
+`started=True` with `started_at=None` is representable, and does occur for a legacy estimate
+whose `created_at` is missing. It is handled correctly (`replay_attributes` falls back to the
+default), but the dataclass also lets a caller construct `built=False, built_at=<date>`,
+which is meaningless.
+**Suggested fix:** low value and not worth much churn. If tightening: add a `__post_init__`
+assertion that each `*_at` is None whenever its boolean is False. The leaning is to leave it —
+the type is internal to this module and the aggregation is its only real producer.
