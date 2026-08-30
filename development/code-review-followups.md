@@ -5546,3 +5546,34 @@ which is meaningless.
 **Suggested fix:** low value and not worth much churn. If tightening: add a `__post_init__`
 assertion that each `*_at` is None whenever its boolean is False. The leaning is to leave it —
 the type is internal to this module and the aggregation is its only real producer.
+
+## 2026-08-29 deferred from /code-review
+
+Logged by `/fix-issues` — the part of finding #7 that could not be completed in that pass.
+The selection was `all`; ten of the eleven findings were fixed. #7's Account half is done
+(`portal/src/components/settings/AccountTab.tsx`); the Company half is carved out below.
+
+### [MEDIUM] portal/src/pages/SettingsPage.tsx:1 — extract CompanyTab to finish the file split
+The file is still 2,558 lines after the Account and shared-header extractions — well over the
+800-line review threshold. The remaining bulk is the Company tab: ~440 lines of JSX plus
+roughly 250 lines of handlers (`handleCompanyEdit` / `Cancel` / `Save`, the three logo
+picker/upload/remove handlers, the close-account dialog handlers) and about a dozen `useState`
+calls. Two things make it materially harder than the Account extraction that was completed:
+`companyDetails` must stay owned by `SettingsPage` because `FinancialTab` receives it as a
+prop, and the close-account confirmation dialog renders in the page's dialog section near the
+bottom of the file rather than inside the Company panel, so the extraction has to split one
+feature across a component boundary.
+
+Deferred deliberately rather than forced: bundling a ~700-line move on top of the behavioral
+fixes already in this change (the load-retry latch, the error relocation, the shared header)
+would make the whole thing hard to review and hard to bisect — which is the argument the
+original finding itself made for giving this its own commit.
+
+**Suggested fix:** extract `CompanyTab.tsx` into `portal/src/components/settings/`, mirroring
+the `{ companyDetails, isLoading, canEdit, onSaved }` prop shape that `FinancialTab` and the
+new `AccountTab` both use. Keep `companyDetails` and its loader in `SettingsPage` and pass
+them down. Move the close-account dialog into the new component along with its trigger, or
+leave the dialog in the page and pass an `onRequestClose` callback — the former is cleaner if
+nothing else opens that dialog. Do it as its own commit, with the existing Settings suites
+(`SettingsPageEditHeaderPlacement`, `SettingsPageCompanyLoadRetry`, `SettingsPageTeam*`) as
+the regression net.
