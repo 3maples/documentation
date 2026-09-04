@@ -5577,3 +5577,16 @@ leave the dialog in the page and pass an `onRequestClose` callback — the forme
 nothing else opens that dialog. Do it as its own commit, with the existing Settings suites
 (`SettingsPageEditHeaderPlacement`, `SettingsPageCompanyLoadRetry`, `SettingsPageTeam*`) as
 the regression net.
+
+## 2026-09-03 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] platform/tests/test_auth_email.py:158 — module constant declared mid-file
+`FIREBASE_VERIFY_LINK` is defined at line 158, below seven existing tests, because the
+verification-link tests were appended to the end of the file. It resolves fine at import time,
+so there is no behavioral consequence; it just makes a shared fixture value harder to find than
+the top-of-module placement a reader expects.
+
+**Suggested fix:** move the `FIREBASE_VERIFY_LINK` assignment up to just under the imports at
+the top of the file, leaving the tests where they are.
