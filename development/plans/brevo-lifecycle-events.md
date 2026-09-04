@@ -149,30 +149,51 @@ No new attribute was needed for the sixth event: `ACTIVATED` already exists.
 
 **Events selectable as real-time entry points:** `account_created`,
 `email_verified`, `setup_completed`, `estimate_draft_started`,
-`first_estimate_built`, `first_document_generated`. Only four are entered on —
-`email_verified` and `first_estimate_built` fire as data and as stop signals.
+`first_estimate_built`, `first_document_generated`. Only three are entered on —
+`setup_completed`, `estimate_draft_started`, `first_estimate_built`. The other
+three fire as data, as stop signals, or — for `first_document_generated` — as
+the mid-flow wait that releases T3.3 inside AUTO-3.
 
 **Automation wiring.** Simon builds these, not Ron. The Cliff sequences do
 **not** exist in the account — nothing to re-point, they are built from nothing.
 
-**Copy is Ron's `Brevo Email Copy Deck` (Aug 20), and it is canonical.** Nine
-templates, frozen, paste verbatim; copy changes route through Ron. The earlier
-seven-email draft in this repo's history is superseded — do not use it. Ron's
-deck also supersedes Section C of his own Aug 11 `Brevo Build: Simon Edition`
-handoff, which we do not hold a copy of (it carries the sender table and the
-Section E acceptance tests — get it before building).
+**Copy is Ron's `BUILD SPEC` v2.0 (Aug 30), and it is canonical.** Nine
+templates, frozen, paste verbatim; copy changes route through Ron. It supersedes
+the Aug 20 `Brevo Email Copy Deck`, the earlier seven-email draft in this repo's
+history, and Section C of his Aug 11 `Brevo Build: Simon Edition` handoff — and
+it carries the sender table and the acceptance tests (19 of them, its §6) that
+the Aug 11 handoff was wanted for, so we no longer need that document.
+
+v2.0 also restates the automation structure. **The wiring below is what we
+build, not v2.0's** — its AUTO-1 enters on `account_created` and its stop
+conditions read `ACTIVATED = true` with the industry meaning, which is not what
+that attribute means here (see the box above). Copy from v2.0, wiring from this
+table.
 
 | Automation | Entry event | Templates | Delays | Check before each send |
 |---|---|---|---|---|
-| AUTO-1a — welcome | `account_created` | T0 | immediate | none (unconditional) |
-| AUTO-1b — nudges | `setup_completed` | T1.1, T1.2, T1.3 | +1d, +3d, +6d **from setup completion** | `ACTIVATED` is true **and** `FIRST_ESTIMATE_AT` is empty |
+| AUTO-1 | `setup_completed` | T0, T1.1, T1.2, T1.3 | immediate, +1d, +3d, +6d **from setup completion** | T0 none (unconditional); each nudge: `ACTIVATED` is true **and** `FIRST_ESTIMATE_AT` is empty |
 | AUTO-2 | `estimate_draft_started` | T2.1, T2.2 | +2h, +1d | `ACTIVATED` is true **and** `FIRST_ESTIMATE_AT` is empty |
-| AUTO-3 | `first_estimate_built` | T3.1, T3.2 | +1d, +3d | `DOCUMENT_GENERATED_AT` is empty |
-| Habit | `first_document_generated` | T3.3 | +7d | — |
+| AUTO-3 | `first_estimate_built` | T3.1, T3.2, T3.3 | +1d, +3d; T3.3 at +7d after `first_document_generated` | T3.1/T3.2: `DOCUMENT_GENERATED_AT` is empty — when it is set, branch to the T3.3 step |
 
-**AUTO-1 is split in two — decided 2026-08-20, see §3.1 item 2.** T0 is
-unconditional and immediate on the transactional stream; the three nudges wait,
-because a user who hasn't finished setup cannot do the thing T1.1–T1.3 ask for.
+**AUTO-1 is one automation entering on `setup_completed` — T0 included.** The
+welcome does not enter on `account_created`: a user who hasn't finished setup
+cannot do the thing T0 and T1.1–T1.3 all ask for, and putting the welcome on the
+same entry as the nudges is what keeps the four sends in one order with one
+clock. T0 stays unconditional and immediate on the transactional stream, first
+step of the flow; the three nudges keep their per-send checks. `account_created`
+therefore enters nothing — it fires as data and as the attribute write.
+
+**AUTO-3 carries the habit email as its own tail.** T3.3 is a step inside
+AUTO-3 rather than a second automation on `first_document_generated`: contacts
+who generate the document branch out of the T3.1/T3.2 nag path onto a +7d wait
+and receive T3.3 there. The event still fires — it is what releases that wait —
+but nothing *enters* on it. One flow per lifecycle stage, one place to read the
+whole post-build path.
+
+**Step-level detail for all three flows is in §3.4** — that is what you build
+from, in the editor.
+
 Ron's check-before-each-send structure is otherwise kept exactly — attributes
 are the durable state, which is why each moment writes an event *and* an
 attribute. His §6 makes the same argument from the copy side: the IF conditions
@@ -256,7 +277,7 @@ renaming the transactional sender.
 
 No code change anywhere: the nine are Brevo automation sends.
 
-**2. Verification gating — RESOLVED (2026-08-20): split AUTO-1 in two.**
+**2. Verification gating — RESOLVED (2026-08-20): move AUTO-1 off `account_created`.**
 Ron's deck enters the whole of Cliff 1 on `account_created`, which fires at
 signup, before verification. That is not a matter of taste: an unverified user
 gets a **403 from `POST /estimates`** ([firebase_auth.py:137](platform/firebase_auth.py:137)),
@@ -268,10 +289,11 @@ send whose moment passed while the user was unverified, so someone who verifies
 on day 4 has T1.1 and T1.2 dropped and meets Maple for the first time through
 T1.3, *"Should I stop?"*.
 
-So: **AUTO-1a** carries T0 alone on `account_created` (immediate, unconditional),
-and **AUTO-1b** carries T1.1/T1.2/T1.3 on its own entry event.
+So: **AUTO-1** moves off `account_created` entirely and carries all four sends
+— T0 immediate and unconditional, then T1.1/T1.2/T1.3 on their checks — from a
+single later entry event.
 
-**Superseded 2026-08-22 — AUTO-1b now enters on `setup_completed`, not
+**Superseded 2026-08-22 — AUTO-1 now enters on `setup_completed`, not
 `email_verified`.** Verification turned out to be the wrong line. It is
 necessary but not sufficient: a verified user who hasn't finished onboarding
 *also* can't reach the estimate builder, because the portal's route guards
@@ -305,7 +327,7 @@ that event fires for everyone including invited teammates. Under
 onboarding edge and fans out to whoever is attached at that moment
 (`_sync_company_members_stage`), so a teammate who joined during setup was part
 of it and belongs in the sequence, while one who joins a fully-onboarded company
-a year later never sees the edge and never enters AUTO-1b at all.
+a year later never sees the edge and never enters AUTO-1 at all.
 
 Keep the guard anyway as belt-and-braces — it costs nothing and covers the case
 where a company somehow re-runs onboarding. Deliberately a Brevo-side condition,
@@ -383,6 +405,95 @@ within one business day*. That's a staffing answer, not a plumbing one.
 sends a numeric list ID we set `BREVO_ONBOARDING_LIST_ID` per environment (DEV
 and PROD are separate lists in the same account, same as the existing four). If
 unset, W1 drops the `listIds` line and everything else works identically.
+
+
+### 3.4 The three flows, step by step
+
+What to build in the editor. Same shape as v2.0's §2 step tables, with the two
+merges applied and the conditions written against what our attributes actually
+mean. Template internal names are v2.0's and are exact (its RULE-2).
+
+**AUTO-1 — Activation**
+- Entry trigger: custom event `setup_completed`
+- Re-entry: OFF
+- Global exit condition: `FIRST_ESTIMATE_AT` is not empty
+- Audience exclusion: `Suppressed - Do Not Mail` (v2.0 PRE-8)
+
+| Step | Type | Value |
+|---|---|---|
+| 1 | Send | `onb-welcome` (T0). Sender Brad, transactional stream. Unconditional |
+| 2 | Wait | 1 day |
+| 3 | Condition | IF `ACTIVATED` is true AND `FIRST_ESTIMATE_AT` is empty → continue. ELSE exit |
+| 4 | Send | `onb-cliff1-day1` (T1.1). Sender Maple |
+| 5 | Wait | 2 days |
+| 6 | Condition | IF `ACTIVATED` is true AND `FIRST_ESTIMATE_AT` is empty → continue. ELSE exit |
+| 7 | Send | `onb-cliff1-day4` (T1.2). Sender Maple |
+| 8 | Wait | 3 days |
+| 9 | Condition | IF `ACTIVATED` is true AND `FIRST_ESTIMATE_AT` is empty → continue. ELSE exit |
+| 10 | Send | `onb-cliff1-day6` (T1.3). Sender Maple |
+| 11 | End | |
+
+Resulting schedule from setup completion: immediate, day 1, day 3, day 6.
+
+**AUTO-2 — Draft recovery**
+- Entry trigger: custom event `estimate_draft_started`
+- Re-entry: OFF
+- Global exit condition: `FIRST_ESTIMATE_AT` is not empty
+- Audience exclusion: `Suppressed - Do Not Mail`
+
+| Step | Type | Value |
+|---|---|---|
+| 1 | Wait | 2 hours. LITERAL. Do not round to 1 day |
+| 2 | Condition | IF `ACTIVATED` is true AND `FIRST_ESTIMATE_AT` is empty → continue. ELSE exit |
+| 3 | Send | `onb-cliff2-2hr` (T2.1). Sender Maple |
+| 4 | Wait | 1 day |
+| 5 | Condition | IF `ACTIVATED` is true AND `FIRST_ESTIMATE_AT` is empty → continue. ELSE exit |
+| 6 | Send | `onb-cliff2-nextday` (T2.2). Sender Maple |
+| 7 | End | |
+
+**AUTO-3 — Send and habit**
+- Entry trigger: custom event `first_estimate_built`
+- Re-entry: OFF
+- Global exit condition: **none** — the flow has to survive to its T3.3 tail
+- Audience exclusion: `Suppressed - Do Not Mail`
+
+| Step | Type | Value |
+|---|---|---|
+| 1 | Wait | 1 day |
+| 2 | Condition | IF `DOCUMENT_GENERATED_AT` is empty → continue. ELSE go to step 8 |
+| 3 | Send | `onb-cliff3-day1` (T3.1). Sender Maple |
+| 4 | Wait | 2 days |
+| 5 | Condition | IF `DOCUMENT_GENERATED_AT` is empty → continue. ELSE go to step 8 |
+| 6 | Send | `onb-cliff3-day3` (T3.2). Sender Maple |
+| 7 | Wait | for event `first_document_generated`. No timeout — a contact who never generates a document ends here, unmailed |
+| 8 | Wait | until 7 days after `DOCUMENT_GENERATED_AT` |
+| 9 | Send | `onb-habit-week1` (T3.3). Sender Maple |
+| 10 | End | |
+
+Four things to watch while building these:
+
+- **Step 8 is a date-relative wait, not a duration.** All three paths into it
+  arrive at different removes from the document — up to a day late from step 2,
+  two days from step 5, immediately from step 7 — so a plain "wait 7 days" would
+  land T3.3 anywhere from day 7 to day 9. Anchoring it to
+  `DOCUMENT_GENERATED_AT` makes every path exact.
+- **Step 7 needs an event-wait step.** If the editor has no open-ended
+  wait-for-event, the fallback is the pre-merge shape: end AUTO-3 at step 6 and
+  run T3.3 as its own automation entering on `first_document_generated` with a
+  7-day delay. Same sends, same timing, one more flow to maintain.
+- **T0's global exit.** The exit is evaluated continuously, so T0 has to be step
+  1 with no wait in front of it. A contact cannot have built an estimate in the
+  instant between `setup_completed` and step 1, but put anything ahead of the
+  welcome and that stops being true.
+- **`ACTIVATED` is true for everyone who enters AUTO-1** — `setup_completed` is
+  what writes it. The clause is kept in every condition as belt-and-braces, and
+  because it is the half that stops being redundant if a flow is ever re-pointed
+  at an earlier entry event. `FIRST_ESTIMATE_AT is empty` is the half doing the
+  work.
+
+*One naming mismatch, cosmetic:* v2.0 calls T1.2 `onb-cliff1-day4`, from its own
+day-1/4/6 schedule. Ours puts it on day 3. Keep the name exactly as written —
+it is how the automation references the template — and know it is a day off.
 
 ---
 
@@ -647,9 +758,9 @@ actually stand:
 
 Still ours, and none of it blocked on Ron:
 
-- **Get the Aug 11 `Brevo Build: Simon Edition` handoff.** We don't hold it. It
-  carries the Section B sender table (which item 3 turns on) and the Section E
-  acceptance tests that R10 gates every template on.
+- ~~Get the Aug 11 `Brevo Build: Simon Edition` handoff.~~ **Closed by v2.0** —
+  the Aug 30 `BUILD SPEC` carries the sender table and the acceptance tests that
+  handoff was wanted for.
 - **All four §3.1 items are resolved and all nine templates are pasteable.**
   Nothing is blocked on Ron any more, but three things are owed to him as
   notifications: the T2.1/T2.2 rewrite, T1.1's *"you made an account
