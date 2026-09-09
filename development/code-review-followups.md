@@ -5590,3 +5590,32 @@ the top-of-module placement a reader expects.
 
 **Suggested fix:** move the `FIREBASE_VERIFY_LINK` assignment up to just under the imports at
 the top of the file, leaving the tests where they are.
+
+## 2026-09-08 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] portal/src/components/tours/TourManager.tsx:83 — TourRunner is 264 lines
+`TourRunner` spans lines 83–347, far past the 50-line guideline: it holds the page-tour
+effect, the dialog-arming effect with its own MutationObserver and retry bookkeeping, the
+anchor-tracking observer, and three callbacks. This is pre-existing, and the phone-viewport
+change only added 8 lines to it, which is why it is LOW and not HIGH — but each new concern
+bolted on makes the next edit harder to reason about, and the phone gate is now duplicated
+across two of the effects.
+
+**Suggested fix:** extract the dialog-arming effect body into a
+`useDialogTourWatcher(pathname, registry, resolveStep, presentStep)` hook in its own file,
+which would take roughly 80 lines out of the component. The existing
+`TourManager — dialog-triggered tours` suite is the regression net.
+
+### [LOW] portal/tests/TourManager.test.tsx:37 — the viewport mock hard-codes the module's current shape
+`vi.mock("../src/tours/viewport", () => ({ isPhoneViewport: vi.fn(() => false) }))` replaces
+the whole module with a single-export factory. If `viewport.ts` later gains a second export
+and `TourManager` imports it, this file fails with an undefined-is-not-a-function error at
+render time rather than anything that names the real cause. The same pattern was since
+copied into `tests/PreferencesCard.test.tsx`, so a fix should cover both.
+
+**Suggested fix:** use
+`vi.mock("../src/tours/viewport", async (importOriginal) => ({ ...(await importOriginal<typeof import("../src/tours/viewport")>()), isPhoneViewport: vi.fn(() => false) }))`
+so future exports pass through unmocked. Low value on its own — fold it in when either test
+file is next touched.
