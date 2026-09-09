@@ -5619,3 +5619,22 @@ copied into `tests/PreferencesCard.test.tsx`, so a fix should cover both.
 `vi.mock("../src/tours/viewport", async (importOriginal) => ({ ...(await importOriginal<typeof import("../src/tours/viewport")>()), isPhoneViewport: vi.fn(() => false) }))`
 so future exports pass through unmocked. Low value on its own — fold it in when either test
 file is next touched.
+
+## 2026-09-08 deferred from /code-review (tour modal overlay)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [LOW] portal/src/components/tours/TourCallout.tsx:159 — outside-click handlers bound to mousedown/pointerdown still fire through the overlay
+The tour's blocking overlay only handles `click`. At least six components dismiss themselves
+from `document.addEventListener("mousedown", ...)` or `"pointerdown"` — `TaskFilterButton.tsx:55`,
+`TaskActionsMenu.tsx:43`, `EstimateTitleBar.tsx:94` and `:110`, `TemplatesTab.tsx:425`,
+`InfoTooltip.tsx:106` — and those events fire before `click` and are a different event type, so
+the overlay's `stopPropagation` on the click never sees them. Clicking the overlay while one of
+those menus is open closes it. LOW because the only observable effect is a dropdown dismissing,
+which is harmless and arguably what a user expects; nothing destructive is bound to those events.
+
+**Suggested fix:** if the block should be airtight, add matching `onMouseDownCapture` and
+`onPointerDownCapture` handlers to the overlay that also call `stopPropagation`. The reviewing
+recommendation was to leave it as-is — the behavior is benign, and three handlers where one
+reads clearly is the worse trade. Recorded so the gap stays a known choice rather than an
+oversight.
