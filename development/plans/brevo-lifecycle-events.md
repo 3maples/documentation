@@ -172,7 +172,7 @@ table.
 
 | Automation | Entry event | Templates | Delays | Check before each send |
 |---|---|---|---|---|
-| AUTO-1 | `setup_completed` | T0, T1.1, T1.2, T1.3 | immediate, +1d, +3d, +6d **from setup completion** | T0 none (unconditional); each nudge: `ACTIVATED` is true **and** `FIRST_ESTIMATE_AT` is empty |
+| AUTO-1 | `setup_completed` | T0, T1.1, T1.2, T1.3 | immediate, +1d, +3d, +6d **from setup completion** | T0 none (unconditional); each nudge: `ACTIVATED` is true **and** `ESTIMATE_STARTED_AT` is empty |
 | AUTO-2 | `estimate_draft_started` | T2.1, T2.2 | +2h, +1d | `ACTIVATED` is true **and** `FIRST_ESTIMATE_AT` is empty |
 | AUTO-3 | `first_estimate_built` | T3.1, T3.2, T3.3 | +1d, +3d; T3.3 at +7d after `first_document_generated` | T3.1/T3.2: `DOCUMENT_GENERATED_AT` is empty — when it is set, branch to the T3.3 step |
 
@@ -423,17 +423,77 @@ mean. Template internal names are v2.0's and are exact (its RULE-2).
 |---|---|---|
 | 1 | Send | `onb-welcome` (T0). Sender Brad, transactional stream. Unconditional |
 | 2 | Wait | 1 day |
-| 3 | Condition | IF `ACTIVATED` is true AND `FIRST_ESTIMATE_AT` is empty → continue. ELSE exit |
+| 3 | Condition | IF `ACTIVATED` is true AND `ESTIMATE_STARTED_AT` is empty → continue. ELSE exit |
 | 4 | Send | `onb-cliff1-day1` (T1.1). Sender Maple |
 | 5 | Wait | 2 days |
-| 6 | Condition | IF `ACTIVATED` is true AND `FIRST_ESTIMATE_AT` is empty → continue. ELSE exit |
+| 6 | Condition | IF `ACTIVATED` is true AND `ESTIMATE_STARTED_AT` is empty → continue. ELSE exit |
 | 7 | Send | `onb-cliff1-day4` (T1.2). Sender Maple |
 | 8 | Wait | 3 days |
-| 9 | Condition | IF `ACTIVATED` is true AND `FIRST_ESTIMATE_AT` is empty → continue. ELSE exit |
+| 9 | Condition | IF `ACTIVATED` is true AND `ESTIMATE_STARTED_AT` is empty → continue. ELSE exit |
 | 10 | Send | `onb-cliff1-day6` (T1.3). Sender Maple |
 | 11 | End | |
 
 Resulting schedule from setup completion: immediate, day 1, day 3, day 6.
+
+**Why the `ESTIMATE_STARTED_AT` clause (added 2026-09-08).** Without it AUTO-1
+and AUTO-2 run concurrently on the same contact for the full six days: they are
+independent flows entering on different events, their conditions were
+identical, and neither reads the other's state (`Re-entry: OFF` is
+per-automation and does not help). A user who completes setup, opens the
+builder and abandons an unpriced draft satisfies both, and there is no
+frequency cap in this design — so they are eligible for five nudges. With Δ =
+setup-completion to builder-open, Δ ≈ 22h lands T1.1 and T2.1 within minutes of
+each other, Δ ≈ 46h does the same to T1.2 and T2.2, and the common case (Δ ≈
+minutes, dashboard → *New Estimate*) puts T1.1 and T2.2 two hours apart on day
+1. The content is the real cost: T1.x says *you haven't built an estimate yet*
+while T2.x says *I saved your draft* — both true, and together they read as two
+systems that don't know about each other. The clause makes AUTO-1 the
+"never started" track and hands abandoners to AUTO-2, which carries the more
+specific message.
+
+**`FIRST_ESTIMATE_AT is empty` was dropped from these three conditions
+(2026-09-08); the global exit is what makes that safe.** It was redundant:
+`ESTIMATE_STARTED_AT is empty` implies it, because `_events_implied_by` marks
+*every* estimate as draft-started and the two events are emitted in a fixed
+order (`_ESTIMATE_EVENT_ORDER`), so no contact reaches `first_estimate_built`
+without `estimate_draft_started` having been attempted first. One state breaks
+that implication — a partial failure. Neither the live hook nor the sweep stops
+on a failed emit (both loop over their pending events and only count the
+failures), so `first_estimate_built` can land while `estimate_draft_started`
+did not, leaving `FIRST_ESTIMATE_AT` set and `ESTIMATE_STARTED_AT` empty. The
+per-send check no longer catches that contact. The **global exit
+`FIRST_ESTIMATE_AT is not empty`** does, and it is evaluated continuously —
+so keep it. Remove the exit as well and AUTO-1 would nudge an activated user.
+
+Two things the clause deliberately does **not** fix:
+
+- **T0 is still unconditional**, and has to be (see the T0 note below), so the
+  reconcile case survives: when the nightly sweep replays `setup_completed` and
+  `estimate_draft_started` back-to-back for a contact whose live pushes both
+  failed, they get T0 immediately and T2.1 two hours later — a welcome and a
+  draft-recovery email for an account that is weeks old. The sweep emits a
+  user's pending events in one loop with no spacing
+  ([`_EVENT_ORDER`](platform/services/brevo_lifecycle_reconcile.py)),
+  and `replay_attributes` back-dates the *attributes* while Brevo's automation
+  clock runs from event receipt.
+- **It over-suppresses, permanently.** `ESTIMATE_STARTED_AT` is once-ever and
+  never cleared, and it is written when the builder *page loads* — the
+  auto-created draft on mount, not a save. One stray click on **New Estimate**
+  and an immediate back-out therefore kills T1.1–T1.3 forever, and AUTO-2
+  cannot re-enter (re-entry OFF, event fires once ever): that user receives T0,
+  T2.1, T2.2 and nothing else. The check asks *has this contact ever opened the
+  builder*, when what we want is *is this contact currently in AUTO-2*. Accepted
+  for launch — it trades an over-mailing bug for a smaller under-mailing one —
+  but it is the reason the `{{BUILD_URL}}` ban in §3.2 now costs more than a
+  quota slot: pointed at `/estimates/new-with-activity`, one click on T1.1 would
+  silently kill T1.2 and T1.3 as well.
+
+  Two ways out when someone wants the tail back: give AUTO-2 its own day-3/day-6
+  steps (new copy, Ron's call), or relax the clause to `ESTIMATE_STARTED_AT is
+  empty OR older than 2 days` so AUTO-1 resumes once AUTO-2 has run its course
+  — **confirm the editor supports a relative date comparison in an automation IF
+  step before designing around it**; Brevo segments do, automation conditions
+  are unverified.
 
 **AUTO-2 — Draft recovery**
 - Entry trigger: custom event `estimate_draft_started`
@@ -488,8 +548,9 @@ Four things to watch while building these:
 - **`ACTIVATED` is true for everyone who enters AUTO-1** — `setup_completed` is
   what writes it. The clause is kept in every condition as belt-and-braces, and
   because it is the half that stops being redundant if a flow is ever re-pointed
-  at an earlier entry event. `FIRST_ESTIMATE_AT is empty` is the half doing the
-  work.
+  at an earlier entry event. The half doing the work differs by flow: in AUTO-1
+  it is `ESTIMATE_STARTED_AT is empty` (see the note under its step table), in
+  AUTO-2 it is still `FIRST_ESTIMATE_AT is empty`.
 
 *One naming mismatch, cosmetic:* v2.0 calls T1.2 `onb-cliff1-day4`, from its own
 day-1/4/6 schedule. Ours puts it on day 3. Keep the name exactly as written —
