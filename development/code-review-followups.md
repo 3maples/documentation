@@ -5684,3 +5684,34 @@ property dialog's own layout follows `md`. Between 640px and 768px the button sh
 **Suggested fix:** leave as-is for consistency with the existing `sm:` label-collapse precedent
 in `TasksPage.tsx` and `TaskDialog.tsx`, or switch all three to `md:` in one pass. Do not change
 `ContactsPicker` alone — a lone `md:` there would be a third convention.
+
+## 2026-09-09 deferred from /code-review (work-item blank-row guard)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+Both are LOW; #1-#6 of that review (the material blank-predicate asymmetry, an
+inaccurate guard comment, the disabled-button hint on both tables, and three
+missing `SearchableSelect` accessible names) were fixed in the same pass.
+
+### [LOW] portal/src/components/estimates/ActivitiesTable.tsx:199 — the add-row button markup is duplicated across the twin tables
+`MaterialsTable` and `ActivitiesTable` were already near-identical siblings; the blank-row
+guard added ~14 more duplicated lines to each — the wrapping flex div, the conditional
+"Finish the empty row" hint span, the `disabled` attribute, and the four `disabled:` utility
+classes. The two copies differ only in the button label, so any future change to the disabled
+treatment has to be made twice and can silently drift.
+
+**Suggested fix:** extract an `AddRowButton` component (`label`, `disabled`, `disabledHint`,
+`onClick`) into `src/components/estimates/` or `src/components/common/`, and render it from
+both tables' headers.
+
+### [LOW] portal/tests/WorkItemBlankRowGuard.test.tsx:97 — blank rows are counted by `textContent` prefix rather than by role name
+`countPlaceholders` filters all comboboxes by `textContent.startsWith("Select material")`. It
+works, but couples the test to the placeholder copy and to the fact that the size select's text
+happens to begin differently ("Select size1 yd"). Renaming a placeholder — a pure copy change —
+silently breaks the guard tests. This existed because the selects had no accessible name; that
+blocker is now gone (they carry `ariaLabel="Material"` / `"Role"` as of the same pass), so the
+cleanup is unblocked.
+
+**Suggested fix:** replace the helper with `screen.queryAllByRole("combobox", { name: "Material" })`
+/ `{ name: "Role" }` and delete `countPlaceholders`. Note the counts change meaning — those
+queries match every row, not only blank ones — so the assertions need rewriting in terms of
+total row count rather than blank-row count.
