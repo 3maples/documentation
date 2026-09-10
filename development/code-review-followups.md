@@ -5638,3 +5638,49 @@ which is harmless and arguably what a user expects; nothing destructive is bound
 recommendation was to leave it as-is — the behavior is benign, and three handlers where one
 reads clearly is the worse trade. Recorded so the gap stays a known choice rather than an
 oversight.
+
+## 2026-09-09 deferred from /code-review (portal mobile layout pass)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+All four are LOW; #1-#8 of that review (stale rationale comments, the duplicated
+Duration row, three missing accessible names) were fixed in the same pass.
+
+### [LOW] portal/src/components/common/EstimatesTable.tsx:279 — Duplicate is now unreachable on a phone
+Removing `RowActionMenu` from the mobile card removed the only mobile entry point to
+Duplicate (the menu's sole item). A phone user who wants to copy an estimate has no path
+to it — the estimates list is the only surface that offers it. This was an explicit product
+request, so it is recorded as an accepted trade-off rather than a defect.
+
+**Suggested fix:** none if the trade-off stands. If mobile duplication should stay reachable,
+the cheapest option is a Duplicate button inside the estimate editor (where there is room for
+a label) rather than restoring the dot-menu to the card.
+
+### [LOW] portal/tests/RecurrenceDialog.test.tsx:50 — brittle substring assertion over a `<select>`'s full option text
+`expect(rowOf(startMonth).textContent).not.toContain("to")` reads the whole row, and a
+`<select>`'s `textContent` includes all twelve `MONTH_LABELS`. It passes today only because no
+abbreviation happens to contain "to". Localizing or renaming a month label (e.g. a full-name
+variant with "October") would fail this test for a reason unrelated to what it guards.
+
+**Suggested fix:** assert on the row's label span instead of the whole row — query the
+`Start`/`End` label element and check its text — or scope the negative assertion to the row's
+direct `<span>` children rather than `textContent`.
+
+### [LOW] portal/src/components/tasks/TaskDialog.tsx:1 — file is 793 lines, just under the 800-line review gate
+The mobile-footer change added 6 lines to a file already at 787. It does not breach the
+800-line threshold, but the footer alone is now ~75 lines of JSX with four conditional buttons
+and two responsive-label rules, and the next small addition crosses the line.
+
+**Suggested fix:** extract the `footer={...}` JSX into a `TaskDialogFooter` component in the
+same directory, taking the handlers and the `isEdit` / `canSubmit` / `submitLabel` state it
+already reads. No behavior change; drops the file roughly 70 lines.
+
+### [LOW] portal/src/components/properties/ContactsPicker.tsx:60 — label collapses at `sm` (640px) while the portal's documented phone breakpoint is `md` (768px)
+The `sm:hidden` / `hidden sm:inline` pair switches at 640px, but `src/lib/breakpoints.ts`
+documents `PHONE_BREAKPOINT_PX = 768` as the width where the portal changes shape, and the
+property dialog's own layout follows `md`. Between 640px and 768px the button shows the full
+"New Contact" inside a dialog still in its phone layout. Not a visible defect at those widths
+(there is room), purely a consistency question.
+
+**Suggested fix:** leave as-is for consistency with the existing `sm:` label-collapse precedent
+in `TasksPage.tsx` and `TaskDialog.tsx`, or switch all three to `md:` in one pass. Do not change
+`ContactsPicker` alone — a lone `md:` there would be a third convention.
