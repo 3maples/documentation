@@ -5715,3 +5715,37 @@ cleanup is unblocked.
 / `{ name: "Role" }` and delete `countPlaceholders`. Note the counts change meaning — those
 queries match every row, not only blank ones — so the assertions need rewriting in terms of
 total row count rather than blank-row count.
+
+## 2026-09-09 deferred from /code-review (checklist dialog Create PDF row)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+#2 and #3 of that review (two container leftovers from moving the button) were
+fixed in the same pass.
+
+### [MEDIUM] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — the page is 1,861 lines, more than twice the 800-line review threshold
+This file holds the entire estimate editor: data loading, autosave, status transitions, gap
+resolution, PDF generation, and five inline modals — the checklist dialog alone is ~140 lines
+of JSX inside the page's single return. Finding the block to change meant scrolling past four
+unrelated dialogs, and the checklist's own state (`isChecklistOpen`, `checklistGrouped`,
+`checklistError`, `checklist`, `handleChecklistPdfDownload`) is scattered ~1,200 lines away
+from the markup that uses it. MEDIUM rather than the HIGH the size check would give: the
+condition is long-standing, and the change that surfaced it made the file shorter, so this is
+standing debt rather than a regression.
+
+**Suggested fix:** extract the checklist modal into `src/components/estimates/ChecklistDialog.tsx`
+taking `{ open, checklist, grouped, error, onGroupedChange, onDownloadPdf, onClose }`, and move
+`checklistGrouped` / `checklistError` state in with it. That is ~150 lines off the page and would
+let `tests/EstimateChecklistDialogLayout.test.tsx` render the dialog directly instead of driving
+the whole page through a dozen module mocks. Worth doing as its own change.
+
+### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1659 — a fourth site collapses a label at `sm` (640px) while the documented phone breakpoint is `md` (768px)
+The `sm:hidden` / `hidden sm:inline` pair on the checklist's Create PDF button switches at 640px,
+but `src/lib/breakpoints.ts` documents `PHONE_BREAKPOINT_PX = 768` as the width where the portal
+changes shape. This is now the fourth such site — `TasksPage.tsx`, `TaskDialog.tsx` and
+`ContactsPicker.tsx` are the others — so it is consistent with practice but not with the
+documented constant. No visible defect in the 640-768px band; the rows have room there.
+
+**Suggested fix:** leave as-is for consistency, or switch all four to `md:` in one deliberate pass.
+Do not change a single site — a lone `md:` would be a third convention. This supersedes the
+`ContactsPicker`-only entry logged earlier the same day: treat the four together whenever this is
+picked up.
