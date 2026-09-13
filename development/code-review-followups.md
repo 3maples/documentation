@@ -5749,3 +5749,67 @@ documented constant. No visible defect in the 640-768px band; the rows have room
 Do not change a single site — a lone `md:` would be a third convention. This supersedes the
 `ContactsPicker`-only entry logged earlier the same day: treat the four together whenever this is
 picked up.
+
+## 2026-09-12 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+That review covered the phone-layout pass across Tasks, Properties, Materials,
+People and the estimate editor; #1-#4, #9 and #10 of it were fixed in the same
+pass (the two focus-steal defects, the misleading empty state, the wasted
+task-statuses fetch, and two test-quality issues).
+
+### [LOW] portal/src/lib/viewport.ts:57 — MediaQueryList.addEventListener with no legacy fallback
+`query.addEventListener("change", ...)` is guarded only by `typeof window.matchMedia ===
+"function"`, not by whether the returned MediaQueryList supports the modern listener API. On a
+host that only implements the deprecated `addListener` the call throws during mount, and because
+`useIsPhone` now runs in TaskDialog, TasksPage, PropertiesPage and NewEstimateWithActivityPage,
+that is a hard crash of those screens rather than a degraded layout. LOW rather than MEDIUM
+because the modern API has been in Safari since 14 (2020) and every current target supports it —
+the realistic victim is a future test that stubs matchMedia minimally and gets a confusing
+TypeError.
+
+**Suggested fix:** feature-detect before subscribing: use `addEventListener` /
+`removeEventListener` when present and fall back to `addListener` / `removeListener` otherwise,
+or wrap the subscribe/unsubscribe pair in a small helper so both call sites stay in step.
+
+### [LOW] portal/src/pages/TasksPage.tsx:104 — `md:order-first` makes DOM order disagree with visual order
+The task card's thumbnail now renders after the text block and is pulled back to the left with
+`md:order-first`. Above 768px the visual sequence is photo→text while the DOM sequence is
+text→photo, so a screen reader hears the task title and metadata before the photo it sits beside
+(WCAG 1.3.2 Meaningful Sequence). Impact is small: the element is an `<img>` with descriptive alt
+text, or an aria-hidden placeholder, and nothing in the card is focusable except the actions menu,
+so tab order is unchanged.
+
+**Suggested fix:** acceptable as-is given the low impact, and reordering the DOM per breakpoint
+would mean duplicating the subtree — worse. If it is worth cleaning up, drop `md:order-first` and
+instead keep the thumbnail first in the DOM with `order-last md:order-none`, so the visual reorder
+happens on the phone (where the image is genuinely secondary) rather than on desktop.
+
+### [LOW] portal/src/pages/MaterialsPage.tsx:60 — `onDuplicate` is optional with no caller that omits it
+Removing the mobile card's `<MaterialsActionsMenu>` (phones are now a read-only catalog) left
+exactly one call site, at line 678, which always passes `onDuplicate`. The `onDuplicate?: () =>
+void` optionality and the `action?.()` no-op it enables are now unreachable. Worth noting that the
+same change silently FIXED a latent bug: the removed mobile instance omitted `onDuplicate`, so its
+always-rendered "Duplicate" menu item did nothing when tapped.
+
+**Suggested fix:** tighten the prop to `onDuplicate: () => void` so a future caller that forgets it
+is a type error rather than a dead menu item.
+
+### [LOW] portal/src/pages/MaterialsPage.tsx:774 — `justify-between` row left with a single child
+With the actions menu removed from the mobile card, this row holds only the "Show Sizes" toggle,
+so `justify-between` no longer distributes anything. Renders correctly (the button sits left) but
+the class now misdescribes the layout.
+
+**Suggested fix:** drop `justify-between` from that div, leaving `flex items-center pt-3 border-t
+border-gray-200`.
+
+### [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — phone-layout pass added to files far past the 800-line guideline
+The cross-cutting checklist treats >800-line files as HIGH. NewEstimateWithActivityPage is 1,874
+lines, MaterialsPage 1,559, PeoplePage 1,195 — all well over, and the phone-layout pass added
+10-25 lines to each. LOW rather than HIGH because every one of these files was already oversized
+beforehand and nothing in that change made the structure worse; the additions are localized class
+edits and one conditional. Overlaps the standing NewEstimateWithActivityPage entry above.
+
+**Suggested fix:** out of scope for a mobile-layout pass; splitting these files is its own piece of
+work. The NewEstimateWithActivityPage entry logged earlier (extract the checklist dialog) is the
+concrete first step already on record.
