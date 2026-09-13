@@ -5833,3 +5833,25 @@ out and lands the file near 720. Deferred rather than done in this pass because
 the prop surface is wide (~15 values) and the drawer is covered only by
 `PortalLayoutSwipe.test.tsx`, which exercises the gesture rather than the
 markup — worth its own change with its own review.
+
+## 2026-09-13 deferred from /code-review (iOS focus-zoom + Maple panel chrome)
+
+Logged by `/fix-issues 1,4,5,6,7,8,9`. Findings #1 and #4-#9 were applied in
+that pass. #2 (the desktop tab reading "Chat" while the phone dock reads
+"Maple") was closed as not-a-finding: Maple is the panel, and Chat / Support /
+What's New are the tabs inside it, so the two labels name different things.
+
+### [MEDIUM] portal/src/components/Layout/AiPanel.tsx:396 — the AI-accuracy disclaimer was removed from the desktop panel too
+"Maple can make mistakes. Please review her work." previously rendered under the composer on
+desktop and was deliberately suppressed only on the mobile sheet, where vertical room is scarce —
+the removed `showDisclaimer` parameter existed precisely to draw that line. The change dropped it
+from both panels, so the app now ships no standing notice that the assistant's output can be
+wrong, on any surface. Maple drafts estimates users send to their own customers, which is the case
+the notice was there for. MEDIUM rather than HIGH because nothing breaks functionally — it is a
+product/compliance judgement, not a defect.
+
+**Suggested fix:** decide it explicitly rather than leaving it as a side effect of a spacing pass.
+Restoring desktop-only is a revert of the removal: reinstate the `showDisclaimer` parameter on
+`renderAiComposer` and pass `false` from the mobile branch at AiPanel.tsx:565, which is what the
+code did before. If removing it everywhere is intended, put the notice somewhere persistent
+instead — the panel header, or the Maple tour step — so the disclosure still exists somewhere.
