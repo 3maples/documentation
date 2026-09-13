@@ -5813,3 +5813,23 @@ edits and one conditional. Overlaps the standing NewEstimateWithActivityPage ent
 **Suggested fix:** out of scope for a mobile-layout pass; splitting these files is its own piece of
 work. The NewEstimateWithActivityPage entry logged earlier (extract the checklist dialog) is the
 concrete first step already on record.
+
+## 2026-09-12 deferred from /code-review (phone tab bar — residual)
+
+Logged by `/fix-issues all`. All ten findings were applied; this is the part of
+#1 the specified fix could not reach.
+
+### [HIGH] portal/src/components/Layout/PortalLayout.tsx:1 — still 894 lines after the phone-chrome extraction
+The review's fix — extract the phone chrome into `useMobileChrome()` — was
+applied and took the file from 923 to 894 lines. It remains over the 800-line
+threshold because it was already at 858 before the tab-bar work began, so no
+change of this size gets it under. The remaining bulk is the tablet drawer:
+~150 lines of JSX plus the drag maths and the swipe wiring, all in the render
+body.
+**Suggested fix:** Extract the drawer into `MobileNavDrawer.tsx` — the backdrop,
+the `<aside>`, the nav list, the account footer and the powered-by strip, taking
+the drag offset and the open/close handlers as props. That is roughly 170 lines
+out and lands the file near 720. Deferred rather than done in this pass because
+the prop surface is wide (~15 values) and the drawer is covered only by
+`PortalLayoutSwipe.test.tsx`, which exercises the gesture rather than the
+markup — worth its own change with its own review.
