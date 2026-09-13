@@ -5855,3 +5855,30 @@ Restoring desktop-only is a revert of the removal: reinstate the `showDisclaimer
 `renderAiComposer` and pass `false` from the mobile branch at AiPanel.tsx:565, which is what the
 code did before. If removing it everywhere is intended, put the notice somewhere persistent
 instead — the panel header, or the Maple tour step — so the disclosure still exists somewhere.
+
+## 2026-09-13 deferred from /code-review (phone chrome fixes — residual)
+
+Logged by `/fix-issues all`. Every finding in that review was applied except the
+residual below: finding #7's prescribed fix (lifting the Maple tab strip into
+its own component) landed and took PortalLayout from 921 to 878 lines, but the
+file is still over the 800-line guideline. Closing the remaining gap needs a
+second, larger extraction than the finding described, so it is left for its own
+pass rather than bundled into a behavioral fix set.
+
+### [MEDIUM] portal/src/components/Layout/PortalLayout.tsx:398 — still 878 lines after the tab-strip extraction
+`mapleNavFooter` moved out to `components/Layout/MapleNavTabs.tsx` (43 lines), which resolved the
+companion finding about that factory being over 50 lines but left the file itself 78 lines above
+the guideline. What remains is genuinely large: the desktop sidebar at lines 398-580 is 183 lines
+of JSX, and the tablet drawer at 603-748 another 145. Both are coherent units that belong in their
+own files — the layout would drop to roughly 550 lines with either one out. Neither move is
+mechanical, though: the sidebar alone closes over 16 identifiers (`companyLogoSrc`,
+`isSidebarCollapsed`, `showUserMenu`, `notificationsUnread`, `handleLogout`, `handleOpenSettings`
+and the setters behind them), so it is a real props-surface design rather than a cut-and-paste, and
+neither block has direct test coverage to catch a slip.
+
+**Suggested fix:** extract `PortalSidebar.tsx` first (lines 398-580), taking a single
+`{company, user, unreadCount, isCollapsed, onToggleCollapse, ...handlers}` shape rather than 16 flat
+props, and add a focused render test for it before the move so the extraction has something to
+verify against. Do it on its own, not alongside behavioral changes — this is the file every phone
+chrome change has landed in, and it just took a layout regression (the `<Outlet/>` wrapper) that no
+test caught.
