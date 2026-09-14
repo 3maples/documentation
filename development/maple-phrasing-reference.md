@@ -2,9 +2,42 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-13
+**Last updated:** 2026-09-14
 
 ### Change log
+
+**2026-09-14 — "Profit Margin" readout renamed to Gross Margin**
+
+The figure formerly labeled "Profit Margin" is now **Gross Margin**, and shares
+a row with **Markup %** — the same dollars stated against cost and against the
+Selling Price. A new **Selling Price** row (subtotal + markup, pre-tax) sits
+directly below, so the margin's denominator is on screen; it previously looked
+miscalculated because the only total nearby included tax.
+
+**Gross Margin % is now editable.** Only `profit_margin` is stored: typing a
+target margin solves backwards for the markup that delivers it. It is *not* a
+unit conversion of the markup — the solver also counts the profit inside
+material prices, so a company whose Materials Markup is earning needs less
+work-item markup to reach a target. The margin dashes and goes un-editable when
+a line has no cost basis, since there is nothing to solve against.
+
+The maths is otherwise unchanged: tax was always excluded from both sides, and
+overhead is still deducted (a deliberate departure from the textbook "gross").
+
+**What this changes for Maple.** Two things, both in `text_helpers.py`:
+
+- `"gross margin"` already reached the financial-field refusal, because the
+  refused set is matched by substring and `"margin"` is inside it.
+- `"markup"` did **not** — it shares no substring with `"margin"`, so
+  "set the markup on the patio work item to 20%" fell through to the generic
+  unknown-field fallback instead of the deliberate UI-pointer refusal. That is
+  the label the UI actually shows on the editable field, so it was the likeliest
+  phrasing of all. `"markup"` is now in `_WORK_ITEM_REFUSED_FIELDS`, and the
+  refusal copy names markup rather than "profit margin".
+
+Users still say "profit margin" — the old label remains in their vocabulary and
+in the refused set. Guide-answered conceptual questions now cover both spellings
+(`test_maple_help_coverage.py` §1.5.7).
 
 **2026-09-13 — "profit margin" split into Markup and Profit Margin**
 
@@ -17,7 +50,8 @@ Margin** appears under each Work Item Total, computed from stored line costs.
 lifted — §1.5.7's write phrasings stay refused. What changed is the *answer*:
 the users' guide previously defined the markup field as a margin, so Maple
 would confidently give the wrong answer to "is my 10% markup the same as a 10%
-margin?". The guide now carries a "Markup vs. Profit Margin" section, and
+margin?". The guide now carries a "Markup vs. Gross Margin" section (renamed
+2026-09-14), and
 conceptual questions about either are answered from it.
 
 **Still refused: reporting a specific work item's margin value.** Maple cannot
@@ -850,7 +884,7 @@ The rename handler already covers description updates. These phrasings extend th
 
 `JobItem` carries four cost parameters: `profit_margin` (default 15%), `overhead_allocation` (default 0%), `labor_burden` (default 0%), and `tax` (default 0%). These multiplicatively affect the work item's `sub_total` and roll up into `Estimate.grand_total`.
 
-**Naming:** the persisted field is still `profit_margin`, but it is a **markup** — applied to the subtotal and added on top — and the UI labels it **Markup %**. The field was not renamed (a migration across estimates, templates and company defaults for no user benefit). The separate read-only **Profit Margin** under the Work Item Total is computed in the frontend and is not stored, which is why Maple cannot report its value.
+**Naming:** the persisted field is still `profit_margin`, but it is a **markup** — applied to the subtotal and added on top — and the UI labels it **Markup %**. The field was not renamed (a migration across estimates, templates and company defaults for no user benefit). The **Gross Margin** shown beside it is computed in the frontend and is not stored, which is why Maple cannot report its value — editing it in the UI writes back to `profit_margin`, so there is still exactly one stored number.
 
 **Current policy:** these fields are in `_WORK_ITEM_REFUSED_FIELDS` — the agent directs users to the UI because financial changes have dollar-impact visibility concerns. The phrasings below are defined for review; implementation would require lifting the refusal.
 
@@ -2185,7 +2219,8 @@ cd platform
 
 **Totals: Tier 1 163/174 · Tier 2 165/174** *(both 2026-07-29, live)*.
 
-*Unchanged by the 2026-09-13 Markup/Profit Margin split: that change was
+*Unchanged by the 2026-09-13 Markup/Margin split or the 2026-09-14 Gross
+Margin rename: neither change was
 documentation-only for Maple — no classifier rule was added, no refusal lifted,
 and `test_maple_crud_coverage.py` exercises the same 174 phrasings. The six new
 §1.5.7 conceptual phrasings route to HELP through existing rules and are

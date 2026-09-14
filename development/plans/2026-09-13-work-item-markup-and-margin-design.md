@@ -1,5 +1,26 @@
 # Work Item Markup & True Profit Margin
 
+> **Amended 2026-09-14 — read this first.** Everything below still describes
+> the maths correctly, but two things changed after it shipped:
+>
+> 1. **"Profit Margin" is now "Gross Margin"** throughout the UI, the users
+>    guide and the code (`getWorkItemMargin` → `getWorkItemGrossMargin`,
+>    `trueProfit` → `grossProfit`, `revenue` → `preTaxRevenue`). §9's mockup
+>    and §10's guide table use the old label.
+> 2. **The readout moved onto the Markup row and became editable.** §9's
+>    "New readout" sketch shows it indented under the Work Item Total; it now
+>    sits beside Markup %, with a new **Selling Price** row (subtotal + markup,
+>    pre-tax) below carrying the denominator. Typing a target margin solves
+>    backwards for the markup via `backCalculateMarkupFromGrossMargin` —
+>    which is **not** `markup / (1 + markup)`: that conversion cannot see the
+>    profit inside material prices and answers 9.09% for §2's job keeping
+>    16.89%.
+>
+> The numerator is unchanged: **overhead is still deducted**, which is a
+> deliberate departure from the textbook reading of "gross" (revenue less
+> direct cost only). Decided 2026-09-14, on the grounds that a work item is
+> asked "am I making money on this job after overhead?".
+
 **Date:** 2026-09-13
 **Status:** Implemented 2026-09-13 (uncommitted)
 **Scope:** `portal/` + `platform/` + `documentation/`
