@@ -5923,3 +5923,24 @@ PropertiesPage, MaterialsPage, PeoplePage) and `InputField` still has a second p
 EquipmentsPage. Those were left alone deliberately — Materials, People and Equipments are not
 otherwise part of this change, and widening a fix set into untouched pages is how a reviewable diff
 stops being reviewable. They are worth a dedicated dedupe pass.
+
+## 2026-09-14 deferred from /code-review (work item Markup + Profit Margin)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+Three further findings were reviewed and **dismissed as accepted risk**, not logged as debt:
+untested `backfill_line_costs` orchestration (#2 — mitigated by always dry-running first), the
+full-document `estimate.save()` in the backfill (#9 — mitigated by running only when nobody is
+working), and a dead `hasattr` branch in a backfill test (#11 — the script runs once).
+
+### [LOW] portal/src/components/onboarding/CompanyStep.tsx:549 — the same setting has two names
+
+Onboarding collects this field as "Standard Unbillable (%)" while Settings → Financial now labels
+it "Unbillable Time". A user sets one during setup and later hunts for it under a different name.
+The mismatch predates the rename but the rename widened it, and the glossary in
+`platform/user_guides/users_guide.md` still says "Standard Unbillable %" — so Maple will name the
+field differently again if asked.
+
+**Suggested fix:** align the onboarding label and the guide glossary entry to "Unbillable Time".
+Deferred deliberately: it touches onboarding wizard copy outside the scope of the Markup change,
+and will be resolved as part of the planned onboarding-flow overhaul.

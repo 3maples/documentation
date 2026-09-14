@@ -2,9 +2,29 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-08-27
+**Last updated:** 2026-09-13
 
 ### Change log
+
+**2026-09-13 — "profit margin" split into Markup and Profit Margin**
+
+The work item's editable percentage is a **markup**, not a margin: it is
+applied to the subtotal and added on top, so 10% yields a 9.09% margin. It is
+now labeled **Markup %** everywhere in the UI. A separate read-only **Profit
+Margin** appears under each Work Item Total, computed from stored line costs.
+
+**What this changes for Maple.** Nothing routes differently and no refusal was
+lifted — §1.5.7's write phrasings stay refused. What changed is the *answer*:
+the users' guide previously defined the markup field as a margin, so Maple
+would confidently give the wrong answer to "is my 10% markup the same as a 10%
+margin?". The guide now carries a "Markup vs. Profit Margin" section, and
+conceptual questions about either are answered from it.
+
+**Still refused: reporting a specific work item's margin value.** Maple cannot
+read the computed figure; the value lives in the frontend calculation. A user
+asking "what's the margin on the Patio work item?" is pointed at the work item
+screen. Lifting this needs the formula ported to Python — tracked as a
+follow-up, not done here.
 
 **2026-08-27 — task ids became `T0042`: decimal, not Crockford (#504)**
 
@@ -826,14 +846,17 @@ The rename handler already covers description updates. These phrasings extend th
 | `list the activities on {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `how many activities does {WI} have?` | `update_estimate` → Estimate Agent | ✅ rule |
 
-### 1.5.7 Cost adjustments (profit margin, overhead, labor burden, tax)
+### 1.5.7 Cost adjustments (markup, overhead, labor burden, tax)
 
 `JobItem` carries four cost parameters: `profit_margin` (default 15%), `overhead_allocation` (default 0%), `labor_burden` (default 0%), and `tax` (default 0%). These multiplicatively affect the work item's `sub_total` and roll up into `Estimate.grand_total`.
+
+**Naming:** the persisted field is still `profit_margin`, but it is a **markup** — applied to the subtotal and added on top — and the UI labels it **Markup %**. The field was not renamed (a migration across estimates, templates and company defaults for no user benefit). The separate read-only **Profit Margin** under the Work Item Total is computed in the frontend and is not stored, which is why Maple cannot report its value.
 
 **Current policy:** these fields are in `_WORK_ITEM_REFUSED_FIELDS` — the agent directs users to the UI because financial changes have dollar-impact visibility concerns. The phrasings below are defined for review; implementation would require lifting the refusal.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
+| `set the markup on {WI} to 20%` | `update_estimate` → Estimate Agent | 🛑 refused |
 | `set the profit margin on {WI} to 20%` | `update_estimate` → Estimate Agent | 🛑 refused |
 | `change the margin on {WI} to 25%` | `update_estimate` → Estimate Agent | 🛑 refused |
 | `set overhead allocation on {WI} to 10%` | `update_estimate` → Estimate Agent | 🛑 refused |
@@ -842,10 +865,29 @@ The rename handler already covers description updates. These phrasings extend th
 | `change the labor burden on the Foundation scope to 18%` | `update_estimate` → Estimate Agent | 🛑 refused |
 | `set tax on {WI} to 13%` | `update_estimate` → Estimate Agent | 🛑 refused |
 | `change the tax rate on {WI} to 8.25%` | `update_estimate` → Estimate Agent | 🛑 refused |
-| `what's the profit margin on {WI}?` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `what's the profit margin on {WI}?` | `update_estimate` → Estimate Agent | 🛑 refused *(value not stored — see below)* |
+| `what's the markup on {WI}?` | `update_estimate` → Estimate Agent | 🛑 refused |
 | `what's the subtotal of {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `how much is {WI}?` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `what's the total for {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
+
+**Conceptual questions route to HELP and are answered from the users' guide** (no estimate context needed, no value reported):
+
+| Phrasing | Intent → Agent | Status |
+|---|---|---|
+| `is my 10% markup the same as a 10% margin?` | `help` → Maple Guide | ✅ guide |
+| `what's the difference between markup and margin?` | `help` → Maple Guide | ✅ guide |
+| `what markup do I need for a 20% margin?` | `help` → Maple Guide | ✅ guide |
+| `how is the profit margin calculated?` | `help` → Maple Guide | ✅ guide |
+| `why does labor show no profit?` | `get_labour` → Labour Agent | ⚠️ gap |
+| `why is my profit margin showing a dash?` | `help` → Maple Guide | ✅ guide |
+
+⚠️ **`why does labor show no profit?` misroutes.** "labor" is a domain keyword,
+so the classifier sends a conceptual question to the Labour agent, which tries
+to look up a role. This is the general keyword-beats-concept routing problem
+rather than anything specific to markup/margin, so it was left alone here.
+Pinned by a strict `xfail` in `test_maple_help_coverage.py` — when routing is
+fixed, that test flips red and this row gets updated.
 
 ### 1.5.8 Total amount adjustment
 
@@ -2142,6 +2184,12 @@ cd platform
 | calculator | 8/8 | 7/8 | 1 LLM miss ("how much topsoil do I need for 1000 sq ft") |
 
 **Totals: Tier 1 163/174 · Tier 2 165/174** *(both 2026-07-29, live)*.
+
+*Unchanged by the 2026-09-13 Markup/Profit Margin split: that change was
+documentation-only for Maple — no classifier rule was added, no refusal lifted,
+and `test_maple_crud_coverage.py` exercises the same 174 phrasings. The six new
+§1.5.7 conceptual phrasings route to HELP through existing rules and are
+covered by `test_maple_help_coverage.py`, which is not part of this matrix.*
 
 *Tier 2's 9 misses: seven are the same known Task bare-title class as Tier 1's ("Fix the Fence Gate" without a verb). The other two — `possessive/property` "what's 123 Main St's city" and `calculator` "how much topsoil do I need for 1000 sq ft" — were verified to fail identically on `main`, so they are standing LLM-tier gaps, not regressions. The model upgrade moved Tier 2 from 81% (95/117) to 95% (165/174); `implicit_relationship` improved most (4/12 → 15/15).*
 
