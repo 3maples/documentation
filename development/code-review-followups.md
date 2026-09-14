@@ -5882,3 +5882,44 @@ props, and add a focused render test for it before the move so the extraction ha
 verify against. Do it on its own, not alongside behavioral changes — this is the file every phone
 chrome change has landed in, and it just took a layout regression (the `<Outlet/>` wrapper) that no
 test caught.
+
+## 2026-09-13 deferred from /code-review (tab-bar stow + mark artwork — residual)
+
+Logged by `/fix-issues all`. All six findings were applied; the residual below is
+the part of finding #5 that the applied fix does not close. #5 asked for
+`ContactsPage.tsx` (1341 lines) to be brought under the 800-line guideline. What
+landed removes 105 lines and, more importantly, kills two real duplications — but
+the file is still 1236 lines, so the guideline is not met.
+
+### [MEDIUM] portal/src/pages/ContactsPage.tsx:1 — still 1236 lines after the shared-component extractions
+Two extractions landed, both chosen because they removed cross-file duplication rather than merely
+moving lines out of one file:
+
+- **`components/common/CsvUploadModal.tsx`** (169 lines) — the CSV batch-import dialog was copied
+  between ContactsPage and PropertiesPage, differing only in title, column list and sample URL.
+  Both pages now share it, and the duplicated `UploadResult` / `UploadResultError` interfaces (a
+  Model Creep instance in its own right) collapsed into one exported `CsvUploadResult`.
+- **the local `InputField`** — a private copy shadowing the existing
+  `components/common/InputField.tsx`, and a strictly worse one: it rendered a bare `<label>` with no
+  `htmlFor` and gave its input no `id`, so none of the contact form's fields were associated with
+  their labels. ContactsPage now uses the shared component (which gained a `type` prop to absorb the
+  email field), and `tests/ContactsPageMobileSheet.test.tsx` pins the association.
+
+What is left is not duplication, so it cannot be fixed by sharing — the file is simply doing too
+much. The contact form Modal is ~250 lines of JSX, and the form state behind it (`ContactFormData`,
+its initial value, the validation and submit handlers, and the address-autocomplete wiring) is
+another ~150 spread through the component body. Moving the JSX alone would leave a component taking
+twenty-odd props, so the extraction only pays off if the state goes with it.
+
+**Suggested fix:** extract `components/contacts/ContactFormModal.tsx` together with a
+`useContactForm` hook holding the form state, validation and submit, so the modal takes roughly
+`{open, editingContact, properties, onSaved, onClose}` instead of a flat prop per field. That should
+land ContactsPage near 850 and a second look at the remaining list/detail JSX would finish it. Worth
+doing on its own: the form is the highest-traffic write path on the page and has no direct test
+coverage, so it wants tests written against the current behaviour before anything moves.
+
+Note the same `PageActionsMenu` component is independently defined in four pages (ContactsPage,
+PropertiesPage, MaterialsPage, PeoplePage) and `InputField` still has a second private copy in
+EquipmentsPage. Those were left alone deliberately — Materials, People and Equipments are not
+otherwise part of this change, and widening a fix set into untouched pages is how a reviewable diff
+stops being reviewable. They are worth a dedicated dedupe pass.
