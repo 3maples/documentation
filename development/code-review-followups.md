@@ -5944,3 +5944,84 @@ field differently again if asked.
 **Suggested fix:** align the onboarding label and the guide glossary entry to "Unbillable Time".
 Deferred deliberately: it touches onboarding wizard copy outside the scope of the Markup change,
 and will be resolved as part of the planned onboarding-flow overhaul.
+
+## 2026-09-15 deferred from /code-review (work item phone density — collapsed rows + Inventory Gaps)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass. Fixed in that
+pass and therefore absent here: the missing `useIsBelowSm` test (#1), the role-group React key
+(#2), the untested empty-gaps branch (#3), the Gross Margin dash left at `text-sm` (#4) and the
+Dismiss tooltip disagreeing with its accessible name (#12).
+
+### [MEDIUM] portal/src/components/estimates/CollapsedLineHeader.tsx:39 — `aria-expanded` with no `aria-controls`
+
+The collapsed-row toggle announces its expanded state but never identifies what it expands. The
+revealed fields are sibling `<td>`s, not descendants, so a screen-reader user hears "expanded" with
+no way to navigate to the content that appeared. Pre-existing, but this change widened its reach
+from 2 tables to 4 and made the bar the permanent home of the row menu and the line amount, so the
+bar is now the primary control for each line.
+
+**Suggested fix:** give the detail cells a container id per row (e.g. `gap-${gap.id}-details`) and
+add the matching `aria-controls` to the toggle; needs a small prop addition to CollapsedLineHeader.
+Deferred because it touches all four call sites and wants its own a11y-focused pass rather than
+riding along with a layout change.
+
+### [MEDIUM] portal/src/components/estimates/InventoryGapsPanel.tsx:106 — `MaterialGapsTable` is 112 lines
+
+Exceeds the 50-line guideline by more than 2x. The body is near-flat presentational JSX — one
+`.map` over gap rows — rather than the branching logic the rule targets, and nesting stays within 4
+levels, which is why this is MEDIUM and not HIGH.
+
+**Suggested fix:** extract the `<tr>` body into a `MaterialGapRow` component, mirroring how
+`MaterialsTable.tsx` separates `MaterialRow` from `MaterialsTable`. This also makes the
+collapsed/expanded split readable at a glance.
+
+### [MEDIUM] portal/src/components/estimates/InventoryGapsPanel.tsx:219 — `RoleGapsTable` is 105 lines
+
+The same over-length problem in the sibling table; tracked separately because it needs its own
+extraction.
+
+**Suggested fix:** extract a `RoleGapRow` component, matching the `ActivityRow` split in
+`ActivitiesTable.tsx`. Worth doing in the same sitting as the `MaterialGapRow` extraction above.
+
+### [MEDIUM] portal/tests/InventoryGapsAccordion.test.tsx:96 — `spanOf` test helper duplicated across two files
+
+An identical `spanOf(row, label)` helper (parse `col-span-N` off the cell carrying a field label)
+now exists in both `InventoryGapsAccordion.test.tsx` and `LineItemAccordion.test.tsx`, as does a
+near-identical `stubViewport` matchMedia stub. Both encode the same grid contract, so a change to
+the span convention has to be found and fixed in two places. Violates the DRY rule in CLAUDE.md §2.
+
+**Suggested fix:** move `spanOf` and `stubViewport` into a shared `tests/helpers/grid.ts` (or
+extend an existing test-utils module) and import from both files. Note `tests/useIsBelowSm.test.tsx`
+and `tests/useIsPhone.test.tsx` now carry a third and fourth copy of a richer `stubMatchMedia`, so
+the consolidation is worth doing across all four at once.
+
+### [LOW] portal/src/lib/viewport.ts:1 — module docstring still describes a single gate
+
+The header reads "The shared phone-viewport gate" and explains only `PHONE_BREAKPOINT_PX` / `md`.
+The module now exports two gates at two breakpoints, and the `md` explanation reads as though it
+governs everything in the file — misleading for the next reader choosing between them.
+
+**Suggested fix:** extend the header to name both gates and say when to reach for each —
+`useIsPhone` for `md:`-stacked layouts, `useIsBelowSm` for `sm:`-stacked ones — with the rule that
+the JS gate must match the breakpoint in the component's Tailwind classes.
+
+### [LOW] portal/src/components/estimates/InventoryGapsPanel.tsx:121 — two matchMedia subscriptions per panel
+
+`MaterialGapsTable` and `RoleGapsTable` each call `useIsBelowSm()`, so one panel registers two
+listeners for the same query and re-renders both subtrees on every resize across 640px. Harmless at
+this scale; noted only because the two values must never disagree.
+
+**Suggested fix:** call `useIsBelowSm()` once in `InventoryGapsPanel` and pass `collapsible` down as
+a prop. This requires moving the call above the `return null` early exit to satisfy the Rules of
+Hooks. Best folded into the `MaterialGapRow` / `RoleGapRow` extraction above, which already reshapes
+these props.
+
+### [LOW] portal/src/components/estimates/InventoryGapsPanel.tsx:147 — key fallback contradicts the accordion id
+
+The material row key is `gap.id || i`, implying `id` may be absent, while the accordion uses bare
+`gap.id` for both `toggle()` and the open comparison. If an id were ever empty, every empty-id row
+would share `openId === ""` and open together. Not live today — ids are generated as
+`material-gap-${index}-${gapIndex}` in `estimateInventoryGaps.ts` and are always truthy — so this is
+an inconsistency rather than a bug. (The role-group equivalent was fixed as #2 in this pass.)
+
+**Suggested fix:** drop the fallback to `key={gap.id}`, matching what the accordion already assumes.
