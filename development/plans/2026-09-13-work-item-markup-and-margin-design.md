@@ -1,6 +1,30 @@
 # Work Item Markup & True Profit Margin
 
-> **Amended 2026-09-14 — read this first.** Everything below still describes
+> **Amended 2026-09-15 — read this first.** **The material markup is now
+> treated as COST, not profit.** §2's table below says the material
+> `cost`→`price` spread is "Yes. Real gross profit"; that is no longer how the
+> margin reads it. A catalog price is the material's cost basis, so the spread
+> never reaches `grossProfit`, and §2's worked example answers **9.09%**, not
+> 16.89%.
+>
+> Two consequences, both intended:
+>
+> - With materials at price and labor at its loaded Rate — the ordinary case —
+>   the work-item markup is the only profit term, and it scales with the same
+>   subtotal the denominator does. Every other input divides out and the margin
+>   is **exactly `markup / (1 + markup)`**. The solver only departs from that
+>   conversion when an activity's billed rate is hand-moved off its `cost_rate`
+>   (which is why the `P` term stays in it).
+> - A material priced **below** its recorded cost reports no loss. That is a
+>   cost-variance question, not a margin one.
+>
+> The dash guard narrowed with it: only an **activity** missing its cost basis
+> dashes the margin (`countLinesMissingCost` → `countActivitiesMissingCost`,
+> now activities-only). `MaterialItem.cost` is still stored, still snapshotted
+> and still maintained by `scripts/backfill_estimate_line_costs.py` — the
+> margin simply stops consulting it.
+>
+> **Earlier amendment, 2026-09-14.** Everything below still describes
 > the maths correctly, but two things changed after it shipped:
 >
 > 1. **"Profit Margin" is now "Gross Margin"** throughout the UI, the users
@@ -11,10 +35,9 @@
 >    "New readout" sketch shows it indented under the Work Item Total; it now
 >    sits beside Markup %, with a new **Selling Price** row (subtotal + markup,
 >    pre-tax) below carrying the denominator. Typing a target margin solves
->    backwards for the markup via `backCalculateMarkupFromGrossMargin` —
->    which is **not** `markup / (1 + markup)`: that conversion cannot see the
->    profit inside material prices and answers 9.09% for §2's job keeping
->    16.89%.
+>    backwards for the markup via `backCalculateMarkupFromGrossMargin`.
+>    (As shipped this was **not** `markup / (1 + markup)`, because the material
+>    markup counted as profit — superseded by the 2026-09-15 amendment above.)
 >
 > The numerator is unchanged: **overhead is still deducted**, which is a
 > deliberate departure from the textbook reading of "gross" (revenue less
@@ -61,7 +84,7 @@ Tracing every rate-derivation path in the app:
 
 | Layer | How price is derived | Is the spread profit? |
 |---|---|---|
-| **Material** | `price = cost × (1 + company.material_markup%)` — `routers/materials.py:119` | **Yes.** Real gross profit. |
+| **Material** | `price = cost × (1 + company.material_markup%)` — `routers/materials.py:119` | **No — changed 2026-09-15.** Was "Yes, real gross profit"; the price is now the material's cost basis. |
 | **Labor (Rate)** | `rate = wage × (1 + unbillable%) × (1 + burden%)` — `services/labour_pricing.py:12` | **No.** Entirely cost recovery — unbillable time and payroll burden. Zero markup by construction. |
 | **Work item Overhead %** | `labourTotal × overhead%` | **No.** Allocated real overhead. |
 | **Work item "Profit %"** | `subtotal × profit%` | **Yes.** |

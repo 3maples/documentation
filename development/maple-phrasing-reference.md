@@ -2,9 +2,25 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-14
+**Last updated:** 2026-09-15
 
 ### Change log
+
+**2026-09-15 — the material markup is now COST, not profit**
+
+Gross Margin no longer counts the spread between a material's catalog cost and
+its price: a price *is* the material's cost basis. The consequence for
+guide-answered questions is that Markup and Gross Margin now **are** a fixed
+conversion of one another (`markup / (1 + markup)`) on any job where labor is
+billed at its role's Rate — which corrects the 2026-09-14 entry below, and the
+users' guide passages Maple answers from. Only a hand-raised activity rate
+makes them differ. The dash now means an **activity** has no cost basis;
+a material without one no longer suppresses the figure.
+
+**No routing or refusal changed** — no phrasing was added, closed or
+reclassified, and §12.3's counts are unaffected. Reporting a specific work
+item's margin value stays refused for the same reason as before (the figure is
+computed in the frontend and never stored).
 
 **2026-09-14 — "Profit Margin" readout renamed to Gross Margin**
 
@@ -15,11 +31,11 @@ directly below, so the margin's denominator is on screen; it previously looked
 miscalculated because the only total nearby included tax.
 
 **Gross Margin % is now editable.** Only `profit_margin` is stored: typing a
-target margin solves backwards for the markup that delivers it. It is *not* a
-unit conversion of the markup — the solver also counts the profit inside
-material prices, so a company whose Materials Markup is earning needs less
-work-item markup to reach a target. The margin dashes and goes un-editable when
-a line has no cost basis, since there is nothing to solve against.
+target margin solves backwards for the markup that delivers it. (As shipped it
+was *not* a unit conversion of the markup, because the solver counted the
+profit inside material prices — superseded by the 2026-09-15 entry above.) The
+margin dashes and goes un-editable when there is no cost basis to solve
+against.
 
 The maths is otherwise unchanged: tax was always excluded from both sides, and
 overhead is still deducted (a deliberate departure from the textbook "gross").
