@@ -6025,3 +6025,74 @@ would share `openId === ""` and open together. Not live today — ids are genera
 an inconsistency rather than a bug. (The role-group equivalent was fixed as #2 in this pass.)
 
 **Suggested fix:** drop the fallback to `key={gap.id}`, matching what the accordion already assumes.
+
+## 2026-09-16 deferred from /code-review
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+That review covered the phone-onboarding redesign; findings #1-#9 were applied.
+
+### [MEDIUM] platform/scripts/migrate_landscaping_industry.py:73 — no way to target prod, and no confirmation before --apply
+
+The script takes only `--apply`. `config.py` loads `.env.local` with precedence, so on a developer
+machine an unqualified `--apply` writes to the **Dev cluster** — with no prompt and no echo of which
+database it just modified. Its sibling `backfill_companies_to_free.py` grew `--prod`, `--mongo-url`,
+and a LIVE confirmation prompt for exactly this reason. An operator can work around it with an inline
+`MONGODB_URL=...`, which is why this is MEDIUM rather than HIGH, but that path is undocumented and the
+docstring doesn't mention it. Less urgent since `CompanyIndustry._missing_` landed (finding #2) — the
+migration is now a cleanup pass rather than a deploy gate — but the script will still be run against
+production eventually.
+
+**Suggested fix:** mirror the `backfill_companies_to_free.py` interface: add `--prod` (read
+`MONGODB_URL` from `.env.production`/`.env`, bypassing `.env.local`), `--mongo-url`, and a
+`--yes`-skippable confirmation before `--apply`. At minimum, print the target host before writing and
+document the `MONGODB_URL=` inline override in the module docstring.
+
+### [MEDIUM] portal/src/pages/OnboardingPage.tsx:84 — the component body is ~270 lines
+
+`OnboardingPage` runs from line 84 to 355, most of it one JSX block of eight `currentStep === "..."`
+branches, three of which now fork again on `isPhone`. Well past the 50-line guideline. It was already
+long; the phone forks roughly doubled the step-rendering section, and the two branches of each fork
+are far enough apart on screen that a copy change to one is easy to miss on the other.
+
+**Suggested fix:** extract the step rendering into a `renderStep(): ReactNode` helper below the
+component, or a `Record<OnboardingStepId, () => ReactNode>` map built from the handlers. Either
+leaves the hook/state block readable on one screen. The shared copy constants at the top of the file
+already do the anti-drift job, so this is readability rather than correctness.
+
+### [MEDIUM] portal/src/lib/onboardingSteps.ts:79 — the desktop progress row may now wrap
+
+The two longest labels in the set replaced two of the shortest: `percentages` went "Defaults" →
+"Percentages" and `plan` went "Plan" → "Choose Plan". The desktop `StepIndicator` renders all eight
+labels in one `flex` row with seven 24px connector rules and `gap-2`, inside a `max-w-3xl` (768px)
+container that itself sits inside `px-4`. Estimated to land within a few pixels of the available
+736px. It will not overflow horizontally — the label `<span>`s have no `whitespace-nowrap`, so they
+wrap — but one or two labels going to two lines would make the dot row ragged. jsdom does no layout,
+so no test can catch this, and `/onboarding` is behind `firebaseAuth.currentUser` so it was not
+visually verified.
+
+**Suggested fix:** needs a look at ≥1024px width first. If it wraps: either shorten `plan` back
+toward "Plan" in `STEP_LABELS` (the card title stays "Choose Your Plan" — they are already
+independent), or widen `containerWidthClass` in `OnboardingPage.tsx` from `max-w-3xl` to `max-w-4xl`
+for the non-plan steps.
+
+### [LOW] portal/src/components/onboarding/CsvUploadStep.tsx:29 — required props that two of the three modes ignore
+
+`sampleCsvUrl` and `onUpload` are non-optional, but `infoOnly` and `standardOnly` never read either —
+the sample link and the file input are both inside the `infoOnly || standardOnly ? null :` branch. So
+`OnboardingPage` passes `sampleCsvUrl={MATERIALS_SAMPLE_CSV_URL}` and a live `onUpload` to screens
+that cannot upload, which reads as though they can.
+
+**Suggested fix:** make both optional and have the normal-mode branch require them (a discriminated
+union on the mode would be most honest, but optional props plus the existing branch guard is enough).
+Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sites in
+`OnboardingPage.tsx`.
+
+### [LOW] .claude/launch.json — untracked at the workspace root and not gitignored
+
+`git check-ignore` reports it is not ignored, so it shows as untracked noise in every `git status` at
+the workspace root and will get swept into someone's `git add .`. Contents are benign (an npm
+dev-server config for the portal on port 5173) — no secrets — so this is hygiene only.
+
+**Suggested fix:** a decision, not a defect. Commit it if the launch config should be shared with the
+team (it is generic enough to be useful), or add `.claude/launch.json` to the workspace-root
+`.gitignore` if it is personal tooling.

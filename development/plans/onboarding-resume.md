@@ -141,6 +141,9 @@ Enum ↔ UI-index map (frontend helper):
 | `people`     | 5 |
 | `plan`       | 6 |
 
+(A sixth value, `welcome` → 0, was added later for test resets — see the
+addendum at the end of this document.)
+
 `onboarding_completed === true` → dashboard (no onboarding seeding).
 
 ### 4. Onboarding page wiring
@@ -205,3 +208,49 @@ Enum ↔ UI-index map (frontend helper):
 - `portal/src/pages/OnboardingPage.tsx` — persist step on advance, mark complete
   on finish, hydrate user on resume.
 - Backend + frontend tests as above.
+
+---
+
+## Addendum — 2026-09-15: the `welcome` step (test resets)
+
+`OnboardingStep` gained a sixth value, `WELCOME = "welcome"` (UI step 0), so a
+test account can be rewound to the very start of the wizard.
+
+Everything above still holds for *forward* progress: the portal's earliest write
+is still `contacts`, because steps 0 (Welcome) and 1 (Company) run before the
+company exists and have nothing to store progress on. `welcome` only ever moves
+backwards, and is set by hand:
+
+```javascript
+db.companies.updateOne(
+  { _id: ObjectId("<company_id>") },
+  { $set: { onboarding_completed: false, onboarding_step: "welcome" } }
+)
+```
+
+Log out and back in — logout clears localStorage, and the next login re-seeds
+the resume flags from `/auth`, dropping the user on Welcome.
+
+**It is resume-only, on purpose.** `STEP_TO_UI_INDEX` maps `welcome → 0`, but
+`UI_INDEX_TO_STEP` deliberately has **no entry for 0**, so the step is never
+written back. `goToStep` PATCHes the server for every index that map resolves,
+and a genuinely new user sitting on Welcome has no company yet — mapping 0 would
+make the ordinary Welcome → Company → Back navigation fire a request that 400s
+on every real signup. The cost of the asymmetry is that stepping back from
+Contacts to Welcome after a reset does not re-persist `welcome`; that is an
+acceptable trade for a testing affordance.
+
+Replaying steps 0–1 over an existing company is already safe: `CompanyStep`
+prefills from the saved company and PUTs an update rather than creating a
+duplicate. The CSV steps, though, import **on top of** whatever data is already
+there — a true virgin-signup test still needs the full teardown
+(`scripts/cleanup/cleanup_company.py` plus unsetting `user.company`), and note
+that `has_ever_joined_company`, `brevo_events_sent` and `completed_tours` are
+all monotonic and survive either reset.
+
+Tests: `test_welcome_is_a_valid_onboarding_step` /
+`test_onboarding_progress_accepts_welcome_step`
+(`platform/tests/test_onboarding_resume.py`) and the `welcome` cases in
+`portal/tests/onboardingResume.test.ts`, which also pin
+`uiIndexToOnboardingStep(0) === null` so the omission does not later read as an
+oversight.

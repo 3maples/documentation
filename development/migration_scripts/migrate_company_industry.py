@@ -1,4 +1,10 @@
-"""One-time migration: set industry to 'Landscaping & Hardscape' for existing companies."""
+"""One-time migration: set industry to 'Landscaping & Hardscape' for existing companies.
+
+SUPERSEDED 2026-09-16. The CompanyIndustry enum dropped "& Hardscape"; the
+value this script writes no longer parses. Kept for the record only — do not
+run it. The current value is written by
+`platform/scripts/migrate_landscaping_industry.py`.
+"""
 import asyncio
 import sys
 from pathlib import Path
