@@ -167,10 +167,16 @@ desktop, not less, because "Later" is the path of least resistance there.
 > **Revised 2026-09-16.** The phone screens dropped the dialog. Their prose now
 > states up front what skipping costs and that Maple still recommends the
 > items, so the modal was asking a question already answered on screen — and on
-> a phone a modal is the whole screen. The laptop screens keep theirs: there the
-> user was offered a file picker and a checkbox, so reaching Next with neither
-> is worth one question. Skip labels became "Skip Materials" / "Skip People
-> Roles".
+> a phone a modal is the whole screen. Skip labels became "Skip Materials" /
+> "Skip People Roles".
+>
+> **Revised 2026-09-17.** The laptop screens dropped it too, and the
+> `skipConfirmMessage` / `skipConfirmTitle` props came out of `CsvUploadStep`
+> with them — nothing passes them any more. The argument for keeping it on a
+> laptop was that the user had been offered a picker and a checkbox, so
+> reaching Next with neither was worth one question. But the reassurance sits
+> directly above the button on both variants, so the question was answered
+> before it was asked. Skipping is now direct on every screen.
 
 ### 3. Component changes
 
