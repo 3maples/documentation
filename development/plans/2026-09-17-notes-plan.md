@@ -3044,6 +3044,10 @@ export interface UseNotesResult {
   reload: () => Promise<void>;
   /** Creates the note, then uploads each file in order; returns the files that failed. */
   createNote: (body: string, files: File[]) => Promise<{ note: Note; failedFiles: File[] }>;
+  /** Upload into a note that already exists; resolves with the files that failed. */
+  uploadAttachments: (noteId: string, files: File[]) => Promise<File[]>;
+  /** Upload into a note that already exists; resolves with the files that failed. */
+  uploadAttachments: (noteId: string, files: File[]) => Promise<File[]>;
   updateNote: (id: string, body: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   addAttachment: (id: string, file: File) => Promise<void>;
@@ -3216,6 +3220,8 @@ export interface UseNotesResult {
   error: string;
   reload: () => Promise<void>;
   createNote: (body: string, files: File[]) => Promise<{ note: Note; failedFiles: File[] }>;
+  /** Upload into a note that already exists; resolves with the files that failed. */
+  uploadAttachments: (noteId: string, files: File[]) => Promise<File[]>;
   updateNote: (id: string, body: string) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   addAttachment: (id: string, file: File) => Promise<void>;
@@ -3290,6 +3296,26 @@ export function useNotes({ parentType, parentId, workItemId, enabled = true }: U
     setNotes((previous) => previous.map((n) => (getEntityId(n) === id ? updated : n)));
   };
 
+  /**
+   * Upload files into a note that already exists; resolves with the ones that
+   * failed. Shared by create and by a retry after a partial failure, so the
+   * retry path cannot drift from the first attempt.
+   */
+  const uploadAttachments = useCallback(async (noteId: string, files: File[]): Promise<File[]> => {
+    const failed: File[] = [];
+    for (let index = 0; index < files.length; index += 1) {
+      try {
+        replace(await notesApi.uploadAttachment(noteId, await prepareUpload(files[index])));
+      } catch {
+        // The connection is likely down; keep the rest for the retry rather
+        // than hammering it.
+        failed.push(...files.slice(index));
+        break;
+      }
+    }
+    return failed;
+  }, []);
+
   const createNote = useCallback(
     async (body: string, files: File[]) => {
       const created = await notesApi.create({
@@ -3299,22 +3325,14 @@ export function useNotes({ parentType, parentId, workItemId, enabled = true }: U
         body,
       });
       if (!created) throw new Error("Failed to create the note.");
-      let latest: Note = created;
-      const failedFiles: File[] = [];
-      for (let index = 0; index < files.length; index += 1) {
-        try {
-          const updated = await notesApi.uploadAttachment(getEntityId(created), await prepareUpload(files[index]));
-          if (updated) latest = updated;
-        } catch {
-          // The connection is likely down; keep the rest for the retry.
-          failedFiles.push(...files.slice(index));
-          break;
-        }
-      }
-      if (mountedRef.current) setNotes((previous) => [latest, ...previous]);
-      return { note: latest, failedFiles };
+      // Prepend before uploading: the note exists server-side now, so it must
+      // be visible even if every attachment fails. Each upload then patches
+      // it in place.
+      if (mountedRef.current) setNotes((previous) => [created, ...previous]);
+      const failedFiles = await uploadAttachments(getEntityId(created), files);
+      return { note: created, failedFiles };
     },
-    [parentType, parentId, workItemId],
+    [parentType, parentId, workItemId, uploadAttachments],
   );
 
   const updateNote = useCallback(async (id: string, body: string) => {
@@ -3334,7 +3352,7 @@ export function useNotes({ parentType, parentId, workItemId, enabled = true }: U
     replace(await notesApi.removeAttachment(id, attachmentId));
   }, []);
 
-  return { notes, isLoading, error, reload, createNote, updateNote, deleteNote, addAttachment, removeAttachment };
+  return { notes, isLoading, error, reload, createNote, uploadAttachments, updateNote, deleteNote, addAttachment, removeAttachment };
 }
 ```
 
@@ -4272,11 +4290,13 @@ import type { Note } from "../src/types/api";
 const list = vi.fn();
 const create = vi.fn();
 const remove = vi.fn();
+const uploadAttachment = vi.fn();
 vi.mock("../src/api/notes", () => ({
   notesApi: {
     list: (...a: unknown[]) => list(...a), create: (...a: unknown[]) => create(...a),
     update: vi.fn(), remove: (...a: unknown[]) => remove(...a),
-    uploadAttachment: vi.fn(), removeAttachment: vi.fn(), attachmentBlob: vi.fn().mockResolvedValue(new Blob()),
+    uploadAttachment: (...a: unknown[]) => uploadAttachment(...a),
+    removeAttachment: vi.fn(), attachmentBlob: vi.fn().mockResolvedValue(new Blob()),
   },
 }));
 const currentUser = vi.fn();
@@ -4296,6 +4316,7 @@ const theirs: Note = { ...mine, _id: "n2", body: "theirs", created_by_email: "an
 beforeEach(() => {
   list.mockReset().mockResolvedValue([mine, theirs]);
   create.mockReset();
+  uploadAttachment.mockReset();
   remove.mockReset().mockResolvedValue({ message: "ok" });
   currentUser.mockReset().mockReturnValue({ email: "me@x.com", role: "Member" });
 });
@@ -4331,6 +4352,28 @@ describe("NotesPanel", () => {
     expect(screen.queryByLabelText("Note body")).toBeNull();
   });
 
+  test("retrying a failed upload adds files to the same note, never a second one", async () => {
+    const created = { ...mine, _id: "n3", body: "with files" };
+    create.mockResolvedValue(created);
+    const bad = new File(["x"], "walk.mp4", { type: "video/mp4" });
+    uploadAttachment.mockRejectedValueOnce(new Error("offline"));
+
+    render(<NotesPanel parentType="property" parentId="p1" />);
+    await userEvent.click(screen.getByRole("button", { name: "Add note" }));
+    await userEvent.type(screen.getByLabelText("Note body"), "with files");
+    await userEvent.upload(screen.getByTestId("note-composer-attach-input"), bad);
+    await userEvent.click(screen.getByRole("button", { name: "Save note" }));
+    await waitFor(() => expect(screen.getByText(/failed to upload/i)).toBeTruthy());
+    expect(create).toHaveBeenCalledTimes(1);
+
+    // The connection comes back and the user presses Save again.
+    uploadAttachment.mockResolvedValueOnce({ ...created, attachments: [{ file_id: "f1", kind: "video", filename: "walk.mp4", content_type: "video/mp4", size_bytes: 1 }] });
+    await userEvent.click(screen.getByRole("button", { name: "Save note" }));
+    await waitFor(() => expect(screen.queryByLabelText("Note body")).toBeNull());
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByTestId("note-card")).toHaveLength(3);
+  });
+
   test("empty and disabled states", async () => {
     list.mockResolvedValue([]);
     const { rerender } = render(<NotesPanel parentType="property" parentId="p1" />);
@@ -4359,7 +4402,7 @@ cd portal && npm test -- tests/NotesPanel.test.tsx
 `portal/src/components/notes/NotesPanel.tsx`:
 
 ```tsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FileText, Loader2, Plus } from "lucide-react";
 import { getCurrentUser } from "../../api/auth";
 import { getEntityId } from "../../api/client";
@@ -4392,10 +4435,13 @@ export function NotesPanel({
   onCountChange, hideHeader = false, composerOpen, onComposerOpenChange,
 }: NotesPanelProps) {
   const currentUser = getCurrentUser();
-  const { notes, isLoading, error, createNote, updateNote, deleteNote, addAttachment, removeAttachment } = useNotes({
+  const { notes, isLoading, error, createNote, uploadAttachments, updateNote, deleteNote, addAttachment, removeAttachment } = useNotes({
     parentType, parentId, workItemId, enabled: !disabled,
   });
   const [localComposerOpen, setLocalComposerOpen] = useState(false);
+  // Set when a create succeeded but some attachments did not. Makes the
+  // composer's retry upload into that note instead of creating another one.
+  const pendingNoteIdRef = useRef("");
   const isComposerOpen = composerOpen ?? localComposerOpen;
   const setComposerOpen = (open: boolean) => {
     setLocalComposerOpen(open);
@@ -4430,11 +4476,27 @@ export function NotesPanel({
               mode="create"
               autoFocus
               onSubmit={async (body, files) => {
-                const { failedFiles } = await createNote(body, files);
+                // A retry after a partial upload failure must NOT make a second
+                // note. The composer keeps the failed files staged and calls
+                // this again with the same body; the note already exists, so
+                // only its attachments are retried.
+                if (pendingNoteIdRef.current) {
+                  const stillFailed = await uploadAttachments(pendingNoteIdRef.current, files);
+                  if (stillFailed.length === 0) {
+                    pendingNoteIdRef.current = "";
+                    setComposerOpen(false);
+                  }
+                  return stillFailed;
+                }
+                const { note, failedFiles } = await createNote(body, files);
                 if (failedFiles.length === 0) setComposerOpen(false);
+                else pendingNoteIdRef.current = getEntityId(note);
                 return failedFiles;
               }}
-              onCancel={() => setComposerOpen(false)}
+              onCancel={() => {
+                pendingNoteIdRef.current = "";
+                setComposerOpen(false);
+              }}
             />
           )}
           {error && <p className="text-sm text-red-600">{error}</p>}
