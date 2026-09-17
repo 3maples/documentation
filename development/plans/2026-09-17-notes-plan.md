@@ -3144,6 +3144,38 @@ describe("useNotes", () => {
     expect(result.current.notes.map((n) => n._id)).toEqual(["n1"]);
   });
 
+  test("a param change mid-fetch does not let the stale response win", async () => {
+    let resolveFirst!: (v: Note[]) => void;
+    list
+      .mockImplementationOnce(() => new Promise((r) => { resolveFirst = r as (v: Note[]) => void; }))
+      .mockResolvedValueOnce([note("n-b", "B notes")]);
+
+    const { result, rerender } = renderHook(
+      ({ id }) => useNotes({ parentType: "property", parentId: id }),
+      { initialProps: { id: "p1" } },
+    );
+    rerender({ id: "p2" });
+    await waitFor(() => expect(result.current.notes.map((n) => n._id)).toEqual(["n-b"]));
+
+    // p1's request finally answers, for a parent nobody is looking at any more.
+    await act(async () => { resolveFirst([note("n-a", "A notes")]); });
+    expect(result.current.notes.map((n) => n._id)).toEqual(["n-b"]);
+  });
+
+  test("disabling mid-fetch does not repopulate the cleared list", async () => {
+    let resolveIt!: (v: Note[]) => void;
+    list.mockImplementationOnce(() => new Promise((r) => { resolveIt = r as (v: Note[]) => void; }));
+
+    const { result, rerender } = renderHook(
+      ({ on }) => useNotes({ parentType: "property", parentId: "p1", enabled: on }),
+      { initialProps: { on: true } },
+    );
+    rerender({ on: false });
+    await act(async () => { resolveIt([note("n1")]); });
+    expect(result.current.notes).toEqual([]);
+    expect(result.current.isLoading).toBe(false);
+  });
+
   test("surfaces a load error", async () => {
     list.mockRejectedValue(new Error("boom"));
     const { result } = renderHook(() => useNotes({ parentType: "property", parentId: "p1" }));
@@ -3199,38 +3231,58 @@ export function useNotes({ parentType, parentId, workItemId, enabled = true }: U
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(enabled);
   const [error, setError] = useState("");
-  // Re-armed inside the effect body, not only in cleanup: StrictMode runs
-  // cleanup then the body again, and a flag left false would drop the
-  // second (real) response. See feedback_strictmode_navigate.
-  const aliveRef = useRef(true);
+  // Unmount-only. This guards setState from the mutation callbacks below,
+  // which are user-initiated and complete one at a time, so they need to know
+  // only whether the component is still there.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
-  const load = useCallback(async () => {
-    if (!enabled) return;
-    setIsLoading(true);
-    setError("");
-    try {
-      const data = await notesApi.list({ parentType, parentId, workItemId });
-      // Page tests stub apiRequest to resolve `{}`; never let a non-array reach .map.
-      if (aliveRef.current) setNotes(Array.isArray(data) ? data : []);
-    } catch (err) {
-      if (aliveRef.current) setError((err as Error).message || "Failed to load notes.");
-    } finally {
-      if (aliveRef.current) setIsLoading(false);
-    }
-  }, [enabled, parentType, parentId, workItemId]);
+  // `isCurrent` is supplied by the caller rather than read from a ref, so a
+  // response can be judged against the invocation that asked for it.
+  const load = useCallback(
+    async (isCurrent: () => boolean) => {
+      if (!enabled) return;
+      setIsLoading(true);
+      setError("");
+      try {
+        const data = await notesApi.list({ parentType, parentId, workItemId });
+        // Page tests stub apiRequest to resolve `{}`; never let a non-array reach .map.
+        if (isCurrent()) setNotes(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (isCurrent()) setError((err as Error).message || "Failed to load notes.");
+      } finally {
+        if (isCurrent()) setIsLoading(false);
+      }
+    },
+    [enabled, parentType, parentId, workItemId],
+  );
 
   useEffect(() => {
-    aliveRef.current = true;
+    // Per-invocation flag, NOT a shared ref. A ref re-armed at the top of every
+    // effect run lets a PREVIOUS run's in-flight response pass the aliveness
+    // check belonging to the CURRENT run — so clicking property A then B while
+    // A is still loading can show A's notes under B's heading, and disabling
+    // the hook mid-fetch can repopulate a list that was just cleared. Same
+    // shape as usePhotoObjectUrl in components/tasks/TaskPhotoGrid.tsx.
+    let alive = true;
     if (!enabled) {
       setNotes([]);
       setIsLoading(false);
       return;
     }
-    void load();
+    void load(() => alive);
     return () => {
-      aliveRef.current = false;
+      alive = false;
     };
   }, [enabled, load]);
+
+  /** Manual refetch. Guarded by mount alone — there is no newer request to lose to. */
+  const reload = useCallback(() => load(() => mountedRef.current), [load]);
 
   const replace = (updated: Note | null) => {
     if (!updated) return;
@@ -3259,7 +3311,7 @@ export function useNotes({ parentType, parentId, workItemId, enabled = true }: U
           break;
         }
       }
-      if (aliveRef.current) setNotes((previous) => [latest, ...previous]);
+      if (mountedRef.current) setNotes((previous) => [latest, ...previous]);
       return { note: latest, failedFiles };
     },
     [parentType, parentId, workItemId],
@@ -3271,7 +3323,7 @@ export function useNotes({ parentType, parentId, workItemId, enabled = true }: U
 
   const deleteNote = useCallback(async (id: string) => {
     await notesApi.remove(id);
-    if (aliveRef.current) setNotes((previous) => previous.filter((n) => getEntityId(n) !== id));
+    if (mountedRef.current) setNotes((previous) => previous.filter((n) => getEntityId(n) !== id));
   }, []);
 
   const addAttachment = useCallback(async (id: string, file: File) => {
@@ -3282,7 +3334,7 @@ export function useNotes({ parentType, parentId, workItemId, enabled = true }: U
     replace(await notesApi.removeAttachment(id, attachmentId));
   }, []);
 
-  return { notes, isLoading, error, reload: load, createNote, updateNote, deleteNote, addAttachment, removeAttachment };
+  return { notes, isLoading, error, reload, createNote, updateNote, deleteNote, addAttachment, removeAttachment };
 }
 ```
 
