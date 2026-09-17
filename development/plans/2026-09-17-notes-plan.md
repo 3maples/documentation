@@ -2524,7 +2524,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Produces (used by every later portal task):
-  - types: `NoteParentType = "work_item" | "property" | "contact"`, `NoteAttachmentKind = "image" | "video" | "pdf"`, `NoteAttachment`, `Note`
+  - types: `NoteParentType = "work_item" | "estimate" | "property" | "contact"`, `NoteAttachmentKind = "image" | "video" | "pdf"`, `NoteAttachment`, `Note`
   - `notesApi.list({ parentType, parentId, workItemId? })`, `notesApi.counts(estimateId)`, `notesApi.create({ parent_type, parent_id, work_item_id?, body })`, `notesApi.update(id, body)`, `notesApi.remove(id)`, `notesApi.uploadAttachment(noteId, file)`, `notesApi.removeAttachment(noteId, attachmentId)`, `notesApi.attachmentBlob(noteId, attachmentId, size)`
   - `canEditNote(note, user)`, `canDeleteNote(note, user)`
   - `formatNoteDate(iso)` → `"Sep 17, 2026"`, `isNoteEdited(note)`
