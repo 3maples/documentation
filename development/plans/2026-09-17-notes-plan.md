@@ -16,7 +16,7 @@
 - **US spellings** in all code, comments, copy and test names.
 - **Commits need explicit user approval each time** (CLAUDE.md). Each "Commit" step says what to commit; ask before running it. Never chain a commit off a prior approval. Never `--amend` without checking `HEAD` first.
 - Commit message format: `<type>: <description>`, type ∈ `feat|fix|refactor|docs|test|chore|perf|ci`. End every commit message with `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
-- **Platform gates:** `./run_mypy.sh <path>` and `./run_ruff.sh <path>` scoped to touched files after every `.py` edit. `./run_bandit.sh` B110 count must stay at 13. Zero-error baseline for all three.
+- **Platform gates:** `./run_mypy.sh <path>` and `./run_ruff.sh <path>` scoped to touched files after every `.py` edit. `./run_bandit.sh` B110 count must stay at 11. Zero-error baseline for all three.
 - **Portal gates:** `npm run typecheck` and the named `npm test -- <file>`. `npm run build` does not type-check.
 - **Portal test assertions use plain vitest, NOT jest-dom** (controller ruling R1, pre-flight). `@testing-library/jest-dom` is a dependency but is never registered: `vite.config.js` has no `setupFiles`, no test imports it, and `tests/ThinkingIndicator.test.tsx` documents the choice. Any test block in this plan spelled with `toBeInTheDocument()`, `toBeDisabled()`, `toHaveAttribute()`, `toHaveTextContent()` or `toBeVisible()` must be rewritten in the house idiom. The assertion's *intent* is binding; its spelling is not. Translations, all in use by existing tests: present -> `expect(screen.getByRole(...)).toBeTruthy()`; absent -> `expect(screen.queryByText(...)).toBeNull()`; disabled -> `expect((el as HTMLButtonElement).disabled).toBe(true)`; attribute -> `expect(el.getAttribute("target")).toBe("_blank")`; text -> `expect(el.textContent).toContain("Notes")`.
 - **Do not run the full test suite.** Run only the test files named in each task. Local MongoDB must be up: `cd platform && ./scripts/start_test_mongo.sh`.
@@ -2313,7 +2313,7 @@ cd platform && ./run_tests.sh tests/test_note_attachments_api.py tests/test_note
 ./run_bandit.sh services routers/notes.py
 ```
 
-Expected: all pass; B110 count unchanged at 13.
+Expected: all pass; B110 count unchanged at 11.
 
 - [ ] **Step 6: Commit (ask first)**
 

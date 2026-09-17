@@ -452,7 +452,7 @@ TDD throughout (CLAUDE.md). Beyond the per-phase files above, the suite pins:
 - **StrictMode:** `useNotes` and the composer's object-URL cleanup are
   exercised under `<StrictMode>` (the effect-flag bug that bit twice).
 - Gates: `./run_mypy.sh`, `./run_ruff.sh`, `./run_bandit.sh` (B110 count must
-  stay at 13), `npm run typecheck`, scoped `npm test`.
+  stay at 11), `npm run typecheck`, scoped `npm test`.
 
 ---
 
