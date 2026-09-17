@@ -801,6 +801,31 @@ cd platform && ./run_tests.sh tests/test_media_blobs.py -v
 
 Expected: FAIL with `ModuleNotFoundError: No module named 'services.media_blobs'`.
 
+**Controller ruling R8 (pre-flight) — the caps must stay injectable, or an existing task test breaks.**
+
+`tests/test_task_photos_api.py::test_upload_video_rejects_oversize` does
+`monkeypatch.setattr(task_photos, "MAX_VIDEO_SIZE_BYTES", 1024)` so it does not
+have to allocate 50MB. Rebinding that name in the `task_photos` namespace has no
+effect on a function living in `media_blobs` that reads `media_blobs`'s own
+global, so a naive re-export wrapper makes the oversize upload succeed and the
+test fail. Since "the task suite stays green untouched" is the whole safety
+property of this refactor, the cap becomes a parameter:
+
+- `media_blobs.store_video_stream(bucket_name, file, filename, content_type, *, max_size_bytes)` — required keyword.
+- `media_blobs.validate_image_upload(content, content_type, *, max_size_bytes=MAX_IMAGE_SIZE_BYTES)`.
+- `media_blobs.validate_pdf_upload(content, content_type, *, max_size_bytes=MAX_PDF_SIZE_BYTES)`.
+- Each wrapper in `task_photos.py` reads its own module-level constant **at call
+  time** and passes it down, e.g.
+  `return await media_blobs.store_video_stream(TASK_PHOTO_BUCKET, file, filename, content_type, max_size_bytes=MAX_VIDEO_SIZE_BYTES)`.
+  Reading it inside the function body is what keeps the monkeypatch effective.
+- `task_photos.max_media_size_bytes` is likewise a real wrapper function reading
+  the task module's own constants, not a re-export of the `media_blobs` one.
+- `note_attachments.py` (Task 8) passes the `media_blobs` defaults and needs no
+  constants of its own.
+
+The size message inside each validator must be derived from the cap actually in
+force, not from the module constant, so a patched cap reports the patched number.
+
 - [ ] **Step 3: Create `media_blobs.py` by moving the code**
 
 Create `platform/services/media_blobs.py`. Move the body of `task_photos.py` (everything from the constants through `delete_photo_blobs`) into it with these changes and nothing else:
