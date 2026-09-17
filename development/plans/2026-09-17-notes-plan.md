@@ -298,7 +298,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `JobItem.id` from Task 1.
-- Produces: `backfill_job_item_ids(apply: bool) -> dict` with keys `estimates_scanned`, `items_assigned`, `estimates_skipped`; CLI `python scripts/backfill_job_item_ids.py [--apply]`.
+- Produces: `backfill_job_item_ids(apply: bool) -> dict` with keys `estimates_scanned`, `items_assigned`, `items_skipped`; CLI `python scripts/backfill_job_item_ids.py [--apply]`.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -464,7 +464,7 @@ async def backfill_job_item_ids(apply: bool) -> dict:
     return {
         "estimates_scanned": scanned,
         "items_assigned": assigned,
-        "estimates_skipped": skipped,
+        "items_skipped": skipped,
     }
 
 
@@ -474,8 +474,8 @@ async def _main(apply: bool) -> int:
     mode = "APPLIED" if apply else "DRY RUN"
     print(f"[{mode}] estimates scanned: {summary['estimates_scanned']}")
     print(f"[{mode}] work item ids {'assigned' if apply else 'to assign'}: {summary['items_assigned']}")
-    if summary["estimates_skipped"]:
-        print(f"[{mode}] skipped (already assigned concurrently): {summary['estimates_skipped']}")
+    if summary["items_skipped"]:
+        print(f"[{mode}] work items skipped (id assigned concurrently): {summary['items_skipped']}")
     if not apply:
         print("Nothing written. Re-run with --apply to persist.")
     return 0
