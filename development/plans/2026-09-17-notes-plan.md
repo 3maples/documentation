@@ -2149,7 +2149,12 @@ async def store_note_attachment(file: UploadFile) -> NoteAttachment:
 
     if is_video_content_type(declared):
         filename = file.filename or "video"
-        file_id, size_bytes = await media_blobs.store_video_stream(NOTE_ATTACHMENT_BUCKET, file, filename, declared)
+        # max_size_bytes is a REQUIRED keyword since ruling R8 made the caps
+        # injectable; media_blobs keeps no per-feature constants of its own.
+        file_id, size_bytes = await media_blobs.store_video_stream(
+            NOTE_ATTACHMENT_BUCKET, file, filename, declared,
+            max_size_bytes=media_blobs.MAX_VIDEO_SIZE_BYTES,
+        )
         kind, content_type = NoteAttachmentKind.VIDEO, normalize_content_type(declared)
     elif is_pdf_content_type(declared):
         content = await file.read()
