@@ -3388,7 +3388,7 @@ export function NoteAttachmentStrip(props: NoteAttachmentStripProps): JSX.Elemen
 
 ```tsx
 import { describe, test, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { NoteAttachment } from "../src/types/api";
 
@@ -3429,6 +3429,25 @@ describe("NoteAttachmentStrip", () => {
     expect(screen.getByRole("button", { name: "Attach" })).toBeInTheDocument();
     const input = screen.getByTestId("note-attach-input") as HTMLInputElement;
     expect(input.accept).toContain("application/pdf");
+  });
+
+  test("a PDF opens in a new tab, and its URL survives long enough to load", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const revoke = vi.spyOn(globalThis.URL, "revokeObjectURL");
+    try {
+      render(<NoteAttachmentStrip noteId="n1" attachments={[pdf]} canManage={false} onAdd={vi.fn()} onRemove={vi.fn()} />);
+      await userEvent.click(screen.getByRole("button", { name: /open pdf gate\.pdf/i }));
+      await waitFor(() => expect(open).toHaveBeenCalledWith("blob:mock", "_blank", "noopener"));
+      // The tab is navigating; revoking now would strand it on an error page.
+      expect(revoke).not.toHaveBeenCalledWith("blob:mock");
+      await act(async () => { vi.advanceTimersByTime(1000); });
+      await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:mock"));
+    } finally {
+      vi.useRealTimers();
+      open.mockRestore();
+      revoke.mockRestore();
+    }
   });
 
   test("renders nothing at all for a read-only note with no attachments", () => {
@@ -3480,6 +3499,9 @@ function useAttachmentObjectUrl(noteId: string, attachmentId: string | undefined
   }, [noteId, attachmentId, size]);
   return objectUrl;
 }
+
+/** Head start the new tab gets before its blob URL is revoked. */
+const PDF_REVOKE_GRACE_MS = 1000;
 
 function kindLabel(attachment: NoteAttachment): "photo" | "video" | "PDF" {
   if (isVideo(attachment.content_type)) return "video";
@@ -3535,10 +3557,15 @@ function Viewer({ noteId, attachment, onClose }: { noteId: string; attachment: N
   }, [onClose]);
   // PDFs open in a new tab as soon as their bytes arrive; nothing to render here.
   useEffect(() => {
-    if (label === "PDF" && fullUrl) {
-      window.open(fullUrl, "_blank", "noopener");
-      onClose();
-    }
+    if (label !== "PDF" || !fullUrl) return;
+    window.open(fullUrl, "_blank", "noopener");
+    // Closing unmounts this component, whose cleanup revokes the very URL the
+    // new tab is still navigating to. Revoking in the same tick races that
+    // navigation and can leave the tab on an error page, so hold the close
+    // long enough for the fetch to start. The URL is still revoked — just not
+    // out from under its own reader.
+    const timer = setTimeout(onClose, PDF_REVOKE_GRACE_MS);
+    return () => clearTimeout(timer);
   }, [label, fullUrl, onClose]);
   if (label === "PDF") return null;
   return (
@@ -3789,14 +3816,18 @@ export function NoteComposer({ mode, initialBody = "", onSubmit, onCancel, autoF
   const stage = (files: FileList | null) => {
     if (!files) return;
     const additions: StagedFile[] = [];
+    const rejected: string[] = [];
     for (const file of Array.from(files)) {
       const sizeError = attachmentSizeError(file);
       if (sizeError) {
-        setError(sizeError);
+        rejected.push(sizeError);
         continue;
       }
       additions.push({ file, previewUrl: URL.createObjectURL(file) });
     }
+    // Report every rejection, not just the last, and clear a stale one once
+    // the user picks something acceptable.
+    setError(rejected.join(" "));
     setStaged((previous) => [...previous, ...additions]);
     if (photoInputRef.current) photoInputRef.current.value = "";
     if (attachInputRef.current) attachInputRef.current.value = "";
