@@ -1640,7 +1640,9 @@ def test_create_list_update_delete_on_a_property(client: TestClient, test_compan
     assert note["created_by_email"] == owner_email
     assert note["created_by_name"] == "Default Owner"
     assert note["attachments"] == []
-    assert note["created_at"].endswith("+00:00")
+    # Pydantic v2 renders an aware-UTC datetime with a Z suffix, not "+00:00".
+    # The "+00:00" form only appears where a router hand-builds .isoformat().
+    assert note["created_at"].endswith("Z")
 
     listed = client.get(f"/notes?parent_type=property&parent_id={prop}")
     assert listed.status_code == 200
