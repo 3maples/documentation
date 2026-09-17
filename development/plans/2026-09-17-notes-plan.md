@@ -1017,6 +1017,11 @@ def test_note_is_registered_everywhere():
 
     assert models.Note is Note
     assert ("notes", "company") in COMPANY_SCOPED_COLLECTIONS
+    # Beanie only binds a collection to a Document that init_db() actually
+    # registered, so this fails loudly if `Note` is ever dropped from
+    # `document_models` while its import survives — the silent-at-runtime
+    # failure mode that a bare import check cannot see.
+    assert Note.get_pymongo_collection().name == "notes"
 
 
 def test_attachment_kinds_and_parent_types():
@@ -1109,10 +1114,15 @@ class Note(Document):
                  ("parent_id", ASCENDING), ("created_at", DESCENDING)],
                 name="notes_by_parent_newest",
             ),
+            # Equality on all four, then the sort key — the shape the work
+            # item feed actually queries ("this work item's notes, newest
+            # first"). The equality prefix alone still serves the counts
+            # aggregation, which groups by work_item_id without sorting.
             IndexModel(
                 [("company", ASCENDING), ("parent_type", ASCENDING),
-                 ("parent_id", ASCENDING), ("work_item_id", ASCENDING)],
-                name="notes_by_work_item",
+                 ("parent_id", ASCENDING), ("work_item_id", ASCENDING),
+                 ("created_at", DESCENDING)],
+                name="notes_by_work_item_newest",
             ),
         ]
 ```
