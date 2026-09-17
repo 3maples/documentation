@@ -567,7 +567,9 @@ test("emits the initial work item id on every change", async () => {
     />,
   );
   await act(async () => {});
-  const last = onChange.mock.calls.at(-1)?.[0] as WorkItemV2;
+  // Not .at(-1): this project's tsconfig targets ES2020, which predates
+  // Array.prototype.at. Use the indexing idiom the file already uses.
+  const last = onChange.mock.calls[onChange.mock.calls.length - 1][0] as WorkItemV2;
   expect(last.id).toBe("wi-fixed-id");
 });
 ```
