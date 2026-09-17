@@ -1,7 +1,7 @@
 # Notes v2: per-work-item, property and contact notes with attachments
 
 **Date:** 2026-09-17
-**Status:** Approved 2026-09-17 (decisions D1–D7 below). Implementation plan: [2026-09-17-notes-plan.md](2026-09-17-notes-plan.md).
+**Status:** Implemented 2026-09-17 (decisions D1–D8 below). Implementation plan: [2026-09-17-notes-plan.md](2026-09-17-notes-plan.md).
 **Scope:** `platform/` + `portal/` + `documentation/`
 
 ---
@@ -389,14 +389,31 @@ follow-up commit, so an accidental early deploy cannot lose data.
 
 ### 3.13 Maple
 
-Maple's property and contact agents currently write the scalar
-(`agents/property/text_helpers.py:96`, `agents/contact/text_helpers.py:81`).
-The phrasing stays supported and its handler switches to
-`services/notes.create_note(...)` with the acting user as author, so "add a
-note to 123 Main St: gate code 4411" produces a real note. Maple does not
-attach files. The phrasing reference (§ Property, § Contact) is updated in the
-same change, per CLAUDE.md. Work-item notes via Maple are out of scope for
-this iteration; the estimate-notes handler is unchanged (D1).
+**Corrected 2026-09-17 during implementation.** Maple's property and contact
+agents previously wrote the scalar; the field-name parsing in
+`agents/property/text_helpers.py:96` and `agents/contact/text_helpers.py:81`
+is unchanged (it still recognizes `notes` as a field name and surfaces it into
+`fields["notes"]`), but the phrasing text and the handler that turns it into
+persisted state both changed. `"notes"` had to stay in `PROPERTY_ALLOWED_FIELDS`
+(`agents/property/service.py`) and `CONTACT_ALLOWED_FIELDS`
+(`agents/contact/service.py`) — those sets are what let the classifier keep
+surfacing `notes` as a field at all.
+
+The handler does **not** switch to `services/notes.create_note(...)` as
+originally planned — it uses `services/notes.create_note_as(...)` instead.
+The agents work from `working_context["current_user_email"]`/`current_user_name`
+(a resolved parent + a known author by email), not a loaded `User` document,
+so they use the bypass function built for exactly that shape rather than
+`create_note()`, which requires a `User` and validates the parent (unneeded
+here — the agent already holds the resolved parent). Both the create and
+update paths pop `fields["notes"]` and call `create_note_as` after every
+clarification early-return, so a turn that stashes a pending intent for
+missing fields never orphans a note. "add a note to 123 Main St: gate code
+4411" and "create a property at 123 Main St with notes: gate code 4411" both
+produce a real note. Maple does not attach files. The phrasing reference (§2.6
+Property, §3.6 Contact) is updated in the same change, per CLAUDE.md.
+Work-item notes via Maple are out of scope for this iteration; the
+estimate-notes handler is unchanged (D1).
 
 ### 3.14 Cascades and cleanup
 

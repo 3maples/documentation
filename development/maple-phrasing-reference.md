@@ -2,9 +2,23 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-15
+**Last updated:** 2026-09-17
 
 ### Change log
+
+**2026-09-17 — property and contact notes phrasings now create a real Note**
+
+`notes` stays a supported field on both the Property and Contact agents
+(§2.6, §3.6), but writing to it no longer sets a scalar — `Property.notes` and
+`Contact.notes` were removed from the models. A note phrasing (on update, and
+inline on create — `create a property at 123 Main St with notes: gate code
+4411`) now inserts a real `Note` document via `services/notes.create_note_as`,
+authored by the acting user and visible in the property/contact detail
+panel's Notes feed. Legacy scalar text was migrated into the new collection
+by `scripts/migrate_legacy_notes.py`.
+
+**No routing changed** — no phrasing was added, closed or reclassified, only
+what a supported phrasing *does* server-side. §12.3's counts are unaffected.
 
 **2026-09-15 — the material markup is now COST, not profit**
 
@@ -1118,6 +1132,7 @@ These edit **top-level `Estimate` fields** — distinct from the work-item (`Job
 | `change the city of {property} to Vancouver` | `update_property` → Property Agent | ✅ rule |
 | `update the city on {property} to Vancouver` | `update_property` → Property Agent | ✅ rule |
 | `set {property}'s city to Vancouver` | `update_property` → Property Agent | ✅ rule |
+| `add a note to {property}: "gate code 4411"` / `set the notes on {property} to "..."` | `update_property` → Property Agent | ✅ rule *(2026-09-17 — `notes` is no longer a `Property` field; the phrasing creates a real `Note`, authored by the acting user, instead of writing a scalar. Also handled inline on create: `create a property at 123 Main St with notes: gate code 4411`.)* |
 
 ## 2.7 Address formats accepted on create (all ✅ rule)
 
@@ -1181,6 +1196,7 @@ No outstanding property-specific gaps in scope for the current backlog. Cross-re
 | `change the phone of {contact} to 555-1111` | ✅ rule |
 | `update the phone on {contact} to 555-1111` | ✅ rule |
 | `set {contact}'s phone to 555-1111` | ✅ rule |
+| `add a note to {contact}: "..."` / `set the notes on {contact} to "..."` | ✅ rule *(2026-09-17 — `notes` is no longer a `Contact` field; the phrasing creates a real `Note`, authored by the acting user, instead of writing a scalar. Also handled inline on create.)* |
 
 ## 3.7 Verbless (all ✅ rule — Phase 2b person-name heuristic)
 
