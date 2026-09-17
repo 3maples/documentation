@@ -18,6 +18,7 @@
 - Commit message format: `<type>: <description>`, type ∈ `feat|fix|refactor|docs|test|chore|perf|ci`. End every commit message with `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
 - **Platform gates:** `./run_mypy.sh <path>` and `./run_ruff.sh <path>` scoped to touched files after every `.py` edit. `./run_bandit.sh` B110 count must stay at 13. Zero-error baseline for all three.
 - **Portal gates:** `npm run typecheck` and the named `npm test -- <file>`. `npm run build` does not type-check.
+- **Portal test assertions use plain vitest, NOT jest-dom** (controller ruling R1, pre-flight). `@testing-library/jest-dom` is a dependency but is never registered: `vite.config.js` has no `setupFiles`, no test imports it, and `tests/ThinkingIndicator.test.tsx` documents the choice. Any test block in this plan spelled with `toBeInTheDocument()`, `toBeDisabled()`, `toHaveAttribute()`, `toHaveTextContent()` or `toBeVisible()` must be rewritten in the house idiom. The assertion's *intent* is binding; its spelling is not. Translations, all in use by existing tests: present -> `expect(screen.getByRole(...)).toBeTruthy()`; absent -> `expect(screen.queryByText(...)).toBeNull()`; disabled -> `expect((el as HTMLButtonElement).disabled).toBe(true)`; attribute -> `expect(el.getAttribute("target")).toBe("_blank")`; text -> `expect(el.textContent).toContain("Notes")`.
 - **Do not run the full test suite.** Run only the test files named in each task. Local MongoDB must be up: `cd platform && ./scripts/start_test_mongo.sh`.
 - **Five separate git repos.** `platform/`, `portal/` and `documentation/` are each their own repo. Commit in the repo you changed.
 - **Datetimes are aware UTC**: `datetime.now(timezone.utc)`. Never `utcnow()`.
@@ -4677,7 +4678,7 @@ and call `void loadNoteCounts();` at the end of `closeWorkItemDialog` and in `sa
                         )}
 ```
 
-5. The estimate-level section (D8). Directly after the work-items card closes (the `</div>` following the Grand Total block at `:1336-1339`), still inside the page container:
+5. The estimate-level section (D8). Place it as a **sibling of the work-items card, inside the page's outer container** (controller ruling R4, pre-flight: the Grand Total block is followed by several closing tags, so read the JSX structure and match the work-items card's own nesting depth rather than counting lines):
 
 ```tsx
       {isEditMode && estimateId && (
@@ -5351,7 +5352,10 @@ cd platform && ./run_tests.sh tests/test_property_api.py tests/test_contact_api.
 
 - Delete `notes: Optional[str] = None` from `models/property.py` and `models/contact.py`. Beanie ignores the stale key on documents the migration has already nulled, and on any it skipped (no Owner) — those companies' legacy text stays in the database untouched, readable by a script, never shown.
 - Delete `notes: Optional[str] = None` from `UpdatePropertyRequest` and `UpdateContactRequest`. `create_property` binds the `Property` document directly, so the model change covers POST (`extra` is ignored by default).
-- `agents/property/service.py`: remove `"notes"` from `PROPERTY_ALLOWED_FIELDS` **but keep** the `notes` aliases in `agents/property/text_helpers.py` (`:53-54`, `:96`) so the phrasing still parses into `fields["notes"]` for Task 23's branch. Delete the accuracy suggestion at `:966-967` (it would now fire on every property). Same for `agents/contact/service.py:78` / `:819-820` and `agents/contact/utils.py:94`.
+- **`notes` STAYS in `PROPERTY_ALLOWED_FIELDS` and `CONTACT_ALLOWED_FIELDS`** (controller ruling R2, pre-flight). Those sets gate `_normalize_fields`, which drops any key not in them — so removing `notes` there would silently discard the note text *before* Task 23's `fields.pop("notes")` ever sees it, killing every Maple note phrasing. They are the classifier's field allowlist, not the database write set; the real write set is `_safe_update_fields` in `_update_property_via_api`, which Task 23 already narrows.
+- **`"notes"` STAYS in the stopword list at `agents/contact/utils.py:94`** (controller ruling R3, pre-flight). That list stops words being parsed into a contact's *name*; it is not a schema reference. Removing it would let "notes" leak into parsed names from phrasings like "update the notes on John Smith".
+- Keep the `notes` aliases in `agents/property/text_helpers.py` (`:53-54`, `:96`) so the phrasing still parses into `fields["notes"]` for Task 23's branch.
+- Delete only the accuracy suggestions that read the now-absent field: `agents/property/service.py:966-967` and `agents/contact/service.py:819-820` — both would otherwise fire on every record.
 - Run `grep -rn "\"notes\"\|\.notes\b" routers/properties.py routers/contacts.py agents/property agents/contact services/*csv* scripts/` and clean up any remaining reference (CSV column maps included; a legacy `notes` column in an upload is simply ignored from now on).
 - Check `tests/test_property_agent.py:322` (`"notes": "legacy"` in a fake doc) — harmless, leave it. `scripts/migrate_legacy_notes.py` and its test read and write raw documents by design, so they keep passing after the field is gone.
 
