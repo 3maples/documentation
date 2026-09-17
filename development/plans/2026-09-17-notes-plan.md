@@ -66,16 +66,17 @@ def _insert_estimate(client: TestClient, company_id: str, descriptions: list[str
     """Insert an estimate straight through Beanie (no AI path) and return its raw dict."""
 
     async def _insert():
-        from models.estimate import Estimate, JobItem
+        from models.estimate import Estimate, EstimateStatus, JobItem
+        from services.estimate_readable_id import insert_estimate_with_readable_id
 
         estimate = Estimate(
             title="Id test",
-            company=PydanticObjectId(company_id),
+            company=PydanticObjectId(company_id), status=EstimateStatus.DRAFT,
             created_by="tests",
             created_by_email="default.owner@example.com",
             job_items=[JobItem(description=d) for d in descriptions],
         )
-        await estimate.insert()
+        estimate = await insert_estimate_with_readable_id(estimate)
         return estimate.model_dump(mode="json", by_alias=True)
 
     return run_on_portal(client, _insert)
@@ -1226,10 +1227,11 @@ def test_estimate_parent_is_the_estimate_itself(client: TestClient, test_company
     from services.notes import assert_parent_exists
 
     async def _check():
-        from models.estimate import Estimate
+        from models.estimate import Estimate, EstimateStatus
+        from services.estimate_readable_id import insert_estimate_with_readable_id
 
-        estimate = Estimate(title="t", company=PydanticObjectId(test_company_id), created_by="tests")
-        await estimate.insert()
+        estimate = Estimate(title="t", company=PydanticObjectId(test_company_id), status=EstimateStatus.DRAFT, created_by="tests")
+        estimate = await insert_estimate_with_readable_id(estimate)
         try:
             await assert_parent_exists(estimate.company, NoteParentType.ESTIMATE, estimate.id, None)
             with pytest.raises(HTTPException) as with_item:
@@ -1251,11 +1253,12 @@ def test_work_item_parent_requires_a_persisted_work_item_id(client: TestClient, 
     from services.notes import assert_parent_exists
 
     async def _check():
-        from models.estimate import Estimate, JobItem
+        from models.estimate import Estimate, EstimateStatus, JobItem
+        from services.estimate_readable_id import insert_estimate_with_readable_id
 
-        estimate = Estimate(title="t", company=PydanticObjectId(test_company_id), created_by="tests",
+        estimate = Estimate(title="t", company=PydanticObjectId(test_company_id), status=EstimateStatus.DRAFT, created_by="tests",
                             job_items=[JobItem(description="A")])
-        await estimate.insert()
+        estimate = await insert_estimate_with_readable_id(estimate)
         real_id = estimate.job_items[0].id
         try:
             await assert_parent_exists(estimate.company, NoteParentType.WORK_ITEM, estimate.id, real_id)
@@ -1276,12 +1279,13 @@ def test_list_is_newest_first_and_counts_group_by_work_item(client: TestClient, 
     from services.notes import count_notes_by_work_item, create_note, delete_notes_for_parent, list_notes
 
     async def _run():
-        from models.estimate import Estimate, JobItem
+        from models.estimate import Estimate, EstimateStatus, JobItem
+        from services.estimate_readable_id import insert_estimate_with_readable_id
 
         company = PydanticObjectId(test_company_id)
-        estimate = Estimate(title="t", company=company, created_by="tests",
+        estimate = Estimate(title="t", company=company, status=EstimateStatus.DRAFT, created_by="tests",
                             job_items=[JobItem(description="A"), JobItem(description="B")])
-        await estimate.insert()
+        estimate = await insert_estimate_with_readable_id(estimate)
         a, b = (ji.id for ji in estimate.job_items)
         user = _user("author@x.com", "Member")
         user.company = company
@@ -1566,11 +1570,12 @@ def _property_id(client: TestClient, company_id: str, email: str) -> str:
 
 def _estimate_with_work_item(client: TestClient, company_id: str) -> tuple[str, str]:
     async def _insert():
-        from models.estimate import Estimate, JobItem
+        from models.estimate import Estimate, EstimateStatus, JobItem
+        from services.estimate_readable_id import insert_estimate_with_readable_id
 
-        estimate = Estimate(title="Notes", company=PydanticObjectId(company_id), created_by="tests",
+        estimate = Estimate(title="Notes", company=PydanticObjectId(company_id), status=EstimateStatus.DRAFT, created_by="tests",
                             job_items=[JobItem(description="Sod")])
-        await estimate.insert()
+        estimate = await insert_estimate_with_readable_id(estimate)
         return str(estimate.id), estimate.job_items[0].id
 
     return run_on_portal(client, _insert)
@@ -2287,12 +2292,13 @@ def _count_notes(client: TestClient, parent_id: str) -> int:
 
 def _estimate(client: TestClient, company_id: str, descriptions: list[str]) -> tuple[str, list[str]]:
     async def _insert():
-        from models.estimate import Estimate, JobItem
+        from models.estimate import Estimate, EstimateStatus, JobItem
+        from services.estimate_readable_id import insert_estimate_with_readable_id
 
-        estimate = Estimate(title="cascade", company=PydanticObjectId(company_id), created_by="tests",
+        estimate = Estimate(title="cascade", company=PydanticObjectId(company_id), status=EstimateStatus.DRAFT, created_by="tests",
                             created_by_email="default.owner@example.com",
                             job_items=[JobItem(description=d) for d in descriptions])
-        await estimate.insert()
+        estimate = await insert_estimate_with_readable_id(estimate)
         return str(estimate.id), [ji.id for ji in estimate.job_items]
 
     return run_on_portal(client, _insert)
