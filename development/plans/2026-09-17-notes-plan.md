@@ -1725,6 +1725,25 @@ def test_edit_is_creator_only_and_delete_is_creator_or_owner(client: TestClient)
     client.delete(f"/properties/{prop}", headers={"X-Test-Email": owner["email"]})
 
 
+def test_a_closed_account_cannot_edit_or_delete_its_notes(client: TestClient):
+    """Archiving a company revokes access everywhere, mutations included."""
+    owner = onboard_owner(client, unique_email("notes.closed"), company_name="Closed Notes Co",
+                          company_email=unique_email("notes.closed.co"), phone="+15550100400")
+    headers = {"X-Test-Email": owner["email"]}
+    prop = _property_id(client, owner["company_id"], owner["email"])
+    note = client.post("/notes", json={"parent_type": "property", "parent_id": prop, "body": "before close"},
+                       headers=headers).json()
+
+    assert client.delete(f"/companies/{owner['company_id']}", headers=headers).status_code == 200
+
+    for response in (
+        client.patch(f"/notes/{note['_id']}", json={"body": "after close"}, headers=headers),
+        client.delete(f"/notes/{note['_id']}", headers=headers),
+    ):
+        assert response.status_code == 403
+        assert response.json()["detail"]["code"] == "COMPANY_ARCHIVED"
+
+
 def test_other_company_cannot_see_or_touch_a_note(client: TestClient, test_company_id: str):
     owner, _, _ = _company_with_three_roles(client)
     prop = _property_id(client, test_company_id, "default.owner@example.com")
@@ -1815,7 +1834,14 @@ class UpdateNoteRequest(BaseModel):
 
 
 async def _get_note_for(user: User, note_id: str) -> Note:
-    """404 for a missing note AND for another tenant's — never reveal existence."""
+    """404 for a missing note AND for another tenant's — never reveal existence.
+
+    The company-access call is here rather than in each endpoint so that every
+    route reaching a note by id inherits the archived-company hard block:
+    PATCH, DELETE, and the attachment routes added later. Without it a member
+    of a closed account could still edit and delete existing notes while being
+    blocked from creating or listing them.
+    """
     try:
         wanted = PydanticObjectId(note_id)
     except Exception as exc:
@@ -1823,6 +1849,7 @@ async def _get_note_for(user: User, note_id: str) -> Note:
     note = await Note.get(wanted)
     if note is None or note.company != user.company:
         raise HTTPException(status_code=404, detail="Note not found")
+    await assert_user_company_access(user, note.company)
     return note
 
 
@@ -1904,7 +1931,7 @@ cd platform && ./run_tests.sh tests/test_notes_api.py -v
 ./run_mypy.sh routers/notes.py main.py && ./run_ruff.sh routers/notes.py routers/__init__.py main.py
 ```
 
-Expected: 7 passed, gates clean. If `test_body_limits` sees 422 from the `max_length` on the model rather than the validator, that is fine: both are 422.
+Expected: 8 passed, gates clean. If `test_body_limits` sees 422 from the `max_length` on the model rather than the validator, that is fine: both are 422.
 
 - [ ] **Step 5: Commit (ask first)**
 
