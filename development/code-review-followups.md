@@ -6096,3 +6096,21 @@ dev-server config for the portal on port 5173) — no secrets — so this is hyg
 **Suggested fix:** a decision, not a defect. Commit it if the launch config should be shared with the
 team (it is generic enough to be useful), or add `.claude/launch.json` to the workspace-root
 `.gitignore` if it is personal tooling.
+
+## 2026-09-17 deferred from /code-review (notes collapsible refactor)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [MEDIUM] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — file is 1,927 lines, well past the 800-line threshold
+
+More than double the file-length review threshold. The notes collapsible change added six lines to
+it, so it worsens the condition only marginally and did not create it — hence MEDIUM rather than the
+HIGH the rubric would otherwise assign. Flagged because the notes work has now touched this file
+twice and the trend is one-directional.
+
+Deferred deliberately: the finding's own remediation says not to expand that diff, and splitting the
+page is a decision about scheduling rather than a defect to patch.
+
+**Suggested fix:** the estimate-level notes block, the details dialog, and the gap dialogs are each
+self-contained JSX islands that could move to sibling components under `components/estimates/`.
+Needs a decision on whether to schedule it as its own task.
