@@ -6114,3 +6114,72 @@ page is a decision about scheduling rather than a defect to patch.
 **Suggested fix:** the estimate-level notes block, the details dialog, and the gap dialogs are each
 self-contained JSX islands that could move to sibling components under `components/estimates/`.
 Needs a decision on whether to schedule it as its own task.
+
+## 2026-09-19 deferred from /code-review (notes UI rework + squeezed-desktop layout)
+
+Logged by `/fix-issues` — findings from the latest review not fixed in that pass.
+
+### [MEDIUM] portal/src/components/notes/NoteBody.tsx:90 — the note text is unreachable by keyboard
+
+The body is an `overflow-y-auto` region with no `tabIndex` and no role, so it never receives focus.
+In Chrome and Safari a non-focusable scroll container cannot be scrolled with the arrow keys or
+Page Down, which means a keyboard-only or screen-reader user can read the first ~8 rows of a note
+and has no way to reach the rest. The chevrons that announce the hidden text are `aria-hidden`, so
+assistive tech is not told it exists either. WCAG 2.1.1.
+
+Deferred: the fix needs a call on tab-stop density. Every overflowing note becoming a tab stop is
+a real cost on a feed of twenty, and the alternative (a single "expand" control per card) is the
+affordance that was just deliberately removed.
+
+**Suggested fix:** when the body actually overflows, make it a focusable labelled region —
+`tabIndex={0} role="region" aria-label={`Note by ${author}`}` on the scroller. Gate it on the
+overflow state already tracked (`edges.above || edges.below`, plus a `hasOverflow` flag) so short
+notes do not each add a tab stop.
+
+### [MEDIUM] portal/tests/PropertiesPageNarrowContent.test.tsx:1 — ~70 lines of mock setup duplicated from the phone suite
+
+The first 80 lines are byte-identical to `PropertiesPageMobileSheet.test.tsx` apart from the
+docblock and one import — the same eight `vi.mock` factories, the same fixtures, the same
+`stubViewport` and `findRow` helpers. The two files test the same component through the same seams,
+so any change to a mocked API forces two edits, and the pair will drift the first time only one is
+updated.
+
+**Suggested fix:** extract the fixtures and helpers to `tests/helpers/propertiesPageHarness.tsx` and
+import from both. `vi.mock` factories are hoisted per-file and cannot move, so either keep those two
+copies, or merge the squeezed-desktop describe into `PropertiesPageMobileSheet.test.tsx` and rename
+the file for the wider subject. Merging is preferable — both describes are about the same stacked
+layout, arrived at by different routes.
+
+### [MEDIUM] portal/src/pages/ContactsPage.tsx:1 — file is 1,225 lines
+
+Well past the 800-line review threshold, and this change added to it. Pre-existing, so MEDIUM rather
+than HIGH — the change did not create the problem and is a handful of lines. The page carries list
+rendering, the detail pane, the sheet, deep linking, CSV import, the dialogs and the layout decision
+in one component, which is precisely why the squeezed-desktop fix and the deep-link fix each had to
+be applied twice across two near-identical files.
+
+**Suggested fix:** extract the master-detail shell that Properties and Contacts both implement —
+list column, detail column, bottom sheet, deep-link handling — into one component taking a row
+renderer and a detail renderer. That also removes the duplication behind the test-harness finding
+above. Its own task, not a patch.
+
+### [MEDIUM] portal/src/components/Layout/PortalLayout.tsx:1 — file is 838 lines
+
+Over the 800-line threshold, and this change added ~20 lines of content-column measurement to it.
+Pre-existing and only marginally worsened, hence MEDIUM. The component owns navigation, the tablet
+drawer, the drag gesture, Maple panel state, mobile chrome, notifications, tours, and now the
+content-layout measurement.
+
+**Suggested fix:** move the measurement out — a `useMeasuredContentLayout(ref)` hook in
+`src/lib/contentLayout.ts` returning the `ContentLayout`, leaving PortalLayout with a ref, a hook
+call and the provider. Small and safe on its own; the larger decomposition is a separate decision.
+
+### [LOW] portal/src/components/notes/NoteBody.tsx:56 — scroll handler reads layout on every event
+
+`sync` reads `scrollHeight`, `clientHeight` and `scrollTop` on every scroll event. In practice this
+is cheap — scroll events already fire about once per frame, nothing is dirtying style at that
+moment, and the functional `setEdges` bails when the answer is unchanged — which is why it is LOW
+rather than a performance defect. It is still an unguarded forced-layout read in a hot path.
+
+**Suggested fix:** coalesce with `requestAnimationFrame` — keep the pending frame id in a ref, skip
+if one is already scheduled, clear it in the callback, and cancel it in the existing effect cleanup.
