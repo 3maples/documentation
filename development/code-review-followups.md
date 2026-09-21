@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **557**. Never
+- **Entries are numbered and permanent.** Next free number: **562**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -159,6 +159,7 @@ seams that already exist as separate classes.
 | ~264 | `TourRunner` — portal/src/components/tours/TourManager.tsx:83 |
 | ~245 | `OrchestratorAgent.process()` — agents/orchestrator/service.py (god-method) |
 | 176 | `_handle_update_estimate_work_item_update_field` — agents/estimate/work_item_handlers.py:851 |
+| ~167 | `MarkdownDescriptionEditor` component body — portal/src/components/common/MarkdownDescriptionEditor.tsx:252 |
 | 140 | `_handle_update_estimate` — agents/estimate/crud_handlers.py |
 | ~120 | `install()` — website/contact-modal/install.js |
 | ~115 | `compute_analytics` — routers/estimates.py:507 |
@@ -174,6 +175,7 @@ seams that already exist as separate classes.
 | ~67 | `bootstrap_company_materials` — services/material_bootstrap.py |
 | 64 | `_resolve_domain_from_history` — agents/estimate/crud_handlers.py |
 | 60 | `detach_non_owner_members` — services/company_service.py:25 |
+| 60 | `_reuse_past_work_item` — agents/estimate/llm_pipeline.py:680 (was 93; loops extracted 2026-09-20. Slated for deletion by #557 — drop this row with it) |
 | 55 | `sync_user_stage` — services/brevo_contacts.py:361 |
 | ~54 | `formatOrchestratorReply` — portal/src/lib/orchestratorReply.ts:39 |
 | 53 | `_run` — scripts/backfill_task_readable_ids.py:70 |
@@ -1836,6 +1838,18 @@ Contact, labour, and property agents force-keep explicitly-requested fields so a
 audit trail.
 **Suggested fix:** pass `always=fields.keys()` to match the siblings.
 
+### 558. [LOW] `_resolve_past_job_item` types its estimate as `Any`
+`platform/agents/estimate/llm_pipeline.py:156` — `estimate: Any` and `estimate_id: Any`, in a
+module that imports the real `Estimate` and knows `estimate_id` is the `str` taken from
+`past_item["estimate_id"]`. mypy therefore checks nothing inside the loop — `item.id`,
+`estimate.job_items`, any future field access — in the function whose whole job is picking the
+right past work item to copy prices from.
+
+**Suggested fix:** annotate `estimate: Estimate` and `estimate_id: str`. The tests pass a
+MagicMock, which is unaffected — annotations are not enforced at runtime.
+**Likely moot:** #557's plan deletes this function along with the reuse path. Fix it only if
+that plan stalls; otherwise close this with #557.
+
 ## Platform — API, models and data
 
 ### 31. [MEDIUM] Intra-CSV duplicate rows now upsert silently instead of erroring
@@ -2512,6 +2526,42 @@ which is meaningless.
 assertion that each `*_at` is None whenever its boolean is False. The leaning is to leave it —
 the type is internal to this module and the aggregation is its only real producer.
 
+### 557. [MEDIUM] Work-item summaries live and die with their estimate
+`platform/services/work_item_summary.py` — three paths tie a summary's fate to a live
+`Estimate`: the `$lookup` + `$match` in `search_similar_work_items` hides any row whose estimate
+is not *currently* Won/Scheduled/Completed, the same join hides rows whose estimate was deleted
+(the join yields `[]`), and `delete_work_item_summaries` removes rows outright on Won → Lost.
+A related symptom: `embed_won_estimate` never deletes the row for a job item that was removed
+from an indexed estimate.
+
+Simon ruled on 2026-09-20 that this is backwards — a summary is a standalone reference to work
+the company actually did, and deleting the estimate must not erase it. **The obvious "fix" of
+deleting rows for absent job items is explicitly NOT wanted**; under that ruling such a row is
+not an orphan.
+
+**Suggested fix:** follow
+[`plans/2026-09-20-work-item-summary-standalone-corpus.md`](plans/2026-09-20-work-item-summary-standalone-corpus.md).
+All three of its open questions were decided on 2026-09-20: drop the `$lookup` join, stop
+retracting on Won → Lost (the corpus is purely additive), and drop structural reuse so the model
+infers from the summaries instead of copying a past job's line items. Close this entry when that
+plan lands.
+
+### 561. [LOW] An adopted work-item summary keeps the previous occupant's `created_at`
+`platform/services/work_item_summary.py:315` — `.set()` never touches `created_at`, so when the
+legacy positional probe adopts an id-less row the date stays from whichever item was indexed
+there before. That date is `_work_item_recency`'s input, which picks among candidates that clear
+the 0.85 reuse bar, so a summary written today can lose to one written earlier. Only reachable
+on a corpus with id-less rows whose item array has shifted, and the positional upsert behaved
+the same way, so this is not a regression.
+
+**Suggested fix:** decide what the field means. Refreshing it on adoption makes it "when this
+summary was written", but then every re-embed refreshes it and recency tracks re-indexing rather
+than when the work was won. Leaving it makes it "when this estimate entered history", which is
+closer to what recency is asking — the leaning is to leave it and add a one-line comment saying
+which of the two it is.
+**Likely moot:** #557's plan removes `job_item_id`, and with it the adoption path that strands
+the date. Close this with #557 unless that plan stalls.
+
 ## Portal — estimate builder
 
 ### 131. [MEDIUM] `saveError` displayed far from origin
@@ -2766,6 +2816,28 @@ would share `openId === ""` and open together. Not live today — ids are genera
 an inconsistency rather than a bug. (The role-group equivalent was fixed as #2 in this pass.)
 
 **Suggested fix:** drop the fallback to `key={gap.id}`, matching what the accordion already assumes.
+
+### 559. [LOW] Redundant cast before the `instanceof` guard it duplicates
+`portal/src/components/common/MarkdownDescriptionEditor.tsx:360` —
+`const target = e.target as Element | null;` is followed immediately by
+`if (!(target instanceof Element)) return;`. The cast asserts exactly what the next line checks,
+and the `| null` it adds is a case the guard rejects anyway, so it reads as though it were
+load-bearing.
+
+**Suggested fix:** `const target = e.target;` — `instanceof Element` narrows `EventTarget` on its
+own and the rest of the handler is unchanged.
+
+### 560. [LOW] The editor's click-target fill hangs off an unclassed Lexical div
+`portal/src/styles/index.css:53` — `.mdxeditor-root-contenteditable > div:first-child` targets a
+wrapper Lexical renders with no class of its own. An MDXEditor version that inserts another
+element there breaks the flex chain silently: the dead strip under the last line comes back, with
+no error and no failing test. `handleChromeMouseDown` still focuses the editor in that case, so
+the feature degrades to "caret jumps to the end" rather than failing outright.
+
+**Suggested fix:** decision needed. Leave it and rely on the documented fallback (preferred —
+MDXEditor exposes no public class for that element, and the fallback is tested), or add a render
+test asserting the contenteditable's parent chain, which pins the assumption at the cost of a
+test that breaks on every MDXEditor upgrade.
 
 ## Portal — layout, navigation and Maple panel
 
@@ -4331,77 +4403,3 @@ that cannot upload, which reads as though they can.
 union on the mode would be most honest, but optional props plus the existing branch guard is enough).
 Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sites in
 `OnboardingPage.tsx`.
-
-## 2026-09-20 deferred from /code-review
-
-Logged by `/fix-issues` — findings from that review not fixed in the pass that
-applied #2, #3 and #4 (shared Photo/Attach pair, `role="alert"` on the composer
-error, `_project_past_line_items` extraction).
-
-### [MEDIUM] platform/services/work_item_summary.py:305 — a deleted job item's summary is never removed
-`embed_won_estimate` upserts one row per current job item and deletes nothing, so an item
-removed from an indexed estimate leaves its summary behind. Verified against the local DB:
-embed two items, delete the first, re-embed — two rows remain, one describing a work item that
-no longer exists.
-
-**Do NOT fix as originally suggested.** The review proposed deleting rows whose `job_item_id`
-is absent from the estimate. Simon ruled the opposite way on 2026-09-20: a work-item summary is
-a standalone reference in a corpus of past work, not a pointer into a live estimate, and
-deleting the estimate (or one of its items) must not remove it. Under that model this row is
-not an orphan at all — it is a past work item that still happened.
-
-**Suggested fix:** none here; it is subsumed by
-[`plans/2026-09-20-work-item-summary-standalone-corpus.md`](plans/2026-09-20-work-item-summary-standalone-corpus.md),
-which covers the three places that currently make a summary's visibility depend on its
-estimate. Close this entry when that plan lands.
-
-### [LOW] platform/agents/estimate/llm_pipeline.py:156 — `_resolve_past_job_item` types its estimate as `Any`
-`estimate: Any` and `estimate_id: Any` in a module that imports the real `Estimate` and knows
-`estimate_id` is the `str` from `past_item["estimate_id"]`. mypy therefore checks nothing inside
-the loop — `item.id`, `estimate.job_items` and any future field access — in the function whose
-whole job is picking the right item.
-
-**Suggested fix:** annotate `estimate: Estimate` and `estimate_id: str`. Tests pass a MagicMock,
-which is unaffected: annotations are not enforced at runtime.
-
-### [LOW] portal/src/components/common/MarkdownDescriptionEditor.tsx:360 — redundant cast before the instanceof guard
-`const target = e.target as Element | null;` is followed immediately by
-`if (!(target instanceof Element)) return;`. The cast asserts what the next line checks, so it
-reads as though it were load-bearing.
-
-**Suggested fix:** `const target = e.target;` — `instanceof Element` narrows `EventTarget` on its
-own and the rest of the handler is unchanged.
-
-### [LOW] portal/src/styles/index.css:53 — the editor fill depends on an unclassed Lexical div
-`.mdxeditor-root-contenteditable > div:first-child` targets a wrapper Lexical renders with no
-class of its own. An MDXEditor version that inserts another element there breaks the chain
-silently — the dead strip under the last line returns, with no error and no failing test.
-`handleChromeMouseDown` still focuses the editor in that case, so the feature degrades to
-"caret goes to the end" rather than failing.
-
-**Suggested fix:** decision needed. Either leave it and rely on the documented fallback
-(preferred — there is no public class to target and the fallback is tested), or add a render
-test asserting the contenteditable's parent chain, which pins the assumption at the cost of a
-test that breaks on every MDXEditor upgrade.
-
-### [LOW] platform/services/work_item_summary.py:315 — an adopted row keeps the previous occupant's `created_at`
-`.set()` never touches `created_at`, so when the legacy positional probe adopts a row the date
-stays from the old occupant's indexing. That date feeds `_work_item_recency`, which picks among
-candidates that clear the reuse bar, so a summary written today can lose to one written earlier.
-Only reachable on a corpus with id-less rows whose item array has shifted; the positional upsert
-behaved identically, so this is not new.
-
-**Suggested fix:** decision needed on what the field means. Refresh `created_at` on adoption (it
-then means "when this summary was written", but every re-embed would refresh it, so recency would
-track re-indexing rather than when the work was won), or leave it as "when this estimate entered
-history" — preferred — and add a one-line comment saying so.
-
-### [LOW] portal/src/components/common/MarkdownDescriptionEditor.tsx:252 — the default export is ~167 lines
-Against the 50-line guideline, and the click-to-focus change added 34 of them. The file's helpers
-were extracted in the previous round (`useOverflowsWidth`, `OverflowMenu`, `SecondaryControls`),
-but the default export keeps growing because every new behaviour lands in it. More than half the
-bulk is explanatory comment rather than branching logic.
-
-**Suggested fix:** lift the focus plumbing into `useEditorFocus(wrapperRef, editorRef, readOnly)`
-returning `{ focused, onFocusCapture, onBlurCapture, onMouseDown }` — three handlers and one piece
-of state, the only cluster in the component that forms a unit.
