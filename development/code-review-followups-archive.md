@@ -4773,3 +4773,863 @@ The `/code-review` bandit step could not run; only the manual security pass cove
 **Suggested fix:** Introduce a `requirements-dev.txt` (or a `[project.optional-dependencies] dev` group) and pin `bandit` there, then wire it into the review tooling. Tooling/process task, not a source fix.
 
 
+
+---
+
+## Consolidation pass — 2026-09-20
+
+The live tracker had grown to 6,185 lines and 408 entries, with resolved items
+interleaved among open ones and the same three oversized files logged up to
+three times each under different (stale) line counts. This pass took it to 370
+open entries, regrouped by theme rather than by review date, and relocated the
+entries below. Item #441 — "append-only log at 5,552 lines" — is what this pass
+answers, and is closed by it.
+
+Also dropped in this pass: the per-session `## <date> deferred from /code-review`
+headers and their "logged by /fix-issues N" preambles, which were scaffolding
+rather than content. Two decisions recorded in those preambles are preserved
+here:
+
+- **2026-04-22 (external warnings triage)** — one of eight externally-raised
+  warnings was a hallucination and was never filed.
+- **2026-09-13 (iOS focus-zoom + Maple panel chrome)** — the finding that the
+  desktop tab reads "Chat" while the phone dock reads "Maple" was closed as
+  not-a-finding: Maple is the panel; Chat / Support / What's New are the tabs
+  inside it, so the two labels name different things.
+
+### Closed, verified 2026-09-20
+
+Four entries were verified as already fixed in the codebase and are closed
+without further work:
+
+- **#418** — `temp data` (JSON) and `tooltips.csv` are no longer in the
+  workspace root.
+- **#465** — `footer-desktop.png` is no longer in the repo root.
+- **#491** — `JobItem` now carries a stable `id` with a `default_factory`, plus
+  `scripts/backfill_job_item_ids.py`; the notes feature depends on it.
+- **#550** — `.claude/launch.json` is tracked as of commit `d2896b8`.
+
+### Absorbed into a surviving entry
+
+- **#433** → **#485**. Same gap (the website has no `tsconfig.json` and no
+  `typecheck` script); #485 states it at the wider `src/seo/` scope.
+- **#524** → **#528**. Same `sm` (640px) vs documented `md` (768px) breakpoint
+  inconsistency; #528 already said in its own body that it superseded #524.
+
+Their bodies:
+
+
+### 433. [LOW] website — no tsconfig or typecheck script, so the new TS→JS import is unchecked
+`widget/api.ts` and `widget/MapleWidget.tsx` now import
+`../lib/recaptchaClient.js`, an untyped JavaScript module. The website has no
+`tsconfig.json` and no `typecheck`/`tsc` npm script — Vite transpiles without
+type checking — so `getRecaptchaTokenSoft`, `loadRecaptcha`, and
+`resolveRecaptchaSiteKey` are implicitly `any` at that boundary, with nothing
+to catch signature drift. Pre-existing repo condition (the website has never
+type-checked), marginally widened by adding the cross-boundary imports.
+**Re-confirmed 2026-07-27** — still deferred, and now slightly wider again:
+`MapleWidget.tsx` imports `loadRecaptcha` / `resolveRecaptchaSiteKey` from the
+same untyped module for the focus-time warm-up.
+**Suggested fix:** Add a `tsconfig.json` + `typecheck` script mirroring
+portal's — note portal's pre-push hook already enforces `npm run typecheck`, so
+the website is the odd repo out — or convert `lib/recaptchaClient.js` to `.ts`
+so at least this boundary is typed.
+
+### 524. [LOW] portal/src/components/properties/ContactsPicker.tsx:60 — label collapses at `sm` (640px) while the portal's documented phone breakpoint is `md` (768px)
+The `sm:hidden` / `hidden sm:inline` pair switches at 640px, but `src/lib/breakpoints.ts`
+documents `PHONE_BREAKPOINT_PX = 768` as the width where the portal changes shape, and the
+property dialog's own layout follows `md`. Between 640px and 768px the button shows the full
+"New Contact" inside a dialog still in its phone layout. Not a visible defect at those widths
+(there is room), purely a consistency question.
+
+**Suggested fix:** leave as-is for consistency with the existing `sm:` label-collapse precedent
+in `TasksPage.tsx` and `TaskDialog.tsx`, or switch all three to `md:` in one pass. Do not change
+`ContactsPicker` alone — a lone `md:` there would be a third convention.
+
+
+### Relocated here as resolved or closed
+
+
+### 435. [MEDIUM] platform/routers/agent_helpers/pending_property_link.py — `_write_link` has no company scoping~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** Both copies of the unscoped write are now
+tenant-scoped, fixed together as the entry warned they would otherwise drift.
+
+- `pending_property_link._write_link` takes the caller's `company_oid` and reads
+  *both* documents, refusing unless each one's `company` matches — the same
+  comparison `dependencies.assert_company_access` makes at the HTTP boundary.
+  Malformed or missing ids, and a missing or unparseable `company_id`, all
+  refuse rather than write.
+- `pending_estimate_follow_up.py:364` scopes its `Estimate.get` the same way.
+  Its property side was already safe (resolved out of the company's own list).
+- The three duplicated "couldn't find estimate" envelopes collapsed into one
+  `_link_failed_envelope`. "Estimate gone", "property gone" and "not yours" are
+  deliberately indistinguishable — distinguishing them would confirm to a
+  crafted request that an id exists.
+- `company_oid_from_context` replaces the inline parse that existed on only the
+  correction path, so all three write paths share one resolution.
+
+Tests: 10 new cross-tenant cases across the two handlers (every write path,
+both documents, plus missing/malformed company). Three pre-existing test fakes
+had to start declaring an owner and using ObjectId-shaped ids — they had been
+modeling a world without tenancy. 402 passing across the related surface;
+scoped ruff + mypy clean.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+`_write_link` calls `Estimate.get(estimate_id)` and
+`parse_object_id(property_id, …)` on values read straight out of
+`context_payload`, which is populated from the client's request context. Neither
+id is checked against the caller's company, so a crafted context could link one
+company's estimate to another company's property. **Not a regression** — it is
+the same seam as `pending_estimate_follow_up.py:364`, which the feature spec
+explicitly named as the pattern to mirror. Logged because this branch makes it
+the *second* copy of an unscoped write in a multi-tenant app, and "inherited" is
+a reason to track it, not to stop noticing it.
+**Suggested fix:** resolve both ids through a company-scoped query
+(`Estimate.find_one(Estimate.id == oid, Estimate.company == company_oid)`) and
+refuse rather than write when either lookup misses. Fix both call sites in one
+change, since they will otherwise drift.
+
+</details>
+
+### 491. [MEDIUM] `JobItem` has no stable id — work items are addressed positionally
+`Estimate.job_items` is a list of `JobItem` (`models/estimate.py:439`) with no
+identity field, so items are addressed by list index. Consequences: any
+work-item edit rewrites the entire array, `WorkItemSummary` keys on
+`(estimate_id, job_item_index)` and desynchronizes on any reshuffle, and the
+portal's `unmatched_*` carry-forward in `portal/src/lib/workItemV2.ts:162`
+reads `rawJobItems[idx]` from a possibly-stale snapshot — so a reordered list
+attaches gaps to the wrong item.
+
+Two people editing *different work items in the same estimate* therefore still
+lose one set. Phase 1 narrowed the window (a title-only save no longer sends
+`job_items` at all), and conflict detection would turn the remaining case into a
+visible 409 rather than silent loss, but neither fixes the root cause.
+
+**Suggested fix:** add `id: UUID` to `JobItem` with a backfill, rekey
+`WorkItemSummary` on it, and match by id rather than index in
+`workItemV2ToJobItemPayload`. Enables true per-work-item merging.
+
+### 505. [MEDIUM] platform/agents/task/ + orchestrator — task-id reading never got the estimate review; four readers, no shared entry point~~ — RESOLVED 2026-08-27
+**Closed as resolved 2026-08-27.** All five readers (the fourth listed below
+plus `_BARE_TASK_CODE_RE`, missed by the original audit) now go through
+`task_code_in_text` / `task_codes_in_text` in `services/readable_id.py`, built
+on shared `TASK_CODE_BODY` / `TASK_CODE_REF` / `TASK_CODE_CUED` fragments.
+`_TASK_CODE_PATTERN` is gone — it had no callers left once the three
+orchestrator sites moved onto the reader.
+
+Both defects the entry named are closed, and a third was found while wiring it:
+
+1. **Hyphenated (`T-0042`)** — accepted at every layer. Verified beforehand
+   that it routed to `None`, exactly as described.
+2. **Cued lowercase (`task t0042`)** — the gate agrees with the resolver now.
+   The update grammar carried the same divergence, which the entry did not
+   name: `rename task t0042 to X` parsed to "What would you like to update?".
+   Fixed with a separate cued branch (`target_code_cued`) rather than by
+   relaxing the bare form, since Python forbids reusing a group name.
+3. **New:** the domain-from-slot comparison at `service.py` compared raw
+   matched text against the captured slot, so `T-0042` in the message and
+   `t0042` in the slot looked like different tasks. Both sides are
+   canonicalized now.
+
+The reader is **plural-first** (`task_codes_in_text`) with the singular built on
+top. The resolver deliberately tries every candidate: the cue word can front an
+ordinary word that is also a valid id (`task tasks` is `T`+`ASKS`), and
+returning only the leading match would let that swallow a real id later in the
+same message — a regression the original single-return sketch would have
+introduced.
+
+**Item 3 of the original body was wrong, and is now fixed.** It said bare
+lowercase "is correctly rejected and must stay that way — do not fix this". The
+premise is right (lowercase `tasks` is `T`+`ASKS`) but the conclusion was too
+broad: measured against `/usr/share/dict/words`, 728 words are structurally
+valid lowercase ids and **none contains a digit**, while no id lacks one below
+sequence 338,250 (`TAAAA`). The digit — not the capital — is the separator. So
+`t0042` and `t-0042` now read, `trims` still does not, and an all-letter body
+still resolves in uppercase.
+
+Scanning also moved from "first match" to every occurrence, because an
+uppercase word is itself a valid id: `archive TASKS t0042` offered only `TASKS`
+before, and a DB miss on it ended the turn with nothing.
+
+**Not done, by design:** the spoken form stays refused, still sequenced behind
+#504.
+
+Tests: `tests/test_task_code_pattern.py` — 22 cases across the gate, both
+grammars, and the shared reader. `documentation/development/maple-phrasing-reference.md`
+updated (new `{TASK}` token in the legend + change-log entry).
+
+<details>
+<summary>Original body (preserved for history)</summary>
+The estimate readable-id work (`plans/2026-08-26-estimate-readable-ids.md`) ended
+by auditing every layer that reads a code out of a user message. That audit found
+a real defect — the routing gate was narrower than the reader behind it, so a
+form the reader understood was rejected before anything could call it. **The same
+audit has not been done for task ids, and a probe says the same class of gap is
+present.**
+
+**Measured on the current code** (`archive …`, rules only):
+
+| form | routing gate | resolver bare | resolver cued | orchestrator | `normalize_task_readable_id` |
+|---|---|---|---|---|---|
+| `T0042` | ✅ | ✅ | – | ✅ | `T0042` |
+| `#T0042` | ✅ | ✅ | ✅ | ✅ | `T0042` |
+| `T4K7Q` | ✅ | ✅ | – | ✅ | `T4K7Q` |
+| `task t0042` (cued lowercase) | ✅ | – | ✅ | **❌** | `T0042` |
+| `T-0042` (hyphenated) | **❌** | **❌** | **❌** | **❌** | `T0042` |
+| `T 0 0 4 2` (spoken) | **❌** | **❌** | **❌** | **❌** | – |
+| `t0042` (bare lowercase) | ❌ | ❌ | ❌ | ❌ | `T0042` |
+
+Two of those are defects, one is correct-by-design, and the last is a judgement
+call:
+
+1. **Hyphenated is a genuine gap.** `normalize_task_readable_id("T-0042")`
+   returns `T0042` — the normalizer strips hyphens — but no pattern accepts the
+   form, so the message never reaches the resolver that would have normalized
+   it. This is exactly the estimate defect: *a reader that can resolve a code
+   the gate has already rejected is a silent dead end, not an error.*
+2. **The orchestrator disagrees with the resolver on cued lowercase.**
+   `agents/task/resolver.py`'s `_READABLE_ID_CUED_RE` accepts `task t0042`;
+   `orchestrator/service.py`'s `_TASK_CODE_PATTERN` does not. Estimates had the
+   identical divergence (one pattern case-sensitive, one not) and it was fixed by
+   collapsing onto a single reader.
+3. **Bare lowercase is correctly rejected** and must stay that way — lowercase
+   `tasks` parses as `T`+`ASKS` and `trees` as `T`+`REES`. Do not "fix" this.
+4. **Spoken support is a judgement call, not an obvious gap** — see below.
+
+**Root cause: there are four independent readers and no shared entry point.**
+`_READABLE_ID_RE` / `_READABLE_ID_CUED_RE` (`agents/task/resolver.py:51-55`),
+`_TASK_CODE_PATTERN` (`agents/orchestrator/service.py:180-182`),
+`_TASK_CODE_REF` / `TASK_REFERENCE` (`agents/orchestrator/intents.py:550-552`),
+and `_READABLE_ID_TARGET` (`agents/task/text_helpers.py:100`). Estimates now
+funnel every one of these through `services/readable_id.py::estimate_code_in_text`,
+which is what makes a divergence impossible rather than merely unlikely.
+
+**Suggested fix:** add `task_code_in_text()` beside `estimate_code_in_text()`,
+have all four sites call it, and keep the uppercase-only rule *inside* it (tasks
+need it; estimates do not, because a decimal body cannot come from prose). Pin
+the forms with a parametrized "every form is understood" test across gate,
+reader, and end-to-end routing, mirroring
+`tests/test_estimate_code_pattern.py`.
+
+**What is already right, and should NOT be changed:** task routing is tested
+against the *real* classifier — `OrchestratorAgent(use_llm=False)`
+(`tests/test_maple_task_routing.py:35`). The estimate bug was concealed by a test
+that stubbed the orchestrator and so never exercised the gate at all; the task
+suite does not have that blind spot. Only the *coverage of forms* is missing, not
+the harness.
+
+**On the spoken form, and its link to #504:** `T 4 K 7 Q` is unsupported, and
+adding it is worth less for tasks than it was for estimates. Crockford drops
+I/L/O/U because they are *visually* confusable; it does nothing about B/D/E/G/P/T/V/Z,
+which are the speech-recognition confusion set — so a letter-bearing body spoken
+aloud is unreliable no matter what the parser accepts. **If tasks migrate to a
+decimal body (#504), spoken support becomes worthwhile and nearly free; until
+then it is polish on an unreliable channel.** Sequence this after #504, or drop
+the spoken row from scope.
+
+</details>
+
+### 418. [LOW] workspace root — untracked files `temp data` (JSON) and `tooltips.csv`
+Carried over from the 2026-07-16 review; both files are still untracked at the
+workspace root. A grep found no credential patterns, but loose data files at
+the repo root risk accidental commit.
+**Suggested fix:** Move into a data/scratch directory, delete, or add to
+.gitignore as appropriate.
+
+### 441. [LOW] documentation/development/code-review-followups.md — append-only log at 5,552 lines
+The cross-cutting review heuristic flags files over 800 lines as HIGH, but that
+rule targets source files, where length signals tangled responsibility. This is
+an append-only ledger, so the heuristic does not transfer and it was
+deliberately not reported as HIGH. It is still worth noting: at 5,552 lines the
+file is hard to scan, and resolved entries sit interleaved with open ones, so
+"what is still outstanding?" cannot be answered without reading the whole thing.
+Note the mild irony that this entry lengthens the file it describes.
+**Suggested fix:** rotate resolved entries into a dated archive
+(`code-review-followups-archive-2026.md`), keeping only open items in the
+working file — mirroring the `.remember/` archive convention this project
+already uses.
+
+### 449. [LOW] portal/src/tours/registry.ts:209 — Tasks tour can end with a full-viewport spotlight on mobile — ACCEPTED, NO ACTION
+The Tasks tour's final Maple step deliberately does not drive the Maple panel,
+so on a mobile viewport where the user already had Maple open, the resolved
+anchor is the full-screen sheet (`fixed inset-0`). `computePosition` finds no
+side that clears a full-viewport target and falls back to the bottom slot, so
+nothing breaks — but the highlight ring frames the whole screen and the tour
+ends there.
+
+Two remedies were considered and rejected. `closesMaplePanelOnMobile` is not
+usable on a step whose anchor IS the panel: closing it races the anchor's
+unmount (the flag is safe on the Dashboard tour only because it sits on a step
+anchored to `nav-account`). Reordering so the step isn't last contradicts the
+feature request, and leaves the same ring mid-tour.
+
+**Decision (2026-07-31):** accepted as-is. The case requires the user to have
+opened Maple themselves, and the outcome is cosmetic. **No action** — this
+entry exists so the next reviewer doesn't re-raise it. If it ever needs
+fixing, the clean remedy is a second `data-tour` value (e.g. `maple-entry`) on
+three small elements — the floating button and each panel's header strip — so
+the step always spotlights something small, leaving the Dashboard tour's
+whole-panel `maple` anchor untouched.
+
+### 465. [LOW] footer-desktop.png (repo root) — stray untracked binary
+An untracked PNG has sat in the workspace root since before the 2026-08-06 session, referenced
+by no tracked file. It will eventually be swept in by an unrelated `git add .`.
+
+**Suggested fix:** delete it, move it under `website/` if it is a real asset, or gitignore it
+if it is scratch output.
+
+### 499. [LOW] platform/routers/agent_helpers/pending_estimate_follow_up.py:364 — a failed link still reports `linked: True`~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** The handler now returns a refusal envelope
+(`success: False`, `linked: False`, "I couldn't link estimate 'X' — I can't find
+it anymore") instead of synthesizing a payload from the pending record, and no
+longer sets `property_id` / `active_property_id` / `active_property_name` for a
+link that never happened. Every cause here is estimate-side and terminal — the
+property was just resolved out of the company's own list — so the pending record
+is dropped rather than re-asked, unlike the sibling handler where "property
+gone" is recoverable. One wording still covers "gone" and "not yours".
+
+**The false success was masking a real regression.** The #435 tenant check had
+already broken the end-to-end path in
+`test_orchestrate_endpoint_estimate_property_follow_up_links_property` — its
+`FakeEstimateDoc` declares no `company`, so the write was being refused — and
+the fabricated payload kept every assertion green. Fixing #499 surfaced it; the
+fake now declares its owner. Worth remembering: a handler that reports success
+unconditionally cannot fail a test.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+When `Estimate.get` returns nothing the handler does not refuse — it synthesizes
+an `updated_payload` from the pending record and returns
+*"Linked estimate 'X' to property 'Y'."* with `linked: True`, having written
+nothing. The user is told a link happened that did not. Pre-existing and pinned
+by `test_select_property_link_falls_back_when_estimate_gone`, so it was
+deliberately left alone by the #435 fix; that fix routes the new "estimate
+belongs to another company" case down the same branch, which is correct for
+non-disclosure but inherits the same false success.
+
+Contrast `pending_property_link.py`, which returns a real refusal envelope
+(`success: False`) for the identical condition — the two handlers disagree about
+what a failed link looks like.
+
+**Suggested fix:** return a refusal envelope mirroring
+`pending_property_link._link_failed_envelope` and update the fallback test to
+assert the refusal. Keep the message identical for "gone" and "not yours".
+
+</details>
+
+### 500. [LOW] platform/routers/agent_helpers/pending_property_link.py:172 — two independent reads run sequentially~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** The two ownership reads now go through one
+`asyncio.gather`. Note the deliberate trade recorded in the code: both documents
+are always fetched, so a missing property no longer short-circuits the estimate
+read — one wasted lookup on a failure in exchange for a faster success, which is
+the common case. The test that documented the old short-circuit was flipped to
+document the new behavior rather than deleted.
+
+The projection half of this entry was **not** done: reading only `company` would
+need a dedicated Beanie projection model, which is more machinery than the gain
+justifies on an LLM-bound turn.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+`Property.get` and `Estimate.get` are awaited one after the other although
+neither depends on the other, and the property document is discarded immediately
+after reading `.company`. This is on a Maple chat turn that is already LLM-bound,
+so the wall-clock cost is negligible — it is a shape issue, not a performance
+problem today.
+**Suggested fix:** `asyncio.gather(Property.get(property_oid),
+Estimate.get(estimate_oid))` and check both results afterwards. Optionally
+project to `company` only. Low value; take it only if this file is open for
+another reason.
+
+</details>
+
+### 501. [LOW] platform/routers/agent_helpers/pending_property_link.py:173 — `getattr(doc, "company", None)` on models that always declare `company`~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** All three sites across the two handlers now
+read `.company` directly, so a future model rename fails loudly instead of
+silently refusing every link. Verified first that every test fake on these paths
+declares `company` — the four corrected during the #435 and #499 work — so the
+change needed no further test edits.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+Both `Estimate` and `Property` declare `company: PydanticObjectId` as a required
+field, so the attribute always exists. The `getattr` guard exists only because
+the test fakes are `SimpleNamespace`-shaped, which is production code bending to
+accommodate test scaffolding. It also silently converts a future model rename
+into "not yours" (refuse everything) rather than a loud AttributeError. The same
+shape is now in `pending_estimate_follow_up.py` for the same reason.
+**Suggested fix:** use `target_property.company != company_oid` and
+`estimate.company != company_oid` directly. The test fakes already set
+`company`, so no test changes are needed. Fix both files together.
+
+</details>
+
+### 502. [LOW] platform/tests/test_orchestrator_endpoint.py:1125 — the company OID is hardcoded twice in one test~~ — RESOLVED 2026-08-25
+**Closed as resolved 2026-08-25.** Bound to a `company_oid` local at the top of
+the test. There turned out to be a **third** occurrence, not two: the
+`fake_get_properties` stub asserted the same literal. All three now reference the
+local.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+`FakeEstimateDoc` hardcodes `"507f1f77bcf86cd799439011"` as its `company`,
+duplicating the `company_id` passed to `OrchestratorAgentRequest` about twenty
+lines below. Changing one without the other makes the test exercise the refusal
+path instead of the link path. It now fails loudly if they diverge — which is
+only true because #499 was fixed; before that, the same mismatch failed silently
+and hid a real regression for a full commit.
+**Suggested fix:** bind the value to a local
+(`company_oid = "507f1f77bcf86cd799439011"`) at the top of the test and use it in
+both places.
+
+</details>
+
+### 504. [LOW] platform/services/readable_id.py — Tasks and Estimates use two different readable-ID schemes~~ — RESOLVED 2026-08-27
+**Closed as resolved 2026-08-27.** Tasks now carry `T` + a decimal counter,
+matching estimates. Plan and phase breakdown:
+[`plans/2026-08-27-task-decimal-readable-ids.md`](plans/2026-08-27-task-decimal-readable-ids.md).
+
+**Re-render, not renumber**, as decided below: every task kept its sequence
+number, so `T000A` became `T0010` — the tenth task either way. Gaps left by
+deleted tasks survive, the job is re-runnable, and `Company.next_task_seq` was
+never written, so there was no race against live creates.
+`scripts/migrate_task_readable_ids_to_decimal.py` — run it with `--apply` per
+environment **before** the decimal codec ships. Both schemes are 4-7 characters
+of `[0-9A-Z]` and the sequence is untouched, so the unique index holds
+throughout and a task created mid-run is cosmetically inconsistent rather than
+corrupting.
+
+**What the decimal body deleted**, which was most of the argument for doing it:
+
+- the **uppercase-only rule** on the bare form;
+- the **"must contain a digit" rule** #505 added the day before;
+- the **338,250-task edge** where an all-letter body still needed uppercase;
+- one of the two target branches in `agents/task/text_helpers.py`.
+
+**The spoken form now resolves** (`T 0 0 4 2`), for the first time — it was
+deliberately out of scope for #505 because a Crockford body read aloud is
+unreliable no matter how good the parser is. `T-0042` rides the same pattern.
+
+**The Crockford codec is out of production code.** `decode_crockford_base32`
+moved *into* the migration script, its only remaining caller; when every
+environment has run the job, delete the file and the alphabet goes with it.
+`encode_crockford_base32` is gone outright.
+
+**Portal:** `portal/src/lib/taskCode.ts` mirrors the backend normalizer, and
+task search matches the id in full rather than as a substring — with a decimal
+body "42" would otherwise hit `T0042`, `T0421` and `T1042` alike.
+
+**Capacity:** four digits is a floor. `format_task_readable_id` widens past
+9,999 rather than failing.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+Estimates adopt `E` + four **decimal** digits (`E0042`) in the readable-ID work
+planned in
+[`plans/2026-08-26-estimate-readable-ids.md`](plans/2026-08-26-estimate-readable-ids.md),
+while Tasks keep `T` + four **Crockford Base32** characters (`T4K7Q`). Two
+schemes in one app is a real inconsistency and it was accepted deliberately, not
+overlooked: Tasks have already been renumbered once, and aligning them would
+mean a second backfill, a second pass over the task regexes, and a second round
+of test churn for users who have started quoting task IDs.
+
+The case for eventually moving Tasks to decimal is the same one that moved
+Estimates:
+
+- **The displayed code diverges from the count.** Task #10 displays as `T000A`
+  and #42 as `T001A`, so "task ten" names nothing. A decimal body makes the
+  number a user counts and the code they read the same object.
+- **Crockford's benefit is visual, not aural.** It drops I/L/O/U because they
+  *look* confusable; it does nothing about B/D/E/G/P/T/V/Z, which are the ASR
+  and over-the-radio confusion set. For a field crew speaking IDs aloud that is
+  the cost without the benefit.
+- **It would delete the digit rule too.** #505 made bare lowercase readable by
+  requiring a digit in the body, because 728 dictionary words are otherwise
+  valid lowercase ids. A decimal body makes every id digit-bearing by
+  construction, so the rule — and the 338,250-task edge where an all-letter
+  body would still need uppercase — both disappear.
+- **It would delete the false-positive machinery.** `(?-i:T[0-9A-HJKMNP-TV-Z]{4,7})`
+  exists because lowercase `tasks` parses as `T`+`ASKS` and `trees` as
+  `T`+`REES`. No English word contains a digit, so a decimal body removes the
+  uppercase-only rule, the cue-word requirement on the lowercase form, and the
+  reason `resolver.py` must fall through on a DB miss.
+
+**Suggested fix:** if Tasks ever migrate, reuse the estimate pieces —
+`format_estimate_readable_id` / `normalize_estimate_readable_id` in
+`services/readable_id.py` and the "not already in the new format" backfill
+selector in `scripts/backfill_estimate_readable_ids.py` are both written to be
+copied. Capacity is the only thing to re-check: four decimal digits is 9,999 per
+company, and tasks are created at a higher rate than estimates, so Tasks may
+want five digits rather than four.
+
+**Do not do this on its own.** It is only worth the change if it rides along
+with other Task work that is already touching the resolver and the orchestrator
+regexes.
+
+**Decisions taken 2026-08-27** (open questions the entry above left unanswered):
+
+- **Width: 4 digits, as a floor.** `format_estimate_readable_id` widens rather
+  than failing, so a company past 9,999 gets `T10000` and nothing breaks. The
+  "tasks may want five digits" worry in the entry above is moot — this is
+  cosmetic padding, not capacity.
+- **Re-render, not renumber.** The entry calls this a "second renumber"; it
+  need not be one. `Company.next_task_seq` is already a sequential per-company
+  counter and Crockford decodes straight back to it (`000A` → 10 → `T0010`), so
+  each task's new id is a pure function of its old one. That is strictly safer
+  than assigning fresh numbers: it preserves the gaps a deletion leaves (the
+  counter counts allocations, not survivors), it keeps the job re-runnable
+  because the target id doesn't depend on position in an ordered set, and it
+  touches `next_task_seq` not at all — no racy counter reset against live
+  creates. **The counter must not be re-advanced.**
+- **No grace period for old ids.** `normalize_task_readable_id` should stop
+  accepting Crockford bodies at the cutover rather than resolving both.
+- **The portal gets a task equivalent** of `portal/src/lib/estimateCode.ts` for
+  search normalization. There is none today — the portal only renders
+  `readableId`.
+- **The Crockford codec goes** once the backfill has run.
+  `encode_crockford_base32` / `decode_crockford_base32` are needed *by* the
+  backfill (to recover each task's sequence number) and dead immediately after.
+- **No index work.** Tasks already carry the unique `(company, readable_id)`
+  partial index (`models/task.py`), unlike estimates where the backfill had to
+  precede the index deploy.
+
+**#505 is done (2026-08-27)**, which was the prerequisite: every layer that
+reads a task id now funnels through `task_code_in_text` /
+`task_codes_in_text` in `services/readable_id.py`, so this migration changes
+the body in one place instead of five. It also means spoken task ids
+("T 0 0 4 2") become worth supporting the moment the body is decimal — a
+Crockford body read aloud lands in the B/D/E/G/P/T/V/Z confusion set no matter
+how good the parser is, which is why the spoken row was left out of #505.
+
+</details>
+
+### 512. [LOW] platform/services/readable_id.py — tasks require a full id, estimates still pad~~ — RESOLVED 2026-08-27
+**Closed as resolved 2026-08-27, taking option (a).** Estimates now apply the
+identical rule: `normalize_estimate_readable_id("E42")` returns "" rather than
+`E0042`. `_ESTIMATE_READABLE_ID_RE` requires the full 4-7 digit width, the
+`zfill` is gone, and `portal/src/lib/estimateCode.ts` mirrors it. The two
+resources agree again — the divergence lasted about an hour.
+
+**Decision 2026-08-27:** a task id must be quoted in full. `normalize_task_readable_id("T42")`
+returns "" rather than `T0042`, because padding guesses between `T0042`,
+`T0420` and `T4200`. This holds at every reader: the orchestrator's bare-id
+shortcut, `services/task_search.py` (so both `GET /tasks?search=` and Maple's
+task list), and `portal/src/lib/taskCode.ts`.
+
+**`normalize_estimate_readable_id` still pads** — `E42` resolves to `E0042`,
+pinned by `test_pads_an_unpadded_body` and the matching portal case. So the two
+resources now disagree on what a partial id means, three weeks after #504
+aligned them on everything else. The divergence is small and only affects
+partial input, but it is the same class of inconsistency #504 existed to remove,
+so it should be a decision rather than an accident.
+
+<details>
+<summary>Original body (preserved for history)</summary>
+
+**Suggested fix:** needs a product call. Options: (a) apply the full-id rule to
+estimates too, which makes the two identical again and is what I would pick —
+the reasoning that motivated it for tasks (padding guesses which record the user
+meant) applies verbatim to estimates; (b) keep estimates padding and record the
+divergence as intentional, on the grounds that estimate volumes are lower so the
+guess is less likely to be wrong.
+
+</details>
+
+### 550. [LOW] .claude/launch.json — untracked at the workspace root and not gitignored
+
+`git check-ignore` reports it is not ignored, so it shows as untracked noise in every `git status` at
+the workspace root and will get swept into someone's `git add .`. Contents are benign (an npm
+dev-server config for the portal on port 5173) — no secrets — so this is hygiene only.
+
+**Suggested fix:** a decision, not a defect. Commit it if the launch config should be shared with the
+team (it is generic enough to be useful), or add `.claude/launch.json` to the workspace-root
+`.gitignore` if it is personal tooling.
+
+### 355. [INFO] tooling / regex — not actionable now
+- `bandit` is not installed in `platform/.venv`, so the Step-3 security scan was
+  skipped during review. `pip install bandit` (or add to dev requirements) to
+  enable `bandit -r . -x tests/`. Manual review found no injection/secrets in the
+  change.
+- `_STATUS_TRANSITION_STATUS_REF_TO_PATTERN` (`agents/estimate/text_helpers.py`)
+  was checked for ReDoS: single lazy span on short chat input → ~O(n²) worst case,
+  not exponential; consistent with the existing `_STATUS_TRANSITION_*` patterns. No
+  action needed — recorded because this repo has a history of ReDoS findings.
+
+### 513. [RESOLVED — no action] operational — the DEV backfill already ran with backfill-day dates
+`backfill_lifecycle_state` shares `_sweep`, so it now writes historical dates too. But it had
+already been applied in DEV, which means those contacts carry backfill-day values for
+`ESTIMATE_STARTED_AT`, `FIRST_ESTIMATE_AT` and `DOCUMENT_GENERATED_AT` — and their claims are
+recorded, so neither a re-run nor the nightly sweep corrects them.
+
+**Closed 2026-08-27: accepted.** DEV holds test contacts whose dates nobody reads, so the
+stale values cost nothing and a repair script would be pure overhead.
+
+**The live constraint this leaves behind:** PROD has *not* run
+`scripts/backfill_brevo_lifecycle.py` yet, and this fix must ship before it does — that is
+the difference between PROD's `FIRST_ESTIMATE_AT` recording real activation dates and
+recording the day the backfill happened to run. There is no second chance: once the claims
+are written, the sweep skips those users forever. Ordering, not a task.
+
+
+### Folded into #4 (file and function size) — 2026-09-20
+
+Twenty length-only entries, folded into #4's tables. Their suggested splits are
+preserved verbatim below. Three files were logged more than once
+(`PortalLayout.tsx` ×3, `ContactsPage.tsx` ×2, `NewEstimateWithActivityPage.tsx`
+×2), each time with a line count that was already stale — which is why #4 is the
+only place a length finding belongs.
+
+
+### 305. [HIGH] Long handler functions in `work_item_field_handlers.py`
+**Where:** `agents/estimate/work_item_field_handlers.py` — `_handle_work_item_add_material()` (132 lines), `_handle_work_item_add_activity()` (114 lines), `_handle_work_item_remove_material()` (101 lines), `_handle_work_item_set_total()` (94 lines), `_handle_work_item_recurring_enable()` (93 lines).
+
+**Issue:** Five handlers exceed the 50-line threshold. Each mixes estimate resolution, work-item matching, sub-resource lookup, mutation, sub_total recalculation, and save into one method.
+
+**Fix:** Extract shared boilerplate (resolve estimate → find work item → clarify on miss) into a `_resolve_work_item_for_update()` helper returning `(target, job_items, idx, matched, err_response)`. Extract catalog lookup + item construction into `_resolve_and_build_material_item()` / `_resolve_and_build_activity_item()`. Each handler shrinks to ~30 lines of domain logic.
+
+### 534. [HIGH] portal/src/components/Layout/PortalLayout.tsx:1 — still 894 lines after the phone-chrome extraction
+The review's fix — extract the phone chrome into `useMobileChrome()` — was
+applied and took the file from 923 to 894 lines. It remains over the 800-line
+threshold because it was already at 858 before the tab-bar work began, so no
+change of this size gets it under. The remaining bulk is the tablet drawer:
+~150 lines of JSX plus the drag maths and the swipe wiring, all in the render
+body.
+**Suggested fix:** Extract the drawer into `MobileNavDrawer.tsx` — the backdrop,
+the `<aside>`, the nav list, the account footer and the powered-by strip, taking
+the drag offset and the open/close handlers as props. That is roughly 170 lines
+out and lands the file near 720. Deferred rather than done in this pass because
+the prop surface is wide (~15 values) and the drawer is covered only by
+`PortalLayoutSwipe.test.tsx`, which exercises the gesture rather than the
+markup — worth its own change with its own review.
+
+### 319. [MEDIUM] Orchestrator/material routing keeps growing already-oversized files
+**Where:** `platform/agents/orchestrator/service.py` (2402 lines), `platform/agents/material/service.py` (2710 lines)
+
+**Issue:** This change correctly adds net-new logic as separate modules, but the new routing fast-paths (`_match_estimate_list_filter`, `_match_material_list_filter`) were added to files already well over the 800-line guideline. Pre-existing structural debt, not introduced here.
+
+**Fix:** Next time these files are touched, consider extracting the orchestrator routing fast-paths into a `routing/` submodule.
+
+### 344. [MEDIUM] `_handle_update_estimate_apply_template` grew to 97 lines
+Added 2026-06-09. `agents/estimate/crud_handlers.py::_handle_update_estimate_apply_template`
+(L598) gained ~30 lines for the named-target-vs-bootstrap branching, pushing it
+to 97 lines (well over the 50-line heuristic). The three-way branch
+(named → resolve-or-refuse / unnamed-no-code → bootstrap from template /
+unnamed-with-code → load) is the kind of logic that reads and tests better
+extracted. Fix: pull the named-target resolution+refuse block into a small
+helper (mirrors the `_resolve_update_estimate_code` seam this change
+introduced), leaving the handler to orchestrate the three branches.
+
+### 516. [MEDIUM] portal/src/pages/SettingsPage.tsx:1 — extract CompanyTab to finish the file split
+The file is still 2,558 lines after the Account and shared-header extractions — well over the
+800-line review threshold. The remaining bulk is the Company tab: ~440 lines of JSX plus
+roughly 250 lines of handlers (`handleCompanyEdit` / `Cancel` / `Save`, the three logo
+picker/upload/remove handlers, the close-account dialog handlers) and about a dozen `useState`
+calls. Two things make it materially harder than the Account extraction that was completed:
+`companyDetails` must stay owned by `SettingsPage` because `FinancialTab` receives it as a
+prop, and the close-account confirmation dialog renders in the page's dialog section near the
+bottom of the file rather than inside the Company panel, so the extraction has to split one
+feature across a component boundary.
+
+Deferred deliberately rather than forced: bundling a ~700-line move on top of the behavioral
+fixes already in this change (the load-retry latch, the error relocation, the shared header)
+would make the whole thing hard to review and hard to bisect — which is the argument the
+original finding itself made for giving this its own commit.
+
+**Suggested fix:** extract `CompanyTab.tsx` into `portal/src/components/settings/`, mirroring
+the `{ companyDetails, isLoading, canEdit, onSaved }` prop shape that `FinancialTab` and the
+new `AccountTab` both use. Keep `companyDetails` and its loader in `SettingsPage` and pass
+them down. Move the close-account dialog into the new component along with its trigger, or
+leave the dialog in the page and pass an `onRequestClose` callback — the former is cleaner if
+nothing else opens that dialog. Do it as its own commit, with the existing Settings suites
+(`SettingsPageEditHeaderPlacement`, `SettingsPageCompanyLoadRetry`, `SettingsPageTeam*`) as
+the regression net.
+
+### 527. [MEDIUM] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — the page is 1,861 lines, more than twice the 800-line review threshold
+This file holds the entire estimate editor: data loading, autosave, status transitions, gap
+resolution, PDF generation, and five inline modals — the checklist dialog alone is ~140 lines
+of JSX inside the page's single return. Finding the block to change meant scrolling past four
+unrelated dialogs, and the checklist's own state (`isChecklistOpen`, `checklistGrouped`,
+`checklistError`, `checklist`, `handleChecklistPdfDownload`) is scattered ~1,200 lines away
+from the markup that uses it. MEDIUM rather than the HIGH the size check would give: the
+condition is long-standing, and the change that surfaced it made the file shorter, so this is
+standing debt rather than a regression.
+
+**Suggested fix:** extract the checklist modal into `src/components/estimates/ChecklistDialog.tsx`
+taking `{ open, checklist, grouped, error, onGroupedChange, onDownloadPdf, onClose }`, and move
+`checklistGrouped` / `checklistError` state in with it. That is ~150 lines off the page and would
+let `tests/EstimateChecklistDialogLayout.test.tsx` render the dialog directly instead of driving
+the whole page through a dozen module mocks. Worth doing as its own change.
+
+### 536. [MEDIUM] portal/src/components/Layout/PortalLayout.tsx:398 — still 878 lines after the tab-strip extraction
+`mapleNavFooter` moved out to `components/Layout/MapleNavTabs.tsx` (43 lines), which resolved the
+companion finding about that factory being over 50 lines but left the file itself 78 lines above
+the guideline. What remains is genuinely large: the desktop sidebar at lines 398-580 is 183 lines
+of JSX, and the tablet drawer at 603-748 another 145. Both are coherent units that belong in their
+own files — the layout would drop to roughly 550 lines with either one out. Neither move is
+mechanical, though: the sidebar alone closes over 16 identifiers (`companyLogoSrc`,
+`isSidebarCollapsed`, `showUserMenu`, `notificationsUnread`, `handleLogout`, `handleOpenSettings`
+and the setters behind them), so it is a real props-surface design rather than a cut-and-paste, and
+neither block has direct test coverage to catch a slip.
+
+**Suggested fix:** extract `PortalSidebar.tsx` first (lines 398-580), taking a single
+`{company, user, unreadCount, isCollapsed, onToggleCollapse, ...handlers}` shape rather than 16 flat
+props, and add a focused render test for it before the move so the extraction has something to
+verify against. Do it on its own, not alongside behavioral changes — this is the file every phone
+chrome change has landed in, and it just took a layout regression (the `<Outlet/>` wrapper) that no
+test caught.
+
+### 537. [MEDIUM] portal/src/pages/ContactsPage.tsx:1 — still 1236 lines after the shared-component extractions
+Two extractions landed, both chosen because they removed cross-file duplication rather than merely
+moving lines out of one file:
+
+- **`components/common/CsvUploadModal.tsx`** (169 lines) — the CSV batch-import dialog was copied
+  between ContactsPage and PropertiesPage, differing only in title, column list and sample URL.
+  Both pages now share it, and the duplicated `UploadResult` / `UploadResultError` interfaces (a
+  Model Creep instance in its own right) collapsed into one exported `CsvUploadResult`.
+- **the local `InputField`** — a private copy shadowing the existing
+  `components/common/InputField.tsx`, and a strictly worse one: it rendered a bare `<label>` with no
+  `htmlFor` and gave its input no `id`, so none of the contact form's fields were associated with
+  their labels. ContactsPage now uses the shared component (which gained a `type` prop to absorb the
+  email field), and `tests/ContactsPageMobileSheet.test.tsx` pins the association.
+
+What is left is not duplication, so it cannot be fixed by sharing — the file is simply doing too
+much. The contact form Modal is ~250 lines of JSX, and the form state behind it (`ContactFormData`,
+its initial value, the validation and submit handlers, and the address-autocomplete wiring) is
+another ~150 spread through the component body. Moving the JSX alone would leave a component taking
+twenty-odd props, so the extraction only pays off if the state goes with it.
+
+**Suggested fix:** extract `components/contacts/ContactFormModal.tsx` together with a
+`useContactForm` hook holding the form state, validation and submit, so the modal takes roughly
+`{open, editingContact, properties, onSaved, onClose}` instead of a flat prop per field. That should
+land ContactsPage near 850 and a second look at the remaining list/detail JSX would finish it. Worth
+doing on its own: the form is the highest-traffic write path on the page and has no direct test
+coverage, so it wants tests written against the current behaviour before anything moves.
+
+Note the same `PageActionsMenu` component is independently defined in four pages (ContactsPage,
+PropertiesPage, MaterialsPage, PeoplePage) and `InputField` still has a second private copy in
+EquipmentsPage. Those were left alone deliberately — Materials, People and Equipments are not
+otherwise part of this change, and widening a fix set into untouched pages is how a reviewable diff
+stops being reviewable. They are worth a dedicated dedupe pass.
+
+### 540. [MEDIUM] portal/src/components/estimates/InventoryGapsPanel.tsx:106 — `MaterialGapsTable` is 112 lines
+
+Exceeds the 50-line guideline by more than 2x. The body is near-flat presentational JSX — one
+`.map` over gap rows — rather than the branching logic the rule targets, and nesting stays within 4
+levels, which is why this is MEDIUM and not HIGH.
+
+**Suggested fix:** extract the `<tr>` body into a `MaterialGapRow` component, mirroring how
+`MaterialsTable.tsx` separates `MaterialRow` from `MaterialsTable`. This also makes the
+collapsed/expanded split readable at a glance.
+
+### 541. [MEDIUM] portal/src/components/estimates/InventoryGapsPanel.tsx:219 — `RoleGapsTable` is 105 lines
+
+The same over-length problem in the sibling table; tracked separately because it needs its own
+extraction.
+
+**Suggested fix:** extract a `RoleGapRow` component, matching the `ActivityRow` split in
+`ActivitiesTable.tsx`. Worth doing in the same sitting as the `MaterialGapRow` extraction above.
+
+### 547. [MEDIUM] portal/src/pages/OnboardingPage.tsx:84 — the component body is ~270 lines
+
+`OnboardingPage` runs from line 84 to 355, most of it one JSX block of eight `currentStep === "..."`
+branches, three of which now fork again on `isPhone`. Well past the 50-line guideline. It was already
+long; the phone forks roughly doubled the step-rendering section, and the two branches of each fork
+are far enough apart on screen that a copy change to one is easy to miss on the other.
+
+**Suggested fix:** extract the step rendering into a `renderStep(): ReactNode` helper below the
+component, or a `Record<OnboardingStepId, () => ReactNode>` map built from the handlers. Either
+leaves the hook/state block readable on one screen. The shared copy constants at the top of the file
+already do the anti-drift job, so this is readability rather than correctness.
+
+### 551. [MEDIUM] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — file is 1,927 lines, well past the 800-line threshold
+
+More than double the file-length review threshold. The notes collapsible change added six lines to
+it, so it worsens the condition only marginally and did not create it — hence MEDIUM rather than the
+HIGH the rubric would otherwise assign. Flagged because the notes work has now touched this file
+twice and the trend is one-directional.
+
+Deferred deliberately: the finding's own remediation says not to expand that diff, and splitting the
+page is a decision about scheduling rather than a defect to patch.
+
+**Suggested fix:** the estimate-level notes block, the details dialog, and the gap dialogs are each
+self-contained JSX islands that could move to sibling components under `components/estimates/`.
+Needs a decision on whether to schedule it as its own task.
+
+### 554. [MEDIUM] portal/src/pages/ContactsPage.tsx:1 — file is 1,225 lines
+
+Well past the 800-line review threshold, and this change added to it. Pre-existing, so MEDIUM rather
+than HIGH — the change did not create the problem and is a handful of lines. The page carries list
+rendering, the detail pane, the sheet, deep linking, CSV import, the dialogs and the layout decision
+in one component, which is precisely why the squeezed-desktop fix and the deep-link fix each had to
+be applied twice across two near-identical files.
+
+**Suggested fix:** extract the master-detail shell that Properties and Contacts both implement —
+list column, detail column, bottom sheet, deep-link handling — into one component taking a row
+renderer and a detail renderer. That also removes the duplication behind the test-harness finding
+above. Its own task, not a patch.
+
+### 555. [MEDIUM] portal/src/components/Layout/PortalLayout.tsx:1 — file is 838 lines
+
+Over the 800-line threshold, and this change added ~20 lines of content-column measurement to it.
+Pre-existing and only marginally worsened, hence MEDIUM. The component owns navigation, the tablet
+drawer, the drag gesture, Maple panel state, mobile chrome, notifications, tours, and now the
+content-layout measurement.
+
+**Suggested fix:** move the measurement out — a `useMeasuredContentLayout(ref)` hook in
+`src/lib/contentLayout.ts` returning the `ContentLayout`, leaving PortalLayout with a ref, a hook
+call and the provider. Small and safe on its own; the larger decomposition is a separate decision.
+
+### 373. [LOW] platform/services/translation.py:661 — `translate_response_bundle` length (~69 lines incl. docstring)
+By the mechanical >50-line rule the function is long. Mitigating context: the executable body is ~30 linear, branch-light lines, and this change reduced the function from ~90 lines (removed the batch/fallback block). Readability is fine.
+**Suggested fix:** None required. The segment-build block could be extracted to a helper if it grows.
+
+### 428. [LOW] platform/agents/estimate/crud_handlers.py — file-length violation worsened (finding #7)
+Now 2,966 lines against the 800-line guideline. Pre-existing, but the
+assumption-adjustment dispatch and its TYPE_CHECKING stubs added 26 lines rather
+than reducing it.
+**Suggested fix:** The update-dispatch table is the natural extraction candidate
+— each `_detect_* → _handle_*` pair could move to its own module, the way the
+work-item handlers already did.
+
+### 477. [LOW] platform/routers/estimates.py:983 — oversized file and function touched again
+Pre-existing: the file is 1652 lines and `update_estimate` is 298. The work-item history
+change added the enter/leave hooks inline rather than in a helper, nudging both further
+past the guideline.
+**Suggested fix:** move the history-transition side effects into
+`routers/estimate_helpers/` alongside the other extracted update logic.
+
+### 518. [LOW] portal/src/components/tours/TourManager.tsx:83 — TourRunner is 264 lines
+`TourRunner` spans lines 83–347, far past the 50-line guideline: it holds the page-tour
+effect, the dialog-arming effect with its own MutationObserver and retry bookkeeping, the
+anchor-tracking observer, and three callbacks. This is pre-existing, and the phone-viewport
+change only added 8 lines to it, which is why it is LOW and not HIGH — but each new concern
+bolted on makes the next edit harder to reason about, and the phone gate is now duplicated
+across two of the effects.
+
+**Suggested fix:** extract the dialog-arming effect body into a
+`useDialogTourWatcher(pathname, registry, resolveStep, presentStep)` hook in its own file,
+which would take roughly 80 lines out of the component. The existing
+`TourManager — dialog-triggered tours` suite is the regression net.
+
+### 523. [LOW] portal/src/components/tasks/TaskDialog.tsx:1 — file is 793 lines, just under the 800-line review gate
+The mobile-footer change added 6 lines to a file already at 787. It does not breach the
+800-line threshold, but the footer alone is now ~75 lines of JSX with four conditional buttons
+and two responsive-label rules, and the next small addition crosses the line.
+
+**Suggested fix:** extract the `footer={...}` JSX into a `TaskDialogFooter` component in the
+same directory, taking the handlers and the `isEdit` / `canSubmit` / `submitLabel` state it
+already reads. No behavior change; drops the file roughly 70 lines.
+
+### 533. [LOW] portal/src/pages/NewEstimateWithActivityPage.tsx:1 — phone-layout pass added to files far past the 800-line guideline
+The cross-cutting checklist treats >800-line files as HIGH. NewEstimateWithActivityPage is 1,874
+lines, MaterialsPage 1,559, PeoplePage 1,195 — all well over, and the phone-layout pass added
+10-25 lines to each. LOW rather than HIGH because every one of these files was already oversized
+beforehand and nothing in that change made the structure worse; the additions are localized class
+edits and one conditional. Overlaps the standing NewEstimateWithActivityPage entry above.
+
+**Suggested fix:** out of scope for a mobile-layout pass; splitting these files is its own piece of
+work. The NewEstimateWithActivityPage entry logged earlier (extract the checklist dialog) is the
+concrete first step already on record.
