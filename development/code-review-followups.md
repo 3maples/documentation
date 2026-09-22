@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **562**. Never
+- **Entries are numbered and permanent.** Next free number: **566**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -49,7 +49,7 @@ Re-rank when the list is worked down; the reasoning for each is in its entry.
 |---|------|---------------|
 | 1 | [#350](#350-high-live-credentials-render-in-plain-text-from-any-settings-repr--object-level-masking-landed-2026-07-27-secretstr-still-open) | HIGH. Live API keys and MongoDB credentials are still reachable through any un-masked `Settings` repr. Object-level masking landed 2026-07-27; `SecretStr` on the fields did not, so this is half-fixed. |
 | 2 | [#451](#451-medium-platformpromptsestimate_generationpy100--company-authored-division-description-is-a-prompt-injection-vector) + [#363](#363-medium-platformpromptsrole_catalogpy55--company-editable-role-text-reaches-the-llm-prompt-unsanitized-for-instruction-injection) | Company-authored division and role text reaches the estimate prompt unsanitized — two live injection vectors into the agent that drafts customer-facing money. |
-| 3 | [#557](#557-medium-work-item-summaries-live-and-die-with-their-estimate) | Deleting an estimate hides its work-item summaries and Won → Lost deletes them outright, against the 2026-09-20 ruling that the corpus is standalone and additive. The plan has all three open questions decided, so it is actionable now — and rows are being lost until it lands. |
+| 3 | [#535](#535-medium-portalsrccomponentslayoutaipaneltsx396--the-ai-accuracy-disclaimer-was-removed-from-the-desktop-panel-too) | The app ships no standing “Maple can make mistakes” notice on any surface — on a product that drafts quotes users send to their own customers. A spacing pass removed it from desktop as well as mobile; restoring desktop-only is a revert of that removal. |
 | 4 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. Users lose work with no signal. Plan written, just unscheduled. |
 | 5 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
 | 6 | [#326](#326-high-duplicated-delegation-block-in-handle_pending_optional_follow_up) | HIGH, and the cheapest item here: a pure refactor already pinned by `test_agent_helpers_optional_follow_up.py`. Two envelope assemblies in the follow-up state machine shared by **all** agents — they will drift. Fold [#335](#335-low-one-turn-shortcut-envelope-omits-accuracy_suggestions--missing_fields) into the same pass. |
@@ -58,9 +58,11 @@ Re-rank when the list is worked down; the reasoning for each is in its entry.
 | 9 | [Silently swallowed errors](#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
 | 10 | [Accessibility](#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name), [#469](#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
 
-**Just off the list:** [#535](#535-medium-portalsrccomponentslayoutaipaneltsx396--the-ai-accuracy-disclaimer-was-removed-from-the-desktop-panel-too) (the AI-accuracy disclaimer removed from every
-surface) and [#60](#60-medium-no-unique-compound-index-on-material--contact) (no unique compound index on Material / Contact). Neither
-got better — [#557](#557-medium-work-item-summaries-live-and-die-with-their-estimate) and [#326](#326-high-duplicated-delegation-block-in-handle_pending_optional_follow_up) are simply stronger claims on the next ten.
+**Just off the list:** [#60](#60-medium-no-unique-compound-index-on-material--contact) (no unique compound index on Material /
+Contact), still open and displaced rather than closed.
+
+**Closed from this queue:** #557 (work-item summaries standalone corpus) and
+#563 (the erasure its §4 left behind), both resolved 2026-09-21.
 
 ## File and function size
 
@@ -1842,17 +1844,32 @@ Contact, labour, and property agents force-keep explicitly-requested fields so a
 audit trail.
 **Suggested fix:** pass `always=fields.keys()` to match the siblings.
 
-### 558. [LOW] `_resolve_past_job_item` types its estimate as `Any`
-`platform/agents/estimate/llm_pipeline.py:156` — `estimate: Any` and `estimate_id: Any`, in a
-module that imports the real `Estimate` and knows `estimate_id` is the `str` taken from
-`past_item["estimate_id"]`. mypy therefore checks nothing inside the loop — `item.id`,
-`estimate.job_items`, any future field access — in the function whose whole job is picking the
-right past work item to copy prices from.
+### 558. ~~[LOW] `_resolve_past_job_item` types its estimate as `Any`~~ — RESOLVED 2026-09-21
 
-**Suggested fix:** annotate `estimate: Estimate` and `estimate_id: str`. The tests pass a
-MagicMock, which is unaffected — annotations are not enforced at runtime.
-**Likely moot:** #557's plan deletes this function along with the reuse path. Fix it only if
-that plan stalls; otherwise close this with #557.
+Moot as predicted: the function was deleted with the reuse path in #557 §3.
+### 565. [MEDIUM] The reuse removal's cost to estimate generation is unmeasured
+
+`platform/agents/estimate/llm_pipeline.py:595` — `_step2_and_3_for_scope` no
+longer returns early on a >= 0.85 vector match, so scopes that used to skip
+step 3 entirely now make a web-search research call. A multi-scope estimate
+that previously reused three items makes three extra researcher calls, and
+prices that were copied verbatim from a past job are now re-researched.
+
+That is the intended behaviour change (#557 §3), not a defect. What is missing
+is the check the plan itself asked for: a side-by-side on a few real scopes
+before this reaches production. Nothing in the test suite can stand in for it —
+it needs live generation against a real company's corpus.
+
+**Suggested fix:** run the side-by-side on a handful of representative scopes
+and record what changed: whether re-researched prices land near the ones that
+used to be copied, and what the added latency per scope actually is.
+
+**Ruled out — do not add a config flag to restore the short-circuit.** It would
+switch between "infer from history" and "copy a past price verbatim", which
+re-introduces the stale-price path #557 removed, and a flag like that gets
+turned on the first time generation feels slow. If the side-by-side shows the
+research path is worse, that is a reason to improve the prompt context, not to
+bring back copying.
 
 ## Platform — API, models and data
 
@@ -2530,42 +2547,115 @@ which is meaningless.
 assertion that each `*_at` is None whenever its boolean is False. The leaning is to leave it —
 the type is internal to this module and the aggregation is its only real producer.
 
-### 557. [MEDIUM] Work-item summaries live and die with their estimate
-`platform/services/work_item_summary.py` — three paths tie a summary's fate to a live
-`Estimate`: the `$lookup` + `$match` in `search_similar_work_items` hides any row whose estimate
-is not *currently* Won/Scheduled/Completed, the same join hides rows whose estimate was deleted
-(the join yields `[]`), and `delete_work_item_summaries` removes rows outright on Won → Lost.
-A related symptom: `embed_won_estimate` never deletes the row for a job item that was removed
-from an indexed estimate.
+### 557. ~~[MEDIUM] Work-item summaries live and die with their estimate~~ — RESOLVED 2026-09-21
 
-Simon ruled on 2026-09-20 that this is backwards — a summary is a standalone reference to work
-the company actually did, and deleting the estimate must not erase it. **The obvious "fix" of
-deleting rows for absent job items is explicitly NOT wanted**; under that ruling such a row is
-not an orphan.
+Shipped per
+[`plans/2026-09-20-work-item-summary-standalone-corpus.md`](plans/2026-09-20-work-item-summary-standalone-corpus.md),
+all four decided sections:
 
-**Suggested fix:** follow
-[`plans/2026-09-20-work-item-summary-standalone-corpus.md`](plans/2026-09-20-work-item-summary-standalone-corpus.md).
-All three of its open questions were decided on 2026-09-20: drop the `$lookup` join, stop
-retracting on Won → Lost (the corpus is purely additive), and drop structural reuse so the model
-infers from the summaries instead of copying a past job's line items. Close this entry when that
-plan lands.
+- **§1** `search_similar_work_items` no longer `$lookup`s `estimates`. Nothing
+  in the pipeline can observe an estimate, so deleting or re-statusing one
+  cannot hide its summaries. The 3x over-fetch went with the filter it existed
+  to refill.
+- **§2** The `Won → Lost` / `On Hold` retraction is unwired, and
+  `leaves_history` is deleted rather than left exported — its docstring argued
+  for the behaviour being removed. `delete_work_item_summaries` survives as
+  manual cleanup with a "do not re-wire this" note.
+- **§3** Structural reuse is gone: `_reuse_past_work_item`,
+  `_resolve_past_job_item`, `_project_past_line_items`,
+  `_WORK_ITEM_REUSE_SCORE_FLOOR` and the qualifying/best block. Every scope now
+  reaches `_step3_research_for_scope` with the matching summaries as context.
+- **§4** `WorkItemSummary.job_item_id` removed; the upsert probe is positional
+  again. **This part had a cost the plan did not anticipate — see #563.**
 
-### 561. [LOW] An adopted work-item summary keeps the previous occupant's `created_at`
-`platform/services/work_item_summary.py:315` — `.set()` never touches `created_at`, so when the
-legacy positional probe adopts an id-less row the date stays from whichever item was indexed
-there before. That date is `_work_item_recency`'s input, which picks among candidates that clear
-the 0.85 reuse bar, so a summary written today can lose to one written earlier. Only reachable
-on a corpus with id-less rows whose item array has shifted, and the positional upsert behaved
-the same way, so this is not a regression.
+Tests: `test_history_eligibility.py` and `test_history_recency.py` rewritten to
+pin the absence of the join and the short-circuit; `test_work_item_identity.py`
+replaced by `test_work_item_corpus.py`; the reuse cases in
+`test_line_item_cost_basis.py` and `test_estimate_division_classification.py`
+removed with the path they covered; `test_scope_assumptions.py`'s
+"reused items get no assumption" inverted. 309 tests pass across every file
+touching the corpus.
 
-**Suggested fix:** decide what the field means. Refreshing it on adoption makes it "when this
-summary was written", but then every re-embed refreshes it and recency tracks re-indexing rather
-than when the work was won. Leaving it makes it "when this estimate entered history", which is
-closer to what recency is asking — the leaning is to leave it and add a one-line comment saying
-which of the two it is.
-**Likely moot:** #557's plan removes `job_item_id`, and with it the adoption path that strands
-the date. Close this with #557 unless that plan stalls.
+**Not done, and deliberately so:** the plan's suggested side-by-side of a few
+real scopes before shipping. It needs live generation against real company
+data, which no test can stand in for. §6 (retention) is tracked as #562.
+### 563. ~~[MEDIUM] Re-indexing after a work item is deleted overwrites its summary and duplicates the survivor~~ — RESOLVED 2026-09-21
 
+Fixed the same day it was filed, and **not** by the fix this entry originally
+suggested. That proposal was to restore `job_item_id` as the upsert probe key.
+Simon pushed back: no reader needs a back-reference to the original work item —
+a summary is self-contained, vector search finds it on its own merits, and the
+id would exist for one writer. He was right, and verified: the only two
+consumers of a search result (`_step3_research_for_scope` and
+`infer_area_from_history`) read `summary` and `created_at`, nothing else.
+
+The real question was not which identity to key on but whether re-indexing
+should update rows at all. It should not. `embed_won_estimate` is now
+append-only: it probes by the summary TEXT
+(`_summary_already_stored`), skips anything already present, and inserts
+anything new. Nothing is ever updated or deleted, so no work-item identity is
+needed on the write path either.
+
+- A removed work item keeps its summary — nothing points at its row, so nothing
+  overwrites it.
+- A survivor is not duplicated — its own text matches the row it already has.
+- A re-index of an unchanged estimate writes nothing and, because the text is
+  compared before the vector is built, pays for **no embeddings**.
+
+**Accepted cost:** editing a work item adds a row rather than replacing one,
+since the new text matches nothing. Both rows describe a state the estimate
+really was in, and `created_at` separates them. Bounded by the content lock —
+editing a Won estimate means Won → Draft → edit → Won.
+
+`job_item_index` survives as write-once provenance; no query reads it. The
+compound index's second key is now vestigial (see #564).
+
+Tests: `test_work_item_corpus.py` rewritten around the new behaviour
+(7 tests, 3 of them red first); `test_embed_won_estimate_upserts_existing`
+became `test_embed_won_estimate_skips_a_summary_it_already_has`.
+### 564. [LOW] The `job_item_index` half of the work-item-summary index is vestigial
+
+`platform/models/work_item_summary.py` — the compound index is
+`(estimate_id, job_item_index)`, but since #563 made indexing append-only no
+query filters or sorts on `job_item_index`. Both remaining queries (the
+"already indexed?" probe and the manual `delete_work_item_summaries`) use the
+`estimate_id` prefix alone, so the second key is dead weight on every write.
+
+Left alone deliberately: changing it means Beanie creates the new single-key
+index while the old compound one lingers until someone drops it by hand, which
+is an operational step for no functional gain.
+
+**Suggested fix:** narrow to `IndexModel([("estimate_id", ASCENDING)])` and drop
+the old index, whenever this collection next needs a migration for another
+reason. Not worth its own deploy.
+
+### 562. [LOW] The work-item corpus now only grows, and nothing bounds it
+
+`platform/models/work_item_summary.py` — §6 of #557's plan, explicitly out of
+scope for that change and now a live question. Every row carries a 1536-float
+embedding, nothing deletes a row automatically any more, and the status join
+that used to keep the working set small by accident is gone.
+
+Not urgent: it becomes real the first time one company's corpus outgrows the
+`$vectorSearch` candidate window (`numCandidates = limit * 10`), at which point
+retrieval quality degrades quietly rather than failing.
+
+**Suggested fix:** a per-company row cap or an age cutoff, decided before a
+large customer hits it rather than after. Worth measuring the largest tenant's
+row count first — this may be years away.
+
+### 561. ~~[LOW] `created_at` on a work-item summary has never been given a meaning~~ — RESOLVED 2026-09-21
+
+Resolved as a side effect of #563's append-only rewrite. The ambiguity came
+from `.set()` never touching `created_at` on a re-embed, which left the field
+meaning "when this slot was first indexed" while two readers treated it as
+"when this work was won".
+
+There is no `.set()` on this collection any more. Every row is inserted once,
+with its own `created_at`, and never modified — so the field now unambiguously
+means "when this summary first entered the corpus", which is what both
+`_work_item_recency` and the dated prompt lines actually want. An edited work
+item gets a new row with a new date rather than an old row with a stale one.
 ## Portal — estimate builder
 
 ### 131. [MEDIUM] `saveError` displayed far from origin

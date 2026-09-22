@@ -1,8 +1,35 @@
 # Work-item summaries as a standalone corpus
 
-**Status:** decided, not yet implemented. Written 2026-09-20 after Simon ruled
+**Status:** IMPLEMENTED 2026-09-21 (#557). Written 2026-09-20 after Simon ruled
 on the question during a `/code-review`; the three open decisions were settled
 the same day and are marked **DECIDED** below.
+
+All four decided sections shipped. Two things this plan said, which the
+implementation could not close:
+
+- **§3's side-by-side** on a few real scopes before shipping did NOT happen. It
+  needs live generation against real company data, which no test substitutes
+  for. Prices that were copied verbatim from a past job are now re-researched;
+  that is the intended change, but nobody has looked at the result yet.
+- **§4's conclusion was right; its reasoning was not, and the gap cost a
+  round trip.** It removed `job_item_id` because `_reuse_past_work_item` was
+  "its only reader", overlooking `_find_existing_summary`, the upsert probe.
+  With the field gone the probe went positional, and deleting a work item from
+  an indexed estimate then overwrote its summary and duplicated the survivor
+  (**#563**).
+
+  The first fix proposed was to restore the field for the probe. Simon rejected
+  it: no reader needs a back-reference to the original work item, so a field
+  carried for one writer is the wrong shape. The actual question was whether
+  re-indexing should update rows at all — and it should not. `embed_won_estimate`
+  is now **append-only**, probing by the summary TEXT and inserting only what it
+  has not seen. No identity is needed on either path. §4's removal therefore
+  stands, and the corpus is additive in the write path as well as the read path.
+  Resolved 2026-09-21; the accepted cost is that an edit adds a row instead of
+  replacing one.
+
+**§6 (retention)** remains out of scope and is logged as **#562**. The now-vestigial
+second key of the collection's compound index is logged as **#564**.
 
 ## The ruling
 
