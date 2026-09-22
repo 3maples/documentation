@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **566**. Never
+- **Entries are numbered and permanent.** Next free number: **567**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -40,29 +40,36 @@ Working rules: one HIGH item per session, failing test first (TDD per
 `CLAUDE.md`), run the related test file only, one commit per item, mark it
 RESOLVED in the same commit.
 
-## Priority queue — next ten
+## Priority queue — next nine
 
-Ranked by severity × value, re-derived 2026-09-20 against 375 open entries.
-Re-rank when the list is worked down; the reasoning for each is in its entry.
+Ranked by severity × value, originally derived 2026-09-20. Two items have been
+worked off and one declined since, so the order below is **maintained, not
+re-derived** — treat it as a to-do list, not a fresh ranking. A full re-derive
+is due.
 
 | # | Item | Why it's here |
 |---|------|---------------|
-| 1 | [#350](#350-high-live-credentials-render-in-plain-text-from-any-settings-repr--object-level-masking-landed-2026-07-27-secretstr-still-open) | HIGH. Live API keys and MongoDB credentials are still reachable through any un-masked `Settings` repr. Object-level masking landed 2026-07-27; `SecretStr` on the fields did not, so this is half-fixed. |
-| 2 | [#451](#451-medium-platformpromptsestimate_generationpy100--company-authored-division-description-is-a-prompt-injection-vector) + [#363](#363-medium-platformpromptsrole_catalogpy55--company-editable-role-text-reaches-the-llm-prompt-unsanitized-for-instruction-injection) | Company-authored division and role text reaches the estimate prompt unsanitized — two live injection vectors into the agent that drafts customer-facing money. |
-| 3 | [#535](#535-medium-portalsrccomponentslayoutaipaneltsx396--the-ai-accuracy-disclaimer-was-removed-from-the-desktop-panel-too) | The app ships no standing “Maple can make mistakes” notice on any surface — on a product that drafts quotes users send to their own customers. A spacing pass removed it from desktop as well as mobile; restoring desktop-only is a revert of that removal. |
-| 4 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. Users lose work with no signal. Plan written, just unscheduled. |
-| 5 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
-| 6 | [#326](#326-high-duplicated-delegation-block-in-handle_pending_optional_follow_up) | HIGH, and the cheapest item here: a pure refactor already pinned by `test_agent_helpers_optional_follow_up.py`. Two envelope assemblies in the follow-up state machine shared by **all** agents — they will drift. Fold [#335](#335-low-one-turn-shortcut-envelope-omits-accuracy_suggestions--missing_fields) into the same pass. |
-| 7 | [#4](#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
-| 8 | [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](#25-medium-regex-email-lookup-in-_resolve_user), [#26](#26-medium-find_contacts_by_name-fetches-whole-company-filters-in-python), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths), [#443](#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
-| 9 | [Silently swallowed errors](#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
-| 10 | [Accessibility](#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name), [#469](#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
+| 1 | [#451](#451-medium-platformpromptsestimate_generationpy100--company-authored-division-description-is-a-prompt-injection-vector) + [#363](#363-medium-platformpromptsrole_catalogpy55--company-editable-role-text-reaches-the-llm-prompt-unsanitized-for-instruction-injection) | Company-authored division and role text reaches the estimate prompt unsanitized — two live injection vectors into the agent that drafts customer-facing money. |
+| 2 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. Users lose work with no signal. Plan written, just unscheduled. |
+| 3 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
+| 4 | [#566](#566-medium-local-dev-and-test-runs-load-real-production-credentials) + [#350](#350-medium-credential-fields-are-plain-str-not-secretstr--both-known-leak-paths-closed-2026-07-27) | `.env.local` is byte-identical to `.env.production` for the Stripe live key, OpenAI, Brevo and the Firebase service account — every `./run_tests.sh` run holds production payment credentials. Needs a decision (test-mode keys, or accept it in writing), not a code change. #350's `SecretStr` conversion is the defense-in-depth half. |
+| 5 | [#4](#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
+| 6 | [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](#25-medium-regex-email-lookup-in-_resolve_user), [#26](#26-medium-find_contacts_by_name-fetches-whole-company-filters-in-python), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths), [#443](#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
+| 7 | [Silently swallowed errors](#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
+| 8 | [Accessibility](#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name), [#469](#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
+| 9 | [#60](#60-medium-no-unique-compound-index-on-material--contact) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
 
-**Just off the list:** [#60](#60-medium-no-unique-compound-index-on-material--contact) (no unique compound index on Material /
-Contact), still open and displaced rather than closed.
+**Closed from this queue:** #557 and #563 (work-item summaries standalone
+corpus + the erasure its §4 left behind), resolved 2026-09-21. **#326**
+(duplicated delegation block) resolved 2026-09-22, taking #335 with it.
+**#535** (AI-accuracy disclaimer) closed 2026-09-22 as an owner decision —
+will not fix; the notice stays removed.
 
-**Closed from this queue:** #557 (work-item summaries standalone corpus) and
-#563 (the erasure its §4 left behind), both resolved 2026-09-21.
+**Demoted 2026-09-21:** #350 fell from slot 1 and from HIGH to MEDIUM. It held
+slot 1 because the 2026-07-27 credential exposure was unrotated; the owner
+confirmed the output never left the laptop, so rotation is withdrawn and both
+leak paths were already closed. What survives is #566 — the reason a laptop had
+production keys at all — plus #350's latent `SecretStr` gap.
 
 ## File and function size
 
@@ -164,6 +171,9 @@ seams that already exist as separate classes.
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
 | ~264 | `TourRunner` — portal/src/components/tours/TourManager.tsx:83 |
 | ~245 | `OrchestratorAgent.process()` — agents/orchestrator/service.py (god-method) |
+| 196 | `handle_pending_optional_follow_up` — routers/agent_helpers/optional_follow_up.py:462 (down from ~281 by #326; #326 claimed this was already tracked here — it was not) |
+| 69 | `_delegate_synthetic` — routers/agent_helpers/optional_follow_up.py:393 (was 95; the 2026-09-22 review split `_envelope_confidence`, `_chain_next_follow_up` and `_propagate_result_extras` out of it. The remainder is ~22 lines of docstring, an early-return guard and one dict literal — no non-arbitrary seam left, so treat this row as recorded, not actionable) |
+| 64 | `get_optional_follow_up_spec` — routers/agent_helpers/optional_follow_up.py:216 (pre-existing; it is a single allowlist dict literal, so the length is data, not logic) |
 | 176 | `_handle_update_estimate_work_item_update_field` — agents/estimate/work_item_handlers.py:851 |
 | ~167 | `MarkdownDescriptionEditor` component body — portal/src/components/common/MarkdownDescriptionEditor.tsx:252 |
 | 140 | `_handle_update_estimate` — agents/estimate/crud_handlers.py |
@@ -669,7 +679,7 @@ Copy-paste that has to be changed in two or more places and can drift. Includes
 the three twin-file pairs (Materials/Activities tables, Categories/Units tabs,
 the settings tabs).
 
-### 326. [HIGH] Duplicated delegation block in `handle_pending_optional_follow_up`
+### 326. ~~[HIGH] Duplicated delegation block in `handle_pending_optional_follow_up`~~ — RESOLVED 2026-09-22
 `routers/agent_helpers/optional_follow_up.py` — the one-turn confirm+value
 shortcut hand-rolls a ~40-line processor-delegation + envelope that near-copies
 the two-turn path at the bottom of the same function. The shortcut deliberately
@@ -682,6 +692,33 @@ processor_factory, context, *, propagate_extras)` helper used by both paths;
 behavior is pinned by the existing `test_agent_helpers_optional_follow_up.py` +
 `TestEstimateFollowUpConfirmStage` tests, so this is a pure refactor. Fold #335
 into the same pass.
+
+**Resolved 2026-09-22.** `_delegate_synthetic()` now owns processor
+resolution, delegation, `_rearm_on_unresolved`, the chained-follow-up block and
+the envelope; both call sites are a single `return await _delegate_synthetic(...)`.
+`handle_pending_optional_follow_up` dropped from ~281 to 195 lines.
+
+Two departures from the fix as written above, both deliberate:
+
+- **No `propagate_extras` flag.** Parameterising the difference would have
+  preserved it, and the difference was the bug — #335 is only closed because
+  both paths now run identical post-processing. A flag would also have been the
+  obvious thing to flip later, re-opening the drift.
+- **Not a pure refactor after all.** Folding #335 in is a behavior change, so
+  it went red-first: `TestOneTurnShortcutParity` in
+  `tests/test_agent_helpers_optional_follow_up.py` failed on
+  `accuracy_suggestions`, `missing_fields` and the chained `optional_follow_up`
+  question before the extraction and passes after. A fifth test pins
+  `completion_ready`, which the shortcut already carried, so the refactor could
+  not quietly trade one propagation for another.
+
+Note the chained-follow-up arming only fires when the delegated result reports a
+`create_*` operation, which a synthetic "Set X to Y" message rarely produces —
+so in practice the live half of this fix is the suggestions/missing-fields
+propagation. Verified: 124 tests pass across
+`test_agent_helpers_optional_follow_up.py`,
+`test_agent_helpers_pending_estimate_follow_up.py` and
+`test_orchestrator_endpoint.py`; ruff + mypy clean on `routers/agent_helpers`.
 
 ### 144. [MEDIUM] Alternating row color computed inline twice
 **Files**:
@@ -1695,10 +1732,15 @@ A real title like "Edge of the Garden" won't bare-extract (the tail stops at
 standard ask-for-code clarification. Documented tradeoff in the phrasing
 reference — revisit only if real titles hit it.
 
-### 335. [LOW] One-turn shortcut envelope omits `accuracy_suggestions` / `missing_fields`
+### 335. ~~[LOW] One-turn shortcut envelope omits `accuracy_suggestions` / `missing_fields`~~ — RESOLVED 2026-09-22
 Intentional and commented, but it makes the one-turn and two-turn paths return
 structurally different envelopes. Resolved automatically by the #326 refactor —
 tracked separately so it isn't forgotten if #326 is deferred.
+
+**Resolved 2026-09-22** with #326, as predicted — but not automatically. Both
+paths sharing `_delegate_synthetic()` is what closes it, and that only works
+because the extraction refused to carry the difference as a parameter. Pinned
+by `TestOneTurnShortcutParity`.
 
 ### 346. [LOW] Redundant double resolution in `apply_template`
 Added 2026-06-09. `agents/estimate/crud_handlers.py` (~L631): computing
@@ -2167,8 +2209,8 @@ geocode and note it in the comment.
 
 ## Platform — services, scripts and integrations
 
-### 350. [HIGH] Live credentials render in plain text from any `Settings` repr — object-level masking landed 2026-07-27, `SecretStr` still open
-**Severity**: HIGH
+### 350. [MEDIUM] Credential fields are plain `str`, not `SecretStr` — both known leak paths closed 2026-07-27
+**Severity**: MEDIUM (was HIGH until 2026-09-21 — see "Incident closed" below)
 `platform/config.py` holds every credential as a plain `str` — `openai_api_key`,
 `stripe_sk`, `stripe_webhook_secret`, `slack_bot_token`, `slack_signing_secret`,
 `slack_webhook_url`, `brevo_api_key`, the three `trello_*` values,
@@ -2177,13 +2219,22 @@ geocode and note it in the comment.
 `google_drive_credentials_json` (whole service-account blobs, RSA private key
 included). Zero `SecretStr` usage.
 
-**This is not theoretical — it fired on 2026-07-27.** A backend test run
-surfaced Settings content in plain text, putting the live Stripe `sk_live_` key,
-OpenAI key, Brevo key, Slack signing secret and the Firebase private key into
-test output. Verified scope: **not** in any commit (`.env` / `.env.local` are
-gitignored), **not** in CI logs (`platform/` has no GitHub Actions workflows and
-the pre-push hook deliberately skips pytest). But the same output pasted into a
-bug report, a Slack thread, or Sentry would carry them.
+**The 2026-07-27 incident — CLOSED 2026-09-21, no rotation required.** A backend
+test run surfaced Settings content in plain text, putting the live Stripe
+`sk_live_` key, OpenAI key, Brevo key, Slack signing secret and the Firebase
+private key into test output. Scope verified at the time: **not** in any commit
+(`.env` / `.env.local` are gitignored — re-confirmed 2026-09-21 that no env file
+other than `.env.example` has ever been committed on any branch), **not** in CI
+logs (`platform/` has no GitHub Actions workflows and the pre-push hook
+deliberately skips pytest).
+
+The one question rotation depended on was whether that output ever left the
+machine. **Owner confirmed 2026-09-21: it did not** — never pasted into a bug
+report, a Slack thread, or Sentry. No credential is known to have reached a
+third party, so **rotation is not required and the recommendation is
+withdrawn.** Earlier revisions of this entry carried "the exposed keys have not
+been rotated" as its most urgent open item and ranked it #1 in the priority
+queue on that basis; both are superseded. What remains is defense-in-depth.
 
 *On the exact mechanism:* an earlier draft of this entry said pytest printed the
 frame's locals. That is **not** verified and is probably wrong — `--showlocals`
@@ -2195,8 +2246,8 @@ this very fix was being written. Recorded this way deliberately: a follow-up
 entry that misstates *how* a credential leak happened will misdirect whoever
 investigates the next one.
 
-**Partially closed 2026-07-27.** Two distinct leak paths, closed two different
-ways — neither covers the other:
+**Both leak paths closed 2026-07-27**, two different ways — neither covers the
+other:
 
 1. **Rendering an existing object.** `Settings.__repr_args__` masks anything
    `_is_secret_field()` classifies as a credential. pydantic v2 routes
@@ -2227,10 +2278,28 @@ operands on failure and leak the exact value under test. There is also a
 guard test that fails when a new field starts matching the classifier, forcing
 a deliberate decision instead of a silent default.
 
-**Still open — the two gaps neither fix closes:**
+**Still open — but latent, not live (re-verified 2026-09-21):**
 - A call site that reads one field and logs it (`logger.info(settings.stripe_sk)`)
-  still handles a plain `str`.
-- `model_dump()` / `model_dump_json()` are unmasked.
+  still handles a plain `str`. **No such call site exists today** — the only
+  print of a credential field is `scripts/db/drop_db.py:121`, which routes
+  `mongodb_url` through `_redact_mongo_uri()` first.
+- `model_dump()` / `model_dump_json()` are unmasked. **No non-test call site
+  invokes `settings.model_dump()`.**
+
+Both are guards against a *future* call site rather than a current leak, which
+is why this dropped to MEDIUM: nothing in the codebase exposes a credential
+today.
+
+**Read this before working on it — local *is* production (verified 2026-09-21).**
+`.env.local` and `.env.production` hold byte-identical values for `stripe_sk`
+(prefix `sk_live_`), `stripe_webhook_secret`, `openai_api_key`, `brevo_api_key`,
+`firebase_credentials_json`, `google_maps_api_key` and `sentry_dsn`; only
+`mongodb_url` differs (Dev vs Prod cluster). `config.py:289` loads `.env.local`
+**last**, so it wins, and `tests/conftest.py:23` overrides **only**
+`MONGODB_URL`. Every `./run_tests.sh` run therefore holds the real production
+Stripe live key in `settings`. That is the structural reason a local test run
+could put production credentials on screen at all, and no fix above changes it.
+Tracked separately as [#566](#566-medium-local-dev-and-test-runs-load-real-production-credentials).
 
 **Suggested fix (the remaining work):** convert the credential fields to
 `SecretStr` and update the ~98 read sites to `.get_secret_value()`. Counted
@@ -2241,11 +2310,6 @@ each, `slack_webhook_url` / `slack_bot_token` 4 each, `trello_api_key` /
 2 each, `slack_signing_secret` 1. Tedious but low-risk: `SecretStr` is not a
 `str`, so every missed site becomes a mypy error and the project's zero-error
 gate catches them all before runtime.
-
-**Unresolved and more urgent than either code change: the exposed keys have not
-been rotated.** No change to `config.py` retroactively protects a credential
-that has already been printed. Rotating Stripe, OpenAI, Brevo, Slack and the
-Firebase service account is a standing owner decision.
 
 ### 74. [MEDIUM] JSON re-parsed on every `bootstrap_company_rate_cards` call
 **File**: [platform/services/rate_card_bootstrap.py:20](../../platform/services/rate_card_bootstrap.py)
@@ -2656,6 +2720,39 @@ with its own `created_at`, and never modified — so the field now unambiguously
 means "when this summary first entered the corpus", which is what both
 `_work_item_recency` and the dated prompt lines actually want. An edited work
 item gets a new row with a new date rather than an old row with a stale one.
+### 566. [MEDIUM] Local dev and test runs load real production credentials
+`platform/.env.local` — the file `config.py:289` loads **last**, so it overrides
+`.env` — holds byte-identical values to `.env.production` for `stripe_sk`
+(prefix `sk_live_`), `stripe_webhook_secret`, `openai_api_key`, `brevo_api_key`,
+`firebase_credentials_json` (service-account blob, RSA private key inside),
+`google_maps_api_key` and `sentry_dsn`. Verified 2026-09-21 by SHA-256
+comparison, values never rendered.
+
+Only `mongodb_url` is genuinely separated (Dev cluster locally, Prod in
+`.env.production`), and `tests/conftest.py:23` overrides **only** `MONGODB_URL`.
+So the Dev/Prod split everyone reasons about is a *database* split: for every
+other credential, local **is** production. Every `./run_tests.sh` run holds the
+live Stripe secret key in `settings`, and any local script, agent run or manual
+`uvicorn` session can transact against production Stripe.
+
+This is the structural precondition behind [#350](#350-medium-credential-fields-are-plain-str-not-secretstr--both-known-leak-paths-closed-2026-07-27):
+the masking work there stops credentials being *displayed*, but the reason a
+laptop had production keys to display is this. Nothing is currently known to
+have leaked (see #350 — the one incident was contained and needed no rotation).
+
+**Suggested fix:** give local development its own credentials where the provider
+offers them — Stripe test-mode keys (`sk_test_`) plus a test webhook secret are
+the highest-value swap, since that is the one credential that can move real
+money. A separate OpenAI key scoped to dev makes spend attributable and is
+cheap. Brevo and the Firebase service account are harder to split and may be
+worth accepting explicitly rather than half-doing.
+
+Decide it rather than inheriting it: if the current arrangement is deliberate
+(small team, no staging Stripe account), record that here as an accepted risk
+and the entry can close. What should not persist is the situation where a
+routine `./run_tests.sh` silently carries production payment credentials and
+nobody has decided that it should.
+
 ## Portal — estimate builder
 
 ### 131. [MEDIUM] `saveError` displayed far from origin
@@ -2975,7 +3072,7 @@ Found during 2026-07-01 manual dev testing: `onSnapshot` terminates permanently 
 The card lists tasks from every status column, including the terminal "Done" status. A finished task whose due date has passed will sit at the top of the card in red indefinitely, crowding out genuinely actionable tasks (the card only shows 5). Deferred pending a product decision on whether "Done" tasks belong in the card.
 **Suggested fix:** Fetch task statuses (taskStatusesApi.list), identify the final status column, and exclude tasks in it — or filter in selectDashboardTasks via a passed-in "done" status id.
 
-### 535. [MEDIUM] portal/src/components/Layout/AiPanel.tsx:396 — the AI-accuracy disclaimer was removed from the desktop panel too
+### 535. ~~[MEDIUM] portal/src/components/Layout/AiPanel.tsx:396 — the AI-accuracy disclaimer was removed from the desktop panel too~~ — CLOSED 2026-09-22, will not fix
 "Maple can make mistakes. Please review her work." previously rendered under the composer on
 desktop and was deliberately suppressed only on the mobile sheet, where vertical room is scarce —
 the removed `showDisclaimer` parameter existed precisely to draw that line. The change dropped it
@@ -2989,6 +3086,16 @@ Restoring desktop-only is a revert of the removal: reinstate the `showDisclaimer
 `renderAiComposer` and pass `false` from the mobile branch at AiPanel.tsx:565, which is what the
 code did before. If removing it everywhere is intended, put the notice somewhere persistent
 instead — the panel header, or the Maple tour step — so the disclosure still exists somewhere.
+
+**Owner decision 2026-09-22: will not fix.** The notice stays removed from both
+panels and is not being relocated. The entry asked for the call to be made
+deliberately rather than inherited from a spacing pass; it has been. Recorded
+so the next reviewer who notices the absence finds a decision here instead of
+re-filing it.
+
+Consequence, stated once for the record: the app ships no standing
+"Maple can make mistakes" notice on any surface. If that becomes a compliance
+question later, the fix is the two-line revert above — nothing about it decays.
 
 ### 112. [LOW] Replace `isMountedRef`/`fetchTokenRef` race-guards with `AbortController`
 **Files**: [portal/src/components/common/ChangeLogPanel.tsx](../../portal/src/components/common/ChangeLogPanel.tsx), [portal/src/components/common/FeedbackPanel.tsx](../../portal/src/components/common/FeedbackPanel.tsx), [portal/src/api/client.ts](../../portal/src/api/client.ts)
