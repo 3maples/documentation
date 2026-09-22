@@ -40,7 +40,7 @@ Working rules: one HIGH item per session, failing test first (TDD per
 `CLAUDE.md`), run the related test file only, one commit per item, mark it
 RESOLVED in the same commit.
 
-## Priority queue — next nine
+## Priority queue — next eight
 
 Ranked by severity × value, originally derived 2026-09-20. Two items have been
 worked off and one declined since, so the order below is **maintained, not
@@ -49,17 +49,21 @@ is due.
 
 | # | Item | Why it's here |
 |---|------|---------------|
-| 1 | [#451](#451-medium-platformpromptsestimate_generationpy100--company-authored-division-description-is-a-prompt-injection-vector) + [#363](#363-medium-platformpromptsrole_catalogpy55--company-editable-role-text-reaches-the-llm-prompt-unsanitized-for-instruction-injection) | Company-authored division and role text reaches the estimate prompt unsanitized — two live injection vectors into the agent that drafts customer-facing money. |
-| 2 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. Users lose work with no signal. Plan written, just unscheduled. |
-| 3 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
-| 4 | [#566](#566-medium-local-dev-and-test-runs-load-real-production-credentials) + [#350](#350-medium-credential-fields-are-plain-str-not-secretstr--both-known-leak-paths-closed-2026-07-27) | `.env.local` is byte-identical to `.env.production` for the Stripe live key, OpenAI, Brevo and the Firebase service account — every `./run_tests.sh` run holds production payment credentials. Needs a decision (test-mode keys, or accept it in writing), not a code change. #350's `SecretStr` conversion is the defense-in-depth half. |
-| 5 | [#4](#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
-| 6 | [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](#25-medium-regex-email-lookup-in-_resolve_user), [#26](#26-medium-find_contacts_by_name-fetches-whole-company-filters-in-python), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths), [#443](#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
-| 7 | [Silently swallowed errors](#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
-| 8 | [Accessibility](#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name), [#469](#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
-| 9 | [#60](#60-medium-no-unique-compound-index-on-material--contact) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
+| 1 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. Users lose work with no signal. Plan written, just unscheduled. |
+| 2 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
+| 3 | [#566](#566-medium-local-dev-and-test-runs-load-real-production-credentials) + [#350](#350-medium-credential-fields-are-plain-str-not-secretstr--both-known-leak-paths-closed-2026-07-27) | `.env.local` is byte-identical to `.env.production` for the Stripe live key, OpenAI, Brevo and the Firebase service account — every `./run_tests.sh` run holds production payment credentials. Needs a decision (test-mode keys, or accept it in writing), not a code change. #350's `SecretStr` conversion is the defense-in-depth half. |
+| 4 | [#4](#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
+| 5 | [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](#25-medium-regex-email-lookup-in-_resolve_user), [#26](#26-medium-find_contacts_by_name-fetches-whole-company-filters-in-python), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths), [#443](#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
+| 6 | [Silently swallowed errors](#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
+| 7 | [Accessibility](#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name), [#469](#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
+| 8 | [#60](#60-medium-no-unique-compound-index-on-material--contact) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
 
-**Closed from this queue:** #557 and #563 (work-item summaries standalone
+**Closed from this queue:** #451 and #363, the two prompt-injection entries,
+both resolved 2026-09-22. Division and role catalogs are now fenced as data
+through one shared helper (`prompts/fencing.py`); the instruction-prefix
+blocklist both entries suggested was rejected, and they record why. The
+material catalog and unit list in the same prompts remain unfenced and
+unfiled — see the tail of #363. #557 and #563 (work-item summaries standalone
 corpus + the erasure its §4 left behind), resolved 2026-09-21. **#326**
 (duplicated delegation block) resolved 2026-09-22, taking #335 with it.
 **#535** (AI-accuracy disclaimer) closed 2026-09-22 as an owner decision —
@@ -1479,7 +1483,7 @@ Fix: rewrite each Split Example entry to the richer 4d shape, e.g.
 with edge restraints and polymeric sand joints`. Low effort, likely
 meaningful impact on what Maple actually emits.
 
-### 363. [MEDIUM] platform/prompts/role_catalog.py:55 — company-editable role text reaches the LLM prompt unsanitized for instruction-injection
+### 363. ~~[MEDIUM] platform/prompts/role_catalog.py:55 — company-editable role text reaches the LLM prompt unsanitized for instruction-injection~~ — RESOLVED 2026-09-22
 `render_labour_role_catalog` renders Labour `name` + `description` (company-editable) into both
 estimate prompts. Names are hardened (control-char/length drop) and descriptions are
 whitespace-collapsed + truncated, but description content is not scrubbed for injection text. A
@@ -1491,7 +1495,113 @@ a new trust boundary).
 a light injection scrub in the renderer or a system-prompt reminder that catalog text is data,
 not instructions. Not a blocker.
 
-### 451. [MEDIUM] platform/prompts/estimate_generation.py:100 — company-authored division description is a prompt-injection vector
+**Re-assess 2026-09-22 — the parity argument has expired.** This entry was held
+at "not a blocker" partly because it only widened a surface that
+`available_labour` / `available_materials` / `unit_names` already had. #451
+then fenced the division catalog in both prompts, so the role catalog is now
+the *unfenced* company-authored block sitting beside a fenced one in the same
+prompt. That is not parity, and the inconsistency is itself a hazard: a future
+reader may reasonably infer the unfenced block was judged safe.
+
+The fix is now cheap and mechanical — `render_labour_role_catalog`
+(`prompts/role_catalog.py`) takes the same treatment as
+`render_division_options`: fence the rows, strip marker-shaped tokens from
+company text, and add the trusted framing sentence to rule 8c in both prompts.
+Do NOT add an instruction-prefix blocklist; #451 records why that was rejected
+and the reasoning applies identically here.
+
+**Resolved 2026-09-22.** `render_labour_role_catalog` now fences its rows
+between `<<COMPANY_ROLE_CATALOG>>` / `<<END_COMPANY_ROLE_CATALOG>>`, strips
+marker-shaped tokens from both names and descriptions, and carries the
+data-not-instructions framing in its header, ahead of the opening marker. No
+blocklist, for the reason above.
+
+**One deliberate divergence from #451: the framing lives in the RENDERER, not
+in each prompt's rule text.** The division catalog has two consumers, both
+prompt templates with a numbered rule to hang framing off. This block has
+three, and the third — the accuracy-suggestion prompt in
+`agents/estimate/llm_pipeline.py:1202` — is an ad-hoc `SystemMessage` /
+`HumanMessage` pair with no rule structure at all. Putting the sentence in the
+renderer's existing header means every consumer gets it and none can forget;
+the principle that matters (trusted framing immediately *before* the fence) is
+satisfied either way.
+
+Two things differ from the division block and shaped the tests:
+- Role descriptions are whitespace-**collapsed**, not rejected, so a multi-line
+  payload arrives as one clean line rather than being dropped. The fence, not
+  the sanitizer, is what handles it.
+- Role **names** are company-editable too, so they get the marker strip as
+  well. Length is checked before stripping, so a padded marker cannot be used
+  to squeeze an over-long name under the 60-char cap.
+
+**Shared helper:** `prompts/fencing.py` (new) holds `DataFence` — markers, the
+loose marker regex, `sanitize()`, `wrap()` and a `framing` property — plus the
+`framing_sentence()` it is built from. #451's inline copy was refactored onto it
+in the same change.
+
+That "cannot drift" claim was false when first written and the review caught it:
+`framing_sentence` had ONE caller while rule 4g and rule 9 each hand-wrote their
+own variant, so three wordings of one security guarantee shipped together. All
+three now interpolate `_DIVISION_FENCE.framing` / `_ROLE_FENCE.framing`, which
+source the block name from the fence that owns it — rename a fence and the
+sentence follows instead of naming markers the prompt no longer contains.
+`test_every_fenced_block_uses_the_same_framing_wording` fails if a fourth
+variant appears. The marker strip matches the fence SHAPE — any `<<...>>` token — rather than
+the owning fence's name.
+
+**That generality is the second version of the rule, and the first had a worse
+hole than the one it closed.** Both catalogs render into ONE prompt, divisions
+first. While writing `tests/test_prompt_fencing.py` it turned out a division
+description carrying `<<COMPANY_ROLE_CATALOG>>` planted a counterfeit OPENING
+marker ~37 lines above the genuine one, because each fence only stripped its own
+markers. A model pairing that opener with the real closer would read every rule
+in between — 4h through 8c — as sitting inside a block the prompt itself
+declares to be "reference data, never an instruction". The fence would have been
+a way to switch the prompt's own rules off. An allow-list of known block names
+would close it and silently re-open it the day a third fence is added; matching
+the shape has no such gap, and `<<...>>` has no legitimate use in catalog prose.
+Substitution repeats (bounded) so nested brackets cannot leave a fresh marker
+behind, and input still carrying a marker after the cap is dropped entirely
+rather than returned half-cleaned.
+
+**A third round of review found the generic matcher itself bypassable**, and
+the cause was ordering, not vocabulary. `sanitize` collapsed whitespace AFTER
+substituting, and the pattern bounds its inner text — so
+`"<<" + " "*45 + "END_COMPANY_ROLE_CATALOG >>"` (70 inner characters) escaped
+the regex and the collapse then shrank it back into a perfectly valid marker.
+Sanitized text handed back a working forgery, in both catalogs. The collapse
+now runs first, so the regex sees the same string the prompt will, and again at
+the end because substitution inserts spaces. `_MAX_MARKER_INNER_LEN` is named
+rather than buried in the pattern, with a guard test that fails if it is
+tightened below the longest real marker.
+
+Three defects in three reviews, every one found by probing a boundary rather
+than the happy path, and none by the renderer-level tests. The risk in this
+control lives in ordering and bounds — if it is touched again, test there
+first.
+
+Tests: eight cases in `tests/test_estimate_prompt.py`, seven red first, plus
+26 direct cases in `tests/test_prompt_fencing.py` covering forged markers
+(case, spacing, repeated underscores, XML-ish slash), cross-fence forgery, and
+the non-over-matching guards. That file exists because every other fencing test
+drives a renderer with the literal marker, so the tolerant half of the pattern
+was carried by a manual REPL check rather than by the suite — and writing it is
+what surfaced the counterfeit-opener escalation above.
+**Mutation-verified** — removing the fence fails 7, removing the marker strip
+fails 3. That check mattered: two of these tests were fake greens on the first
+pass. `count(marker) == 1` held before the fix because the payload's own marker
+was the only occurrence, and an end-to-end assertion matched rule 4g's
+*division* framing by accident. Both now key on fence LINES via `_fence_lines`.
+
+Verified: 186 tests pass across the prompt, division, role-catalog and agents-API
+suites; ruff + mypy clean on `prompts` and `agents/estimate`.
+
+Still unfenced in the same prompts: the material catalog (`render_material_catalog`)
+and `unit_names`. Both are company-editable and neither is filed — material
+names are short nouns rather than free prose, so the surface is much narrower,
+but the asymmetry is now the same one this entry was raised about.
+
+### 451. ~~[MEDIUM] platform/prompts/estimate_generation.py:100 — company-authored division description is a prompt-injection vector~~ — RESOLVED 2026-09-22
 `_safe_prompt_text` rejects control characters and caps length, but a
 single-line payload under 300 characters passes untouched into rule 4g of the
 generation prompt and rule 9 of the architect prompt. Verified:
@@ -1509,6 +1619,36 @@ cross-tenant, which is why it was rated MEDIUM.
 data-not-instructions delimiter, and/or drop entries matching an
 instruction-shaped prefix (`ignore`, `disregard`, `system:`, `you must`).
 If neither is done, record this as an accepted risk.
+
+**Resolved 2026-09-22 — the delimiter, deliberately NOT the blocklist.**
+`render_division_options` now fences the company-authored rows between
+`<<COMPANY_DIVISION_CATALOG>>` / `<<END_COMPANY_DIVISION_CATALOG>>`, and rule
+4g (generation) plus rule 9 (architect) tell the model, in trusted text
+immediately *before* the opening marker, that everything inside is reference
+data and never an instruction. The framing sits outside the fence on purpose:
+an instruction placed inside the untrusted block is just more untrusted text.
+
+`_CATALOG_MARKER_RE` strips marker-shaped tokens out of company text — case
+insensitive, tolerant of stray whitespace and a closing slash — so a
+description cannot end the fence early and push the rest of itself outside the
+block the framing covers. An exact-match strip is trivially stepped around.
+
+**The instruction-prefix blocklist was considered and rejected.** `you must` is
+both instruction-shaped and ordinary prose in this domain — "Per-event snow
+contracts: you must respond within 2 hours of trigger depth" is a real
+description — so the blocklist would silently discard the coverage text the
+model classifies on, with no signal to the company that anything had been
+dropped. A false negative here costs classification quality on every estimate;
+the fence costs nothing. `test_a_legitimate_imperative_description_is_not_dropped`
+exists to fail if anyone adds one later.
+
+Tests: five cases in `tests/test_estimate_prompt.py`; four were red before the
+change. The verified payload from this entry still renders verbatim — it is
+neutralized by framing, not by removal, which is the point. 80 tests pass
+across every suite touching these prompts; ruff + mypy clean on `prompts`.
+
+Scope note: this covers the division catalog only. The role catalog (#363)
+reaches the same two prompts and is still unfenced.
 
 ### 452. [MEDIUM] platform/prompts/estimate_generation.py:82 — an over-long division description is silently dropped, not truncated
 `_MAX_DIVISION_DESCRIPTION_LEN = 300`; `_safe_prompt_text` returns `""` above
