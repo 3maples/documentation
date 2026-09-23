@@ -40,7 +40,7 @@ Working rules: one HIGH item per session, failing test first (TDD per
 `CLAUDE.md`), run the related test file only, one commit per item, mark it
 RESOLVED in the same commit.
 
-## Priority queue — next eight
+## Priority queue — next seven
 
 Ranked by severity × value, originally derived 2026-09-20. Two items have been
 worked off and one declined since, so the order below is **maintained, not
@@ -49,16 +49,18 @@ is due.
 
 | # | Item | Why it's here |
 |---|------|---------------|
-| 1 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. Users lose work with no signal. Plan written, just unscheduled. |
+| 1 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. **In progress 2026-09-22:** the server mechanism and the TaskDialog are built; the estimate builder is the remaining surface — see the entry for what it still needs. |
 | 2 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
-| 3 | [#566](#566-medium-local-dev-and-test-runs-load-real-production-credentials) + [#350](#350-medium-credential-fields-are-plain-str-not-secretstr--both-known-leak-paths-closed-2026-07-27) | `.env.local` is byte-identical to `.env.production` for the Stripe live key, OpenAI, Brevo and the Firebase service account — every `./run_tests.sh` run holds production payment credentials. Needs a decision (test-mode keys, or accept it in writing), not a code change. #350's `SecretStr` conversion is the defense-in-depth half. |
-| 4 | [#4](#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
-| 5 | [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](#25-medium-regex-email-lookup-in-_resolve_user), [#26](#26-medium-find_contacts_by_name-fetches-whole-company-filters-in-python), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths), [#443](#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
-| 6 | [Silently swallowed errors](#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
-| 7 | [Accessibility](#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name), [#469](#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
-| 8 | [#60](#60-medium-no-unique-compound-index-on-material--contact) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
+| 3 | [#4](#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
+| 4 | [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](#25-medium-regex-email-lookup-in-_resolve_user), [#26](#26-medium-find_contacts_by_name-fetches-whole-company-filters-in-python), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths), [#443](#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
+| 5 | [Silently swallowed errors](#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
+| 6 | [Accessibility](#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name), [#469](#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
+| 7 | [#60](#60-medium-no-unique-compound-index-on-material--contact) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
 
-**Closed from this queue:** #451 and #363, the two prompt-injection entries,
+**Closed from this queue:** #566 (local dev holds production credentials),
+closed 2026-09-22 as an owner decision — accepted risk, the laptop is not a leak
+path. #350 left the queue with it but stays open: its `SecretStr` half guards a
+future call site, which is a different question. #451 and #363, the two prompt-injection entries,
 both resolved 2026-09-22. Division and role catalogs are now fenced as data
 through one shared helper (`prompts/fencing.py`); the instruction-prefix
 blocklist both entries suggested was rejected, and they record why. The
@@ -108,7 +110,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 2,561 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
 | 2,375 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | |
 | 1,848 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927) |
-| 1,775 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | |
+| 1,795 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | +20 on 2026-09-22 for #490's conditional write; `update_estimate` is most of the file's weight (see below) |
 | 1,721 | [platform/routers/agents.py](../../platform/routers/agents.py) | |
 | 1,559 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | |
 | 1,544 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | |
@@ -122,9 +124,9 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,155 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | |
 | 1,154 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | |
 | 1,118 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | |
+| 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
 | 865 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | |
 | 856 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
-| 812 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793 |
 | 812 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
@@ -171,6 +173,7 @@ seams that already exist as separate classes.
 
 | Lines | Function |
 |------:|----------|
+| 376 | `update_estimate` — routers/estimates.py:1042 (grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
 | 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
 | ~264 | `TourRunner` — portal/src/components/tours/TourManager.tsx:83 |
@@ -2141,6 +2144,53 @@ when the changed-field sets do not overlap, and a 409 naming the conflicting
 fields when they do. **Supersedes #59**, which proposed optimistic concurrency
 keyed on `estimate.updated_at` for the Drive-filename race.
 
+**Status 2026-09-22 — in progress.** Built:
+
+- `services/conflict_detection.py` — `conditional_update` (precondition,
+  bounded auto-merge, 409 via `ConflictError`) and `versioned_set` for writers
+  that hold no loaded version. `version: int = 0` on `Estimate` and `Task`.
+- Both PUT routes take an optional `base_version` and put
+  `audit_metadata(document, patch)` — `version` plus the `fields` actually
+  written — on their audit entry. `changed_fields_since` reads those, falling
+  back to the `changes` diff only for older entries (the diff over-reports:
+  it also picks up whatever another writer landed mid-request). It requires
+  the entries to be **contiguous** over `(base, current]`; any gap degrades
+  to a document-level conflict rather than an auto-merge. The returned
+  document is built from the write's own `ReturnDocument.AFTER` snapshot, so
+  the audited version is always this write's.
+- Every other writer bumps `version`: Maple's Task agent
+  (`_apply_task_update`, audited with the version), and Maple's estimate
+  writes via `persist_fields` plus the three direct `.set()` sites that used
+  to bypass it (`estimate_update.py`, `pending_property_link.py`,
+  `pending_estimate_follow_up.py`). The cost backfill no longer does a
+  whole-document `.save()`, which could move `version` backwards.
+- Raw pymongo skips Beanie's event actions, so `conditional_update` re-runs
+  the model's `after_event(Update)` hooks itself — the estimate PUT route is
+  the load-bearing caller of `Estimate.note_brevo_lifecycle`.
+- Portal: the TaskDialog sends `base_version` and renders `ConflictNotice`
+  (Reload / Save anyway) from Save, Archive and Create Estimate; Save anyway
+  resumes whichever of the three the conflict interrupted. The builder's
+  whole-save sends only changed header fields (`lib/estimateHeaderPatch.ts`),
+  a prerequisite for versioning it.
+
+**Remaining — the estimate builder:**
+
+1. **Maple's estimate writes bump `version` but most record no audited
+   version.** `persist_fields` has no user and writes no audit entry, so once
+   the builder sends `base_version`, any conflict spanning a Maple edit
+   degrades to document level — a false conflict whenever the fields were in
+   fact disjoint, which is the failure the whole design exists to avoid. Give
+   `persist_fields` (or its callers) an audit entry carrying
+   `audit_metadata(written, update)` **before** wiring the builder. No
+   before-state is needed: the recorded fields are what the lookup reads.
+2. Wire `base_version` into the builder's field auto-save and whole-save, and
+   render `ConflictNotice` there.
+
+**Deploy:** `scripts/backfill_document_versions.py --apply` is no longer a
+hard prerequisite — the precondition matches a missing `version` for base 0 —
+but run it once per environment so stored data carries the number the API
+reports.
+
 ### 29. [LOW] `update_estimate` recalculates totals on any `job_items`-present edit
 **File**: `routers/estimates.py:1868-2016`
 **Severity**: LOW (likely won't fix)
@@ -2439,7 +2489,7 @@ today.
 `MONGODB_URL`. Every `./run_tests.sh` run therefore holds the real production
 Stripe live key in `settings`. That is the structural reason a local test run
 could put production credentials on screen at all, and no fix above changes it.
-Tracked separately as [#566](#566-medium-local-dev-and-test-runs-load-real-production-credentials).
+Tracked separately as [#566](#566-medium-local-dev-and-test-runs-load-real-production-credentials--closed-2026-09-22-accepted-risk).
 
 **Suggested fix (the remaining work):** convert the credential fields to
 `SecretStr` and update the ~98 read sites to `.get_secret_value()`. Counted
@@ -2860,7 +2910,7 @@ with its own `created_at`, and never modified — so the field now unambiguously
 means "when this summary first entered the corpus", which is what both
 `_work_item_recency` and the dated prompt lines actually want. An edited work
 item gets a new row with a new date rather than an old row with a stale one.
-### 566. [MEDIUM] Local dev and test runs load real production credentials
+### 566. ~~[MEDIUM] Local dev and test runs load real production credentials~~ — CLOSED 2026-09-22, accepted risk
 `platform/.env.local` — the file `config.py:289` loads **last**, so it overrides
 `.env` — holds byte-identical values to `.env.production` for `stripe_sk`
 (prefix `sk_live_`), `stripe_webhook_secret`, `openai_api_key`, `brevo_api_key`,
@@ -2892,6 +2942,22 @@ Decide it rather than inheriting it: if the current arrangement is deliberate
 and the entry can close. What should not persist is the situation where a
 routine `./run_tests.sh` silently carries production payment credentials and
 nobody has decided that it should.
+
+**Owner decision 2026-09-22: accepted risk, closed.** The arrangement is
+deliberate and the laptop is not considered a leak path. The entry existed to
+force the decision rather than to presume the answer; it has been made, so this
+closes rather than lingering as an open finding a future reviewer re-raises.
+
+What this decision covers: the credentials being *present* locally. It does not
+retire the mechanical facts above — `.env.local` still overrides `.env`,
+`tests/conftest.py` still overrides only `MONGODB_URL`, and a local script or
+`uvicorn` session can still transact against production Stripe. Anyone changing
+how config is loaded should read those first.
+
+[#350](#350-medium-credential-fields-are-plain-str-not-secretstr--both-known-leak-paths-closed-2026-07-27)
+stays open on its own merits: its remaining `SecretStr` conversion guards
+against a *future* call site logging a credential, which is a different question
+from where the credentials live.
 
 ## Portal — estimate builder
 
