@@ -28,6 +28,7 @@ the doc after the NOTES section.
 | D6 | Images are **new uploads only**. There is no picker for existing note photos. They carry forward through D5. |
 | D7 | Images reach Google through **short-lived signed Firebase Storage URLs**. They are not platform URLs, which Google can't reach from local dev. |
 | D8 | Generated versions are **read-only** in the dialog: open or delete only, with no reloading of an older version's inputs. |
+| D9 | **Maple never writes what prints.** "Add a note to the estimate" in Maple now files a real estimate-level `Note` in the Notes feed and no longer writes `Estimate.notes`. Maple has no access to Additional Information. (Option C, decided 2026-09-23.) |
 
 ## Section 1 — Storage & data model
 
@@ -247,6 +248,31 @@ versions keep it (Section 1 lifecycle).
 - The dialog owns its own form state. The page keeps owning `docVersions` and
   the delete-confirmation state, as it does today. Object URLs are revoked on
   unmount and on removal (the `NoteComposer` pattern).
+
+## Section 4 — Maple estimate notes (D9)
+
+`agents/estimate/crud_handlers.py::_handle_update_estimate_notes` is replaced
+by `_handle_add_estimate_note`, which calls `services.notes.create_note_as`
+with `parent_type=ESTIMATE`, attributing the note to `current_user_email` and
+`current_user_name`. It follows the property and contact agents' note
+behavior:
+
+- **No signed-in user:** the note is skipped with `NOTE_SAVE_NO_AUTHOR_REASON`.
+- **Insert failure:** reported with `NOTE_SAVE_FAILED_REASON`. The body is
+  never logged.
+
+Two consequences:
+
+- **Replace phrasings add a note too.** "set/replace the notes to …" adds a
+  note as well, because a feed has nothing to overwrite. The `set`/`append`
+  mode from `_detect_note_update` is ignored.
+- **Notes skip the edit lock.** Following the Notes system's rule that an
+  estimate's status never gates notes, the handler loads the estimate without
+  the Draft/Review lock. Every other update sub-op keeps the lock.
+
+`Estimate.notes` is then written by nothing in Maple and read by nothing on
+the doc path. It stays in the model as legacy data. Estimate details still
+render it when it's non-empty.
 
 ## Testing
 
