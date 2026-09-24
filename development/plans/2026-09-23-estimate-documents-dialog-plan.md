@@ -3112,11 +3112,13 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 
 Unit tests fake Google and Firebase Storage. Three behaviors can only be proven against the real services, and the spec's Risks section depends on them.
 
-- [ ] **Step 1:** With the platform running locally against Dev (`uvicorn main:app --reload`) and the portal dev server up, open a Dev estimate. Generate a version with two lines of Additional Information and two photos (one landscape, one portrait phone photo).
+- [ ] **Step 1:** With the platform running locally against Dev (`uvicorn main:app --reload`) and the portal dev server up, open a Dev estimate. Generate a version with two lines of Additional Information and three photos (one landscape, one portrait phone photo, one tall portrait image such as a phone screenshot).
 - [ ] **Step 2:** Open the generated Doc and confirm:
   - (a) The NOTES text is present, and each image sits on its own line directly **below** the notes text, in the order picked. This proves that `replaceAllText` turns `\n` into a new paragraph. If the images sit inline on the notes line instead, report it: the fix is to find the `{{NOTES}}` paragraph's end index instead of using the marker's own paragraph.
   - (b) No `{{NOTES_IMAGES}}` text is left anywhere.
   - (c) The portrait photo is upright and at most page width.
+  - (d) The tall portrait image (the phone screenshot) fits on one page and is not clipped.
+  - (e) The multi-line Additional Information prints as separate lines with no extra blank lines between them.
 - [ ] **Step 3:** Confirm signing worked. `platform` logs show no `Failed to sign estimate doc image URLs`. If it failed with a missing-private-key error, the credentials in that environment can't sign V4 URLs. Report it; do not work around it silently.
 - [ ] **Step 4:** Reopen Documents. The text and both photos are prefilled. Remove one photo, add another, and generate v2. Then delete v1, and in the Firebase console confirm that the blob shared with v2 still exists. Delete v2 and confirm both of its blobs are gone.
 - [ ] **Step 5:** Record the outcome of Steps 2–4 in `documentation/development/notes.md` (date, estimate id, pass/fail per check).
