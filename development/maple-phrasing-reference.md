@@ -2,9 +2,21 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-23
 
 ### Change log
+
+**2026-09-23 — estimate notes → Notes feed (Option C)**
+
+Every estimate note phrasing (add / append / jot / FYI / remember / set /
+replace) now files an estimate-level `Note` via `_handle_add_estimate_note`;
+nothing writes `Estimate.notes`. Set/replace phrasings add rather than
+overwrite. Notes ignore the Draft/Review lock; the lock tests now probe with
+a description edit. Tests: `TestEstimateNotesGoToFeed`,
+`test_estimate_notes_ignore_the_edit_lock`.
+
+**No routing changed** — no phrasing was added, closed or reclassified, only
+what a supported phrasing *does* server-side. §12.3's counts are unaffected.
 
 **2026-09-17 — property and contact notes phrasings now create a real Note**
 
@@ -1060,7 +1072,7 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 
 ## 1.10 Estimate-level field edits (title, description & notes)
 
-These edit **top-level `Estimate` fields** — distinct from the work-item (`JobItem`) description edits in §1.5.3. `title`, `description`, and `notes` all exist on the `Estimate` model (`models/estimate.py`). Routing is `update_estimate` → Estimate Agent; the dispatcher is `_handle_update_estimate` (`crud_handlers.py:1632`).
+These edit **top-level `Estimate` fields** (`title`, `description`) — distinct from the work-item (`JobItem`) description edits in §1.5.3. **Notes phrasings no longer write an `Estimate` field**: as of 2026-09-23 they file a real estimate-level `Note` on the Notes feed (section 9.6 of the user guide) via `_handle_add_estimate_note`; `Estimate.notes` itself has no writer left in Maple. Routing is `update_estimate` → Estimate Agent; the dispatcher is `_handle_update_estimate` (`crud_handlers.py:1632`).
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
@@ -1068,8 +1080,8 @@ These edit **top-level `Estimate` fields** — distinct from the work-item (`Job
 | `rename it to {new title}` (pronoun target) | `update_estimate` → Estimate Agent | ✅ rule *(resolves via `active_estimate_code`)* |
 | `change/set the title of this estimate to {new title}` / `change the name of this quote to {new title}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-07-30)* |
 | Renaming a **locked** estimate (Sent / Approved / Archived / Won / Completed …) | Refused | 🛑 refusal *(2026-07-30 — the handler resolves through `_load_estimate_for_update`, so the Draft/Review edit-lock covers the title exactly like notes, description, and work-item edits. Locked means locked for everything.)* |
-| `for estimate {EST}, add to the notes the following: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(`_detect_note_update` → `_handle_update_estimate_notes`, append-mode; preserves existing notes. 2026-06-07 — the quoted body is captured in full even with an apostrophe inside (`"Contact me if there's any issues"`); straight + curly, double + single quotes via the shared `_QUOTED_VALUE_GROUP`)* |
-| `set the notes on {EST} to "..."` / `update notes: ...` | `update_estimate` → Estimate Agent | ✅ rule *(same handler; set-mode vs append-mode chosen by verb)* |
+| `for estimate {EST}, add to the notes the following: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(`_detect_note_update` → `_handle_add_estimate_note`; files a real estimate-level `Note` via `create_note_as`, added to the Notes feed (section 9.6) — `Estimate.notes` is never touched, and the note ignores the Draft/Review edit lock. 2026-06-07 — the quoted body is captured in full even with an apostrophe inside (`"Contact me if there's any issues"`); straight + curly, double + single quotes via the shared `_QUOTED_VALUE_GROUP`. 2026-09-23 — Option C.)* |
+| `set the notes on {EST} to "..."` / `update notes: ...` | `update_estimate` → Estimate Agent | ✅ rule *(same handler; 2026-09-23 — "set"/"replace" phrasing is still recognized but now **adds** a note rather than overwriting anything, since a Notes feed only ever grows)* |
 | `for estimate {Estimate Name}, add to the notes the following: "..."` (estimate referenced by **title**) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — notes handler resolves via the shared `_resolve_estimate_code_or_title`; bare titles extracted by `_TITLE_PRE/POST_NOUN_RE` — first word capitalized, 2+ words (sentence-case OK) near "estimate"/"quote". The bare-title patterns run **before** the any-quoted fallback so a quoted note body is never mistaken for the title.)* |
 | `add a note to the {title} quote: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06)* |
 | `update the description of estimate {EST} with the following: "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `_detect_estimate_description_update` + `_handle_update_estimate_description` set the top-level `Estimate.description`; quoted, colon, and unquoted `to ...` value forms supported, incl. an EST-code sitting between the keyword and the connector)* |
@@ -1080,14 +1092,14 @@ These edit **top-level `Estimate` fields** — distinct from the work-item (`Job
 | `describe the {title} estimate as "..."` / `the description for the {title} job should be "..."` | `update_estimate` → Estimate Agent | ⚠️ gap *(`describe ... as` and `... should be` shapes have no extractor; "the {X} job" also isn't an estimate reference)* |
 | `make a note on {EST} that ...` / `leave a note on {EST}: "..."` / `tack a note onto the {title} quote: "..."` | `update_estimate` → Estimate Agent | ⚠️ gap *(corrected 2026-06-06: the routing verb list lacks `make`/`leave`/`tack`, so these never reach the agent on a fresh turn; "make a note ... that X" additionally needs a generic `note ... that` tail extractor (only `remember ... that` exists). Reachable today only when the orchestrator already routed to `update_estimate` for another reason.)* |
 | `note on the {title} job: ...` | `update_estimate` → Estimate Agent | ⚠️ gap *(verbless + "the {X} job" isn't an estimate reference — Task-8 stretch)* |
-| `jot down on the {title} estimate: "..."` / `remember on this estimate that ...` / `FYI on the {title} job: "..."` (with an estimate/quote token) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — informal cues `jot`/`fyi`/`remember`/`write down` in `_NOTE_UPDATE_CUES` + value extractors (`_NOTE_WITH_COLON_SEP` broadened, new `_NOTE_REMEMBER_TAIL`); routed end-to-end by the orchestrator's value-bearing `_informal_note` arm. Always **append**-mode. Note: the phrase still needs an estimate/quote/EST token — "the Smith job" alone doesn't reference an estimate.)* |
+| `jot down on the {title} estimate: "..."` / `remember on this estimate that ...` / `FYI on the {title} job: "..."` (with an estimate/quote token) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — informal cues `jot`/`fyi`/`remember`/`write down` in `_NOTE_UPDATE_CUES` + value extractors (`_NOTE_WITH_COLON_SEP` broadened, new `_NOTE_REMEMBER_TAIL`); routed end-to-end by the orchestrator's value-bearing `_informal_note` arm. 2026-09-23 — always **adds** a `Note` to the estimate's Notes feed; `Estimate.notes` is untouched. Note: the phrase still needs an estimate/quote/EST token — "the Smith job" alone doesn't reference an estimate.)* |
 | `write down on the {title} estimate that ...` | `update_estimate` → Estimate Agent | ⚠️ gap *(`write down` is a cue, but only `remember` has a `... that ...` tail extractor; needs the tail generalized)* |
 
 **Title-vs-target trap (2026-07-30):** the rename handler must resolve its target from the message **head**, never the raw query. `_resolve_estimate_code_or_title` treats the bare word "title" as an explicit name cue (`_TITLE_BARE_RE`), so `change the title of this estimate to Patio Rebuild` would otherwise hunt for an estimate literally named *"of this estimate to Patio Rebuild"*, miss, and refuse instead of falling back to the active estimate. `_detect_estimate_title_update` returns `(new_title, target_text)` for exactly this reason. Two exclusions run against that **head**, never the new value (an estimate may legitimately be titled "Scope of Work"): a work-item noun in the head (`rename the patio work item|scope to X`) leaves the message to the work-item op, and a *qualified* name field (`set the name **of the property** on {EST} to X`) leaves it to the property-link branch — without that second guard the value was silently written into `Estimate.title` instead.
 
 **Disambiguation note:** `set the description of {WI} to "..."` (§1.5.3) targets a **work item** and is already ✅ rule. The phrasings here target the **estimate as a whole** — the implementation must detect the absence of a work-item reference (no `work item` / `job item` / `scope` / `line item` token) to route to the estimate-level handler rather than the work-item one.
 
-**Implementation note (shipped 2026-06-06):** all update sub-handlers (description / notes / property-link) resolve the estimate by **code → `active_estimate_code` anaphora → "latest" → quoted-or-bare title** via the shared `_resolve_estimate_code_or_title`. Set-vs-append for notes follows the verb (`set`/`change`/`replace`/`overwrite`/`rewrite` + note → set; everything else, incl. all informal cues, → **append**, the non-destructive default). Dispatcher order in `_handle_update_estimate`: work-item ops → status → **description** → notes → property link → template (description sits above notes so a "description" cue never lands in the notes branch; work-item ops stay first so `description of {WI}` is untouched). **Remaining ⚠️ in this section:** value-before-cue (`put "X" as the overview`), `describe ... as` / `should be`, routing verbs `make`/`leave`/`tack`, a generalized `note ... that` tail, and "the {X} job" as an estimate reference (Task-8 stretch).
+**Implementation note (shipped 2026-06-06; notes behavior changed 2026-09-23):** all update sub-handlers (description / notes / property-link) resolve the estimate by **code → `active_estimate_code` anaphora → "latest" → quoted-or-bare title** via the shared `_resolve_estimate_code_or_title`. The verb (`set`/`change`/`replace`/`overwrite`/`rewrite` + note vs. everything else, incl. all informal cues) still selects a "mode," but as of 2026-09-23 (Option C) every mode **adds** a `Note` via `_handle_add_estimate_note` → `create_note_as` — nothing ever writes `Estimate.notes` again, and the note ignores the Draft/Review edit lock. Dispatcher order in `_handle_update_estimate`: work-item ops → status → **description** → notes → property link → template (description sits above notes so a "description" cue never lands in the notes branch; work-item ops stay first so `description of {WI}` is untouched). **Remaining ⚠️ in this section:** value-before-cue (`put "X" as the overview`), `describe ... as` / `should be`, routing verbs `make`/`leave`/`tack`, a generalized `note ... that` tail, and "the {X} job" as an estimate reference (Task-8 stretch).
 
 ---
 

@@ -1,6 +1,6 @@
 # Estimate Documents dialog — Additional Information & images
 
-**Status:** Design — sections 1–3 discussed in chat; written spec up for review
+**Status:** Implemented 2026-09-23 (plan: 2026-09-23-estimate-documents-dialog-plan.md)
 **Date:** 2026-09-23
 
 ## Why
