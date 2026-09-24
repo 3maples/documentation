@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **567**. Never
+- **Entries are numbered and permanent.** Next free number: **611**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -103,14 +103,14 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 
 | Lines | File | Note |
 |------:|------|------|
-| 3,249 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | no clean seam |
+| 3,103 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py` |
 | 3,112 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a ~245-line god-method |
 | 2,788 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | |
 | 2,567 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug |
 | 2,561 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
 | 2,375 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | |
 | 1,848 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927) |
-| 1,795 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | +20 on 2026-09-22 for #490's conditional write; `update_estimate` is most of the file's weight (see below) |
+| 1,679 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; `update_estimate` is most of the file's weight (see below) |
 | 1,721 | [platform/routers/agents.py](../../platform/routers/agents.py) | |
 | 1,559 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | |
 | 1,544 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | |
@@ -125,7 +125,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,154 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | |
 | 1,118 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | |
 | 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
-| 865 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | |
+| 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
 | 856 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
 | 812 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | |
 
@@ -189,6 +189,7 @@ seams that already exist as separate classes.
 | 112 | `MaterialGapsTable` — portal/src/components/estimates/InventoryGapsPanel.tsx:106 |
 | 105 | `RoleGapsTable` — portal/src/components/estimates/InventoryGapsPanel.tsx:219 |
 | 97 | `_handle_update_estimate_apply_template` — agents/estimate/crud_handlers.py |
+| 94 | `DocumentsDialog` component body — portal/src/components/estimates/DocumentsDialog.tsx:48 (was 107; `DocumentsDialogFooter` extracted 2026-09-23. About 38 of it is JSX. The next seam is a `useDocumentForm(versions)` hook owning `info` / `kept` / `ready`, the `syncedVersions` reconciliation and `submit`) |
 | ~85 | `_send_flow` — routers/support.py |
 | ~77 | `assert_token_quota` — services/llm/quota.py |
 | 72 | `reinstate_company_account` — routers/companies.py:111 |
@@ -1321,6 +1322,16 @@ would mean duplicating the subtree — worse. If it is worth cleaning up, drop `
 instead keep the thumbnail first in the DOM with `order-last md:order-none`, so the visual reorder
 happens on the phone (where the image is genuinely secondary) rather than on desktop.
 
+### 601. [LOW] Doc-image loading placeholder's aria-label is ignored
+`portal/src/components/estimates/DocImagePicker.tsx:18` — A `div` with `aria-label` and no role is not announced, so screen readers get nothing while a kept image loads or after it fails. The remove badge still names the file, hence LOW.
+
+**Suggested fix:** Add `role="img"` to the placeholder.
+
+### 602. [LOW] Keyboard focus is lost after deleting a doc version
+`portal/src/components/estimates/DocVersionList.tsx:43` — The delete-confirm modal returns focus to the trash button, whose row no longer exists, so focus lands on `<body>`.
+
+**Suggested fix:** When `versions` shrinks, move focus to the next row's trash button or to the "Generated versions" heading (`tabIndex={-1}`).
+
 ## Responsive and breakpoint drift
 
 Phone/tablet layout issues, plus the `sm` (640px) vs documented `md` (768px)
@@ -2056,6 +2067,16 @@ turned on the first time generation feels slow. If the side-by-side shows the
 research path is worse, that is a reason to improve the prompt context, not to
 bring back copying.
 
+### 569. [LOW] `or target.company` fallback can file a Maple note under another tenant
+`platform/agents/estimate/note_handlers.py:164` — When `company_id` is empty or malformed, the loader falls back to an unscoped `Estimate.find_one(estimate_id == code)` and the note is filed under `target.company`, which could be any tenant's estimate with that code. The orchestrator always supplies a company today, so this is defense in depth.
+
+**Suggested fix:** If `_coerce_company_oid(company_id)` is None, return the failure envelope; never fall back to `target.company`.
+
+### 581. [LOW] `_detect_note_update` keeps a dead `mode` with a false rationale
+`platform/agents/estimate/note_handlers.py:98` — The docstring says `mode` is needed to extract the right value, but it is computed after extraction and the only caller discards it (every note phrasing now adds a note).
+
+**Suggested fix:** Return just `Optional[str]` and drop the set/add verb patterns from this path (update `TestNoteCueBroadening`), or correct the docstring.
+
 ## Platform — API, models and data
 
 ### 31. [MEDIUM] Intra-CSV duplicate rows now upsert silently instead of erroring
@@ -2396,6 +2417,28 @@ change and spends a geocode round-trip (fail-open, so cost only).
 **Suggested fix:** normalize in the property handler before calling `changed()` (strip
 strings, coerce `""`/`None` equivalence) — three lines — or accept the occasional spurious
 geocode and note it in the comment.
+
+### 567. [LOW] Every storage error on the doc-image GET becomes a 404
+`platform/routers/estimate_documents.py:264` — `except Exception` → 404 "Image not found". A transient Firebase outage looks like a deleted image, so the Documents dialog may render it as gone and the user may drop it from the form.
+
+**Suggested fix:** Map `google.api_core.exceptions.NotFound` → 404 and everything else → 503.
+
+### 568. ~~[LOW] A generate that overlaps an estimate delete can still end in an `AssertionError` 500~~ — RESOLVED 2026-09-23
+**Resolved 2026-09-23:** the reload and its `assert` are gone. `append_doc_version_to_estimate` now returns the `ReturnDocument.AFTER` snapshot of the same atomic `find_one_and_update` (run through `as_written`), so there is no window between the write and the read; an estimate deleted first gives None → 409 plus cleanup. Move to the archive in the next cleanup pass.
+
+`platform/routers/estimate_documents.py:242` — Narrowed on 2026-09-23: the atomic `$push` now 409s (and cleans up) when the estimate is gone before the write. A window remains between that push and the reload `assert reloaded is not None`, where a concurrent delete turns a successful generate into a 500.
+
+**Suggested fix:** Replace the assert with `if reloaded is None:` → return 404 (the doc and blobs are already recorded against a deleted estimate, so the delete cascade's snapshot misses them; best-effort trash + discard there too).
+
+### 570. [LOW] `logger.exception` in doc creation sends customer PII and signed URLs to Sentry
+`platform/routers/estimate_helpers/doc_versions.py:164` — The frame's locals hold `replacements` (customer name, property address, free-text NOTES) and `images` (10-minute signed URLs). The line predates the Documents dialog and is router code, hence LOW.
+
+**Suggested fix:** `logger.error("Failed to create Google Doc for estimate %s (%s)", estimate.estimate_id, type(err).__name__)`, with no `exc_info`.
+
+### 607. [MEDIUM] Deleting a doc version can still remove a blob a concurrent generate is keeping
+`platform/routers/estimate_documents.py (delete_docs_version)` — Partly fixed 2026-09-23 (code review #7): the version is now removed with an atomic `$pull` and orphans are computed from the returned document, which narrows the window. It does not close it: a generate that has already resolved its kept images can still have one deleted underneath it, and then either 502s or records a version pointing at a missing blob. Needs two tabs or two users within the generate window.
+
+**Suggested fix:** Decided 2026-09-23: option (b), a delayed sweep, was chosen as the real fix but deferred because it needs a scheduled job. Mark candidate paths on version delete instead of deleting them, and have a sweep delete ones still unreferenced by any version after ~15 minutes.
 
 ## Platform — services, scripts and integrations
 
@@ -2959,6 +3002,21 @@ stays open on its own merits: its remaining `SecretStr` conversion guards
 against a *future* call site logging a credential, which is a different question
 from where the credentials live.
 
+### 576. [LOW] `_image_object_size` divides by width and height unguarded
+`platform/services/google_doc_images.py:31` — A 0 dimension raises `ZeroDivisionError`, surfacing as an unexplained 502. Stored dimensions come only from server processing and are ≥1 today.
+
+**Suggested fix:** `max(width_px, 1) * PX_TO_PT`, and the same for height.
+
+### 577. [LOW] The no-marker fallback insert point assumes a non-empty doc body
+`platform/services/google_doc_images.py:94` — `content[-1]` raises `IndexError` on an empty body, which ends in a 502 and a trashed doc instead of appended images.
+
+**Suggested fix:** `insert_at = content[-1]['endIndex'] - 1 if content else 1`.
+
+### 610. [LOW] A 16-bit color PNG's transparency key never matches, so the "transparent" color prints
+`platform/services/estimate_doc_images.py` — Found while fixing the 16-bit grayscale case (code review 2026-09-23 #2). For a 16-bit RGB PNG, Pillow reduces the pixels to 8-bit but leaves the tRNS key in 16-bit, so no pixel ever equals the key. The keyed color (often magenta or green) prints on the customer's doc instead of flattening to white. Rare: it needs a 16-bit RGB PNG that uses a color key rather than an alpha channel.
+
+**Suggested fix:** When `image.mode == "RGB"` and `image.info["transparency"]` has any component above 255, scale the key down to 8-bit (`>> 8`) before the convert to RGBA. Test: a 16-bit RGB PNG with a magenta key comes out with no magenta pixels.
+
 ## Portal — estimate builder
 
 ### 131. [MEDIUM] `saveError` displayed far from origin
@@ -3235,6 +3293,41 @@ the feature degrades to "caret jumps to the end" rather than failing outright.
 MDXEditor exposes no public class for that element, and the fallback is tested), or add a render
 test asserting the contenteditable's parent chain, which pins the assumption at the cost of a
 test that breaks on every MDXEditor upgrade.
+
+### 592. [LOW] The Documents dialog's friendly fallback message never shows for API or network errors
+`portal/src/components/estimates/DocumentsDialog.tsx:102` — The fallback shows only for an empty message, but `performApiRequest` always sets `Request failed (N)` and fetch sets "Failed to fetch", so users see raw text such as "Request failed (413)".
+
+**Suggested fix:** Show the fallback for an `ApiError` with no parsed detail (`/^Request failed \(\d+\)$/`) and for a `TypeError`; otherwise keep `err.message`.
+
+### 593. [LOW] The save-failure reason is hidden behind the Documents dialog
+`portal/src/pages/NewEstimateWithActivityPage.tsx:563` — When the save before generation fails, the dialog shows a generic message and the real reason goes to `saveError`, rendered on the page behind the modal.
+
+**Suggested fix:** Have `handleSaveEstimate` return or throw the reason, and include it: `Your changes couldn't be saved (${reason}), so no document was generated.`
+
+### 594. [LOW] A comment claims an ordering requirement the Documents dialog doesn't need
+`portal/src/pages/NewEstimateWithActivityPage.tsx:571` — "setDocVersions must run before this resolves" — the dialog re-prefills from the resolved value and its reconciliation is correct in either order, so a maintainer could protect or rely on a requirement that doesn't exist.
+
+**Suggested fix:** Reword: "The dialog re-prefills from the returned versions; the setDocVersions order here is not load-bearing."
+
+### 595. [LOW] The portal still sends a `created_by` the server now ignores
+`portal/src/pages/NewEstimateWithActivityPage.tsx:567` — Superseded in part on 2026-09-23: the platform now takes a version's author from the authenticated user and ignores the form field (it is still accepted so old tabs don't 422). The portal keeps sending `currentUserDisplayName || "portal-user"`, which is dead weight and misleading to read.
+
+**Suggested fix:** Drop `createdBy` from `GenerateDocInput` and the page call; keep the server accepting-and-ignoring the field for a release, then remove it.
+
+### 596. [LOW] `getEntityId(estimate) ?? ""` is dead code on the Documents button
+`portal/src/pages/NewEstimateWithActivityPage.tsx:1037` — `getEntityId` returns `string`, so `?? ""` never applies; an empty id would silently break every thumbnail URL. Nothing tests this or the `isEditMode` gate.
+
+**Suggested fix:** Pass the route `estimateId` (or `getEntityId(estimate)` without the `??`), and render `EstimateDocuments` only when the id is non-empty.
+
+### 597. [LOW] Over-cap image picks don't say which files were skipped
+`portal/src/components/estimates/useStagedImages.ts:40` — The loop `break`s on a generic "at most 10 images" message: dropped files aren't named, and later wrong-type or oversize files are never checked or reported.
+
+**Suggested fix:** Don't break; collect the overflow names and report once: `Only 10 images fit; skipped a.jpg, b.jpg.`
+
+### 598. [LOW] Image pick errors stay on screen after they stop being true
+`portal/src/components/estimates/useStagedImages.ts:45` — The error is cleared only on the next add or submit, so "at most 10 images" stays up after the user frees a slot.
+
+**Suggested fix:** Clear the error in unstage and in the kept-image remove handler.
 
 ## Portal — layout, navigation and Maple panel
 
@@ -4092,6 +4185,51 @@ cleanup is unblocked.
 queries match every row, not only blank ones — so the assertions need rewriting in terms of
 total row count rather than blank-row count.
 
+### 578. [LOW] No test that `discard_doc_image_paths` swallows errors
+`platform/routers/estimate_helpers/doc_versions.py:376` — Every API test swaps in a `delete_doc_images` that never raises, so the "never fails the request" branch the delete route relies on is untested.
+
+**Suggested fix:** A unit test with a raising `delete_doc_images`: assert no exception and one warning.
+
+### 579. [LOW] No test for the doc-image GET when the blob is missing from storage
+`platform/routers/estimate_documents.py:264` — Only an unknown image id is tested, not a known id whose blob is gone (for example after a race).
+
+**Suggested fix:** Pop the blob from `fake_store.blobs`, then assert 404.
+
+### 582. [LOW] Stale docstring says notes inherit the estimate edit lock
+`platform/tests/test_estimate_agent.py:3818` — `test_locked_estimate_refuses_title_rename` still lists "notes" among the sub-ops that inherit the lock; notes bypass it since 2026-09-23.
+
+**Suggested fix:** Remove "notes /" from the docstring.
+
+### 583. [LOW] Lost the agent-level check that Review status is editable
+`platform/tests/test_estimate_agent.py:3842` — The old notes test covered Draft and Review; `test_editable_estimate_allows_title_rename` covers only Draft, so a regression that locked Review would pass every Maple lock test.
+
+**Suggested fix:** `@pytest.mark.parametrize("status", ["Draft", "Review"])`.
+
+### 584. [LOW] Rewritten Maple note tests don't check `success` or the response copy
+`platform/tests/test_estimate_agent.py:5552` — They check only the created note bodies; `success` and the "I've added a note" copy are covered only in `test_maple_estimate_field_edits.py`.
+
+**Suggested fix:** Add `assert result["success"] is True` and a check on the response copy.
+
+### 603. [LOW] No test re-renders the Documents dialog with the post-success versions
+`portal/tests/DocumentsDialog.test.tsx:97` — The kept-image reconciliation never runs against a freshly kept image — the path the adjust-during-render design was accepted for. It is believed correct; nothing pins it.
+
+**Suggested fix:** After the `waitFor`, `rerender(<DocumentsDialog {...props} versions={[v3, v2, v1]} />)` and assert "Remove c.jpg" is present and the counter reads "1 / 10".
+
+### 604. [LOW] Documents dialog test name says "oversize files" but uploads none
+`portal/tests/DocumentsDialog.test.tsx:86` — The size branch is covered only by the `docImagePickError` unit test.
+
+**Suggested fix:** Upload `jpeg("big.jpg", 10 * 1024 * 1024 + 1)` and assert `/big\.jpg.*10MB/`, or rename the test.
+
+### 605. [LOW] `useBlobObjectUrl`'s leak guards aren't tested
+`portal/tests/useBlobObjectUrl.test.tsx:27` — No test for a late resolution after unmount (URL revoked, never returned) or a key change (old URL revoked) — the branches `NoteAttachmentStrip` now relies on.
+
+**Suggested fix:** Add a deferred-load-resolves-after-unmount test and a key-change rerender test asserting the first URL is revoked and `load` is called twice.
+
+### 606. [LOW] The estimate page's own generate-doc rejection paths aren't tested
+`portal/tests/NewEstimateWithActivityPage.documents.test.tsx:194` — The dirty-save failure (must reject without calling `generateGoogleDoc`) and the `!estimate` guard have no test.
+
+**Suggested fix:** Make the page dirty and make `estimatesApi.update` reject, call onGenerate, and assert it rejects with /couldn't be saved/ and `generateMock` was not called.
+
 ## Codebase hygiene (batchable)
 
 Small, low-risk cleanups. Safe to batch into a single `chore: code hygiene`
@@ -4810,3 +4948,89 @@ that cannot upload, which reads as though they can.
 union on the mode would be most honest, but optional props plus the existing branch guard is enough).
 Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sites in
 `OnboardingPage.tsx`.
+
+### 571. [LOW] "5,000" hard-coded in the additional-info 422 message
+`platform/routers/estimate_documents.py:117` — The message duplicates `MAX_ADDITIONAL_INFO_CHARS`, so the two can drift.
+
+**Suggested fix:** `detail=f"Additional information can be at most {MAX_ADDITIONAL_INFO_CHARS:,} characters."`
+
+### 572. [LOW] "10 MB" hard-coded in the doc-image size message
+`platform/services/estimate_doc_images.py:60` — Not derived from `MAX_DOC_IMAGE_FILE_SIZE_BYTES`; the test patches the cap to 10 bytes and still asserts "10 MB".
+
+**Suggested fix:** `f'"{name}" is larger than {MAX_DOC_IMAGE_FILE_SIZE_BYTES // (1024 * 1024)} MB.'`
+
+### 573. [LOW] Doc-image file-name limit `200` is an unnamed literal
+`platform/services/estimate_doc_images.py:66` — `name[:200]` is a magic number.
+
+**Suggested fix:** `MAX_DOC_IMAGE_FILE_NAME_CHARS = 200`.
+
+### 574. [LOW] `max-age=3600` literal on the doc-image response
+`platform/routers/estimate_documents.py:267` — A magic number inside the header string.
+
+**Suggested fix:** `DOC_IMAGE_CACHE_SECONDS = 3600` and build the header from it.
+
+### 575. [LOW] `_normalized_bucket_name` is imported privately across modules
+`platform/services/estimate_doc_images.py:33` — The private helper from `services.company_logo` now has a third caller outside that module (after `support_attachments.py`).
+
+**Suggested fix:** Rename it to the public `normalized_bucket_name` (or move it to `services/firebase_storage.py`) and update the callers.
+
+### 580. [LOW] `prepare_doc_template` docstring doesn't mention `additional_info`
+`platform/routers/estimate_helpers/doc_versions.py:222` — It doesn't say that `additional_info` fills `{{NOTES}}` or that `Estimate.notes` is no longer read.
+
+**Suggested fix:** Add one sentence saying so.
+
+### 585. [LOW] `Form([])` / `File([])` mutable list defaults on generate-doc
+`platform/routers/estimate_documents.py:195` — Matches the mutable-default pattern. Safe in practice because pydantic copies field defaults.
+
+**Suggested fix:** `Form(default_factory=list)` / `File(default_factory=list)`.
+
+### 586. [LOW] `get_doc_image` has no return annotation
+`platform/routers/estimate_documents.py:247` — A new public route without `-> Response` (its sibling `generate_google_doc` now has one).
+
+**Suggested fix:** Add `-> Response`.
+
+### 587. [LOW] `find_doc_image` has no docstring
+`platform/routers/estimate_helpers/doc_versions.py:321` — Undocumented that it searches every version and returns the first match.
+
+**Suggested fix:** Add a one-line docstring.
+
+### 588. [LOW] `doc_image_storage_path` has no docstring
+`platform/services/estimate_doc_images.py:152` — The path layout is load-bearing for company scoping and cleanup, and isn't documented.
+
+**Suggested fix:** Add a one-line docstring.
+
+### 589. [LOW] `store_doc_image` has no docstring
+`platform/services/estimate_doc_images.py:163` — Undocumented that the blob gets no public download token and the content type is always JPEG.
+
+**Suggested fix:** Add a one-line docstring.
+
+### 590. [LOW] `read_doc_image` has no docstring
+`platform/services/estimate_doc_images.py:176` — Undocumented that it raises on a missing blob, which the router relies on.
+
+**Suggested fix:** Add a one-line docstring.
+
+### 591. [LOW] `ProcessedDocImage` has no docstring
+`platform/services/estimate_doc_images.py:47` — Undocumented that width and height are post-resize pixels.
+
+**Suggested fix:** Add a one-line docstring.
+
+### 599. [LOW] "10MB" hard-coded in the Documents dialog helper text
+`portal/src/components/estimates/DocImagePicker.tsx:70` — Duplicates `MAX_DOC_IMAGE_BYTES`, so copy and check can drift.
+
+**Suggested fix:** Export `MAX_DOC_IMAGE_MB = MAX_DOC_IMAGE_BYTES / (1024 * 1024)` from `docVersions.ts` and build the text from it.
+
+### 600. [LOW] "10MB" hard-coded in the image rejection message
+`portal/src/components/estimates/docVersions.ts:39` — Same drift risk as #599.
+
+**Suggested fix:** Use `MAX_DOC_IMAGE_MB` in the message.
+
+
+### 608. [LOW] `QUOTED_VALUE_GROUP` comment names a caller that doesn't use it, and the constant splits a block
+`platform/agents/estimate/text_helpers.py:32` — The comment says the group is shared by the "note / description / title detectors", but no title detector uses it. The constant also sits between `PENDING_FIELDS_CONTEXT_KEY` and `PARTIAL_ESTIMATE_CONTEXT_KEY`, splitting that block of context keys.
+
+**Suggested fix:** Change the comment to "note / description detectors" and move the block below the context-key constants.
+
+### 609. [LOW] Estimate Brevo hook docstring names only one of the two raw writes that bypass it
+`platform/models/estimate.py:617` — It says one hook catches every write path and names `append_doc_version_to_estimate`'s raw `$push` as the only write no event sees (which now runs the after-Update actions itself via `as_written`). `remove_doc_version_from_estimate` also writes a raw `$pull` that fires nothing. Harmless, since removing a version can't cross a lifecycle line, but unstated.
+
+**Suggested fix:** Add: "`remove_doc_version_from_estimate`'s raw `$pull` fires nothing either; removing a version cannot cross a lifecycle line."
