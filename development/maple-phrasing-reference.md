@@ -31,6 +31,11 @@ Headlines, 2026-09-27 (multi-turn everywhere — design
   property links; creates that carry due date, assignee, status and property;
   "remind me to …" and to-do lists; list filters and "what's due today?";
   resumable value questions and menus; paging.
+- **Estimates** (§1) — "it" means the estimate in focus for status, archive
+  and link; questions about an estimate are answered from it (§1.2); menus
+  and listed rows resume; lists filter by customer, property and date and can
+  be refined; more create wordings; ~46 planner-only work-item phrasings
+  promoted to grammar entries (§1.0).
 
 Headlines, 2026-09-24 → 2026-09-26:
 

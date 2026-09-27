@@ -45,6 +45,20 @@ platform `3526a08` … `67892ec`)
   number, readable id or title words (#692); "show more" (§10.9). A field
   answer never lands on the newest task instead of the one being edited
   (#698).
+- Estimates (§1): with an estimate in focus, "mark it as sent" / "mark it
+  won" / "archive it" / "link it to 12 Oak St" act on it; questions about one
+  estimate (status, total, customer, property, markup, margin, dates) are
+  answered from it, not the user guide (#691), and its details show the
+  property and customer; "which estimate?" menus resume by code, number or
+  name (#685); "delete the first one" after a list deletes that row (#686);
+  "list estimates for Bob Lee" and "from last month" filter (#687); the list
+  just shown can be narrowed, sorted and totalled; "put together / draw up
+  an estimate for …", "I need a quote for …" and "quote a fence for …"
+  create one; "send it" says how. About 46 work-item phrasings that only the
+  LLM planner understood got grammar entries — material and activity lines,
+  division and total verbs, margin/markup wordings, "scope" as a work item —
+  and notes land where they were addressed (#664, #665, #666, #684). Routing
+  notes are never shown to the user.
 
 **2026-09-26 — routing convergence: rounds 12–24**
 
