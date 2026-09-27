@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **698**. Never
+- **Entries are numbered and permanent.** Next free number: **699**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -1932,6 +1932,11 @@ bring back copying.
 **Update 2026-09-27:** two tiers drop the number. The strict tier `TITLE_PRE_NOUN_RE` (`title_reference.py:71-74`) needs a capitalized first word, so "4 Elm St" can't open a title; and a listed rename resolves through `_match_estimates_by_title`, whose rung 3 is a raw substring (`:354-355`) — "4 elm st" ⊂ "14 elm st front walk". Four-part fix: (1) the strict pre-noun pattern allows `\d+[A-Za-z]?\s+` before the capitalized word; (2) the loose pre/post extractors keep a number when a non-stop word follows it; (3) rung 3 gets digit guards, `(?<!\d)…(?!\d)`; (4) `_names_whole` then needs no change once the candidate carries the number. Fix #334 in the same change.
 
 **Resolved 2026-09-27** (platform `69fd512`): the strict and loose extractors keep a house number ("4 Elm St"), and the title ladder's substring rung never matches inside a longer number. #334 fixed in the same change: connectors between capitalized words stay in the name ("Edge of the Garden"). Pinned by `tests/test_estimate_title_reference.py` and corpus row `safety-address-estimate-keeps-house-number`.
+
+### 698. ~~[HIGH] A task field answer lands on the newest task, not the one being edited~~ — RESOLVED 2026-09-27
+`platform/agents/task/field_flow.py:_handle_awaited_field_value` — "update task T0001" → "due date" → "Friday" set the due date on T0003, the most recently updated task. The "which field?" question never resolved the task the message named (its pending record took `active_task_id`, empty when no task had been shown), and the value turn fell back to the resolver's recency step. Surfaced by the multi-turn corpus once the question gate began routing the field answer (2026-09-27); the underlying defect is older.
+
+**Resolved 2026-09-27** (platform `bd3dabf`): the task a message names is resolved before the field question, so the pending record carries it; an awaited value with no task asks "Which task should I update?" instead of guessing. Pinned by corpus rows `task-field-then-due-date` and `task-field-value-never-lands-on-the-newest-task`.
 
 ### 674. ~~[HIGH] Catalog delete confirmation is a substring test, so "delete it" deletes at once~~ — RESOLVED 2026-09-27
 `platform/agents/property/text_helpers.py:100` — `_is_confirm_text` is true when the message *contains* "confirm", "yes", "yep", "proceed", "delete it" or "do it" (twins: `contact/text_helpers.py:86`, `labour/text_helpers.py:91`, `material/text_helpers.py:139`, `equipment/text_helpers.py:68`). It is OR'd into `confirm_delete` on the first delete turn (`property/service.py:1394, :2025`; `contact/service.py:958, :1447`; `labour/service.py:1090`; `material/service.py:1497, :2307`), so "delete it" and "delete item 3" delete without asking, "no, don't delete it" confirms, and a name containing "yes" — "Yesler", "Yesenia", "Reyes" — confirms too. A property delete is hard and cascades its notes (`property/service.py:490-513`). HIGH: an irreversible delete nobody confirmed, from ordinary phrasings.
