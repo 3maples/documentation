@@ -22,8 +22,8 @@ four independent repositories plus AI tooling:
 
 | Path | Repo | Contents |
 |---|---|---|
-| `platform/` | `3maples/platform` | FastAPI backend (estimates, agents, AI) |
-| `portal/` | `3maples/portal` | React 18 + Vite frontend |
+| `platform/` | `3maples/fieldservice-platform` | FastAPI backend (estimates, agents, AI) |
+| `portal/` | `3maples/fieldservice-portal` | React 18 + Vite frontend |
 | `website/` | `3maples/website` | Marketing site (auto-deploys via GitHub Actions) |
 | `documentation/` | `3maples/documentation` | Plans, changelog, design, dev process (this file) |
 | `.claude/`, `.remember/`, `.agents/` | — | AI memory, session handoff, agent config (not versioned product code) |
@@ -35,6 +35,8 @@ Consequences worth remembering:
   and remote.
 - Plans and process docs live in `documentation/`, intentionally versioned
   alongside — but separate from — the code they describe.
+
+Setting up a new machine: [`new-machine-setup.md`](new-machine-setup.md).
 
 ---
 
