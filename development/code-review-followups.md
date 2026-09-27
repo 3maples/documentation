@@ -1861,26 +1861,32 @@ bring back copying.
 
 *(Review 2026-09-26 round 21 #1.)*
 
-### 664. [MEDIUM] An estimate note addressed by code or "that estimate" asks unless its separator is a colon
+### 664. ~~[MEDIUM] An estimate note addressed by code or "that estimate" asks unless its separator is a colon~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/command_grammar.py:472` — `_addresses_a_non_estimate` strips the estimate reference but leaves the preposition before it, and `_NOTE_ADDRESS_RE` then reads that preposition plus the next word (only `with`/`as` are excused) as a target. Verified: "add a note to that estimate saying call the client", "add a note to our estimate that says call the client", "drop a note on E0042 saying the gate sticks", "new note for this estimate saying call Bob" and "add a note to E0042 about the gate: code 1234" all ask "Which estimate or work item should the note go on?". Before round 27 they filed, and the colon forms still do. No write goes wrong (it asks), but the user has to retype a supported note. A regression from the round-27 fix.
 
 **Suggested fix:** Strip the preposition together with the estimate reference: `_NOTE_ESTIMATE_REF_RE = re.compile(rf"(?:\b(?:{_NOTE_PREP})\s+)?(?:(?:\bestimate\s+)?(?<!\w){_REF_CODE}|\b(?:this|that|the|our|your|my)\s+(?:current\s+)?{_EST_NOUN}\b)", re.I)`, then drop the `with|as` lookahead from `_NOTE_ADDRESS_RE`. Add the five messages as False rows in `test_note_names_an_unlisted_target`. If the note-target area keeps producing findings, the lean alternative is to retire the ported `estimate_note` detector: give its few remaining forms core entries in `command_grammar.py` and let everything else ask.
 
 *(Review 2026-09-26 round 28 #3.)*
 
-### 665. [MEDIUM] A target named before "note" is never checked, so the note goes on the estimate
+**Resolved 2026-09-27** (platform `71473ce`): the five shapes are `add_note` entries (the note target accepts "that/our/my/your estimate"; "drop a note" and "new note" are note verbs), and the ported check strips the preposition with the estimate reference as suggested. Pinned by the False rows in `test_note_names_an_unlisted_target` and `test_more_note_shapes_are_listed`.
+
+### 665. ~~[MEDIUM] A target named before "note" is never checked, so the note goes on the estimate~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/command_grammar.py:496` — `note_names_an_unlisted_target` only reads the text after the first "note", and `foreign_note_target` / `note_names_unparsed_work_item` only read a head that starts with the verb. Verified: "On work item 2, add a note: check drainage" with E0042 open and fresh → ported `estimate_note`, and the agent attempts `add_estimate_note` on E0042 — an estimate-level note, not one on work item 2. MEDIUM rather than HIGH: it needs the target fronted before the verb, and the reply names the estimate.
 
 **Suggested fix:** Also check a leading prepositional clause: if the text before "note" (after `_LEAD`) starts with a preposition, run `_addresses_a_non_estimate` on it up to the first comma — `re.match(rf"^\s*(?:{_NOTE_PREP})\s+[^,]+", parts[0])`. Anchor it at the start so "I want to add a note: …" is not flagged by "to add". Add a True row for the message above and a False row for "I want to add a note: call the client".
 
 *(Review 2026-09-26 round 28 #4.)*
 
-### 666. [LOW] The "<target> - <text>" body check also runs on bodies after a colon
+**Resolved 2026-09-27** (platform `71473ce`): "On work item 2, add a note: …" is an `add_note` entry that files on that work item; any other fronted target that isn't an estimate makes the ported path ask. Pinned by corpus row `estimate-note-target-said-first`.
+
+### 666. ~~[LOW] The "<target> - <text>" body check also runs on bodies after a colon~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/command_grammar.py:499` — `_NOTE_BODY_ADDRESS_RE` is meant for implicit-tail bodies ("… note to the work item on E0042 - check drainage") but runs whichever extractor produced the body. Verified: "note: on Friday - bring the trailer" asks where the note goes instead of filing an untargeted note. LOW: it needs a body that opens with a preposition phrase followed by " - ".
 
 **Suggested fix:** Run the body-head check only when nothing but whitespace separates "note" from the body: `if not parts[-1].strip() and head and _addresses_a_non_estimate(head.group("head"))`. Add "note: on Friday - bring the trailer" as a False row.
 
 *(Review 2026-09-26 round 28 #5.)*
+
+**Resolved 2026-09-27** (platform `71473ce`): the body-head check runs only when nothing but whitespace separates "note" from the body. Pinned by the "note: on Friday - bring the trailer" row.
 
 ### 668. [LOW] A work-item field question reads the field as the work item's name
 `platform/agents/estimate/work_item_field_handlers.py:63` — `_extract_wi_hint` tries the words after "work item" before the name in front of it, so "what is the patio work item division" / "…subtotal" look for a work item called "division" / "subtotal" and answer "I couldn't find a work item matching …". Read-only: no write. Round 31 #1 reported the same misread on the recurring commands, where it wrote to the wrong work item; the user resolved that by deferring recurring from chat (2026-09-26), which removed the write path — this read path remains.
@@ -2028,26 +2034,32 @@ The calculator's pending question releases only on an action+domain pivot (`plat
 
 **Update 2026-09-27:** partly closed by the question gate (platform `19e34f8`, `2b67761`): one gate for every question Maple asks — `routers/agent_helpers/open_question.py::decide_turn` lists every open question (Estimate yes/no and records, every agent's pending records and `pending_delete_*` keys, task confirmations, status offers, gathering, template size, property link, both follow-up machines, pending calculations) and reads the message once: it answers the newest question it fits, cancels, or is a new request, and then every open question is dropped before classification. A question lives one turn. Post-create follow-ups no longer swallow a question ("what's the rate now?") or a new command; the calculator and template size accept "cancel"; "maybe later"/"not now" to "what size?" cancel instead of creating a billed estimate. Still open: the estimate post-create "link a property?" question still takes an assumption adjustment ("make the patio 400 sq ft instead") as a property name, and gathering still takes "hi maple" as the work description (design §7.2).
 
-### 684. [MEDIUM] "add a note to work item 2 about drainage" files a garbled estimate note
+### 684. ~~[MEDIUM] "add a note to work item 2 about drainage" files a garbled estimate note~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/note_handlers.py:84` — `_NOTE_WITH_IMPLICIT_TAIL` captures everything after "note", and the `add_note` dispatch files it on the estimate (`crud_handlers.py:2911`): the note reads "to work item 2 about drainage" and sits on the estimate, not on work item 2. The phrasing reference listed this ✅ (§1.11). MEDIUM: a wrong but visible note, deletable in the app.
 
 **Suggested fix:** Give "add a note to <work item> about / to / , <text>" a grammar entry that targets the work item (design §7.2, planner-only phrasings promoted); until then a note body that opens with a work-item reference asks which work item.
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
-### 685. [MEDIUM] The several-estimates "which one did you mean?" stores no question
+**Resolved 2026-09-27** (platform `71473ce`): an `add_note` entry takes "about / regarding …" as the body after a work-item or estimate target, so the note is "about drainage" on work item 2. Pinned by `test_more_note_shapes_are_listed` and corpus row `estimate-note-to-work-item-not-garbled`.
+
+### 685. ~~[MEDIUM] The several-estimates "which one did you mean?" stores no question~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/crud_handlers.py:2065` (`_several_titles_question`) and `platform/routers/agent_helpers/delegate_get_estimate.py:140` (`_multi_match_envelope`) list the matching estimates but store nothing, so the answer — "2", a code, a title — is classified from scratch and the original request is lost. MEDIUM: a dead end. Related: #615.
 
 **Suggested fix:** Store it as a registry `pick` question (design §5.1) whose answer — ordinal, readable code or a candidate's label — resumes the original request (design §7.2).
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
-### 686. [MEDIUM] "delete the second one" after a list targets the open estimate
+**Resolved 2026-09-27** (platform `9b87099`): both menus store a `choose_estimate` question with the request and the estimates offered; a code, a number or words from a title resume it. Pinned by corpus rows `estimate-several-matches-answer-by-{code,name}`, `estimate-show-several-matches-answer-by-number` and `estimate-several-matches-then-something-else`.
+
+### 686. ~~[MEDIUM] "delete the second one" after a list targets the open estimate~~ — RESOLVED 2026-09-27
 `platform/routers/agent_helpers/estimate_resolver.py:159` — `find_estimate_from_context_or_message` has no listed-row step, so with an estimate open, "list my estimates" → "delete the second one" proposes deleting the open estimate, not row 2. It asks first, so nothing is lost unless the user confirms the wrong name. MEDIUM.
 
 **Suggested fix:** Resolve listed rows ahead of the open estimate for delete/update (design §7.2), under the list-memory rule that a positional write is honoured only while nothing else has taken focus (§5.4).
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (platform `00d88a6`): `find_estimate_from_context_or_message` resolves a row of the current estimate list ahead of the open estimate; a stale list is no target. Pinned by corpus row `estimate-delete-listed-row-not-the-open-one` (fails without the fix).
 
 ### 687. [MEDIUM] Lists silently drop filters; "last month" returns one row; the assigned-to email filter never matches
 `platform/agents/estimate/crud_helpers.py:401` reads "last" as a newest-first sort with limit 1, so "estimates from last month" shows one row. These lists come back unfiltered without saying so: estimates by title, customer or property ("list estimates for Ana Reyes"); tasks overdue, due this week, or by property, status or assignee name; contacts by role or city ("show contacts in Toronto"); and the property count by city (`agents/property/service.py:2367`). `agents/task/service.py:59` — `_ASSIGNED_TO_FILTER_RE` stops the email at ".", so "tasks assigned to bob@acme.com" filters on "bob@acme" and is always empty. MEDIUM: wrong answers presented as complete.
@@ -2058,6 +2070,8 @@ The calculator's pending question releases only on an action+domain pivot (`plat
 
 **Update 2026-09-27** (platform `00c17d8`): the task half is done — task lists filter by overdue, due window, upcoming, status, open, assignee (email, name, "Jordan's tasks"), unassigned and property; the assigned-to email is read whole; a teammate, status or property that doesn't resolve is answered, not dropped. Pinned by `tests/test_task_list_filters.py` and the `task-*-filter*` corpus rows. Still open: estimates ("last month", title/customer/property), contact role/city, property count by city.
 
+**Update 2026-09-27** (platform `00d88a6`): the estimate half is done — "list estimates for Bob Lee / Elm House" filters by that customer or property (a name that is neither is answered), and "last month" is the date window, never "the latest one". Refinements of the list just shown ("just the drafts", "only the ones over $1000") also filter (`a74fa30`). Still open: contact role/city and the property count by city (design §7.3).
+
 ### 690. [MEDIUM] `_prefer_explicit_rule_match` demotes correct LLM answers to off_topic
 `platform/agents/orchestrator/service.py:1712` — when a message has no action or domain keyword and history resolution finds nothing, the LLM's CRUD intent is overwritten with `off_topic` (`:1764-1777`). "what's its price?" and "link Carla Diaz to 12 Oak St" lose a correct LLM answer this way; "link" isn't in `ACTION_HINTS` (`agents/orchestrator/intents.py:143`). MEDIUM: a right answer thrown away for a canned one.
 
@@ -2065,12 +2079,14 @@ The calculator's pending question releases only on an action+domain pivot (`plat
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
-### 691. [MEDIUM] The help short-circuit swallows record questions and shows an "Intent identified" placeholder
+### 691. ~~[MEDIUM] The help short-circuit swallows record questions and shows an "Intent identified" placeholder~~ — RESOLVED 2026-09-27
 `platform/routers/agents.py:1093` — `is_help_query` runs before classification and never delegates, so "what's the status of E0042?" is answered by the user-guide responder instead of from the estimate. Separately, CRUD intents that end in the orchestrator's own envelope get the placeholder reply "Intent identified: `get_material` via Material Agent." (`agents/orchestrator/service.py:1379, :1526, :2038, :2294`). MEDIUM: a question about a record gets a generic or internal-looking answer.
 
 **Suggested fix:** Questions about the record in focus (status, total, customer, property, markup, margin) are matched ahead of help (design §7.2); the placeholder is never user-facing — delegate or answer.
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (platform `f98c59a`, `fa863c0`): questions about one estimate (status, total, customer, property, markup, margin, dates, code — by code, title or in focus) are answered from the estimate ahead of help (`agents/estimate/focus_questions.py`); the "Intent identified" placeholder and the "I detected … at N% confidence" reply are replaced with plain questions. Pinned by `tests/test_estimate_focus_questions.py`, `tests/test_router_fallback_wording.py` and the `estimate-*question*` corpus rows.
 
 ### 692. ~~[MEDIUM] Task delete can never be confirmed; convert, menu and value replies dead-end~~ — RESOLVED 2026-09-27
 `platform/agents/task/service.py:621` stashes `pending_delete_task_id` but writes no `pending_intents` record, so the router has nothing to route the confirming "yes" to and a task delete never completes from chat. `tests/test_maple_task_crud.py:1297` hides it by re-injecting the `delete_task` intent alongside the "yes". Convert confirmations and "which task?" menu replies work only when the classifier happens to route them back; value questions (assignee, status, date) dead-end, and a bare "due date" reply to the field question routes to `get_material`. MEDIUM: a supported capability that doesn't work.

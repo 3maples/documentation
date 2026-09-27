@@ -129,11 +129,11 @@ Estimate has 17 cases in the CRUD coverage matrix (`estimate_work_item_edits` 8,
 
 The complete set of estimate phrasings a rule handles
 (`agents/estimate/command_grammar.py`). Anything not here is 🤖 planner (edits)
-or the classifier (routing) — where the sections below still say ✅ rule for a
-material/activity line edit, read 🤖 planner. **2026-09-27:** about 46 rows
-marked ✅ in §1.5–§1.11 currently reach only the LLM edit planner (off in
-tests), not a grammar entry; they are being promoted to grammar entries
-(design 2026-09-27 §7.2, decision 7).
+or the classifier (routing). **2026-09-27:** the rows in §1.5–§1.11 that were
+marked ✅ but reached only the LLM edit planner (off in tests) — about 46:
+material and activity lines, division and total verbs, margin and markup
+wordings, "scope" as a work item — now have entries below (design 2026-09-27
+§7.2, decision 7), each checked end to end in the multi-turn corpus.
 
 **Shared pieces:** up to three openers (hey, hi, maple, ok, yes, great,
 perfect, thanks, please, now, also, and, actually, just, never mind, one more
@@ -159,7 +159,11 @@ estimate".
 | set_percentage | "set the markup on work item 2 to 20%", "set tax rate on the patio work item to 7% on E0043" | update_estimate |
 | set_gross_margin | "make the gross margin 30%", "set the profit margin on the patio work item to 20%" | update_estimate |
 | set_total | "set the total on work item 1 to $1,000" | update_estimate |
-| add_note | "add a note to work item 2: check drainage", "leave a note on this estimate that says: …", "add a note: call Bob" (the record in focus) | update_estimate |
+| add_note | "add a note to work item 2: check drainage", "leave a note on this estimate that says: …", "add a note: call Bob" (the record in focus), "add a note to work item 2 about drainage" (the body keeps "about …"), "add a note to that / our estimate saying …", "drop a note on E0042 saying …", "new note for this estimate saying …", "On work item 1, add a note: …" (target first) | update_estimate |
+| add_material / remove_material / update_material *(2026-09-27)* | "add 20 concrete blocks to work item 2", "add 10 bags of mulch to the front patio work item", "remove concrete blocks from work item 2", "change the quantity of mulch in work item 1 to 12", "update the price of mulch in work item 1 to $5" — a plural finds the singular catalog item or line | update_estimate |
+| add_activity / add_activity_prompt / remove_activity / update_activity *(2026-09-27)* | "add activity Grading with role Foreman for 4 hours to work item 2", "add an activity to work item 2" (asks its name, then adds it), "remove the Grading activity from work item 2", "make the excavation activity 8 hours", "change the role on the Excavation activity to Landscaper", "assign the Landscaper role to the cleanup activity", "update the rate for the Planting activity to $45/hr" | update_estimate |
+| move_work_item_division / clear_percentage *(2026-09-27)* | "move / assign / put work item 2 to / under Tree Care", "drop the tax on work item 2" (to 0%) | update_estimate |
+| *(2026-09-27 wordings on existing entries)* | set_total: "adjust / round / bump / reduce work item 2 to $X", "make work item 2 an even $X", "set a flat rate of $X on work item 2"; set_gross_margin: "change the margin on …", "I want a 30% margin on …"; set_percentage: "put a 15% markup on it"; rename_work_item: "change the name of work item 2 to …"; list_work_items: "how many work items does E0042 have?"; create_estimate: "put together / draw up / draft an estimate for …", "I need a quote for …", "quote a fence for Bob Lee". A work item may be called a "scope" or "job item" ("delete the Driveway scope from E0042"). | as the entry |
 | *(ported)* set_status, set_estimate_description, set_estimate_title, estimate_note, generate_work_item, list_work_item_lines, query_work_item_field, adjust_assumption, apply_template, link_property | the older detectors, unchanged: "mark E0042 as sent", "retitle E0042 as …", 'Set note on E0059 to "…"', "generate a work item for …", "apply the Driveway Maintenance template to E0042" | the Estimate Agent (the orchestrator's own rules route these) |
 
 **Refused by rule:** bulk delete and equipment (orchestrator, on the command
@@ -191,6 +195,11 @@ a note to a material or role. **Refused by the planner:** labor burden
 | `which estimates haven't been updated in 30 days?` / `estimates not touched in a month` | `list_estimates` with `updated_at <= cutoff` | ✅ rule *(2026-06-02 — staleness alternation in `_AGE_DAYS_OLD_PATTERN`; verbless forms routed via `_match_estimate_list_filter`)*                                                                                                                                   |
 | `find estimates in draft` / `estimates in review`    | `list_estimates` with status filter                            | ✅ rule *(`in` connector in `_estimate_status_from_text`; only fires when the token after `in` is a known status — "estimates in Toronto" stays a property query)*                                                                                                   |
 | `show me Draft estimates at property {property}`     | `list_estimates` with status + property cross-resource filter  | ✅ rule *(May expansion — "at\s+property" added to the property→estimate cross-resource pattern)*                                                                                                                                                                    |
+| `list estimates for Bob Lee` / `show estimates for Elm House` | `list_estimates` for that customer (contacts → their properties) or property; a name that is neither is answered ("I couldn't find a customer or a property called …") | ✅ rule *(2026-09-27, #687 — the name was dropped and every estimate listed)* |
+| `show me estimates from last month` | `list_estimates` over the past 30 days (a rolling window, like "from last week") | ✅ rule *(2026-09-27, #687 — "last" was read as "the latest one" and returned a single row)* |
+| after a list: `just the drafts` / `which ones are on hold?` / `only the ones over $1000` / `only the ones from last month` / `only for Bob Lee` | the same list, narrowed | ✅ rule *(2026-09-27 — refinements chain; §10.8)* |
+| after a list: `sort them by total` / `sort them by date` | the same list, highest value / newest first | ✅ rule *(2026-09-27)* |
+| after a list: `what's the total of those?` / `add them up` / `how many is that?` | the combined value / the count of that list | ✅ rule *(2026-09-27)* |
 
 ## 1.2 Value / total queries for a specific estimate
 
@@ -203,6 +212,18 @@ a note to a material or role. **Refused by the planner:** labor burden
 | `worth of {EST}`                       | `get_estimate` → Estimate Agent | ✅ rule                        |
 
 Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads the response with the dollar amount.
+
+**Questions about one estimate** *(2026-09-27, #691)* — answered from the estimate, ahead of the user-guide help that used to take them (`agents/estimate/focus_questions.py`). The estimate is named by code or title, or is the one in focus ("it", or no reference at all). Plural "estimates", a work item, and how-to questions are not these.
+
+| Phrasing | Answer | Status |
+|---|---|---|
+| `what's the status of {EST}?` / `is it sent?` | "E0001 'Oak St patio' is Draft." | ✅ rule |
+| `what's the total on it?` / `how much is {EST}?` | "The total on E0001 … is $1,250.00." | ✅ rule |
+| `who's the customer?` / `who is it for?` | the contacts on its property: "… is for Ana Reyes at 12 Oak St." | ✅ rule |
+| `what's the address?` / `where is it?` | its property, or how to link one | ✅ rule |
+| `what's the markup on this estimate?` / `what's the gross margin on it?` | per work item | ✅ rule |
+| `when was it created?` / `when was {EST} last updated?` / `what's the code for this estimate?` | the date / the code | ✅ rule |
+| `show me estimate {EST}` | the details now include "Property: 12 Oak St — Ana Reyes" | ✅ rule *(2026-09-27)* |
 
 **Title-based lookup** *(May expansion)*: when no estimate code is found in the query, `_resolve_estimate_by_title` extracts a title from quoted text (`"Untitled Estimate"`) or `title/called/named X` phrasings and searches by substring match. Single match → returns the estimate. Multiple matches → lists them and asks the user to pick by code.
 
@@ -226,8 +247,10 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
 | `create an estimate for {property} — needs 20 yards of concrete and two landscapers` | `create_estimate` → Estimate Agent | 🤖 LLM |
-| `draft a quote for a driveway replacement at 456 Oak Ave` | `create_estimate` → Estimate Agent | 🤖 LLM |
-| `I need an estimate for [job description]` | `create_estimate` → Estimate Agent | 🤖 LLM |
+| `draft a quote for a driveway replacement at 456 Oak Ave` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27)* |
+| `I need an estimate for [job description]` / `I need a quote for a new patio at 12 Oak St` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27)* |
+| `can you put together / draw up / write up / work up / prepare / price out an estimate for …` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — "put together …" went to get_estimate)* |
+| `quote a fence for Bob Lee` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — was unknown)* |
 | `create a residential estimate` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `new commercial quote` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `create an estimate to plant six hydrangea at the {property} residence` — property auto-linked at creation; "six" stays a plant quantity, never an area | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — property link + area grounding guard; the generation itself remains 🤖 LLM)* |
@@ -304,13 +327,15 @@ EstimateStatus has 13 values (`models/estimate.py:23`): `Generating`, `Failed`, 
 | `archive {EST}` / `unarchive {EST}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-15 routing; archive/unarchive verbs are their own triggers)* |
 | `reject the estimate` | `update_estimate` → Estimate Agent | ⚠️ gap *(not parsed; 2026-09-27 review)* |
 | `send {EST} for review` | `update_estimate` → Estimate Agent | ⚠️ gap *(not parsed; 2026-09-27 review)* |
-| `put {EST or title} on hold` / `place it on hold` | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-09-27 review: routes to `unknown` on the rules tier.)* Earlier: *(2026-06-09 — `_ON_HOLD_PATTERN` maps bare "on hold" (with a status verb incl. `put`/`place`) to ONHOLD; guarded by `_NOTE_OR_DESC_CUE_PATTERN` so a note/description body mentioning "on hold" isn't hijacked)* |
+| `mark it as sent` / `mark it won` / `mark {EST} sent` / `archive it` / `place it on hold` (estimate in focus) | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — "it" is the estimate in focus unless a task, contact, material or role is named; "as" is optional after "mark")* |
+| `send it` / `email the quote to the client` | — | 🛑 redirect *(2026-09-27 — Maple never sends an estimate: create the document with the Documents button, send it, then "mark it as sent"; §9.8)* |
+| `put {EST or title} on hold` | `update_estimate` → Estimate Agent | ⚠️ gap for a title *(2026-09-27 review: routes to `unknown` on the rules tier; with a code or "it" it works.)* Earlier: *(2026-06-09 — `_ON_HOLD_PATTERN` maps bare "on hold" (with a status verb incl. `put`/`place`) to ONHOLD; guarded by `_NOTE_OR_DESC_CUE_PATTERN` so a note/description body mentioning "on hold" isn't hijacked)* |
 | `move this estimate to draft` | `update_estimate` → Estimate Agent | ⚠️ gap *(not parsed — `to draft` has no `status` terminator; 2026-09-27 review)* |
 | `Can you set the status for {EST} to {Y}?` (question form) | `help` → Orchestrator, then **offer** | ✅ rule *(2026-06-15 — answered with "Yes — I can set {EST} to {Y} … Want me to go ahead?" + a `pending_status_transition` record; a following "yes" executes, "no" cancels. Requires an E-code + recognized target.)* |
 | `yes` / `go ahead` (replying to the offer above) | `update_estimate` → Estimate Agent | ✅ rule *(`handle_pending_status_transition`, `routers/agent_helpers/pending_status_transition.py`)* |
 | `update {EST or title} from {X} to {Y} status` (e.g. `from Sent to Review status`) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-08 — `_detect_status_transition` now recognizes the `update` verb and the `from X to Y status` / `to Y status` phrasings via `_STATUS_TRANSITION_TO_STATUS_PATTERN`, anchored on the trailing `status` word so it captures the target Y. Previously fell through to "What would you like to change?". **Same change** switched the status handler to the title-aware resolver `_resolve_estimate_code_or_title`, and made an explicitly-named title override `active_estimate_code` — fixes a data-integrity bug where naming an estimate by title while viewing another updated the WRONG (viewed) estimate. **2026-06-09:** extended title-awareness to ALL estimate UPDATE + READ sub-ops — work items, work-item fields, status — via the shared `_resolve_update_estimate_code` seam and a title-aware `_load_estimate_for_read`.)* |
 | `update {EST or title} to {Y} status` (e.g. `to Review status`) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-08 — same `to Y status` pattern; works with `update`/`move`/`change`/`transition`/`switch`/`put`/`place` verbs)* |
-| `what's the status of {EST}?` | `get_estimate` → Estimate Agent | ⚠️ gap *(the router's help short-circuit answers it from the user guide before classification — #691)* |
+| `what's the status of {EST}?` | `get_estimate` → Estimate Agent | ✅ rule *(2026-09-27, #691 — answered from the estimate; §1.2)* |
 
 ## 1.5 Work-item / line-item management
 
@@ -324,7 +349,7 @@ All work-item operations route to `update_estimate` → Estimate Agent. The phra
 | `{WI}` (by description) | `the Driveway work item`, `the Foundation scope` |
 | `{WI}` (contextual) | `this work item`, `my work item` (the anchored one). A bare `the work item` is **not** a reference — the grammar rejects it; say "this work item", its number or its name. |
 
-The written command list (§1.0) names a work item as "work item …"; `job item`, `scope` and `line item` are **not** interchangeable with it (corrected 2026-09-27).
+The written command list (§1.0) names a work item as "work item …", "scope …" or "job item …" (2026-09-27); `line item` is **not** interchangeable with it. A bare "the scope" is no more a reference than "the work item" — Maple asks which.
 
 ### 1.5.1 Work-item CRUD (add / remove / rename)
 
@@ -336,10 +361,10 @@ The written command list (§1.0) names a work item as "work item …"; `job item
 | `add a line item to this estimate` | `update_estimate` → Estimate Agent | ✅ rule |
 | `create another scope on {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `add a work item called "Foundation Prep" to {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `change work item #1 in {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change work item #1 in {EST}` | `update_estimate` → Estimate Agent — asks what to change | ✅ rule |
 | `remove work item 2 from this estimate` | `update_estimate` → Estimate Agent | ✅ rule |
-| `delete the Driveway scope from {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `rename the scope to Foundation` | `update_estimate` → Estimate Agent | ✅ rule |
+| `delete the Driveway scope from {EST}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — "scope" is a work item)* |
+| `rename the scope to Foundation` | `update_estimate` → Estimate Agent — asks which work item ("the scope" names none) | ✅ rule |
 | `how many work items does {EST} have?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `list the work items in {EST}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `show me the scopes on this estimate` | `update_estimate` → Estimate Agent | ✅ rule |
@@ -364,7 +389,7 @@ The fallback scorer ranks evidence in tiers: **the company's own description** f
 | `set all work items in {EST} to Maintenance` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `set the division of {WI} to {custom division}` (a division the company added or renamed) | `update_estimate` → Estimate Agent | ✅ rule *(2026-07-31 — was a ⚠️ gap earlier the same day: the handler validated against the `EstimateDivision` enum only and answered "isn't a recognized division" for a company's own rows. It now validates against the company's live divisions, canonicalizes casing/punctuation to the stored spelling, and lists the company's own divisions when it refuses.)* |
 | `set the division of {WI} to Special Project` — a near miss (missing plural, typo, leading part of the name like `snow`) | asks "Did you mean Special Projects? Say yes and I'll use it."; **yes** applies it | ✅ rule *(2026-09-24 — was a flat refusal listing every division. `closest_division_name` (`routers/estimate_helpers/division.py`) proposes the single closest division; the batch is stashed as a `sub_op="edit_commands"` confirmation with the guess substituted, so "no" cancels and nothing is written until "yes". Two about-equally-close divisions (`Care` → Tree Care / Turf & Plant Care) or nothing close keeps the refusal and its list.)* |
-| `move {WI} to {custom division}` — **without** the word "division" | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-07-31 — the op detector (`work_item_handlers.py::_detect_work_item_field_op`) still gates on a hardcoded alternation of the seven seeded names, so a bare custom name isn't recognized as a division op at all. Any phrasing that includes the word "division" works for every value.)* |
+| `move {WI} to {custom division}` — **without** the word "division" | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — `move_work_item_division` takes any value and the handler checks it against the company's divisions.)* Earlier: ⚠️ gap *(2026-07-31 — the op detector (`work_item_handlers.py::_detect_work_item_field_op`) still gates on a hardcoded alternation of the seven seeded names, so a bare custom name isn't recognized as a division op at all. Any phrasing that includes the word "division" works for every value.)* |
 
 ### 1.5.3 Description
 
@@ -408,7 +433,7 @@ The rename handler already covers description updates. These phrasings extend th
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
 | `add concrete blocks to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `add material {material} to {WI} in {EST}` | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-09-27 review: routes to `create_material` on the rules tier)* |
+| `add material {material} to {WI} in {EST}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-27)* |
 | `add 50 concrete blocks to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `add {material} with quantity 20 and size 12x12 to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `remove concrete blocks from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
@@ -431,9 +456,9 @@ The rename handler already covers description updates. These phrasings extend th
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `add an activity to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `add an activity to {WI}` → *"What's the activity called?"* → `Seeding with role Landscaper for 3 hours` | adds it to that work item | ✅ rule *(2026-09-27)* |
 | `add activity "Excavation" to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `add an activity called "Grading" with role Landscaper to {WI}` | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-09-27 review: routes to `create_labour` on the rules tier)* |
+| `add an activity called "Grading" with role Landscaper to {WI}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-27)* |
 | `add activity "Planting" with 8 hours of effort to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `remove the Excavation activity from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `remove all activities from {WI}` | — | 🛑 refused *(bulk-delete refusal, §9.1)* |
@@ -544,6 +569,8 @@ Sets a work item's total to an absolute dollar amount by **back-calculating its 
 | `update the estimate` | `update_estimate` → Estimate Agent | 🤖 LLM + context |
 | `show me the estimate` / `show me this estimate` | `get_estimate` → Estimate Agent | ✅ rule + context *(2026-09-24 — the router's get path now reads the anchor)* |
 | `open the second one` (after a list of estimates) | `get_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
+| `list my estimates` → `delete the first one` (another estimate open) | deletes the first **listed** row, after confirming | ✅ rule *(2026-09-27, #686 — it offered to delete the open estimate)* |
+| `mark the patio estimate as sent` → *"I found 2 estimates… which one?"* → `E0001` / `2` / `the backyard one` | the request runs on that estimate | ✅ rule *(2026-09-27, #685 — the reply dead-ended)* |
 | `add a work item called Fence` while viewing an estimate in the portal | `update_estimate` → Estimate Agent | ✅ rule + context *(2026-09-24 — the viewed estimate)* |
 | `update the henderson job` (no estimate titled that, one is open) | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-09-27 review: routes to `update_property` on the rules tier.)* Earlier: *(2026-09-24 — "I couldn't find … Did you mean E0042, the estimate you're working on?"; "yes" re-runs the request there)* |
 | `this estimate` / `the last estimate` / `that one` | resolves via `active_estimate_code` | 🤖 LLM + context |
@@ -662,7 +689,9 @@ showed, and the question it last asked.
 | `rename work item 3 to X` → *"which estimate?"* → `E0042` | resumes on E0042 | ✅ rule |
 | `add a note to work item 2: check drainage` / `note on this work item: …` | files a work-item Note (outside the edit lock) | ✅ rule |
 | `add a note to the patio work item` → *"What should the note say?"* → `check the grade` | files the reply as a note on the patio work item | ✅ rule |
-| `add a note to work item 2 about drainage` / `… to check drainage` / `…the patio scope, check drainage` | files an **estimate** note whose body is "to work item 2 about drainage" — use a colon (`add a note to work item 2: …`) | ⚠️ gap *(#684; verified for the first form)* |
+| `add a note to work item 2 about drainage` / `… regarding the gate` | files "about drainage" on work item 2 | ✅ rule *(2026-09-27, #684 — it filed "to work item 2 about drainage" on the estimate)* |
+| `On work item 1, add a note: check drainage` | files it on work item 1 | ✅ rule *(2026-09-27, #665)* |
+| `add a note to that estimate saying call the client` / `drop a note on {EST} saying …` / `new note for this estimate saying …` | files the estimate note | ✅ rule *(2026-09-27, #664 — these asked where the note should go)* |
 | `set the markup on all work items to 20%` / `… for work items 1 and 2 …` | not a listed command: the edit planner's. Without it, Maple asks what to change ("… What would you like to change?") and writes nothing | 🤖 planner *(corrected 2026-09-27 — the "one work item at a time" reply no longer exists)* |
 | `remove work item 1 and set the markup on work item 2 to 20%` | the edit planner types both; without it, Maple asks what to change and writes nothing | 🤖 planner *(corrected 2026-09-27 — the "one change at a time" reply no longer exists)* |
 | `also raise the markup by 5%` / `change the markup by 5%` | a relative change isn't a listed command: the planner's. Without it, Maple asks what to change; a change BY 5 is never applied as the new value | 🤖 planner *(corrected 2026-09-27 — the "What should the new markup be?" reply no longer exists)* |
@@ -702,7 +731,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, and older #22, #23, #279, #329, #334, #354, #406, #436, #437, #439, #569, #614, #615, #616, #617, #645, #659, #663, #664, #665, #666, #668, #670 (see [code-review-followups.md](code-review-followups.md)).
+**Open gaps:** #682, #683, #689, #696, and older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659, #663, #668, #670 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #664, #665, #666, #671, #673, #677, #684, #685, #686, #691, #697, #334, #436; #687's estimate and task halves are done.
 
 # 2. Properties
 
@@ -1718,6 +1747,12 @@ Maple remembers the last **read** — its message and the records it was about �
 | `what's my pipeline this month?` → `and last month?` | the same question for last month | ✅ rule |
 | `change Bob Lee's phone to …` → `what about Carla Diaz?` | not replayed — Carla's phone is left alone | ✅ rule |
 | `… ` → `and then delete it` | a new request, not a new target | ✅ rule |
+
+**Refining the list just shown** (2026-09-27, the same module): after an
+estimate or task list, `just the drafts`, `which ones are on hold?`, `only the
+ones over $1000`, `sort them by total`, `what's the total of those?`, `just the
+overdue ones`, `how many is that?` replay that list with the refinement added
+— so refinements chain (§1.1, §7.5).
 
 ## 10.9 "Show more" *(2026-09-27)*
 
