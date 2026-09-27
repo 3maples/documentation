@@ -59,6 +59,16 @@ platform `3526a08` … `67892ec`)
   division and total verbs, margin/markup wordings, "scope" as a work item —
   and notes land where they were addressed (#664, #665, #666, #684). Routing
   notes are never shown to the user.
+- Contacts, properties and notes (§2, §3, §3.9): notes are added ("add a
+  note to him: …", or the text on the next turn), read back and deleted
+  (your own, after a yes); "link John Doe to 123 Main St" in either order;
+  creates ask for what's missing in plain words and take a bare name;
+  "his phone is …" / "zip …" after a create or a view update that record;
+  "which contact?" lists names and resumes; lists filter by city and role;
+  "add a contact named …" creates; "show me Elm House" finds the property;
+  "update the name of 12 Oak St to Oak House" renames it correctly. A
+  greeting during estimate gathering and an estimate edit during "link a
+  property?" are never taken as answers (#683, #687).
 
 **2026-09-26 — routing convergence: rounds 12–24**
 

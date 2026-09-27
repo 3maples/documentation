@@ -36,6 +36,9 @@ Headlines, 2026-09-27 (multi-turn everywhere — design
   and listed rows resume; lists filter by customer, property and date and can
   be refined; more create wordings; ~46 planner-only work-item phrasings
   promoted to grammar entries (§1.0).
+- **Contacts, properties, notes** (§2, §3, §3.9) — notes added, read back and
+  deleted; guide-worded links; creates that ask for what's missing; follow-up
+  fields; "which contact?" menus; city and role filters.
 
 Headlines, 2026-09-24 → 2026-09-26:
 
@@ -744,7 +747,8 @@ Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
 | Phrasing | Intent → Agent |
 |---|---|
-| `create a new property` | `create_property` → Property Agent |
+| `create a new property` → *"What's the property's address? For example: 20 Birch Rd, Toronto, ON."* → `20 Birch Rd, Toronto, ON` | `create_property` → Property Agent *(2026-09-27 — it asked for "the missing property details" without naming any)* |
+| `add a property called Birch Cottage` | `create_property` → Property Agent *(2026-09-27)* |
 | `list all properties` | `list_properties` → Property Agent |
 | `delete the property {property}` | `delete_property` → Property Agent |
 
@@ -770,7 +774,9 @@ Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
 ## 2.5 Filter / find (all ✅ rule)
 
-`find properties named Toronto` · `show properties in Toronto` · `search for properties matching Toronto`
+`find properties named Toronto` · `search for properties matching Toronto`
+
+`how many properties are in Toronto?` → "You have 2 properties in Toronto." · `list properties in Guelph` · `show me properties in Toronto` — the city filters (2026-09-27, #687: every property was listed or counted); a city nobody has is said so ("You don't have any properties in Ottawa").
 
 ## 2.6 Field-targeted update
 
@@ -779,6 +785,8 @@ Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 | `change the city of {property} to Vancouver` | `update_property` → Property Agent | ✅ rule |
 | `update the city on {property} to Vancouver` | `update_property` → Property Agent | ✅ rule |
 | `set {property}'s city to Vancouver` | `update_property` → Property Agent | ✅ rule |
+| `update the name of {property} to Oak House` | `update_property` → Property Agent | ✅ rule *(2026-09-27 — it wrote the name "12 Oak St to Oak House" and looked the property up by the new name)* |
+| right after a property is created or shown: `zip M4B 1B3` / `the postal code is M4B 1B3` / `its city is Guelph` | `update_property` on that property | ✅ rule *(2026-09-27, §10.8)* |
 | `add a note to {property}: "gate code 4411"` / `set the notes on {property} to "..."` | `update_property` → Property Agent | ✅ rule *(2026-09-17 — `notes` is no longer a `Property` field; the phrasing creates a real `Note`, authored by the acting user, instead of writing a scalar. Also handled inline on create: `create a property at 123 Main St with notes: gate code 4411`.)* |
 
 ## 2.7 Address formats accepted on create (all ✅ rule)
@@ -808,13 +816,15 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 
 | Phrasing | What happens | Status |
 |---|---|---|
-| `remove {contact} from {property}` / `delete the last note on {property}` / `delete that note` | read as `delete_property` — the property and its notes are deleted on "yes" (#679) | ⚠️ gap |
-| a property whose name looks like a person's, or a title-case two-word name (`Elm House`) | routes to the Contact rules before the LLM runs | ⚠️ gap |
+| `remove {contact} from {property}` | nothing is deleted; Maple says the link is removed in the app (§9.8, #679) | 🛑 redirect |
+| a property whose name looks like a person's (`show me Elm House`) | the property, when that is its exact name and no contact's | ✅ rule *(2026-09-27 — it answered "No contact found with name 'Elm House'")* |
 | `N <words> way` / `court` / `ct` phrasings (`60 minutes one way`) | `_ADDRESS_PATTERN` false-matches them as a property lookup (#49) | ⚠️ gap |
 
 Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8.
 
-**Open gaps:** #674, #675, #676, #677, #679, #682, #683, #687, #697, and older #49, #101, #322 (see [code-review-followups.md](code-review-followups.md)).
+**Notes, links and follow-ups** for properties and contacts are in §3.9.
+
+**Open gaps:** #682, and older #49, #101, #322 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #683, #687, #697.
 
 ---
 
@@ -823,6 +833,8 @@ Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8
 ## 3.1 Direct imperatives (all ✅ rule)
 
 `create a new contact` · `list all contacts` · `delete the contact {contact}`
+
+`create a contact` → *"What's the contact's name? First and last, please."* → `Dan Park` creates Dan Park *(2026-09-27 — the bare name reply asked the same question again)*; `add a contact named Dan Park` creates one *(2026-09-27 — it looked for a Dan Park to update)*.
 
 ## 3.2 Casual phrasings (all ✅ rule)
 
@@ -844,13 +856,15 @@ Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8
 
 `find contacts named Smith` · `search for contacts matching Smith` — ✅ rule.
 
-`show contacts in Toronto` — ⚠️ gap: there is no city (or role) filter, so the list comes back unfiltered without saying so (#687; corrected 2026-09-27).
+`show contacts in Toronto` · `how many contacts are in Guelph?` · `list homeowners` · `show me the property managers` · `which contacts are administrators?` · `list homeowners in Guelph` — ✅ rule *(2026-09-27, #687: city and role filters; the list came back unfiltered)*. A filtered list is remembered, so `show me the second one` picks from it.
 
 ## 3.6 Field-targeted update
 
 | Phrasing | Status |
 |---|---|
 | `change the phone of {contact} to 555-1111` | ✅ rule |
+| `change Ana's phone to …` with two Anas → *"More than one contact matches that: 1. Ana Reyes 2. Ana Lopez"* → `Ana Lopez` / `2` / `the second one` | ✅ rule *(2026-09-27 — it said "Multiple contacts matched" and the reply dead-ended)* |
+| right after a contact is created or shown: `his phone is 519-555-1234` / `her email is …` / `add his email …` / a bare email or phone number | ✅ rule *(2026-09-27, §10.8 — these were unknown, or started a second contact)* |
 | `update the phone on {contact} to 555-1111` | ✅ rule |
 | `set {contact}'s phone to 555-1111` | ✅ rule |
 | `add a note to {contact}: "..."` / `set the notes on {contact} to "..."` | ✅ rule *(2026-09-17 — `notes` is no longer a `Contact` field; the phrasing creates a real `Note`, authored by the acting user, instead of writing a scalar. Also handled inline on create.)* |
@@ -863,13 +877,25 @@ Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8
 
 | Phrasing | What happens | Status |
 |---|---|---|
-| `add a contact named {contact}` | routes to `update_contact`, not `create_contact` | ⚠️ gap |
-| `show contacts in Toronto` / contacts by role | no city or role filter — the list is unfiltered (#687) | ⚠️ gap |
-| `link {contact} to {property}` | a correct LLM answer is demoted to `off_topic` (#690) | ⚠️ gap |
+| `link {contact} to {property}` on the LLM tier | a correct LLM answer can be demoted to `off_topic` (#690) — the rule tier now handles the guide's phrasings first (§3.9) | ⚠️ gap (LLM tier) |
 
 Cross-resource phrasings (e.g. `where does {contact} live?`) are tracked under §8.
 
-**Open gaps:** #674, #675, #676, #677, #679, #683, #687, #690 (see [code-review-followups.md](code-review-followups.md)).
+## 3.9 Notes, links and follow-ups for contacts and properties *(2026-09-27)*
+
+One handler (`agents/conversation/record_notes.py`) keeps the notes feed for contacts, properties and estimates, and one (`agents/conversation/record_links.py`) links a contact and a property in the user guide's words (design 2026-09-27 §7.3; user decision (b)). Adding a note to an estimate or work item stays with the estimate grammar (§1.0).
+
+| Phrasing | Behavior | Status |
+|---|---|---|
+| `add a note to him: call after 5` (contact in focus) / `add a note to Bob Lee saying …` / `jot down a note for 12 Oak St: …` | files the note, authored by you | ✅ rule *(it asked "which fields?" on the rules tier)* |
+| `add a note to Bob Lee` → *"What should the note say?"* → the text | files the reply, even if it reads like a command | ✅ rule |
+| `show me the notes for 12 Oak St` / `what notes are on Bob Lee?` / `any notes on E0042?` / `show me his notes` | lists them newest first, with author and date | ✅ rule |
+| `delete my note on Bob Lee` / `delete note 2` (after a list) / `delete my last note on Ana Reyes` → *"Delete your note …? This can't be undone."* → `yes` / `no` | deletes it, or keeps it; your own notes, or any as an Owner | ✅ rule *(it was redirected to the app)* |
+| `link John Doe to 123 Main St` / `link 123 Main St to John Doe` / `connect Carla Diaz with the Elm House property` / `add Carla Diaz to 12 Oak St` / `Carla Diaz lives at 12 Oak St` | links them (either order); "already linked" when they are | ✅ rule *(the guide's own phrasing was unknown on the rules tier)* |
+| `link Zed Quill to 12 Oak St` (no such contact) | "I couldn't find a contact or a property called Zed Quill." | ✅ rule |
+| `remove Ana Reyes from 12 Oak St` / `unlink …` | done in the app — §9.8 | 🛑 redirect |
+
+**Open gaps:** #690 (LLM tier), #682 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #683, #687.
 
 ---
 
@@ -1512,7 +1538,7 @@ Detectors are narrow on purpose — a false positive refuses something Maple can
 
 ## 9.9 Deletes — a plain yes, from someone allowed to *(2026-09-27)*
 
-Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A request about a record's notes or links ("delete the note on Bob", "remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8) or handled as a note.
+Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A request about a record's links ("remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8); a request about its notes deletes the note you name, after asking (§3.9).
 
 ---
 
