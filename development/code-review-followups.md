@@ -2088,7 +2088,7 @@ The calculator's pending question releases only on an action+domain pivot (`plat
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
-### 697. [MEDIUM] Out-of-chat features are misrouted instead of redirected
+### 697. ~~[MEDIUM] Out-of-chat features are misrouted instead of redirected~~ — RESOLVED 2026-09-27
 Features Maple doesn't handle in chat fall into whichever rule matches: "add a division" becomes `create_contact`, "upgrade my plan" a material lookup (the material-shape residual, `platform/agents/orchestrator/service.py:3209-3221`), and "create a document for E0042" `create_estimate`. Conversation turns — "cancel", "never mind", "thanks", "ok", "repeat that", "show more", "go back", "clear chat" — reach the same material fallback. MEDIUM: confusing replies, and a misroute can open a create question.
 
 **Suggested fix:** One out-of-chat table (`agents/conversation/out_of_chat.py`, design §5.7) that refuses with a redirect to the page or user-guide section for everything in design §2.3, plus a meta layer ahead of classification for cancel / thanks / repeat / show more / clear chat (§5.6).
@@ -2096,6 +2096,8 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
 ## Platform — API, models and data
+
+**Resolved 2026-09-27** (platform `2c2e5d0`): `agents/conversation/out_of_chat.py` answers company default percentages, team/invitations, billing/plan/credits, Load Standard, CSV import, units, divisions, unlink, duplicate, the estimate document and photos with the place in the app where each is done (user-guide wording), as a policy refusal read on the command head only. Pinned by `tests/test_out_of_chat_redirects.py` (including false-positive guards: work-item markup, "the duplicate contact", "the invoice task", note bodies) and corpus rows `boundary-*`. Snapshot: "duplicate it" and "set the company's default markup for work items to 20%" now redirect.
 
 ### 31. [MEDIUM] Intra-CSV duplicate rows now upsert silently instead of erroring
 **Files**: `routers/equipments.py:148-170`, `routers/labours.py:204-229`
@@ -2887,6 +2889,8 @@ row count first — this may be years away.
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
 ## Portal — estimate builder
+
+**Update 2026-09-27** (platform `a612723`, `3526a08`): the server half is fixed — the conversation remembers its language (`conversation_lang`), a short reply in a non-English conversation is detected and translated, a code/email/number reply is answered in the conversation's language, and "No."/"No, thanks." read as a no. Still open (portal, design §8): the restored transcript shows the English history.
 
 ### 131. [MEDIUM] `saveError` displayed far from origin
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
