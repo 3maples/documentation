@@ -12,6 +12,40 @@ New entries go at the top of this file.
 
 ### Change log
 
+**2026-09-27 — multi-turn everywhere** (design
+[`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md);
+platform `3526a08` … `67892ec`)
+
+- Deletes: every Maple delete asks first; only a plain yes confirms (#674);
+  Owners and Admins only, as in the app; "delete the note on Bob" / "remove
+  Ana from 12 Oak St" never delete the record (§9.9).
+- Catalog writes run as the signed-in user (they crashed with auth on); a
+  material cost edit keeps the markup (the server derives the price); Maple
+  never creates a category or unit as a side effect of a material create —
+  an unknown one is named in the reply.
+- A refusal ends the turn; out-of-chat requests (Settings, team, billing,
+  Load Standard, CSV, units, divisions, unlinking records, duplicate,
+  documents, photos) are answered with where to do them (§9.8, #697).
+- One gate for every question; a question lives one turn (§10.6; #671,
+  #675, #676). An edit that reaches a stale anchor only through "it" asks
+  first; a named contact or property beats the one in focus (§10.7, #677).
+  "the second one" answers only from a list that is still current (§10.5).
+- "thanks", stray yes/no, cancel, repeat, start over (§10.10); the
+  conversation keeps its language across short replies.
+- "what about X?" / "and last month?" repeat the last read (§10.8).
+- A named estimate keeps its house number and connectors ("4 Elm St",
+  "Edge of the Garden"; #334). A task title containing "last" is a title.
+- Tasks (§7): due-date verbs ("make it due Friday", "push it to next week",
+  "clear the due date"), status verbs ("I finished it", "reopen it"), give /
+  unassign by teammate name, property link / unlink; creates that carry a due
+  date, assignee, status and property; "remind me to …", "add … to my to-do
+  list", "new to-do: …"; list filters (overdue, due windows, upcoming,
+  status, open, assignee, unassigned, property) and "what's due today?"
+  (#687, task half); value questions and "which task?" menus that resume by
+  number, readable id or title words (#692); "show more" (§10.9). A field
+  answer never lands on the newest task instead of the one being edited
+  (#698).
+
 **2026-09-26 — routing convergence: rounds 12–24**
 
 - Thirty-third review: tasks follow the estimate rule — a task reference

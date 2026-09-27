@@ -2056,6 +2056,8 @@ The calculator's pending question releases only on an action+domain pivot (`plat
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
+**Update 2026-09-27** (platform `00c17d8`): the task half is done — task lists filter by overdue, due window, upcoming, status, open, assignee (email, name, "Jordan's tasks"), unassigned and property; the assigned-to email is read whole; a teammate, status or property that doesn't resolve is answered, not dropped. Pinned by `tests/test_task_list_filters.py` and the `task-*-filter*` corpus rows. Still open: estimates ("last month", title/customer/property), contact role/city, property count by city.
+
 ### 690. [MEDIUM] `_prefer_explicit_rule_match` demotes correct LLM answers to off_topic
 `platform/agents/orchestrator/service.py:1712` — when a message has no action or domain keyword and history resolution finds nothing, the LLM's CRUD intent is overwritten with `off_topic` (`:1764-1777`). "what's its price?" and "link Carla Diaz to 12 Oak St" lose a correct LLM answer this way; "link" isn't in `ACTION_HINTS` (`agents/orchestrator/intents.py:143`). MEDIUM: a right answer thrown away for a canned one.
 
@@ -2070,7 +2072,7 @@ The calculator's pending question releases only on an action+domain pivot (`plat
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
-### 692. [MEDIUM] Task delete can never be confirmed; convert, menu and value replies dead-end
+### 692. ~~[MEDIUM] Task delete can never be confirmed; convert, menu and value replies dead-end~~ — RESOLVED 2026-09-27
 `platform/agents/task/service.py:621` stashes `pending_delete_task_id` but writes no `pending_intents` record, so the router has nothing to route the confirming "yes" to and a task delete never completes from chat. `tests/test_maple_task_crud.py:1297` hides it by re-injecting the `delete_task` intent alongside the "yes". Convert confirmations and "which task?" menu replies work only when the classifier happens to route them back; value questions (assignee, status, date) dead-end, and a bare "due date" reply to the field question routes to `get_material`. MEDIUM: a supported capability that doesn't work.
 
 **Suggested fix:** Task confirmations, menus and value questions become registry entries (design §5.1, §7.1). Drop the intent injection from the test so it exercises the real path.
@@ -2078,6 +2080,8 @@ The calculator's pending question releases only on an action+domain pivot (`plat
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
 **Update 2026-09-27:** the delete confirmation now completes — the gate routes the "yes" to the Task Agent (corpus row `task-delete-confirmed`). Convert confirmations and menu replies go through the same gate. Still open: value questions (assignee, status, date) and menu replies by readable id or partial title (design §7.1).
+
+**Resolved 2026-09-27** (platform `5d0a33c`): value questions resume — "assign it", "change the status", "reschedule it" ask for that one value and the reply applies it; an unparseable date asks again. A "which task?" menu takes a number, the task's readable id ("T0004") or words from its title ("the paint one"); the question gate reads a reply that names a choice as the answer. The agent-level tests in `test_maple_task_crud.py` still pass the intent — that is the router's contract with the agent — and the real router path is pinned by corpus rows `task-delete-confirmed`, `task-assign-asks-who-then-resumes`, `task-status-asks-which-then-resumes`, `task-due-date-bad-value-asks-again` and `task-which-task-menu-by-{code,partial-title,number}`.
 
 ### 693. [MEDIUM] "show me my labour roles" filters by "S"; the equipment refusal blocks "Heavy Equipment Operator"
 `platform/agents/labour/text_helpers.py:180` — `_extract_name_from_message` returns "S" for "show me my labour roles" (and "list all labour roles"), and the Labour agent adopts it as the role name (`agents/labour/service.py:1365`), so the list is filtered to roles matching "S". Separately, `is_equipment_request` (`agents/text_utils.py:403`, pattern :398) matches the word "equipment", so the standard "Heavy Equipment Operator" role can't be read, created or edited from chat. MEDIUM: a wrong list, and a blocked role.

@@ -14,6 +14,24 @@ against the code and added an **Open gaps** line to each resource section
 [`code-review-followups.md`](code-review-followups.md); the fixes are planned in
 [`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md).
 
+Headlines, 2026-09-27 (multi-turn everywhere — design
+[`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md)):
+
+- **Safety** — every delete asks first and only a plain yes confirms it; Owners
+  and Admins only; a request about notes or links never deletes the record
+  (§9.9). Catalog writes run as the signed-in user; a cost edit keeps the
+  material markup; Maple never creates a category or unit as a side effect.
+- **One question at a time** (§10.6), **the record in focus** (§10.7), **"what
+  about X?"** (§10.8), **"show more"** (§10.9), **thanks / cancel / repeat /
+  start over** and language continuity (§10.10).
+- **Done in the app** — Settings, team, billing, Load Standard, CSV import,
+  units, divisions, unlinking records, duplicating, documents and photos are
+  refused with where to do them (§9.8).
+- **Tasks** (§7) — due dates, status verbs, give/unassign by teammate name,
+  property links; creates that carry due date, assignee, status and property;
+  "remind me to …" and to-do lists; list filters and "what's due today?";
+  resumable value questions and menus; paging.
+
 Headlines, 2026-09-24 → 2026-09-26:
 
 - **2026-09-26** — work-item recurring schedules deferred from chat (user
@@ -1102,13 +1120,18 @@ Token conventions: `{task}` = a task title (e.g. `fix the fence gate`); `{status
 | `create a new task` (no title, **no** notes) → *"What should the task be called?"* → bare reply | `create_task` field-then-value flow (§10.1) — the reply becomes the title; inline notes from the first turn are kept | ✅ rule *(only reached when there are no notes to derive a title from, or the notes yield nothing usable — e.g. `notes: ...`)* |
 | `list my tasks` | `list_tasks` → Task Agent | ✅ rule |
 | `show me the {task} task` | `get_task` → Task Agent | ✅ rule |
-| `delete the {task} task` | `delete_task` → Task Agent (manager-only, confirm first) | ✅ rule — ⚠️ but the confirming "yes" never deletes (#692) |
+| `delete the {task} task` → *"…are you sure?"* → `yes` | `delete_task` → Task Agent (manager-only, confirm first) | ✅ rule *(2026-09-27 — the "yes" now deletes; #692)* |
+| `create a task to call Bob tomorrow and assign it to me` / `add a task to trim the hedge due Friday and assign it to Jordan` | `create_task` → Task Agent with due date / assignee | ✅ rule *(2026-09-27 — a create's tail sets fields: `assign it to` me / an email / a teammate's name, `mark it` / `status:` a status, a date phrase (`tomorrow`, `due Friday`, `by next week`, `on Oct 3`) as the due date. Instructions come out of the note; the date stays in it. Before, the trailing "assign it to …" routed the whole message to an edit of another task.)* |
+| `create a task to fix the side gate at the Elm House property` / `add a task to rake the leaves at 12 Oak St` | `create_task` → Task Agent, linked to the property | ✅ rule *(2026-09-27 — "at the X property" or an "at …" tail that names one property; the words stay in the note)* |
+| `create a task to call the supplier and assign it to Zed` (no such teammate) | `create_task` — the task is made, assigned to you, and the reply says Zed wasn't found | ✅ rule *(2026-09-27 — a clause Maple can't apply is reported, never dropped)* |
 
 ## 7.2 Casual phrasings
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `jot down a task to order more mulch` | `create_task` → Task Agent | ⚠️ gap *(informal create cues — LLM-tier candidates, unverified)* |
+| `jot down a task to order more mulch` | `create_task` → Task Agent | ✅ rule *(2026-09-27)* |
+| `remind me to call Bob tomorrow` / `set a reminder to …` / `don't let me forget to …` | `create_task` → Task Agent (due tomorrow) | ✅ rule *(2026-09-27 — a reminder is a task, whatever it is about)* |
+| `add order more mulch to my to-do list` / `put … on the to do list` / `new to-do: …` / `create a reminder to …` | `create_task` → Task Agent | ✅ rule *(2026-09-27)* |
 | `I need to remember to winterize the irrigation` | `create_task` → Task Agent | ⚠️ gap |
 | `pull up my tasks` | `list_tasks` → Task Agent | ✅ rule |
 | `what tasks do I have?` | `list_tasks` → Task Agent | ✅ rule |
@@ -1125,19 +1148,25 @@ Bare-title possessives carry no "task" keyword for the rule tier to anchor on, a
 
 ## 7.4 Count (all ✅ rule)
 
-`how many tasks do I have?` · `count my tasks` · `total number of tasks` — `list_tasks` count path → `format_count_response`. ⚠️ `how many open tasks?` returns the unfiltered total, without saying so (#687; see §7.5 status filter).
+`how many tasks do I have?` · `count my tasks` · `total number of tasks` — `list_tasks` count path → `format_count_response`. Every §7.5 filter applies to a count too: `how many tasks are overdue?` → "You have 1 overdue task." *(2026-09-27, #687)*
 
 ## 7.5 Filter / find
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `what tasks are at {property}?` | `list_tasks` filtered by property | 🤖 LLM routing; ⚠️ property filter not yet applied agent-side |
-| `which tasks are assigned to {email}?` / `tasks assigned to me` | `list_tasks` filtered by assignee | 🤖 LLM routing; ⚠️ the email form never matches — the filter regex stops at ".", so it is always empty (#687). "assigned to me" works. |
+| `what tasks do we have at {property}?` / `tasks for the {property} property` | `list_tasks` filtered by property | ✅ rule *(2026-09-27; a property that doesn't match is answered — "I couldn't find a property called …")* |
+| `tasks assigned to {email}` / `tasks assigned to me` / `tasks assigned to Jordan` / `Jordan's tasks` | `list_tasks` filtered by assignee | ✅ rule *(2026-09-27 — the email is read whole (it stopped at the first ".", #687); a teammate by first, last or full name; an unknown name is answered, never dropped)* |
+| `tasks for Jordan` | property first, then teammate | ✅ rule *(2026-09-27)* |
+| `unassigned tasks` | `list_tasks` with no assignee | ✅ rule *(2026-09-27)* |
 | `list my tasks` | `list_tasks` (ALL tasks — "my" is not an assignee filter, matching every other resource; use "assigned to me" to filter) | ✅ rule |
-| `tasks in progress` / `what's still to do?` | `list_tasks` filtered by status | ⚠️ gap (no status-name list filter yet) |
+| `tasks in progress` / `show done tasks` / `list to do tasks` / `tasks with status {status}` | `list_tasks` filtered by status | ✅ rule *(2026-09-27; "to do" is a status only before "tasks" — "my to-dos" are all tasks)* |
+| `show open tasks` / `what's still to do?` | `list_tasks` leaving out finished tasks (a status named Done / Completed / Finished / Closed / Cancelled) | ✅ rule *(2026-09-27)* |
+| `show my overdue tasks` / `what's overdue?` | `list_tasks`, due before today and not finished, soonest first with each due date | ✅ rule *(2026-09-27)* |
+| `what's due today?` / `tasks due tomorrow` / `tasks due this week` / `tasks due next week` / `tasks due by Friday` / `tasks due on Oct 3` / `today's tasks` / `tasks for next week` | `list_tasks` with a `due_date` window, soonest first | ✅ rule *(2026-09-27 — no "task" word needed: only tasks have due dates. A week runs Monday to Sunday.)* |
+| `upcoming tasks` / `what's coming up this week?` / `anything due soon?` | `list_tasks`, due in the next 7 days and not finished | ✅ rule *(2026-09-27 — the dashboard's Upcoming Tasks card in words)* |
 | `show archived tasks` | `list_tasks` with archived-only filter | ✅ rule |
-| `tasks due this week` | `list_tasks` with `due_date` window | ⚠️ gap |
-| `find tasks about fencing` | `list_tasks` with title/description search | ✅ rule *(named/matching/about/containing all apply the search term)* |
+| `find tasks about fencing` | `list_tasks` with title/description search | ✅ rule *(named/matching/about/containing/called all apply the search term)* |
+| `list my tasks` (more than 20) → *"That's 1–20 of 24 … say "show more" for the next 4."* → `show more` / `next page` / `the rest` | the same list, from where it stopped — filters included | ✅ rule *(2026-09-27 — good for the next turn only; "show more" with no longer list open says so)* |
 
 ## 7.6 Field-targeted update
 
@@ -1153,6 +1182,10 @@ The `the {task} task` keyword forms are ✅ rule; bare-title forms (`change the 
 | `set the description of the {task} task to {text}` | `update_task` → Task Agent | ✅ rule |
 | `change the due date of {task} to Friday` (bare title) | `update_task` → Task Agent | 🤖 LLM |
 | `set {task}'s due date to next Monday` (bare title) | `update_task` → Task Agent | ⚠️ gap |
+| `make it due Friday` / `push it to next week` / `reschedule the {task} task to Oct 3` / `it's due in 3 days` / `due Friday` (task in focus) | `update_task` (due date) → Task Agent | ✅ rule *(2026-09-27 — dates also accept `next week`, `in N days/weeks`, `end of the week/month`, `Oct 3` / `3rd of October`)* |
+| `clear the due date` / `remove the due date from the {task} task` | `update_task` (due date cleared) → Task Agent | ✅ rule *(2026-09-27)* |
+| `link it to 12 Oak St` / `link the {task} task to the Elm House property` / `set the property of the {task} task to Elm House` | `update_task` (property) → Task Agent | ✅ rule *(2026-09-27)* |
+| `remove the property from the task` / `unlink it from the property` | `update_task` (property cleared) → Task Agent | ✅ rule *(2026-09-27 — unlinking a task is Maple's; unlinking a contact from a property is still done in the app, §9)* |
 
 ## 7.6.1 Notes on an existing task (append by default)
 
@@ -1196,7 +1229,8 @@ Either step can be entered directly: `description` on its own selects the field 
 |---|---|---|
 | `update the task` → *"What would you like to update…?"* → `description` → *"What would you like me to add…?"* → `{text}` | `update_task` field-then-value → Task Agent | ✅ rule *(2026-07-25)* |
 | `add to the description` → *"What would you like me to add…?"* → `{text}` | `update_task` (notes append) → Task Agent | ⚠️ only as a reply to the field question *(2026-09-27 review)* |
-| bare `title` / `due date` / `status` / `assignee` → value | `update_task` field-then-value → Task Agent | ✅ rule *(status resolves per-company names; assignee takes an email or "me"; due date takes ISO / tomorrow / a weekday)* |
+| bare `title` / `due date` / `status` / `assignee` → value | `update_task` field-then-value → Task Agent | ✅ rule *(status resolves per-company names; assignee takes an email, "me" or a teammate's name; due date takes any §7.6 date phrase, and an unreadable one asks again)* |
+| `assign it` / `change the assignee` / `change the status` / `move it` / `set a due date` / `reschedule it` → the value | `update_task` → Task Agent asks for that one value | ✅ rule *(2026-09-27 — no "what would you like to update?" first; #692)* |
 
 ## 7.7 Status changes
 
@@ -1208,16 +1242,19 @@ Either step can be entered directly: `description` on its own selects the field 
 | `mark the {task} task as done` | `update_task` (status) → Task Agent | ✅ rule |
 | `move the {task} task to In Progress` | `update_task` (status) → Task Agent | ✅ rule |
 | `set the status of the {task} task to {status}` | `update_task` (status) → Task Agent | ✅ rule *(unknown names get a clarification listing the company's statuses; done/complete/finished + in-progress/started + to-do/open synonyms map to the default names when present)* |
+| `I finished it` / `it's done` / `complete the {task} task` / `start it` / `reopen it` | `update_task` (status) → Task Agent | ✅ rule *(2026-09-27 — "reopen" moves it back to the company's first status)* |
 
 ## 7.8 Assignee operations
 
-Assignees are plain emails (`assigned_to_email`); parity with the REST API — no team-membership validation.
+Assignees are stored as emails (`assigned_to_email`); an email is taken as given (parity with the REST API — no team-membership validation), and since 2026-09-27 a teammate can be named by first, last or full name.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
 | `assign this to {email}` (active task) | `update_task` (assign) → Task Agent | ✅ rule with a task anchor *(2026-09-27 review)* |
 | `assign the {task} task to me` | `update_task` (assign, current user) → Task Agent | ✅ rule |
 | `assign the {task} task to {email}` / `reassign …` | `update_task` (assign) → Task Agent | ✅ rule |
+| `give it to Jordan` / `hand the {task} task over to Ana` / `assign it to Jordan` | `update_task` (assign by teammate name) → Task Agent | ✅ rule *(2026-09-27 — two teammates with that name get a question listing both)* |
+| `unassign it` / `assign the {task} task to nobody` / `remove the assignee` | `update_task` (assignee cleared) → Task Agent | ✅ rule *(2026-09-27)* |
 | `who is the {task} task assigned to?` | `get_task` → Task Agent | ⚠️ gap *(details view already shows Assigned to; the who-question routing is unwired)* |
 
 ## 7.9 Archive / unarchive
@@ -1257,7 +1294,7 @@ Resolver: `agents/task/resolver.py::find_task_from_context_or_message` — order
 | By property | `the task at {property}` | ✅ |
 | Anaphora (active task) | `mark it as done` / `convert it` / `rename it to {new}` | ✅ agent-side *(pronoun-only messages route via the LLM tier + active-task context. 2026-07-30 — two routing bugs used to steal these: a stale `active_estimate_code` from earlier in the session out-ranked the just-created task, and a Capitalized new value was mined as a person name and sent to Contact. The anchor is now chosen by recency (`active_entity_domain`), and a pronoun-targeted edit's payload is never read as a domain signal.)* |
 | Anaphora (bare determiner) | `mark the task as done` / `assign my task to {email}` / `archive the task` / `rename the task to {new}` | ✅ agent-side *(2026-07-25 — "the/my task" with no name in between is anaphora: the target hint collapses to empty and resolution goes through the active-task context. Previously the stray determiner leaked into the title matcher and could hit ANY title containing "the".)* |
-| Ambiguity → confirmation | two similar titles → numbered clarification, reply `1` / title / `no` | ✅ |
+| Ambiguity → confirmation | two similar titles → numbered clarification, reply `1` / `the second one` / `T0004` / words from one title (`the paint one`) / `no` | ✅ *(2026-09-27 — the readable id and title words; the question gate reads a reply naming a choice as the answer, #692)* |
 
 ## 7.12 Task refusals — 🛑
 
@@ -1275,14 +1312,13 @@ Resolver: `agents/task/resolver.py::find_task_from_context_or_message` — order
 Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-support.md)). Remaining ⚠️ rows, confirmed against both tiers where noted:
 
 - **Bare-title references** (possessive §7.3, verbless, set-possessive §7.6) — no "task" keyword to anchor on; both tiers fail (2026-07-22 Tier-2 run). Same gap class as materials/contacts pre-Phase-2b; a catalog-backed title lookup would close it.
-- **Status-name list filter** — `tasks in progress`, `how many open tasks?`.
-- **Due-date window list filter** — `tasks due this week`.
-- **Property filter on list** — `what tasks are at {property}?` routes (LLM tier) but the agent lists all tasks; wire a property filter like the assignee one.
-- **Informal create cues** — `jot down…`, `I need to remember to…` (LLM-tier candidates, unverified).
+- **Informal create cue** — `I need to remember to…` (LLM tier, unverified). `jot down…`, `remind me to…` and the to-do list forms are rule-tier since 2026-09-27.
 - **`who is the {task} task assigned to?`** — unwired; details view covers the need.
 - **`add a task to the estimate`** — routes to the Task Agent (estimate work items are never called "tasks" in code or docs); when the message names an estimate, Maple should offer redirection to the work-item flow ("Did you mean a work item on the estimate?"). Not yet implemented.
 
-**Open gaps:** #672, #675, #676, #683, #687, #692, and older #442, #447, #470 (see [code-review-followups.md](code-review-followups.md)).
+Task details (2026-09-27) also show the linked property, the estimate it was converted into, and how many photos and videos it has.
+
+**Open gaps:** #683, and older #442, #447, #470 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676 and #692 were resolved 2026-09-27; #687's task half is done.
 
 ---
 
@@ -1419,6 +1455,30 @@ Mirrors the portal's `isEditableStatus`: estimate contents are editable **only i
 | Archived | `unarchive {EST}` | ✅ allowed via the status-transition path (Owner/Admin or creator, §9.6) |
 
 Legacy/unknown stored statuses fail open so old data isn't stranded. The HTTP PUT route enforces the same Draft/Review content lock (`estimate_status_allows_content_edit`, `models/estimate.py`).
+
+## 9.8 Done in the app, not in chat — 🛑 redirected *(2026-09-27)*
+
+Requests Maple doesn't do from chat are refused with where to do them, in the user guide's words (`agents/conversation/out_of_chat.py`, #697). The orchestrator checks the table with its other policy refusals on the command head, so a refusal ends the turn — and a refusal is final: the router never sends it on to an agent afterwards. These used to misroute ("add a division called Snow Removal" became a contact action, "upgrade my plan" a material lookup, "create a document for E0042" a new estimate).
+
+| Phrasing | Redirected to | Status |
+|---|---|---|
+| `set the default markup to 20%` / `change our company tax rate` / `what's the material markup?` | Settings → Financial tab (Owners and Admins); work-item markup/overhead/tax stay Maple's (§1.5.7) | 🛑 redirect |
+| `invite Sam to the team` / `add a new team member` / `remove a user` | Settings → Team Members tab | 🛑 redirect |
+| `upgrade my plan` / `how many Maple credits do I have left?` / `change my credit card` / `show my invoices` | Settings → Billing tab | 🛑 redirect |
+| `load the standard materials` / `reload standard people` | Load Standard in the Materials or People page's actions menu, or the matching Settings tab | 🛑 redirect |
+| `import contacts from a CSV` / `upload a spreadsheet of materials` | the CSV upload on the Properties, Contacts or Materials page | 🛑 redirect |
+| `add a unit called pallet` / `rename the unit bag` | Settings → Materials Unit tab (categories: §9.3) | 🛑 redirect |
+| `add a division called Snow Removal` | Settings → Divisions tab; setting a work item's division stays Maple's (§1.5.2) | 🛑 redirect |
+| `unlink Carla Diaz from 12 Oak St` / `detach the contact` | the property or contact in the app; unlinking a task's property is Maple's (§7.6) | 🛑 redirect |
+| `duplicate the patio estimate` / `clone this material` / `make a copy of …` | Duplicate in the row's menu on the Estimates, Materials or People page | 🛑 redirect |
+| `generate the document for E0042` / `export a PDF` / `create a Google Doc` | the estimate's Documents button | 🛑 redirect *(user decision 2026-09-27: no document generation from chat)* |
+| `add a photo to the task` / `upload a video` | Photo or Video on the task in the app | 🛑 redirect |
+
+Detectors are narrow on purpose — a false positive refuses something Maple can do: "delete the duplicate contact" is a delete, "set the markup on work item 1 to 20%" is Maple's. Tests: `tests/test_out_of_chat_redirects.py`, `tests/test_maple_refusal_is_final.py`.
+
+## 9.9 Deletes — a plain yes, from someone allowed to *(2026-09-27)*
+
+Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A request about a record's notes or links ("delete the note on Bob", "remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8) or handled as a note.
 
 ---
 
@@ -1628,7 +1688,54 @@ Routing is part of the fix: a positional follow-up names no domain, so the rule 
 | ordinal inside content — `put on the first coat of paint`, `add 2x4 lumber first`, `the second coat needs to dry` | not a pick; reaches free-text resolution unchanged | ✅ rule *(2026-07-30)* |
 | **estimate line-item numbering** — `delete work item #2`, `show work item 2`, `remove line item #1` | NOT a row pick — these keep targeting the estimate the user has open (§1.5) | ✅ rule *(2026-07-30 — caught in review: `#2` is how a line item AND a listed row are named, so with an estimate list on screen a work-item op silently retargeted a different estimate. `resolve_listed_reference` now stands down whenever the message names a work item / job item / scope / line item.)* |
 
-**Known limits:** the word table stops at `tenth` (`the eleventh one` is not a pick — marked digits cover the rest); the record survives until the next list, so a positional reference many turns later still resolves against that list; and a row deleted between turns re-asks rather than guessing. Tests: `tests/test_maple_listed_positional_reference.py` (per-resource round trips + orchestrator routing + estimate code resolution), `tests/test_text_utils.py::TestMatchPositionalReference` / `::TestListedItemsContext`.
+**Known limits:** the word table stops at `tenth` (`the eleventh one` is not a pick — marked digits cover the rest); and a row deleted between turns re-asks rather than guessing. *(2026-09-27: a list is current only while nothing but its own rows has taken focus since — "list my contacts" → open an estimate → "change the email of the second one" now asks "which one?" instead of editing the old list's second contact; #677.)* Tests: `tests/test_maple_listed_positional_reference.py` (per-resource round trips + orchestrator routing + estimate code resolution), `tests/test_text_utils.py::TestMatchPositionalReference` / `::TestListedItemsContext`.
+
+## 10.6 One question at a time *(2026-09-27)*
+
+Every question Maple asks — a yes/no, a numbered menu, a value ("What's the new city?"), a multi-step flow — goes through one gate (`routers/agent_helpers/open_question.py::decide_turn`). The next message either **answers** the newest open question, **cancels** ("never mind", "cancel", "forget it"), or is a **new request** — and then every open question is dropped before the message is classified. A question lives one turn. Before, a delete question survived turns that didn't answer it and a later "ok thanks" confirmed it (#671, #675), and an awaited field value captured every later message (#676).
+
+| Turn 2, after a question | Behavior | Status |
+|---|---|---|
+| the answer (`yes`, `2`, `T0004`, `Cambridge`) | the question's owner applies it | ✅ rule |
+| `never mind` / `cancel` | "No problem — …", every question dropped | ✅ rule |
+| a new request (`list my properties`, `show me E0042`, `how do I add a property?`) | the question is dropped and the request runs | ✅ rule |
+| a note or description asked for, and the reply reads like a command | stored as the text — only a cancel backs out | ✅ rule |
+| a delete question left open beside another question | set aside, so a stray "yes" can't confirm it | ✅ rule |
+| a question asked under another company | dropped unread | ✅ rule |
+
+## 10.7 The record in focus *(2026-09-27)*
+
+Each `active_<domain>_id` anchor records the turn it was set on. An anchor set this turn or last — or the record the portal page is showing — is fresh, and "it" acts on it. An edit that would reach an older anchor only through "it" or no name at all asks first: *"Just to check — do you mean Ana Reyes?"* (#677, `agents/conversation/focus.py`). Deletes (their confirmation names the record already) and notes (they overwrite nothing) don't ask. Pronouns pick the domain before recency does: "him"/"her" mean the contact, "there" the property. A record the message names always beats the one in focus ("show me contact Bob Lee" with Ana in focus shows Bob).
+
+## 10.8 "What about X?" *(2026-09-27)*
+
+Maple remembers the last **read** — its message and the records it was about — and rewrites an elliptical follow-up into that request with the new target (`agents/conversation/followup.py`). A write is never replayed: "what about Bob?" after changing Ana's phone does not change Bob's.
+
+| Turn 1 → turn 2 | Behavior | Status |
+|---|---|---|
+| `who lives at 12 Oak St?` → `and 9 Maple Ave?` | the same question for 9 Maple Ave | ✅ rule |
+| `show me contact Bob Lee` → `what about Ana Reyes?` | Ana's details | ✅ rule |
+| `what's my pipeline this month?` → `and last month?` | the same question for last month | ✅ rule |
+| `change Bob Lee's phone to …` → `what about Carla Diaz?` | not replayed — Carla's phone is left alone | ✅ rule |
+| `… ` → `and then delete it` | a new request, not a new target | ✅ rule |
+
+## 10.9 "Show more" *(2026-09-27)*
+
+A list that stops short of the whole result says how far it got and remembers where it stopped (`agents/conversation/paging.py`). On the next turn, `show more` / `more` / `next page` / `the rest` / `keep going` replays the same request — filters included — from there. Good for one turn; with no longer list open, Maple says so. Tasks page this way today (§7.5); other lists can adopt the same helper.
+
+## 10.10 Conversation turns *(2026-09-27)*
+
+Turns about the conversation itself are answered after the question gate has had its chance — an open question gets its "yes" first (`agents/conversation/meta.py`). These used to fall through to "I'm not quite sure what you mean" or a material lookup ("go ahead", "never mind" → `get_material`).
+
+| Phrasing (no question open) | Reply | Status |
+|---|---|---|
+| `thanks` / `ok thanks` / `great` / `perfect` / `that's all` | "You're welcome — anything else I can help with?" | ✅ rule |
+| `cancel` / `never mind` / `stop` | "There's nothing to cancel right now — …" | ✅ rule |
+| a stray `yes` / `no` / `go ahead` | "I'm not waiting on an answer right now — …" | ✅ rule |
+| `repeat that` / `say that again` | Maple's last reply again | ✅ rule |
+| `start over` / `reset` / `clear the chat` | points to the clear button; drops anything Maple was waiting on | ✅ rule |
+
+**Language** (2026-09-27): the conversation keeps the language the user is writing in. A short reply ("sí", "2", "Cambridge") is answered in that language rather than re-detected from two characters, and a language-neutral message (a code, a number) never switches it (`services/translation.py::conversation_language`).
 
 ---
 
