@@ -1925,12 +1925,14 @@ bring back copying.
 
 **Update 2026-09-27:** two tiers drop the number. The strict tier `TITLE_PRE_NOUN_RE` (`title_reference.py:71-74`) needs a capitalized first word, so "4 Elm St" can't open a title; and a listed rename resolves through `_match_estimates_by_title`, whose rung 3 is a raw substring (`:354-355`) — "4 elm st" ⊂ "14 elm st front walk". Four-part fix: (1) the strict pre-noun pattern allows `\d+[A-Za-z]?\s+` before the capitalized word; (2) the loose pre/post extractors keep a number when a non-stop word follows it; (3) rung 3 gets digit guards, `(?<!\d)…(?!\d)`; (4) `_names_whole` then needs no change once the candidate carries the number. Fix #334 in the same change.
 
-### 674. [HIGH] Catalog delete confirmation is a substring test, so "delete it" deletes at once
+### 674. ~~[HIGH] Catalog delete confirmation is a substring test, so "delete it" deletes at once~~ — RESOLVED 2026-09-27
 `platform/agents/property/text_helpers.py:100` — `_is_confirm_text` is true when the message *contains* "confirm", "yes", "yep", "proceed", "delete it" or "do it" (twins: `contact/text_helpers.py:86`, `labour/text_helpers.py:91`, `material/text_helpers.py:139`, `equipment/text_helpers.py:68`). It is OR'd into `confirm_delete` on the first delete turn (`property/service.py:1394, :2025`; `contact/service.py:958, :1447`; `labour/service.py:1090`; `material/service.py:1497, :2307`), so "delete it" and "delete item 3" delete without asking, "no, don't delete it" confirms, and a name containing "yes" — "Yesler", "Yesenia", "Reyes" — confirms too. A property delete is hard and cascades its notes (`property/service.py:490-513`). HIGH: an irreversible delete nobody confirmed, from ordinary phrasings.
 
 **Suggested fix:** Delete the helper. The first delete request always asks, even with a clearly named target (design §2.4), and a confirmation is accepted only through the question registry (design §5.1) with a normalized yes/no — never a substring.
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (platform `3526a08`): the five `_is_confirm_text` helpers are gone. A delete runs only when a confirmation is pending and the reply is a plain yes (`agents/conversation/delete_confirmation.py`, reading replies through `agents/conversation/replies.py`); a no, a cancel or "don't" clears it. Pinned by `tests/test_conversation_replies.py` and the corpus rows `safety-delete-it-asks-first`, `safety-dont-delete-is-a-no`, `safety-name-containing-yes-still-asks`.
 
 ### 675. [HIGH] Non-estimate delete confirmations never expire and can't be cancelled
 `platform/routers/agents.py:417` — the `pending_delete_{property,contact,material,labour,equipment,task,template}_id` keys are cleared only by a completed delete. "no" or "cancel" re-asks, and a bare "yes" any number of turns later is routed back to the owning agent by `_get_pending_fallback_match` (called at `agents.py:1462`) and deletes; "delete contact Yesenia" while a delete of Bob is pending deletes Bob. The confirm-time load is by bare id, not company-scoped (`Contact.get` at `contact/service.py:753`, `Template.get` at `template/service.py:365`), and `ConversationContext` is keyed by user id, so a pending delete survives a company change. HIGH: a stale question deletes a record the user has moved on from.
@@ -1938,6 +1940,8 @@ bring back copying.
 **Suggested fix:** Registry expiry and cancel (design §5.1: a question lives one turn; "cancel" or any new request drops it), and company-scoped loads at confirm time (design §4).
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Update 2026-09-27:** partly closed by #674 — "yes, delete contact Carla Diaz" is no longer a yes, so it asks about Carla instead of deleting the pending Bob (corpus row `safety-stale-delete-not-applied-to-new-target`), and a no/cancel now clears the pending delete. Expiry and the company check at confirm time remain (design §5.1).
 
 ### 676. [HIGH] An awaited field value captures every later message
 `platform/routers/agents.py:1341` — while a pending intent carries `awaiting_value_for`, the router overrides classification (`AWAITED_VALUE_CONFIDENCE = 0.95`, `agents.py:143`) and hands the message to that agent, which writes the raw text into the field (`property/service.py:1583`). The slot is removed only when `pending_override_applied` is set (`property/service.py:1903`, `contact/service.py:1362`), and on the awaited-value path it never releases: after "update 12 Oak St" → "city", every later message — "show me my properties" included — is written into the city. The task create-title prompt has the same shape: any reply that isn't a fresh command becomes the title (`task/create.py:274`). HIGH: silent wrong writes that continue until the slot is cleared.
