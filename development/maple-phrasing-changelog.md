@@ -69,6 +69,25 @@ platform `3526a08` … `67892ec`)
   "update the name of 12 Oak St to Oak House" renames it correctly. A
   greeting during estimate gathering and an estimate edit during "link a
   property?" are never taken as answers (#683, #687).
+- Materials, people and templates (§4, §5, §6; platform `00110ed` …
+  `948e255`): a material, role or template named without its kind ("the
+  Paver Patio template", "Topsoil's price", a bare "Black Mulch") is found;
+  "move Topsoil to the Bulk Materials category" works (#694); "list my
+  roles" lists every role and "Heavy Equipment Operator" is a role, not
+  equipment (#693); sizes of more than one word, and add / remove /
+  reprice / rename / list a size, by rule; "which size?" resumes the edit;
+  a new role or material is asked for one field at a time, and a material
+  for its cost, priced by the server from the markup; "find templates named
+  Paver" and "which templates have … in the name?" filter. Possessive looks
+  ("show me Bob Lee's details", "what's the phone number for Bob Lee?",
+  "update Bob Lee's record") reach the record — they routed but found no one.
+- Across records (§8; platform `634703f`, `695e0f8`): "which properties use
+  Black Mulch?", "which properties need a Foreman?", "what estimates use the
+  Foreman role?", "what materials does E0042 use?" and "which roles are on
+  E0042?" read the estimates' work items — they queried fields `Estimate`
+  doesn't have and were always empty (#682). "which estimates use Black
+  Mulch?" / "find estimates with …" and "show me jobs needing a Foreman"
+  filter instead of listing everything; the replies say it in plain words.
 
 **2026-09-26 — routing convergence: rounds 12–24**
 

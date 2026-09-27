@@ -38,7 +38,17 @@ Headlines, 2026-09-27 (multi-turn everywhere — design
   promoted to grammar entries (§1.0).
 - **Contacts, properties, notes** (§2, §3, §3.9) — notes added, read back and
   deleted; guide-worded links; creates that ask for what's missing; follow-up
-  fields; "which contact?" menus; city and role filters.
+  fields; "which contact?" menus; city and role filters; possessive looks
+  ("show me Bob Lee's details", "what's Elm House's city?").
+- **Materials, people, templates** (§4, §5, §6) — records found however
+  they're named ("the Paver Patio template", "Topsoil's price", a bare
+  "Black Mulch"); sizes of more than one word, and add / remove / reprice /
+  rename / list a size; category moves; a new role or material asked for one
+  field at a time; "list my roles" and the Heavy Equipment Operator role;
+  templates filtered by name.
+- **Across records** (§8) — "which properties use Black Mulch?", "which
+  estimates use the Foreman role?", "what materials does E0042 use?" read the
+  estimates' work items and answer (they were always empty, #682).
 
 Headlines, 2026-09-24 → 2026-09-26:
 
@@ -193,8 +203,8 @@ a note to a material or role. **Refused by the planner:** labor burden
 | `what is the total value of the open estimates`      | aggregated `sum(grand_total)` across DRAFT/APPROVED/REVIEW/WON | ✅ rule *(closed in xfail-wave-3 Workstream C — `_AGGREGATE_VALUE_QUERY_PATTERN` + `_OPEN_ESTIMATE_QUERY_PATTERN` short-circuit `_handle_list_estimates` to a single dollar figure)*                                                                                 |
 | `show me draft estimates from last week`             | `list_estimates` with `created_at` window                      | ✅ rule *(closed in xfail-wave-3 Workstream C — `_parse_estimate_date_filter` adds a `$gte/$lte` constraint on `created_at`)*                                                                                                                                        |
 | `approved quotes over $10k`                          | `list_estimates` with status + `grand_total` range             | ✅ rule *(closed in xfail-wave-3 Workstream C — verbless plural-domain inference + `_parse_estimate_amount_filter` adds a `$gt`/`$lt` constraint on `grand_total`; `k`/`m` suffixes supported)*                                                                      |
-| `what materials does {EST} use?`                     | `list_materials` filtered to one estimate's snapshot           | ✅ rule *(closed in xfail-wave-3 Workstream C — orchestrator routes via `_CROSS_RESOURCE_QUERY_PATTERNS` with `filter_by={type=estimate, name=E0042}`; Material agent's `_handle_list_materials_for_estimate` resolves and projects the embedded `materials` array)* |
-| `what roles are on {EST}?`                           | `list_labours` filtered to one estimate's snapshot             | ✅ rule *(closed in xfail-wave-3 Workstream C — symmetric Labour-agent drilldown via `_handle_list_labours_for_estimate`)*                                                                                                                                           |
+| `what materials does {EST} use?`                     | `list_materials` filtered to one estimate's snapshot           | ✅ rule *(routes via `_CROSS_RESOURCE_QUERY_PATTERNS` with `filter_by={type=estimate, name=E0042}`; since 2026-09-27 (#682) it reads the materials of every work item — it read a top-level list `Estimate` doesn't have and always said "doesn't list any materials yet")* |
+| `what roles are on {EST}?` / `which roles are on {EST}?` | `list_labours` filtered to one estimate's snapshot             | ✅ rule *(symmetric Labour-agent drilldown; since 2026-09-27 (#682) it reads the activities' and labour lines' roles in every work item, and "which roles …" is delegated — it showed "Intent identified: …")* |
 | `how many estimates did I win this month?`           | `list_estimates` with status=WON + date filter                 | ✅ rule *(May expansion — "win" added as a verb-form alias for EstimateStatus.WON in `_estimate_status_from_text`)*                                                                                                                                                  |
 | `show only estimates with Won status this month`     | `list_estimates` with status=WON + date filter                 | ✅ rule *(status + date qualifiers already compose; no new code needed)*                                                                                                                                                                                              |
 | `show me all estimates older than 60 days`           | `list_estimates` with `updated_at <= cutoff`                   | ✅ rule *(`_AGE_FILTER_PATTERN` + age branch in `_parse_estimate_date_filter` returns `(None, cutoff)`; field is `updated_at` as of the 2026-06-02 expansion)*                                                                                                       |
@@ -739,7 +749,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** #682, #683, #689, #696, and older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659, #663, #668, #670 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #664, #665, #666, #671, #673, #677, #684, #685, #686, #691, #697, #334, #436; #687's estimate and task halves are done.
+**Open gaps:** #683, #689, #696, and older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659, #663, #668, #670 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #664, #665, #666, #671, #673, #677, #682, #684, #685, #686, #687, #691, #697, #334, #436.
 
 # 2. Properties
 
@@ -765,8 +775,10 @@ Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
 | `show me {property}'s details` | `get_property` → Property Agent | ✅ rule |
-| `what's {property}'s city?` | `get_property` → Property Agent | ✅ rule |
-| `update {property}'s record` | `update_property` → Property Agent | ✅ rule |
+| `what's {property}'s city?` / `what's the city of {property}?` | `get_property` → Property Agent | ✅ rule |
+| `update {property}'s record` → *"which fields?"* → `city` → the value | `update_property` → Property Agent | ✅ rule |
+
+These routed but reached no record until 2026-09-27: the agent couldn't read a name followed by "'s". The router now rewrites a possessive or "the <field> of <name>" look — for a property, contact, material, role or template whose exact name it is, and only one kind — into the form its agent reads (`agents/conversation/catalog_names.py::_record_reference`). A name that is nobody's is left alone, and "{name}'s estimates" / "{name}'s notes" are other questions (§8, §3.9).
 
 ## 2.4 Count (all ✅ rule)
 
@@ -824,7 +836,7 @@ Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8
 
 **Notes, links and follow-ups** for properties and contacts are in §3.9.
 
-**Open gaps:** #682, and older #49, #101, #322 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #683, #687, #697.
+**Open gaps:** older #49, #101, #322 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #697.
 
 ---
 
@@ -845,8 +857,10 @@ Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8
 | Phrasing | Status |
 |---|---|
 | `show me {contact}'s details` | ✅ rule |
-| `what's {contact}'s phone?` | ✅ rule |
-| `update {contact}'s record` | ✅ rule |
+| `what's {contact}'s phone?` / `what's the phone number for {contact}?` / `what's Bob's email?` (first name) | ✅ rule |
+| `update {contact}'s record` → *"which fields?"* → `phone` → the number | ✅ rule |
+
+Routed, but found no one until 2026-09-27 — see §2.3.
 
 ## 3.4 Count (all ✅ rule)
 
@@ -895,7 +909,7 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `link Zed Quill to 12 Oak St` (no such contact) | "I couldn't find a contact or a property called Zed Quill." | ✅ rule |
 | `remove Ana Reyes from 12 Oak St` / `unlink …` | done in the app — §9.8 | 🛑 redirect |
 
-**Open gaps:** #690 (LLM tier), #682 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #683, #687.
+**Open gaps:** #690 (LLM tier) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687.
 
 ---
 
@@ -915,7 +929,7 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | -------------------------------- | -------------------------- | ------ |
 | `show me {material}'s details`   | `get_material`             | ✅ rule |
 | `what's {material}'s price?`     | `get_material` field focus | ✅ rule |
-| `update {material}'s record`     | `update_material`          | ✅ rule |
+| `update {material}'s record`     | `update_material` — asks which field | ✅ rule |
 
 ## 4.4 Count
 
@@ -939,6 +953,10 @@ The "different" / "types of" modifiers don't change the routing — `how many` a
 | `change the price of {material} to $5` | ✅ rule |
 | `update the price on {material} to $5` | ✅ rule |
 | `set {material}'s price to $5` | ✅ rule |
+| `change the cost of Topsoil to 20` / `update Topsoil's price to 45` (no "material") | ✅ rule *(2026-09-27 — a material, role or template named exactly is rewritten kind-first, `catalog_names.py`)* |
+| `move Topsoil to the Bulk Materials category` | ✅ rule *(2026-09-27, #694 — the category name is resolved to its id, never created; it failed every time)* |
+| `rename it to Screened Topsoil` (material in focus) | ✅ rule |
+| `show me the Black Mulch material` / `show me Black Mulch` | ✅ rule *(it listed every material, or looked for a contact)* |
 
 Closed by Phase 2 of xfail-wave-1 — `_match_possessive_or_field_targeted` resolves the missing material domain via `FIELD_TO_DOMAIN["price"] → material` plus the material-shape residual on the captured entity name.
 
@@ -946,24 +964,24 @@ Closed by Phase 2 of xfail-wave-1 — `_match_possessive_or_field_targeted` reso
 
 `{material}` · `I want the details for {material}` · `tell me about {material}`
 
-## 4.8 Size-scoped operations *(shipped in Phase B)*
+## 4.8 Size-scoped operations *(shipped in Phase B; any size since 2026-09-27)*
 
-⚠️ **One-word sizes only** (2026-09-27 review): the size-scoped rules recognize a single-token size (`12x12`); a size of more than one word isn't recognized.
-
-All size-scoped phrasings require an explicit `size <X>` token to fire. Material Agent's `_build_sizes_from_fields` handles the payload; `_handle_update_material` enforces the last-size refusal and add-size missing-field refusal.
+A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft bag`, `1 cubic yard`, `2x4`) or one word (`large`). Parsed by `agents/material/size_commands.py` (2026-09-27 — a size of more than one word was never recognised) and applied through the ordinary update path, so its guards hold.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `find material {material} with size {size}` | `get_material` (size-scoped) | ⚠️ one-word sizes only |
-| `how much is {material} with size {size}?` | `get_material` (size-scoped) | ⚠️ one-word sizes only |
-| `update the cost for {material} with size {size} to $5` | `update_material` (size-scoped cost) | ⚠️ one-word sizes only |
-| `update the price for {material} with size {size} to $5` | `update_material` (size-scoped price) | ⚠️ one-word sizes only |
-| `delete size {size} for {material}` | `update_material` (size_op=remove) | ⚠️ one-word sizes only |
-| `add size {size} to {material} with cost $8 and unit each` | `update_material` (append) | ⚠️ one-word sizes only |
+| `add size {size} to {material} with cost $8 and unit Bag` / `add a 3 cu ft bag size to {material} at $6` / `… at cost 200 per cu yd` | `update_material` (append) | ✅ rule |
+| `delete size {size} for {material}` / `remove the {size} size from {material}` | `update_material` (remove) | ✅ rule |
+| `update the price for {material} with size {size} to $5` / `change the cost of the {size} size of {material} to 4.50` | `update_material` (one size) | ✅ rule |
+| `rename size {size} of {material} to 1 cubic yard` | `update_material` (rename) | ✅ rule |
+| `how much is {material} in the {size} size?` / `find material {material} with size {size}` | `get_material` — that size's price and cost | ✅ rule |
+| `show all sizes for {material}` / `what sizes does {material} come in?` | `get_material` — *"Black Mulch comes in 2 sizes: 2 cu ft at 4.40, 1 yd at 38.50."* | ✅ rule |
+| `change its price to 5` on a material with several sizes → *"which size?"* → `2 cu ft` | the change, on that size | ✅ rule *(2026-09-27 — the answer didn't resume the edit)* |
 
 **Invariants:**
 - **Last-size delete refusal** — cannot remove the only remaining size on a material. Copy: *"I can't remove the last size from this material — it needs at least one size. Add another size first, or delete the material entirely if that's what you mean."*
-- **Add-size requires BOTH cost and unit** — `add size {size} to {material} with cost $8` (no unit) refuses and prompts for the unit. Same if cost is missing.
+- **Add-size requires BOTH cost and unit** — `add size {size} to {material} with cost $8` (no unit) refuses and prompts for the unit. Same if cost is missing. A unit is resolved to one of the company's units; a name it doesn't have is answered, never created (#681).
+- A message that names an estimate or work item is never a size command — those have their own grammar (§1.5.5).
 
 ## 4.9 Material gaps
 
@@ -972,7 +990,7 @@ All size-scoped phrasings require an explicit `size <X>` token to fire. Material
 | `How much does {material} cost?` | `get_material` field focus | ✅ rule *(closed in xfail-wave-3 Workstream B — non-possessive cost-query rule in orchestrator)* |
 | `list materials under $10` | `list_materials` with price range | ✅ rule *(closed in xfail-wave-3 Workstream B — `_parse_price_range_filter` in `agents/material/text_helpers.py` filters the list response by `under/over/below/above $N`)* |
 | `rename size {old} to {new} for {material}` | `update_material` (size_op=rename) | ✅ rule *(closed in xfail-wave-3 Workstream B — orchestrator `_match_size_scoped_material_op` rule routes the rename verb)* |
-| `show all sizes for {material}` | `get_material` | 🤖 LLM |
+| `show all sizes for {material}` | `get_material` — lists every size | ✅ rule *(2026-09-27; see §4.8)* |
 | `how much does {size} of {material} cost?` | `get_material` (size-scoped) | ✅ rule *(May expansion — "of" form cost query pattern)* |
 | `what is the price of {size} of {material}?` | `get_material` (size-scoped) | ✅ rule *(May expansion)* |
 | `what category is material {material}?` | `get_material` (category focus) | ✅ rule *(May expansion — `_match_field_specific_query` before help classifier)* |
@@ -999,7 +1017,20 @@ generic-word guard drops a non-qualifier capture.
 
 **Disambiguation:** `material units` / `material categories` / `material types` are NOT treated as "{X} materials" lists — a negative lookahead on `_LIST_QUALIFIER_PATTERN` keeps those routing to their help/enum or category handlers.
 
-**Open gaps:** #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697, and older #495 (see [code-review-followups.md](code-review-followups.md)).
+## 4.11 Create, one question at a time *(2026-09-27)*
+
+A create that is missing details asks for the next one alone, remembers which, and reads a bare reply as its value (`agents/conversation/create_questions.py`, §10.6). It asked for everything at once ("To create a material, I'll need: category, unit, size, price.") and ignored "Bulk Materials". A material is asked for its **cost**: the server prices the size from the company's material markup (see the pricing model in CLAUDE.md), so a create that gives a cost and no price no longer asks for a price.
+
+| Turn | Maple | Status |
+|---|---|---|
+| `create a new material called River Rock` | *"Which category does River Rock go in? You have: Bulk Materials, Masonry, Soil."* | ✅ rule |
+| `Bulk Materials` | *"What unit is River Rock sold by? You have: Bag, Cubic Yard, Each."* | ✅ rule |
+| `Bag` | *"What size does River Rock come in? For example: 2 cu ft, or Standard."* | ✅ rule |
+| `2 cu ft` | *"What does River Rock cost you? I'll set the price from your material markup."* | ✅ rule |
+| `5` | created — cost 5.00, price 5.50 at a 10% markup | ✅ rule |
+| a category or unit the company doesn't have | says so and asks again, never creates one (#681) | ✅ rule |
+
+**Open gaps:** #690 (LLM tier), and older #495 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #678, #680, #681, #682, #683, #694, #697.
 
 ---
 
@@ -1009,23 +1040,21 @@ Labor = catalog of **role definitions** (Landscaper, Foreman, Operator). Individ
 
 ## 5.1 Direct imperatives (✅ rule except as noted)
 
-`create a new labour role` · `list all labour roles` · `delete the labour role {role}`
-
-⚠️ `list all labour roles` — filtered by "S"; see §5.2 (#693).
+`create a new labour role` · `list all labour roles` · `delete the labour role {role}` · `create a new role called {role}` · `delete the {role} role` · `list my roles`
 
 ## 5.2 Casual phrasings (✅ rule except as noted)
 
-`show me my labour roles` · `what labour roles do I have?` · `pull up labour role {role}`
+`show me my labour roles` · `what labour roles do I have?` · `pull up labour role {role}` · `show me the {role} role` · `what's the rate for {role}?`
 
-⚠️ gap (#693, corrected 2026-09-27): the Labour agent's name extractor reads a role name out of the list phrasing — "S" from `show me my labour roles` and `list all labour roles`, "S Do I Have" from `what labour roles do I have?` — so the list is filtered by it instead of showing every role.
+Fixed 2026-09-27 (#693): the name extractor read "S" out of `show me my labour roles` and `list all labour roles` ("S Do I Have" from `what labour roles do I have?`) and filtered the list by it.
 
 ## 5.3 Possessive
 
 | Phrasing | Status |
 |---|---|
-| `show me {role}'s details` | ✅ rule |
+| `show me {role}'s details` / `tell me {role}'s rate` | ✅ rule |
 | `what's {role}'s cost?` | ✅ rule |
-| `update {role}'s record` | ✅ rule |
+| `update {role}'s record` — asks which field | ✅ rule |
 
 ## 5.4 Count (all ✅ rule)
 
@@ -1042,6 +1071,8 @@ Labor = catalog of **role definitions** (Landscaper, Foreman, Operator). Individ
 | `change the cost of {role} to $50` | ✅ rule |
 | `update the cost on {role} to $50` | ✅ rule |
 | `set {role}'s cost to $50` | ✅ rule |
+| `change role {role}'s wage to 45` | ✅ rule *(2026-09-27)* |
+| `update role {role}` → *"which fields?"* → `wage` → `45` | ✅ rule *(2026-09-27 — it asked "which labor role?")* |
 
 ## 5.7 Verbless (all ✅ rule — DOMAIN_HINTS include role names)
 
@@ -1064,12 +1095,16 @@ Note: "labor burden" and "unbillable rate" are company-level settings, not per-r
 
 | Phrasing | What happens | Status |
 |---|---|---|
-| `list my roles` / `create a new role called {role}` | routes to `unknown` on the rules tier | ⚠️ gap |
-| anything about the "Heavy Equipment Operator" role | refused as equipment — the refusal matches the word "equipment" (#693) | ⚠️ gap |
+| `list my roles` / `create a new role called {role}` | lists every role / creates the role | ✅ rule *(2026-09-27 — both were unknown on the rules tier)* |
+| anything about the "Heavy Equipment Operator" role | read, created and edited as a role | ✅ rule *(2026-09-27, #693 — the equipment refusal matched the word "equipment"; an equipment operator is a person)* |
+
+## 5.10 Create, one question at a time *(2026-09-27)*
+
+As for materials (§4.11): `create a new role called Arborist` → *"What's the average wage for Arborist? For example: $30 an hour."* → `30` → *"Is Arborist paid hourly, daily or per job?"* → `hourly` → created. `add a labour role` asks *"What's the role called?"* first; `$30 an hour` answers the wage and the unit together. It said "To create a role, I'll need: unit, wage." and a bare "30" asked again. ✅ rule.
 
 Cross-resource phrasings (e.g. `which properties need a {role}?`) are tracked under §8.
 
-**Open gaps:** #674, #675, #676, #677, #678, #682, #683, #693 (see [code-review-followups.md](code-review-followups.md)).
+**Open gaps:** #690 (LLM tier) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #678, #682, #683, #693.
 
 ---
 
@@ -1100,8 +1135,8 @@ Template **creation** is refused — see §9.5. Users must create templates thro
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `show me {template}'s details` | `get_template` → Template Agent | 🤖 LLM |
-| `what's {template}'s description?` | `get_template` → Template Agent | 🤖 LLM |
+| `show me {template}'s details` | `get_template` → Template Agent | ✅ rule *(2026-09-27)* |
+| `what's {template}'s description?` / `what's the description of the {template} template?` | `get_template` → Template Agent | ✅ rule *(2026-09-27)* |
 
 ## 6.4 Count
 
@@ -1111,9 +1146,7 @@ All ✅ rule — routes to `list_templates` → Template Agent with count respon
 
 ## 6.5 Filter / find
 
-`find templates named Driveway` · `search for templates matching Driveway`
-
-Routing is ✅ rule (`list_templates` → Template Agent), but ⚠️ the name isn't applied: Maple lists every template (2026-09-27 review).
+`find templates named Driveway` · `search for templates matching Driveway` · `which templates have patio in the name?` — ✅ rule. The list is narrowed to templates whose name contains it (*"Here are your templates matching "Paver":"*), or says none match; `show me the first one` picks from it. *(2026-09-27 — every template was listed, and "which templates …" went to the user guide.)*
 
 Template **update** and **duplicate** are refused — see §9.5. Users must edit and copy templates through the portal UI.
 
@@ -1121,9 +1154,10 @@ Template **update** and **duplicate** are refused — see §9.5. Users must edit
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `{template}` (bare template name) | `get_template` → Template Agent | 🤖 LLM |
+| `{template}` (bare template name, written like a name) | `get_template` → Template Agent | ✅ rule *(2026-09-27)* |
+| `show me the {template} template` / `delete the {template} template` | `get_template` / `delete_template` | ✅ rule *(2026-09-27 — it asked "which template?")* |
 | `I want the details for {template}` | `get_template` → Template Agent | 🤖 LLM |
-| `tell me about {template}` | `get_template` → Template Agent | 🤖 LLM |
+| `tell me about {template}` / `tell me about the {template} template` | `get_template` → Template Agent | ✅ rule *(2026-09-27)* |
 
 ## 6.7 Apply template to estimate
 
@@ -1154,11 +1188,11 @@ When a **create-estimate** request names a template, `delegate_create_estimate` 
 
 ## 6.8 Template gaps
 
-Orchestrator routing, refusal guard, and Template Agent are implemented. Possessive (§6.3) and verbless (§6.6) phrasings are 🤖 LLM — they rely on the LLM classifier since template names lack a rule-tier entity-shape heuristic. Template creation, update, and duplicate are explicitly refused (§9.5).
+Orchestrator routing, refusal guard, and Template Agent are implemented. Possessive (§6.3) and most verbless (§6.6) phrasings are rule-tier since 2026-09-27: the router rewrites a template's exact name kind-first (`catalog_names.py`). Template creation, update, and duplicate are explicitly refused (§9.5).
 
 Additional cross-resource phrasings (e.g. `which templates include {material}?`) are future candidates — not tracked here yet.
 
-**Open gaps:** #675, #677, #681, #695; `find templates named X` (§6.5) has no follow-up yet (see [code-review-followups.md](code-review-followups.md)).
+**Open gaps:** #695 (portal) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681; `find templates named X` (§6.5).
 
 ---
 
@@ -1384,7 +1418,7 @@ Task details (2026-09-27) also show the linked property, the estimate it was con
 
 # 8. Cross-resource / implicit relationships
 
-Questions users ask when they think about the domain rather than the database. Routing is via `_match_cross_resource_query` in the orchestrator (Wave 2 Phase 1); the join is performed by the target agent reading a `filter_by` payload off `context` (Wave 2 Phase 2). Direct lookups (Property↔Contact) hit the linked-id list on the Property document. Transitive joins (material/labour → property, labour → estimate) are meant to go through estimate lines, which live at `job_items[].materials[].material` and `job_items[].activities[].role` — but the joins query `materials.material` / `labours.labour`, paths `Estimate` doesn't have, so they always come back empty (#682, found 2026-09-27; `agents/property/service.py:647, :663`, `agents/estimate/crud_handlers.py:1362`). The estimate list has no material filter at all.
+Questions users ask when they think about the domain rather than the database. Routing is via `_match_cross_resource_query` in the orchestrator (Wave 2 Phase 1); the join is performed by the target agent reading a `filter_by` payload off `context` (Wave 2 Phase 2). Direct lookups (Property↔Contact) hit the linked-id list on the Property document. Transitive joins (material/role → property, material/role → estimate, estimate → materials/roles) go through the estimates' lines, which live in their work items: `job_items[].materials[].material` and `job_items[].activities[].role` (plus legacy `job_items[].labours[].labour`). One filter and two readers in `agents/cross_resource.py` (`estimate_line_filter`, `estimate_material_names`, `estimate_role_names`) serve every join. Until 2026-09-27 (#682) the joins queried top-level `materials.material` / `labours.labour`, paths `Estimate` doesn't have, and always came back empty; the estimate list had no material filter.
 
 ## 8.1 Property ↔ Contact
 
@@ -1403,17 +1437,17 @@ Questions users ask when they think about the domain rather than the database. R
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `which properties use {material}?` | `list_properties` joined via estimates | ⚠️ routes ✅; the join is always empty (#682) |
-| `where is {material} used?` | `list_properties` joined via estimates | ⚠️ routes ✅; the join is always empty (#682) |
-| `find estimates with {material}` | `list_estimates` filtered by material | ⚠️ routes ✅ (plural-aware list flip); the estimate list applies no material filter (#682) |
+| `which properties use {material}?` | `list_properties` joined via estimates — *"Properties with an estimate that uses Black Mulch:"* / *"No property has an estimate that uses Topsoil."* | ✅ rule *(2026-09-27, #682)* |
+| `where is {material} used?` | `list_properties` joined via estimates | ✅ rule *(2026-09-27, #682)* |
+| `which estimates use {material}?` / `what estimates include {material}?` / `find estimates with {material}` | `list_estimates` filtered by material — *"Estimates that use Black Mulch:"* / *"None of your estimates use Topsoil."* | ✅ rule *(2026-09-27, #682 — `find estimates with …` listed every estimate; `with status sent` and other list filters are left to the list)* |
 
 ## 8.3 Labour → Property / Estimate
 
 | Phrasing | Intended behavior | Status |
 |---|---|---|
-| `which properties need a {role}?` | `list_properties` joined via estimates | ⚠️ routes ✅; the join is always empty (#682) |
-| `what estimates use the {role} role?` | `list_estimates` filtered by labour | ⚠️ routes ✅; the filter is always empty (#682) |
-| `show me jobs needing a {role}` | `list_properties` joined via estimates | ⚠️ routes ✅ (plural-aware list flip); the join is always empty (#682) |
+| `which properties need a {role}?` | `list_properties` joined via estimates | ✅ rule *(2026-09-27, #682)* |
+| `what estimates use the {role} role?` / `which estimates use {role}?` (no "role") | `list_estimates` filtered by role | ✅ rule *(2026-09-27, #682 — it was always empty, and the help pre-check showed "Intent identified: …" instead of delegating)* |
+| `show me jobs needing a {role}` / `list properties that need a {role}` | `list_properties` joined via estimates | ✅ rule *(2026-09-27, #682 — it listed every property)* |
 
 ---
 
@@ -1435,7 +1469,7 @@ Applies to all 4 CRUD resources. Maple-only policy — HTTP routers may still ex
 
 ## 9.2 Equipment — 🛑 refused
 
-Equipment isn't a Maple resource. A phrasing that says "equipment", "equipments" or "machinery" (Spanish "equipo(s)", "maquinaria") refuses with `EQUIPMENT_REFUSAL_MESSAGE` (`is_equipment_request`, `agents/text_utils.py:403`). Naming a machine — excavator, skid steer, bobcat — without one of those words does not trigger it, and the same word match also refuses the "Heavy Equipment Operator" role (#693).
+Equipment isn't a Maple resource. A phrasing that says "equipment", "equipments" or "machinery" (Spanish "equipo(s)", "maquinaria") refuses with `EQUIPMENT_REFUSAL_MESSAGE` (`is_equipment_request`, `agents/text_utils.py:403`). Naming a machine — excavator, skid steer, bobcat — without one of those words does not trigger it. "Equipment operator" is a role, not equipment: since 2026-09-27 (#693) the "Heavy Equipment Operator" role is read, created and edited, and only the rest of the message is checked.
 
 | Phrasing | Behavior |
 |---|---|
@@ -1763,6 +1797,8 @@ Every question Maple asks — a yes/no, a numbered menu, a value ("What's the ne
 | a delete question left open beside another question | set aside, so a stray "yes" can't confirm it | ✅ rule |
 | a question asked under another company | dropped unread | ✅ rule |
 
+**Creates ask one field at a time** (2026-09-27): a contact, property, role or material create that is missing details asks for the next one alone and takes a bare reply as its value — "Dan Park" for the name, "30" for a wage, "Bulk Materials" for a category (§3, §2, §5.10, §4.11).
+
 ## 10.7 The record in focus *(2026-09-27)*
 
 Each `active_<domain>_id` anchor records the turn it was set on. An anchor set this turn or last — or the record the portal page is showing — is fresh, and "it" acts on it. An edit that would reach an older anchor only through "it" or no name at all asks first: *"Just to check — do you mean Ana Reyes?"* (#677, `agents/conversation/focus.py`). Deletes (their confirmation names the record already) and notes (they overwrite nothing) don't ask. Pronouns pick the domain before recency does: "him"/"her" mean the contact, "there" the property. A record the message names always beats the one in focus ("show me contact Bob Lee" with Ana in focus shows Bob).
@@ -1778,6 +1814,8 @@ Maple remembers the last **read** — its message and the records it was about �
 | `what's my pipeline this month?` → `and last month?` | the same question for last month | ✅ rule |
 | `change Bob Lee's phone to …` → `what about Carla Diaz?` | not replayed — Carla's phone is left alone | ✅ rule |
 | `… ` → `and then delete it` | a new request, not a new target | ✅ rule |
+
+**A field said about the record just shown** (2026-09-27, the same module): right after a contact or property is created or shown, `his phone is 519-555-1234`, `her email is …`, `zip M4B 1B3` or a bare email or phone number is rewritten to `update {name}'s {field} to {value}` for that record (`rewrite_field_statement`; §2.6, §3.6). A post-create "link a …?" question doesn't claim them.
 
 **Refining the list just shown** (2026-09-27, the same module): after an
 estimate or task list, `just the drafts`, `which ones are on hold?`, `only the
