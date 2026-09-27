@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **611**. Never
+- **Entries are numbered and permanent.** Next free number: **674**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -103,31 +103,32 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 
 | Lines | File | Note |
 |------:|------|------|
-| 3,103 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py` |
-| 3,112 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a ~245-line god-method |
+| 3,304 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin |
+| 3,352 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net) — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py` |
 | 2,788 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | |
 | 2,567 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug |
 | 2,561 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
 | 2,375 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | |
-| 1,848 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927) |
-| 1,679 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; `update_estimate` is most of the file's weight (see below) |
-| 1,721 | [platform/routers/agents.py](../../platform/routers/agents.py) | |
+| 2,223 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam |
+| 1,644 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
+| 1,755 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`) |
 | 1,559 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | |
 | 1,544 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | |
 | 1,399 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | |
-| 1,397 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | |
-| 1,257 | [platform/agents/estimate/work_item_field_handlers.py](../../platform/agents/estimate/work_item_field_handlers.py) | handlers inside are 100-176 lines each |
-| 1,244 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
+| 1,475 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73) |
+| 973 | [platform/agents/estimate/work_item_field_handlers.py](../../platform/agents/estimate/work_item_field_handlers.py) | −284 on 2026-09-24 as its handlers moved onto the edit executor |
+| 1,026 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation). **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py` |
+| 1,300 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
 | 1,234 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
 | 1,210 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below |
 | 1,195 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
 | 1,155 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | |
-| 1,154 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | |
-| 1,118 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | |
+| 1,193 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | |
+| 1,148 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | +48 over the 2026-09-24 review passes |
 | 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
 | 856 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
-| 812 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | |
+| 843 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
 lifecycle into `routers/invitations.py` (~400 lines, a clean seam, leaves
@@ -177,13 +178,35 @@ seams that already exist as separate classes.
 | 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
 | ~264 | `TourRunner` — portal/src/components/tours/TourManager.tsx:83 |
-| ~245 | `OrchestratorAgent.process()` — agents/orchestrator/service.py (god-method) |
+| 282 | `OrchestratorAgent.process()` — agents/orchestrator/service.py:1883 (god-method; +19 on 2026-09-24 — move the two new early exits into one `_match_estimate_conversation_lane()`, review #67) |
 | 196 | `handle_pending_optional_follow_up` — routers/agent_helpers/optional_follow_up.py:462 (down from ~281 by #326; #326 claimed this was already tracked here — it was not) |
 | 69 | `_delegate_synthetic` — routers/agent_helpers/optional_follow_up.py:393 (was 95; the 2026-09-22 review split `_envelope_confidence`, `_chain_next_follow_up` and `_propagate_result_extras` out of it. The remainder is ~22 lines of docstring, an early-return guard and one dict literal — no non-arbitrary seam left, so treat this row as recorded, not actionable) |
 | 64 | `get_optional_follow_up_spec` — routers/agent_helpers/optional_follow_up.py:216 (pre-existing; it is a single allowlist dict literal, so the length is data, not logic) |
 | 176 | `_handle_update_estimate_work_item_update_field` — agents/estimate/work_item_handlers.py:851 |
+| 396 | `EstimateAgent.process` — agents/estimate/service.py:821 (+13 on 2026-09-24, +14 on 2026-09-25 for the bulk-delete/equipment guard; move the CRUD short-circuit block into `_process_crud_intent(...)`, review #71) |
+| 182 | `delegate_get_estimate` — routers/agent_helpers/delegate_get_estimate.py:168 (+35 on 2026-09-24; one helper per rung plus `_render_estimate_summary`, review #62) |
+| 143 | `_run_edit_commands` — agents/estimate/edit_executor.py:209 (new 2026-09-24, +18 in the third review pass for the dry-run confirmation and the transient/bug error split, +7 in the fourth for the pin snapshot; extract `_persist_batch`, `_success_envelope` and the exception branches, review #57) |
+| 114 | `run_update_estimate` — routers/agent_helpers/estimate_update.py:163 (+44 on 2026-09-24; extract `_dispatch_to_planner` and `_build_dispatch_context`, review #63) |
+| 123 | `_dispatch_confirmed_intent` — routers/agent_helpers/fuzzy_confirmation.py:65 (+25 on 2026-09-24, +30 on 2026-09-25 for the delete permission check and audit — move that branch into `_confirm_delete(...)`; a `sub_op` → handler dict, review #64) |
+| 91 | `_resolve_estimate_code_or_title` — agents/estimate/crud_handlers.py:1948 (+21 on 2026-09-24; move the forced-code, open-work-item and offer steps into helpers, review #69) |
+| 87 | `finalize_orchestrate_result` — routers/agent_helpers/finalize_result.py:173 |
+| 85 | `_handle_query_work_item_field` — agents/estimate/work_item_field_handlers.py:889 (+24 on 2026-09-24; extract `_describe_work_item_field`, review #65) |
+| 80 | `_classify_via_action_domain` — agents/orchestrator/service.py:2682 (+16 on 2026-09-24; extract `_apply_note_add_target`, review #66) |
+| 66 | `build_edit_snapshot` — agents/estimate/edit_planner.py:66 (new 2026-09-24; extract `_snapshot_work_item`, `_active_entry`, `_chat_slice`, review #58) |
+| 62 | `find_estimate_from_context_or_message` — routers/agent_helpers/estimate_resolver.py:144 (+12 on 2026-09-24; extract `_from_named_or_listed`, review #70) |
+| 53 | `_update_estimate_anchor` — routers/agent_helpers/finalize_result.py:118 (new 2026-09-24; extract `_estimate_from_flat_result`, review #61) |
+| 66 | `_resolve_target` — agents/estimate/edit_executor.py:530 (new 2026-09-24; extract `_resolve_active`, review #59) |
+| 131 | `_handle_update_estimate_work_item_remove` — agents/estimate/work_item_handlers.py:749 (126 before 2026-09-24; next step: route the removal through the executor's `RemoveWorkItem`, which already confirms and persists — third pass #31) |
+| 68 | `_prepare_estimate_turn` — agents/estimate/work_item_context.py:452 (new 2026-09-24, +8 in the fourth pass for the cancel reply; one resume helper per pending op, e.g. `_resume_choice` / `_resume_value` — third pass #30) |
+| 51 | `_plan_and_apply_edits` — agents/estimate/edit_planner.py:236 (crossed 50 on 2026-09-25 with the material-cost refusal; extract the `unsupported_reason` dispatch into `_answer_unsupported(plan, ...)`) |
+| 51 | `_confirm_division_guess` — agents/estimate/edit_executor.py:426 (new 2026-09-24, crossed 50 in the fourth pass naming removals from the loaded list; extract `_removal_labels(target, commands, pins)`) |
+| 51 | `_match_work_items` — agents/estimate/work_item_handlers.py:576 (crossed 50 in the fourth pass; extract the forced-pick block into `_forced_pick_matches(...)`) |
+| 53 | `_match_listed_positional_follow_up` — agents/orchestrator/service.py:1058 (47 at HEAD; extract the scope check into `_list_pick_scope_matches` — fourth pass #33) |
+| 61 | `_resolve_intent_with_history` — agents/orchestrator/service.py:3230 (55 at HEAD, grew with the bare-reply and no-inferred-delete guards; extract `_history_action_allowed(message, action)` — fourth pass #34) |
+| 84 | `handle_estimate_fuzzy_confirmation` — routers/agent_helpers/fuzzy_confirmation.py:167 (79 at HEAD — fourth pass #35) |
+| 316 | `delegate_create_estimate` — routers/agent_helpers/delegate_create_estimate.py:102 (309 at HEAD, grew with the anchor write; extract the follow-up stash block — fourth pass #36) |
 | ~167 | `MarkdownDescriptionEditor` component body — portal/src/components/common/MarkdownDescriptionEditor.tsx:252 |
-| 140 | `_handle_update_estimate` — agents/estimate/crud_handlers.py |
+| 153 | `_handle_update_estimate` — agents/estimate/crud_handlers.py:2378 (+14 on 2026-09-24; extract the work-item dispatch into `_dispatch_work_item_op(...)`, review #68) |
 | ~120 | `install()` — website/contact-modal/install.js |
 | ~115 | `compute_analytics` — routers/estimates.py:507 |
 | 112 | `MaterialGapsTable` — portal/src/components/estimates/InventoryGapsPanel.tsx:106 |
@@ -498,6 +521,18 @@ pattern, so this is consistency-vs-efficiency rather than a defect.
 for the `_resolve_target_*` id branches in Property / Contact / Material /
 Labour, which scan a full `_list_*_via_api` result for the same reason.
 
+### 618. [LOW] The estimate is loaded twice per planned edit
+`platform/agents/estimate/edit_planner.py:248` — `_plan_and_apply_edits` loads it, then `_run_edit_commands` loads it again: an extra query, and a snapshot that may be out of date.
+
+**Suggested fix:** Pass the loaded `target` into the executor as an optional parameter.
+
+### 669. [MEDIUM] Maple's named-estimate lookup loads every estimate document in full
+`platform/routers/agent_helpers/estimate_resolver.py:188` (and `delegate_get_estimate.py:~219`, `agents/estimate/crud_handlers.py` `_match_estimates_by_title`) — to match "the Patio estimate" by title, each path loads every estimate the company has, whole documents with their job items, then filters in Python. Round 32 #2 widened the router's two paths from the newest 100 to the full set, so they agree with the agent's resolver (a capped list matched the wrong estimate as an exact target); the cost grows with the company's estimate count, per named message.
+
+**Suggested fix:** Load a projection for title matching — `_id`, `estimate_id`, `title`, `property` (plus whatever `_effective_title` reads) — with the company filter, and fetch the one matched document afterwards. One shared helper for the router and the agent. Keep the full set (no newest-N cap): the cap is what caused the wrong match.
+
+*(Review 2026-09-26 round 32 #2, cost of the fix.)*
+
 ## Silently swallowed errors
 
 Paths that discard the real failure. #64 is the anchor; #430 is the standing
@@ -680,6 +715,11 @@ same number — update both together.
 and add `logger.debug(...)` (or `logger.exception(...)` where a failure is not
 routine) before falling through. Best done as one focused sweep, since the
 pattern is near-identical across the six files.
+
+### 619. [LOW] A failed estimate-edit persist logs nothing about the cause
+`platform/agents/estimate/edit_executor.py:219` — `logger.warning(..., code)` makes version conflicts and outages indistinguishable.
+
+**Suggested fix:** Log `type(exc).__name__` (still no exc_info, to keep note bodies out of logs).
 
 ## Duplicated code and twin files
 
@@ -1721,6 +1761,16 @@ per-item semantics than true numerals.
 deliberately (they do cover "plant a few shrubs") and document the choice — a
 one-line comment stating the trade-off is enough.
 
+### 620. [LOW] The edit planner's `clarifying_question` is shown to the user verbatim
+`platform/agents/estimate/edit_planner.py:242` — Model-written text, influenced by fenced company data, can put up to 500 arbitrary characters into Maple's reply.
+
+**Suggested fix:** Use it only when `needs_clarification` is true, and strip URLs.
+
+### 621. [LOW] `client_context.current_path` only has a length limit and reaches the classifier prompt unfenced
+`platform/routers/agent_helpers/client_context.py:52` — It is saved and injected unfenced into the orchestrator LLM context ("Current page: …", orchestrator/service.py:1176). The client can only affect its own session.
+
+**Suggested fix:** Validate it against a URL-path pattern such as `^/[\w\-/]*$`. Also add `source` and `current_path` to `TRANSIENT_KEYS` (`routers/agent_helpers/finalize_result.py`), so they are not saved with the conversation as stale state (review 2026-09-25 fifth pass #26, a duplicate of this entry).
+
 ## Platform — Maple agents
 
 ### 49. [MEDIUM] `_ADDRESS_PATTERN` can false-match "N <word>+ way/court"
@@ -2076,6 +2126,296 @@ bring back copying.
 `platform/agents/estimate/note_handlers.py:98` — The docstring says `mode` is needed to extract the right value, but it is computed after extraction and the only caller discards it (every note phrasing now adds a note).
 
 **Suggested fix:** Return just `Optional[str]` and drop the set/add verb patterns from this path (update `TestNoteCueBroadening`), or correct the docstring.
+
+### 611. [LOW] The edit planner applies the edit lock even to a notes-only plan
+`platform/agents/estimate/edit_planner.py:214` — `_load_estimate_for_update` uses the default `enforce_edit_lock=True`, so a note that reaches the planner on an Approved estimate is refused, though notes sit outside the lock.
+
+**Suggested fix:** Load with `enforce_edit_lock=False` and let `_run_edit_commands` enforce the lock by `CONTENT_OPS`.
+
+### 612. ~~[LOW] The removal question comes before the rest of the batch is validated~~ — RESOLVED 2026-09-24 (third review pass #11: the question is built from a dry run of the whole batch)
+`platform/agents/estimate/edit_executor.py:300` — The projected total ignores the batch's other edits, and those edits are validated only after "yes", so the user can confirm and then get a rejection.
+
+**Suggested fix:** Dry-run the full batch on copies before asking, and quote the resulting grand total.
+
+### 613. ~~[LOW] A removal plus a near-miss division ends in a question "yes" can't answer~~ — RESOLVED 2026-09-24 (third review pass #11: one question names both, and "yes" runs both)
+`platform/agents/estimate/edit_executor.py:192` — After the removal "yes", a near-miss division gets a plain question with no pending record, so a second "yes" does nothing.
+
+**Suggested fix:** Stash the rewritten batch marked already-confirmed for the removal, or name both changes in a single question.
+
+### 614. [LOW] `run_confirmed_edits` acts on the stashed code, not the verified target
+`platform/agents/estimate/edit_executor.py:274` — `fuzzy_confirmation.py:92` loads the target by `pending["estimate_id"]` (company-scoped), but the re-run looks up `pending["estimate_code"]`, and nothing checks the two agree. Pending state is server-owned, so this is defense in depth.
+
+**Suggested fix:** Pass `target.estimate_id` from fuzzy_confirmation into `run_confirmed_edits`, or reject when it differs from the stashed code.
+
+### 615. [LOW] Several title matches collapse to "not found" on update/delete
+`platform/routers/agent_helpers/estimate_resolver.py:184` — `_from_named_title` returns `(None, False)` on more than one match, so update/delete ask a generic "Which estimate…?" without listing the candidates (get does list them).
+
+**Suggested fix:** Return the matches, or a sentinel, so callers can show the codes.
+
+### 616. [LOW] A named title with no match still reaches the loose substring rung
+`platform/routers/agent_helpers/delegate_get_estimate.py:252` — With `names_title` true and zero named matches, step 3 can still answer with a different estimate. The resolver treats this case as the end of the search.
+
+**Suggested fix:** Gate step 3 on `not names_title`, or return the not-found clarification.
+
+### 617. [LOW] `intent` and `existing_estimate_id` aren't treated as per-turn keys
+`platform/routers/agent_helpers/finalize_result.py:47` — `run_update_estimate` puts them in `dispatch_context`, and the CRUD passthrough returns that context, so they get saved and a later generation reads them (service.py:984). Company-checked; impact unconfirmed.
+
+**Suggested fix:** Add both to `TRANSIENT_KEYS`.
+
+### 627. ~~[HIGH] A pricing edit that names a work item without the words "work item" lands on the anchored item~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_edit_detectors.py:198` — `_extract_wi_hint` needs a work-item noun, so these give an empty hint, which becomes `use_active`:
+
+- "set the markup on the patio to 20%" / "set the markup to 20% on the patio" / "set the patio markup to 20%"
+- "set the markup on item 2 / on #2 / on the second one to 20%"
+- "set the company's default markup for work items to 20%"
+Each edits whichever item is anchored, or the only item. HEAD's legacy cascade matched none of these, so it wrote nothing.
+
+**Suggested fix:** When the hint is empty but an `on|for|in <words>` phrase names something outside the field and value, pass that phrase as `description_hint`. Return None for `default|company|future|new work items`. Add tests.
+
+*(Review 2026-09-24 fourth pass #7.)*
+
+### 628. ~~[HIGH] `_PCT_ZERO` has no end anchor, so ordinary sentences zero a field~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_edit_detectors.py:136` — Verified, with an estimate open (all route to update_estimate):
+
+- "no markup changes please" → markup 0
+- "no markup yet, I'll decide later" → markup 0
+- "no overhead questions, I just want to see the total" → overhead 0
+- "remove the tax exemption" → tax 0
+- "take off the tax label" → tax 0
+- "drop the markup discussion, set the price of pavers to $4" → markup 0
+
+**Suggested fix:** Anchor the end: `…\b(?:\s+(?:on|for|from|in)\s+[^,.;]{0,60})?\s*[.!]?$`. Drop the bare "no" verb, or allow it only before an end or target clause. Add tests.
+
+*(Review 2026-09-24 fourth pass #8.)*
+
+### 629. ~~[HIGH] The "compound" check runs before the content check and ignores the named resource~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_edit_detectors.py:453` — "add a note that we need to cut and remove the stump", "rename work item 2 to Grade and remove the sod" and "set the description to Excavate and remove the old sod" become `compound`. They go to the planner, which has no work-item rename, instead of the deterministic handlers. On the routing side, with an estimate open, `compound` claims other resources (HEAD sent them to their own agents):
+
+- "add a note to the Smith property saying trim and remove the hedge"
+- "update the Smith property and set the city to Toronto"
+- "rename the mulch material to Black Mulch and set the price to 5"
+
+**Suggested fix:** Check `_CONTENT_LEAD` before the compound check; return `compound` only when a value detector matches the first clause. In `_is_work_item_edit`, stand down for compound/multi_target when `_match_first_hint(DOMAIN_HINTS)` names a non-estimate domain. Add tests.
+
+*(Review 2026-09-24 fourth pass #9.)*
+
+### 630. ~~[HIGH] Second edits and extra work items are still dropped without saying so~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_edit_detectors.py:414` — `_SECOND_CLAUSE` and `_MULTI_TARGET` miss common shapes, and only the first part is applied. Verified:
+
+- Second edit lost: "set the quantity of mulch to 8 and the price to $4", "set the hours on excavation to 6 and the rate to $65", "set the markup to 20%, overhead to 10%", "… plus the tax to 13%", "… and 13% tax", "set the markup to 20%. Set the tax to 13%".
+- Only one work item edited: "set the markup on work item 1 and 2 to 20%" (hint 1), "… on work item 1 to 20% and on work item 2 to 25%" (hint 1), "for the patio and the driveway work items".
+
+**Suggested fix:** Second clause: also match `(?:,|;|\.|\band\b|\bplus\b|\balso\b)\s+(?:the\s+)?(?:price|qty|quantity|hours?|rate|role|<pct fields>)\b`, and a second % or $ value after the first match. Multi-target: also match `\bwork\s+items?\s+#?\d+\s*(?:,|and|&)\s*(?:work\s+item\s+)?#?\d+` and `\b\w+\s+and\s+(?:the\s+)?\w+\s+work\s+items\b`. Add tests.
+
+*(Review 2026-09-24 fourth pass #11.)*
+
+### 632. ~~[MEDIUM] A reply to the work-item menu with a delete verb turns into a whole-estimate delete~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/routers/agents.py:1231` — The delete branch has no open-question check, and `_pick_candidate` doesn't strip a leading verb. With the menu open, "remove the back lawn" and "delete the back one" get "Are you sure you want to delete estimate 'Alpha Yard (E0003)'?". It still needs confirming, but the flow jumped from a work item to the estimate.
+
+**Suggested fix:** In `_pick_candidate`, strip a leading remove/delete/show verb before matching; add the `answers_open_question` check to the delete branch and send a match to the agent as update_estimate. Add a test.
+
+*(Review 2026-09-24 fourth pass #19.)*
+
+### 633. ~~[MEDIUM] `LEAD_IN` is too narrow for ordinary openers~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_edit_detectors.py:50` — These return None (a planner call, or the capability text with the planner off):
+
+- "on work item 2 set the markup to 20%" (no comma)
+- "for estimate E0042 set the tax to 13%"
+- "actually set …", "no, set …", "sorry, …", "wait, …", "yes please set …", "hi maple, …", "great, now set …"
+Also "oh and set the tax to 13%" becomes `compound`.
+
+**Suggested fix:** Make the comma after the target clause optional when an edit verb follows; add `estimate\s+[Ee]\d{4,7}`; add correction words (actually, no, sorry, wait, yes, yeah, great, thanks, hi, oh, um) to the politeness group. Add tests.
+
+*(Review 2026-09-24 fourth pass #20.)*
+
+### 634. ~~[MEDIUM] `_NOTE_VERB` still accepts "drop the note"~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_edit_detectors.py:305` — "drop the note for work item 2, it's outdated" files a new note "it's outdated"; "drop the note on work item 2" asks "What should the note say?". Both are requests to delete a note; `_NOTE_ADD_RE` was fixed for this in the third pass, the detector wasn't.
+
+**Suggested fix:** Mirror that fix: require `drop\s+(?:a|an|another)`, and don't accept "the|this" after "drop". Add tests.
+
+*(Review 2026-09-24 fourth pass #21.)*
+
+### 636. ~~[MEDIUM] "show the lawn work item" with no estimate open asks to confirm an update of a fuzzy-matched estimate~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/orchestrator/service.py:2425` — This was noticed in passing by the router reviewer. With no active estimate, the read is classified update_estimate, fuzzy-matches "Beta Yard" and asks "confirm to update this estimate"; replying "E0003" then goes to the Property Agent ("No property found for id 'E0003'").
+
+**Suggested fix:** Route a work-item read ("show/view/open … work item") to get_estimate; with no estimate in play, ask "Which estimate?" rather than fuzzy-matching for an update. Add a test.
+
+*(Review 2026-09-24 fourth pass #23.)*
+
+### 637. ~~[LOW] Hints starting with punctuation no longer match~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_handlers.py:604` — The `\b` prefix needs a word character right before the match. "(phase 2)", "& lighting" and "#1 priority" match nothing now; the same regex serves menu replies (`work_item_context.py:373`).
+
+**Suggested fix:** Use `(?<!\w)` + `re.escape(needle)` instead of the `\b` prefix in both places.
+
+*(Review 2026-09-24 fourth pass #24.)*
+
+### 642. ~~[LOW] "set the price of pavers on the patio to $4" reads the material as "pavers on the patio"~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_edit_detectors.py:40` — `_WI_CLAUSE` requires the words "work item", so the location phrase stays in the material query and the lookup fails ("couldn't find").
+
+**Suggested fix:** Strip a trailing `on|in|for (the) <words>` from the material query and use it as the work-item hint when no work-item noun is present. Add a test.
+
+*(Review 2026-09-24 fourth pass #29.)*
+
+### 643. ~~[LOW] A note to several work items files one note with the others in its body~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_edit_detectors.py:314` — "add a note to work item 2, 3 and 4: gate code 1234" files the note on item 2 with the body "3 and 4: gate code 1234".
+
+**Suggested fix:** Detect a list of work items in the note target and return `multi_target` (ask which one) rather than a note. Add a test.
+
+*(Review 2026-09-24 fourth pass #30.)*
+
+### 645. [LOW] The planner rejects references to a work item added in the same plan
+`platform/agents/estimate/edit_planner.py:120` — `invalid_targets` rejects any target that isn't in the snapshot unless it is `use_active` with an anchor, so "add a Fence work item and put 10 mulch on it" can't be planned when nothing is anchored.
+
+**Suggested fix:** Allow `use_active` or a description hint naming an `add_work_item` earlier in the plan (the executor already resolves these). Add a test.
+
+*(Review 2026-09-24 fourth pass #32.)*
+
+### 646. ~~[MEDIUM] The fourth-pass guard now blocks renaming estimates whose titles contain a preposition~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/crud_handlers.py:395` — "rename the Scope of Work estimate to Spring Refresh" gives "I couldn't find a work item matching 'of Work estimate'", and "rename the Materials for Jones estimate to Spring" gives the capability list (verified). Both worked after the third pass. "Scope of Work" is a common estimate title. Graded MEDIUM: the user gets a refusal, and no record is written.
+
+**Suggested fix:** Treat the connector as a break only when a pointer follows it: `(?:on|in|of|for|from|at|to|within|inside|under|with)\s+(?:the|this|that|my|our|your|\w+'s|[Ee]\d{4,7})\b`. Add both titles to `test_an_estimate_titled_with_a_line_noun_can_be_renamed`.
+
+*(Review 2026-09-25 fifth pass #14.)*
+
+### 647. ~~[MEDIUM] Requiring a bare ordinal drops ordinary menu answers~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_context.py:414` — After the menu, "I want the second one", "go with the second", "no, the second one", "the 2nd one thanks" and "let's go with the second one" each got the capability list. The pending rename was lost and nothing was written (verified).
+
+**Suggested fix:** Before `match_ordinal_reference`, strip lead-ins (`(?:no|yes|ok),?\s*`, `i want|i'll take|go with|let's go with|i meant`) and a trailing thanks/please. Or use `match_positional_reference` once the code and request-verb checks have passed. Add tests.
+
+*(Review 2026-09-25 fifth pass #16.)*
+
+### 648. ~~[MEDIUM] "rename the lawn job to Turf" retitles the estimate when "lawn" is a work item (pre-existing)~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/crud_handlers.py:471` — With E0042 active and a "Lawn seeding" work item, "rename the lawn job to Turf" renamed estimate E0042 to "Turf" (verified). `_job_name_is_an_open_work_item` recognizes the work item but only returns the active code to the title-rename path.
+
+**Suggested fix:** In `_detect_estimate_title_update`'s caller, when `loose_job_name(head)` matches exactly one work item on the active estimate, treat the message as a work-item rename (or return None so the work-item path takes it). Add a test.
+
+*(Review 2026-09-25 fifth pass #17.)*
+
+### 649. ~~[MEDIUM] A courtesy word after filler now becomes an estimate name~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/title_reference.py:129` — Since filler no longer ends a name, "show me the estimate again thanks" extracts "again thanks" and Maple replies "I couldn't find an estimate named 'again thanks'. Did you mean E0042…?". "show me the whole estimate so far thanks" extracts "so far thanks" (verified). Both gave "" before the fourth pass.
+
+**Suggested fix:** Add pleasantries (thanks thank thx pls plz ok okay cheers) to the stop words. In `_real_name`, also reject a name whose non-filler words are all pleasantries. Add both phrasings to `test_filler_words_are_not_estimate_names`.
+
+*(Review 2026-09-25 fifth pass #18.)*
+
+### 650. ~~[MEDIUM] The new object lookahead in `_ADD_TO_ESTIMATE_CODE_RE` also matches nouns used as modifiers~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/orchestrator/service.py:135` — "add task lighting to E0042" now routes to create_task (fourth pass: update_estimate), "add a follow-up visit to E0042" to unknown, and "add contact paper liner to E0042" to update_contact (verified).
+
+**Suggested fix:** Exclude only when the resource noun heads the object: `(?:tasks?|to-?dos?|reminders?|contacts?|propert(?:y|ies)|follow[\s-]?ups?)\s+(?:to|for|about|that|:)\b`, or the "<name> as the contact" form. Add these phrasings beside the #10 tests.
+
+*(Review 2026-09-25 fifth pass #19.)*
+
+### 652. ~~[MEDIUM] The note's text decides which record gets the note~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/orchestrator/service.py:2763` — When the command before the colon names no domain, `_classify_via_action_domain` re-reads the whole message, note text included. With an estimate active and last touched (verified): "leave a note: the homeowner's phone is 555-1234" → update_contact (HEAD: unknown), "add a note: the property has a steep slope" → update_property, "add a note: use the black mulch material" → update_material, and "add a note: the foreman should check the task list" → update_labour.
+
+**Suggested fix:** Skip the full-text re-read when `is_note_add_request(head)` is true, so an unnamed target falls to the anchor or history. Add tests.
+
+*(Review 2026-09-25 fifth pass #21.)*
+
+### 653. ~~[MEDIUM] Command validation errors escape `EstimateAgent.process`~~ — RESOLVED 2026-09-25 (sixth pass: `EditExecutorMixin._command` turns an out-of-range value into a clarification)
+`platform/agents/estimate/work_item_field_handlers.py:568` — The older handlers build EditCommands outside a `try` (also work_item_field_handlers.py:741, 893 and work_item_handlers.py:910, 1121, 1140), unlike `_handle_work_item_edit`, which uses `_validation_reply`. "set the total on work item 1 to $200,000,000" (le 1e8), "add 2000000 mulch to work item 2" (le 1e6) and "add activity Grading with effort 200000 hours" (le 1e5) each raised `pydantic.ValidationError` out of `process` and failed the turn (verified). Graded MEDIUM: no data is written, and the router answers with its generic error.
+
+**Suggested fix:** Build commands through one helper (e.g. `self._command(cls, **fields)`) that catches `ValidationError` and returns the `_validation_reply` clarification. Add a test per bound.
+
+*(Review 2026-09-25 fifth pass #22.)*
+
+### 656. ~~[LOW] An older value prompt from another agent beats a newer Estimate question~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/routers/agents.py:1351` — `_get_awaiting_value_match` picks the newest entry that has `awaiting_value_for`, not the newest entry overall. With pending `[Property awaiting "city", Estimate choose_work_item]`, the reply "the second one" becomes the property's city (verified for that state). Graded LOW: the router normally takes the Property value first, so the state is hard to reach.
+
+**Suggested fix:** Honor the awaited value only when it is the last entry in `pending_intents`. Add a test.
+
+*(Review 2026-09-25 fifth pass #25.)*
+
+### 657. ~~[LOW] "change Bob to a client contact" now routes to update_estimate~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/text_utils.py:1464` — With an estimate active, `strip_assigned_value` cuts " to a client contact", which removes the only domain noun, so the message routes to update_estimate (HEAD: update_contact) (verified). Graded LOW: the user gets a capability reply, and nothing is written.
+
+**Suggested fix:** Don't cut when the text after " to " is `a/an <domain noun>`. Add a test in test_maple_assigned_value_routing.py.
+
+*(Review 2026-09-25 fifth pass #27.)*
+
+### 658. ~~[LOW] Answering "what should I call it?" truncates names with inch or foot marks~~ — RESOLVED 2026-09-25 (routing convergence: the rule behind it was replaced by the written command list — `agents/estimate/command_grammar.py` — and the phrasing is a routing-snapshot row; design 2026-09-25)
+`platform/agents/estimate/work_item_context.py:476` — The resume wraps the reply in quotes, `f'add a work item called "{name}"'`, so "Install 12\" drain pipe" is saved as "Install 12" and "6' cedar \"privacy\" fence" as "6" (verified). Typed directly, the same names are kept whole.
+
+**Suggested fix:** Carry the value in a transient context key and add the work item with it, rather than rebuilding a quoted sentence. Add a test.
+
+*(Review 2026-09-25 fifth pass #28.)*
+
+### 659. [LOW] Setting a work item back to its original total doesn't reset the adjustment the way the portal does
+`platform/agents/estimate/edit_executor.py:824` — The portal's `handleAdjustSet` (WorkItemInlineContent.tsx:233-250) treats a total equal to the baseline as a reset: it restores the baseline markup and clears `original_profit_margin`. Maple stores the back-calculated markup, float residue included, and keeps `original_profit_margin`, so "set work item 1 back to $440" leaves the Adjust pill showing and the markup slightly off.
+
+**Suggested fix:** If `round(amount*100) == round(baseline_total*100)` (the baseline being the total at `original_profit_margin`), set `profit_margin = original_profit_margin` and `original_profit_margin = None`. Add a test.
+
+*(Review 2026-09-25 fifth pass #29.)*
+
+### 663. [LOW] The "Just to check" question names the open work item, not one forced by a "… job" name
+`platform/agents/estimate/crud_handlers.py:167` — `_anchored_work_item_stash` always takes `active_work_item`. When `_resolve_listed_estimate` has already forced a work item for this turn (a "<name> job" reference matching an open item), the executor writes to the forced one, but the question names and pins the anchor. Verified: work item 3 renamed "Paint second last coat", work item 1 open, then "set the markup to 20% on the second last coat job" → "Just to check: apply this to the "Front patio pavers" work item on E0042 …?", and "yes" would pin Front patio pavers. The wrong item is named in the question, so it is not silent, and the trigger needs a work-item name that itself contains a from-end phrase.
+
+**Suggested fix:** In `_anchored_work_item_stash`, prefer `context[FORCED_WORK_ITEM_ID_KEY]` (and `FORCED_WORK_ITEM_FALLBACK_KEY`) over `active_work_item` — the same precedence `_anchored_index` uses — so the question names exactly the item the write will land on. Test: the case above names and pins "Paint second last coat".
+
+*(Review 2026-09-26 round 21 #1.)*
+
+### 664. [MEDIUM] An estimate note addressed by code or "that estimate" asks unless its separator is a colon
+`platform/agents/estimate/command_grammar.py:472` — `_addresses_a_non_estimate` strips the estimate reference but leaves the preposition before it, and `_NOTE_ADDRESS_RE` then reads that preposition plus the next word (only `with`/`as` are excused) as a target. Verified: "add a note to that estimate saying call the client", "add a note to our estimate that says call the client", "drop a note on E0042 saying the gate sticks", "new note for this estimate saying call Bob" and "add a note to E0042 about the gate: code 1234" all ask "Which estimate or work item should the note go on?". Before round 27 they filed, and the colon forms still do. No write goes wrong (it asks), but the user has to retype a supported note. A regression from the round-27 fix.
+
+**Suggested fix:** Strip the preposition together with the estimate reference: `_NOTE_ESTIMATE_REF_RE = re.compile(rf"(?:\b(?:{_NOTE_PREP})\s+)?(?:(?:\bestimate\s+)?(?<!\w){_REF_CODE}|\b(?:this|that|the|our|your|my)\s+(?:current\s+)?{_EST_NOUN}\b)", re.I)`, then drop the `with|as` lookahead from `_NOTE_ADDRESS_RE`. Add the five messages as False rows in `test_note_names_an_unlisted_target`. If the note-target area keeps producing findings, the lean alternative is to retire the ported `estimate_note` detector: give its few remaining forms core entries in `command_grammar.py` and let everything else ask.
+
+*(Review 2026-09-26 round 28 #3.)*
+
+### 665. [MEDIUM] A target named before "note" is never checked, so the note goes on the estimate
+`platform/agents/estimate/command_grammar.py:496` — `note_names_an_unlisted_target` only reads the text after the first "note", and `foreign_note_target` / `note_names_unparsed_work_item` only read a head that starts with the verb. Verified: "On work item 2, add a note: check drainage" with E0042 open and fresh → ported `estimate_note`, and the agent attempts `add_estimate_note` on E0042 — an estimate-level note, not one on work item 2. MEDIUM rather than HIGH: it needs the target fronted before the verb, and the reply names the estimate.
+
+**Suggested fix:** Also check a leading prepositional clause: if the text before "note" (after `_LEAD`) starts with a preposition, run `_addresses_a_non_estimate` on it up to the first comma — `re.match(rf"^\s*(?:{_NOTE_PREP})\s+[^,]+", parts[0])`. Anchor it at the start so "I want to add a note: …" is not flagged by "to add". Add a True row for the message above and a False row for "I want to add a note: call the client".
+
+*(Review 2026-09-26 round 28 #4.)*
+
+### 666. [LOW] The "<target> - <text>" body check also runs on bodies after a colon
+`platform/agents/estimate/command_grammar.py:499` — `_NOTE_BODY_ADDRESS_RE` is meant for implicit-tail bodies ("… note to the work item on E0042 - check drainage") but runs whichever extractor produced the body. Verified: "note: on Friday - bring the trailer" asks where the note goes instead of filing an untargeted note. LOW: it needs a body that opens with a preposition phrase followed by " - ".
+
+**Suggested fix:** Run the body-head check only when nothing but whitespace separates "note" from the body: `if not parts[-1].strip() and head and _addresses_a_non_estimate(head.group("head"))`. Add "note: on Friday - bring the trailer" as a False row.
+
+*(Review 2026-09-26 round 28 #5.)*
+
+### 667. [LOW] A note only the edit planner can parse is refused on a locked estimate
+`platform/agents/estimate/edit_planner.py:234` — `_plan_and_apply_edits` loads the estimate with the edit lock on before planning, but the executor already exempts notes-only batches, and CLAUDE.md says a parent's status never gates notes. Reproduced: estimate status "Sent", planner returning `AddWorkItemNote(position 1, "gate code is 1234")` → the planner is never called, and the reply is "…has already been sent, so it's locked for edits…". `tests/test_maple_edit_planner.py::test_a_locked_estimate_is_refused_before_planning` deliberately pins lock-before-plan, to save a paid call that would be refused anyway. LOW: it needs a note phrasing no rule parses, on a locked estimate.
+
+**Suggested fix:** Needs a product call (deferred at /fix-issues without a ruling). (a) Load with `enforce_edit_lock=False`, plan, and return the lock refusal only if the plan holds content ops — costs one planner call per request on a locked estimate. (b) Keep lock-before-plan and record it as a gap ("a note on a locked estimate needs a phrasing the rules parse"). Recommended: (a), since notes-on-locked is a stated product rule. Update the pinned test to cover the notes-only case.
+
+*(Review 2026-09-26 round 29 #6.)*
+
+### 668. [LOW] A work-item field question reads the field as the work item's name
+`platform/agents/estimate/work_item_field_handlers.py:63` — `_extract_wi_hint` tries the words after "work item" before the name in front of it, so "what is the patio work item division" / "…subtotal" look for a work item called "division" / "subtotal" and answer "I couldn't find a work item matching …". Read-only: no write. Round 31 #1 reported the same misread on the recurring commands, where it wrote to the wrong work item; the user resolved that by deferring recurring from chat (2026-09-26), which removed the write path — this read path remains.
+
+**Suggested fix:** Keep the leading number check first ("work item 2 …"). Then read the name before the noun: "this"/"that" directly before it returns "" (the anchor); otherwise the name left after stripping `_WI_HINT_PRE_STOP`; only then the words after the noun ("rename work item Front patio to Fence"). Add `test_work_item_hint_extraction` rows ("patio" for "what is the patio work item division").
+
+*(Review 2026-09-26 round 31 #1, residual after the recurring deferral.)*
+
+### 670. [LOW] A customer name that starts or ends with punctuation never matches
+`platform/agents/estimate/title_reference.py:368` — `_names_whole` bounds the candidate (and, since round 33 #5, the stored name) with `\b`, which can't match next to a non-word character at the edge. A candidate like "Acme Inc." never matches a property named "Acme Inc." (verified: the finder returns it, the filter drops it, 0 resolved). LOW: Maple asks instead of answering.
+
+**Suggested fix:** Use `(?<!\w)` + `re.escape(text)` + `(?!\w)` instead of `\b…\b`, in both directions. Add a row for "Acme Inc.".
+
+*(Review 2026-09-26 round 33 #6.)*
+
+### 671. [HIGH] A delete question survives turns that don't answer it, and a later "ok thanks" deletes the estimate
+`platform/routers/agents.py:1105` — Six handlers return before the open-question decider without dropping the estimate yes/no question: pending status transition, gathering, template size, property link, estimate follow-up and optional follow-up. Only the help (line ~1094) and calculator (~1102) paths call `_drop_unanswered_estimate_yes_no`. The end-of-turn release in `routers/agent_helpers/finalize_result.py:~222` compares only the `pending_intents` question (`estimate_question`), never `pending_estimate_fuzzy_confirmation`. And a multi-intent turn (agents.py:~1394-1435) can leave the delete question pending beside a second question. Reproduced through the real endpoint on local Mongo, standing in for the LLM classifier's multi-intent output (`[create_estimate, delete_estimate]`): "Create a new estimate and delete estimate E0002" asks both questions. "confirm" is taken by the gathering handler (it creates E0003 with "Work: confirm") while the delete question stays saved. "ok thanks" is then read as yes: "Estimate 'Smith Deck' has been deleted." Confirmed in the code that only the two paths drop it and that finalize doesn't consider it. HIGH, not CRITICAL: it needs a compound request that leaves two questions open, but the result is an irreversible delete nobody confirmed.
+
+**Suggested fix:** In `finalize_orchestrate_result`, snapshot `pending_estimate_fuzzy_confirmation` at load alongside `estimate_question_at_load`, and drop it when the turn ends with it unchanged. That covers all six early returns at once. Give the stored question an id, so one re-asked this turn doesn't compare equal. In the multi-intent assembly, never leave a delete confirmation pending beside another question: keep the delete question alone, or drop it and say so. Endpoint test: seed a gathering state plus a delete question, send "confirm", then "ok thanks", and assert the estimate still exists.
+
+*(Review 2026-09-26 round 34 #1; deferred at /fix-issues none.)*
+
+### 672. [HIGH] A task whose title starts with "Last" is taken as "the newest task", so another task is edited
+`platform/agents/task/resolver.py:204` — Step 2 (recency) fires on any "last/latest/newest/previous" in the message, before the title step, and returns the newest task. Reproduced on local Mongo: tasks "Last mow of the season" (older) and "Send contract to Lisa" (newer) → "archive the last mow of the season task" resolves to "Send contract to Lisa"; the note and "mark … as done" versions write to it too, and "Last walkthrough" behaves the same. "First/Second/Next/Final…" titles resolve by title correctly. Older than the 2026-09-26 routing work.
+
+**Suggested fix:** Take step 2 only when the task reference (`title_hint` or `extract_reference_hint(text)`, which is "last mow of the season" here) holds nothing but recency words, "my", "the" and "task" ("the last task", "my latest task", "most recent task"). Otherwise fall through to the title step. Add regression rows for "Last mow of the season" and "Last walkthrough".
+
+*(Review 2026-09-26 round 34 #2; deferred at /fix-issues none.)*
+
+### 673. [HIGH] An address-style estimate name drops its house number, so another address's estimate is written
+`platform/agents/estimate/title_reference.py:163` — `_is_stop` treats a digit as a stop word, so the loose extractor stops before the house number: `extract_named_title("rename the 4 Elm St estimate to Spring Cleanup")` → "Elm St". With only "14 Elm St Front Walk" in the company, the agent renamed that estimate to "Spring Cleanup" with no question. The customer fallback does the same: `_names_whole` matches "elm st" whole-word inside the street "14 Elm St", and the router returns it as exact. "12 Oak St" matches "112 Oak St Patio" the same way. If 4 Elm St has its own estimate, both match and Maple asks; the silent wrong write happens when it has none, or when its only estimate is archived and the live-wins tie rule (round 33 #3) picks the other address.
+
+**Suggested fix:** In the loose extractor (`_loose_pre_noun`), keep a number that directly precedes the collected words ("4 Elm St"), so the candidate carries the house number; whole-word matching then keeps "4 elm st" from matching "14 Elm St". Add rows: "the 4 Elm St estimate" with only "14 Elm St Front Walk" → no match (asks); with a "4 Elm St" estimate → that one.
+
+*(Review 2026-09-26 round 34 #3; deferred at /fix-issues none.)*
 
 ## Platform — API, models and data
 
@@ -2439,6 +2779,13 @@ geocode and note it in the comment.
 `platform/routers/estimate_documents.py (delete_docs_version)` — Partly fixed 2026-09-23 (code review #7): the version is now removed with an atomic `$pull` and orphans are computed from the returned document, which narrows the window. It does not close it: a generate that has already resolved its kept images can still have one deleted underneath it, and then either 502s or records a version pointing at a missing blob. Needs two tabs or two users within the generate window.
 
 **Suggested fix:** Decided 2026-09-23: option (b), a delayed sweep, was chosen as the real fix but deferred because it needs a scheduled job. Mark candidate paths on version delete instead of deleting them, and have a sweep delete ones still unreferenced by any version after ~15 minutes.
+
+### 631. [MEDIUM] The estimates PUT still recomputes with the old formula
+`platform/routers/estimates.py:1296` — The PUT rounds once, half-even; Maple now rounds each line, half-up. Verified: 5 lines of 2.5 × $3.99 with 15% markup and 13% tax → PUT $64.81, Maple $64.85. A portal save restates a total Maple stored to the cent, and the assumption rescale's exact `line_derived` check (< 0.01) now flags portal-saved items as manual overrides.
+
+**Suggested fix:** Have the PUT use `work_item_breakdown` (the portal sends burden 0), or loosen `line_derived` to accept either formula. Needs your call because it changes the HTTP API's stored totals; I'd pick the former for one formula everywhere. **Awaiting Simon's decision** (changes the totals the HTTP API stores).
+
+*(Review 2026-09-24 fourth pass #17.)*
 
 ## Platform — services, scripts and integrations
 
@@ -3251,7 +3598,14 @@ with the editable table's 240px.
 **Suggested fix:** widen this header to match the editable table (`w-[240px]`) so unit
 names stay on one line and both tables in the dialog line up.
 
-### 493. [LOW] The estimate builder never refetches while open
+### 493. ~~[LOW] The estimate builder never refetches while open~~ — RESOLVED 2026-09-24
+Resolved by `plans/2026-09-23-maple-estimate-multi-turn-editing.md` Phase 1:
+the page listens for `portal:estimates:changed` and reloads when the change is
+about the estimate on screen (matched by id or by the code a flat result
+carries), skipping the reload while the page is dirty or saving. No "changed"
+prompt was added for the dirty case. Pinned by
+`portal/tests/NewEstimateWithActivityPage.mapleSync.test.tsx`.
+
 `NewEstimateWithActivityPage`'s load effect depends only on `[estimateId]`, and
 the page does not listen to the `portal:estimates:changed` bus that every list
 page already subscribes to (`src/components/Layout/agentMutationEvents.ts:13`).
@@ -3328,6 +3682,69 @@ test that breaks on every MDXEditor upgrade.
 `portal/src/components/estimates/useStagedImages.ts:45` — The error is cleared only on the next add or submit, so "at most 10 images" stays up after the user frees a slot.
 
 **Suggested fix:** Clear the error in unstage and in the kept-image remove handler.
+
+### 635. [MEDIUM] A notes refresh wipes a note the user just created
+`portal/src/hooks/useNotes.ts:84` — When Maple files a note, `refreshKey` bumps and a fetch starts. If the user creates their own note before it lands, `createNote` prepends it and then the older fetch replaces the list without it. A probe went from ['created'] to []; in the partial-upload retry path `notes.find(pendingId)` then finds nothing.
+
+**Suggested fix:** After any local change to the list (create, delete, replace), start a fresh `load` (or bump the sequence), so the stale response is superseded. Add a test.
+
+*(Review 2026-09-24 fourth pass #22.)*
+
+### 638. [LOW] The note-only badge refresh isn't actually note-only, and `loadNoteCounts` is unguarded
+`portal/src/pages/NewEstimateWithActivityPage.tsx:562` — A note event calls `loadNoteCounts` twice (lines 564 and 571); a non-note event still calls it once via line 571 or the deferred flush. `loadNoteCounts` has no sequence or estimate guard, so A's counts can land on B.
+
+**Suggested fix:** Call it once and only for note operations (skip at 571 when 564 ran); add a sequence and estimateId guard.
+
+*(Review 2026-09-24 fourth pass #25.)*
+
+### 639. [LOW] Enabling the hook with a changed refresh key fetches twice
+`portal/src/hooks/useNotes.ts:136` — A `refreshKey` change while disabled isn't recorded as seen, so enabling fetches from both effects. It can't happen today (NotesPanel never passes `enabled`).
+
+**Suggested fix:** Record `seenRefreshKeyRef.current = refreshKey` in the main load effect too.
+
+*(Review 2026-09-24 fourth pass #26.)*
+
+### 640. [LOW] A Maple change during the first load is dropped
+`portal/src/pages/NewEstimateWithActivityPage.tsx:557` — While `loadedIdRef` is null, a matching event is ignored outright rather than deferred. If the first GET was answered before Maple's write was saved, the page shows stale data until something else reloads it.
+
+**Suggested fix:** When the event matches by `_id`/`id` during the first load, set `pendingMapleReloadRef`, and flush once the first load applies.
+
+*(Review 2026-09-24 fourth pass #27.)*
+
+### 641. [LOW] A write finishing after the page closed still fires a reload
+`portal/src/pages/NewEstimateWithActivityPage.tsx:514` — `trackWrite`'s `finally` calls `flushRef.current()`, and the flush has no `aliveRef` check, so a pending reload fires a wasted GET plus `loadNoteCounts` (setState after unmount).
+
+**Suggested fix:** Add `if (!aliveRef.current) return;` at the top of `flushDeferredMapleReload`.
+
+*(Review 2026-09-24 fourth pass #28.)*
+
+### 651. [MEDIUM] The Delete Document Version dialog survives a switch to another estimate
+`portal/src/pages/NewEstimateWithActivityPage.tsx:486` — The estimateId reset clears `deletingWorkItemIndex` but not `isDeleteDocOpen`, `docVersionToDelete` or `isDeleteOpen`. If the dialog "Delete Estimate V{n}" is open when the user goes Back/Forward to another estimate and confirms, `handleDeleteDocVersion` deletes version n of the NEW estimate (`getEntityId(estimate)` is B, the version is A's). Suspected from code reading. Graded MEDIUM rather than HIGH because it needs in-page navigation while a modal is open.
+
+**Suggested fix:** In the reset effect, also call `setIsDeleteDocOpen(false)`, `setDocVersionToDelete(null)`, `setIsDeleteOpen(false)`, `setStatusAlert(null)`, `setMaterialGap(null)` and `setRoleGaps(null)`. Better still, store the estimate id with `docVersionToDelete` and refuse when it differs. Add a test.
+
+*(Review 2026-09-25 fifth pass #20.)*
+
+### 654. [MEDIUM] Notes filed by a mixed batch or the planner don't refresh the open feeds
+`portal/src/pages/NewEstimateWithActivityPage.tsx:568` — Only the rule note path reports `operation: "add_work_item_note"` (platform work_item_edit_handlers.py:189). Batches through `_run_edit_commands` report `"operation": "update_estimate"` with the note only in `applied`: the planner (edit_planner.py:260), the replay after a confirmation (edit_executor.py:383), mixed batches ("set markup 20% and note 'gate code' on item 2"), and estimate notes filed in a batch. `notesRefreshKey` never bumps, so the feeds stay stale. With the dialog open the reload is also blocked, so the badges don't update.
+
+**Suggested fix:** Platform: set `result["notes_filed"] = True` in `_run_edit_commands` when `batch.notes` is non-empty. Portal: carry it through `dispatchAgentMutation` and bump the key when `NOTE_OPERATIONS.has(op) || detail.notes_filed`. Add tests on both sides.
+
+*(Review 2026-09-25 fifth pass #23.)*
+
+### 655. [MEDIUM] A failed refresh empties the feed and loses a note edit in progress
+`portal/src/hooks/useNotes.ts:103` — The `catch` clears notes on every failure. That was meant for a parent switch, but it now also runs on a Maple-triggered refetch of the same parent. Verified: `['n1']` → `[]` with the error "offline". Each `NoteCard` holds its edit composer in local state (NoteCard.tsx:61), so a card being edited unmounts and the typed text is lost. `onCountChange(0)` also resets the badge.
+
+**Suggested fix:** Pass a `refresh` flag to `load` and only `setNotes([])` when the parent changed. On a refresh failure keep the list and set `error` (or a light "couldn't refresh" message). Add a test.
+
+*(Review 2026-09-25 fifth pass #24.)*
+
+### 660. [LOW] Every Maple reload refetches the company's full property and contact lists
+`portal/src/pages/NewEstimateWithActivityPage.tsx:410` — `loadEstimate(true)` reuses the first-load `Promise.all`, so each Maple change to the estimate costs three GETs plus `notesApi.counts`, and two of them are lists that didn't change.
+
+**Suggested fix:** When `fromMaple` is true, call only `estimatesApi.get`.
+
+*(Review 2026-09-25 fifth pass #30.)*
 
 ## Portal — layout, navigation and Maple panel
 
@@ -3520,6 +3937,13 @@ which is harmless and arguably what a user expects; nothing destructive is bound
 recommendation was to leave it as-is — the behavior is benign, and three handlers where one
 reads clearly is the worse trade. Recorded so the gap stays a known choice rather than an
 oversight.
+
+### 661. [LOW] A confirmation question fires `estimates:changed`
+`portal/src/components/Layout/agentMutationEvents.ts:103` — Results such as `{"operation": "update_estimate", "missing_fields": ["confirmation"]}` (edit_executor.py:419/471) change nothing but still reload the page. If the page is blocked, they leave a reload waiting.
+
+**Suggested fix:** Skip the dispatch when `agentResult.needs_clarification` is true or `result.missing_fields` is non-empty. Add a test.
+
+*(Review 2026-09-25 fifth pass #31.)*
 
 ## Portal — settings, billing, onboarding and ops
 
@@ -4229,6 +4653,20 @@ total row count rather than blank-row count.
 `portal/tests/NewEstimateWithActivityPage.documents.test.tsx:194` — The dirty-save failure (must reject without calling `generateGoogleDoc`) and the `!estimate` guard have no test.
 
 **Suggested fix:** Make the page dirty and make `estimatesApi.update` reject, call onGenerate, and assert it rejects with /couldn't be saved/ and `generateMock` was not called.
+
+### 644. [LOW] The fake patches the wrong `get_company_defaults`
+`platform/tests/_estimate_fakes.py:92` — It patches `work_item_handlers.get_company_defaults`, but the executor imports its own name, so executor add tests never use the fake's 20/10/13 defaults (they hit the real lookup, which fails and falls back to 0).
+
+**Suggested fix:** Also patch `agents.estimate.edit_executor.get_company_defaults` in `wire_estimate_agent`.
+
+*(Review 2026-09-24 fourth pass #31.)*
+
+### 662. [LOW] /code-review's bandit command bypasses the pinned config
+`.claude/commands/code-review.md:69` — Step 3 runs `bandit -r . -x tests/`, which doesn't load `platform/bandit.yaml` (bandit reads it only with `-c`; `run_bandit.sh` passes it). A literal run therefore reports every B101 `assert … is not None` from the mypy playbook and scans `.claude` worktrees, while Step 3 says to number every hit and compare against the 11-B110 baseline — a comparison that can't hold on that output. CLAUDE.md says to run bandit via `./run_bandit.sh` and not to pass flags ad hoc. Predates the 2026-09-25/26 Maple routing work; review tooling, not user-facing.
+
+**Suggested fix:** Replace the code block with `cd platform && ./run_bandit.sh` (the script activates the venv and pins `-c bandit.yaml`).
+
+*(Review 2026-09-26 round 20 #2.)*
 
 ## Codebase hygiene (batchable)
 
@@ -5034,3 +5472,29 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `platform/models/estimate.py:617` — It says one hook catches every write path and names `append_doc_version_to_estimate`'s raw `$push` as the only write no event sees (which now runs the after-Update actions itself via `as_written`). `remove_doc_version_from_estimate` also writes a raw `$pull` that fires nothing. Harmless, since removing a version can't cross a lifecycle line, but unstated.
 
 **Suggested fix:** Add: "`remove_doc_version_from_estimate`'s raw `$pull` fires nothing either; removing a version cannot cross a lifecycle line."
+
+### 622. [LOW] `ClientContext` has no docstring
+`platform/routers/agent_helpers/client_context.py:48` — The allowlist contract isn't stated on the model.
+
+**Suggested fix:** Add a one-line docstring naming the allowlist contract.
+
+### 623. [LOW] `context_scope` module docstring is out of date
+`platform/routers/agent_helpers/context_scope.py:3` — It still says `context_payload` is populated from the client's request context.
+
+**Suggested fix:** Say state is server-owned and the client supplies only the allowlisted `client_context`.
+
+### 624. [LOW] `create_note_as` points work-item callers to the wrong function
+`platform/services/notes.py:169` — Its docstring and `ValueError` say to use `create_note()` for work-item notes, but server-side callers should now use `create_work_item_note_as`.
+
+**Suggested fix:** Update the message and the docstring.
+
+### 625. [LOW] `WorkItemEdit` has no docstring
+`platform/agents/estimate/work_item_edit_detectors.py:55` — A public dataclass with no docstring.
+
+**Suggested fix:** Add a one-line docstring naming its kind/fields/name_hint contract.
+
+### 626. [LOW] `_handle_work_item_edit` has no docstring
+`platform/agents/estimate/work_item_edit_handlers.py:55` — The entry point for rule-detected work-item edits isn't documented.
+
+**Suggested fix:** Add a one-line docstring.
+

@@ -974,6 +974,11 @@ git commit -m "feat: finish post-creation estimate property-link follow-up"
 
 ## Task 8 (stretch): Estimate synonyms + job-name reference
 
+> **Closed 2026-09-24** by `2026-09-23-maple-estimate-multi-turn-editing.md`
+> Phase 1: `bid`/`proposal` are estimate synonyms, and a name that is no
+> estimate's title resolves through the matching property or contact
+> (`agents/estimate/title_reference.py::resolve_named_estimates`).
+
 **Why:** Surfaced while brainstorming variants — `bid`/`proposal` aren't recognized as "estimate", and "the Smith job" / "Bob's quote" means resolving via the linked customer/property name, not the title. Lower priority; ship Tasks 1-7 first.
 
 **Files:**

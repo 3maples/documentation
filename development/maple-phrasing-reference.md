@@ -2,9 +2,458 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-23
+**Last updated:** 2026-09-26
 
 ### Change log
+
+**2026-09-26 — routing convergence: rounds 12–24**
+
+- Thirty-third review: tasks follow the estimate rule — a task reference
+  that counts from the end ("mark the second to last task as done") asks
+  which task, and is never matched to a task by its title; "the second task"
+  with no list shown asks too. A list pick is the first reference in the
+  message: "rename the last one to Lot #2" renames the last one, and "the
+  last one, not the first one" / "…instead of the first one" mean the last
+  one. A title shared with an archived estimate ("Patio" live, last year's
+  "Patio" archived) resolves to the live one; a list of matching estimates
+  shows the newest first, with each status. "the Smith residence" finds the
+  property named "Smith" (whole words, either direction).
+- ⚠️ Gap (follow-up #670): a customer name ending in punctuation ("Acme
+  Inc.") isn't matched.
+- Thirty-second review: an estimate named by its customer matches the
+  customer's name, street or property name as a whole word — "the lee job"
+  is Dan Lee's, never Kathleen Moore's; "park" is not "45 Parkside Dr". A
+  named estimate is looked up among all the company's estimates (archived
+  too), not only the newest 100, so "the Patio estimate" finds the one titled
+  "Patio" however old it is.
+- Thirty-first review: work-item recurring schedules are deferred from chat
+  (user decision) — "make work item 2 recurring", "turn off recurring on …",
+  "is … recurring?" are no longer handled (§1.5.4 🛑); use the estimate page.
+  This also retires a misread where "make the patio work item recurring"
+  switched on a work item whose name contained "recurring". The "the patio
+  job" work-item menu now names an estimate Maple guessed from a while back,
+  like the other menus. "Great, archive …" / "Perfect, archive …" archive —
+  the archive check shares the grammar's lead words.
+- Thirtieth review: with a note or description in the message, "archive"
+  is an archive command only when the message starts with it ("archive the
+  Site Overview estimate", "please unarchive the Notes estimate"); anywhere
+  else it is the text ("add archive photos to the notes on this estimate").
+  When a "which work item?" menu or a "what should the new description be?"
+  prompt is about an estimate Maple guessed from a while back, it now names
+  it ("On E0042 'Spring Cleaning': …"), and answering it is the
+  confirmation.
+- Twenty-ninth review: changing an assumed size or material "on the patio
+  job" no longer asks "Which work item?" (the answer was ignored); it
+  targets the assumption by name as before. "archive the Site Overview
+  estimate" / "archive the Notes estimate" archive again — a note or
+  description word only stops an archive when it comes before it. "on the
+  other / new / whole / entire job" is not a work-item name; Maple asks which
+  estimate. A plan that both guesses the open work item and names another
+  now asks about the guessed one, and a removal question also names a
+  guessed work item the same batch would change.
+- ⚠️ Gap (follow-up #667): on a locked (Sent/Won/…) estimate, a note phrased
+  in a way no rule parses is refused instead of filed.
+- ⚠️ Gap: "mark the Site Overview estimate as sent" — a title holding
+  notes/description/overview blocks a "mark … as" status change; use the
+  code ("mark E0042 as sent").
+- Twenty-eighth review: a "… job" name that matches two or more work items
+  on the open estimate ("set the tax to 13% on the patio job" with "Front
+  patio pavers" and "Back patio lights") asks which one — it used to change
+  whichever work item was open. Adding a work item "to the patio job" still
+  goes on the open estimate. A note or description whose text says
+  "archive" ("note on this estimate: archive photos go in the shared drive")
+  is no longer read as archiving the estimate; say "archive E0042" or
+  mention "status" to change it.
+- ⚠️ Gaps (follow-ups #664–#666): an estimate note by code or "that estimate"
+  with "saying"/"that says"/"about" instead of a colon asks where it goes; a
+  work item named before the verb ("On work item 2, add a note: …") goes on
+  the estimate; "note: on Friday - bring the trailer" asks where it goes.
+- Twenty-seventh review: a note that says where it goes in a shape Maple
+  doesn't parse — a quoted body before its target (`add a note "check
+  drainage" to work item 2`), a " - " after it ("add a note to the work item
+  on E0042 - check drainage"), or any target other than an estimate code or
+  "this/that/our estimate" ("drop a note on the Johnson Residence estimate:
+  …", "leave a note for the crew: …") — asks "Which estimate or work item
+  should the note go on?" instead of going on the open estimate. Untargeted
+  notes ("add a note to call the client", "note: …") and ones addressed to an
+  estimate by code ("Set note on E0059 to \"…\"") file as before. "add a
+  note to the patio job: …" asks whether you mean the estimate titled Patio
+  or the open estimate's patio work item when both exist. A task note whose
+  title holds "about" or "from" ("add a note to the call Bob about pricing
+  task: …") goes to the task instead of being refused as a material.
+- Twenty-fourth review (supersedes the "the work item" parts of the 22nd and
+  23rd): "the work item" with no number or name is not read as the one you
+  have open — say "this work item", "work item 2" or its name. It never
+  changes a guessed work item either. A note to a work item Maple can't
+  pick out ("add a note to work item 2, 3 and 4: …", "…to the work item: …")
+  asks which work item instead of going on the estimate; a note to someone
+  that mentions the work item ("add a note to John Doe about the work item:
+  …") goes to that person.
+- ⚠️ Gap: a bare "the work item" ("set the markup on the work item to 20%",
+  "add mulch to the work item") — use "this work item", its number or name.
+- Twenty-third review: "rename the work item for the patio job to …" no
+  longer renames the estimate itself, and "set the markup on the work item
+  for the patio job to 20%" no longer changes the open work item — "the work
+  item" followed by for/on/in/of/from names which one. "set the work item
+  description to …" changes the open work item (it looked for one called
+  "description"). "add a note to the work item: …" files a work-item note.
+  A note to a contact or property whose text mentions "the work item" ("add
+  a note to John Doe saying he approved the work item") goes to that record.
+- Twenty-second review: "the work item" on its own means the one you have
+  open, like "this work item". "set the markup on the work item to 20%" /
+  "set the total on the work item to $500" / "set the gross margin for the
+  work item at 30%" change the open work item — "to"/"at" was read as a
+  work item's name and could change one called "Topsoil…". "add mulch to
+  the work item" goes to the open work item (it was not understood, or
+  created a material). "set the work item total to $1,600" sets the open
+  work item's total (it looked for a work item called "total").
+- Eighteenth review: a change whose message counts from the end — "archive
+  the second to last estimate", "now rename the second to last one to …",
+  "mark the second to last draft estimate as sent" — and doesn't name the
+  estimate by code or title asks first: "Just to check: apply this to E0042
+  'Spring Cleaning'? (yes/no)". No writes, nothing renamed, until you say
+  yes. The same question comes up when a message merely mentions it ("set
+  the description to install a light next to the last step"); yes applies
+  it. Name the estimate (E0042, or its title) and there is no question.
+- Sixteenth review (supersedes the fourteenth and fifteenth bullets' special
+  question): counting from the end is simply not supported. Maple has no
+  special "Which one did you mean?" for it any more; it only makes sure the
+  phrase is never misread. "the second to last …" never picks row 2, the
+  last row, the newest record or the estimate you have open — however it is
+  worded ("that second to last estimate", "the estimate next to last",
+  "Make sure to archive the second to last estimate"). What you get instead
+  is the ordinary answer ("Which estimate…?", "Which one did you mean?").
+  "Make sure to add … to our equipment list" is refused again, like any
+  equipment request.
+- Fifteenth review: a message is read left to right — the first thing it
+  names is its target, and a position counted from the end after it is
+  content. "add a note to E0042 saying the second to last bed needs mulch",
+  "add a work item called Regrade the second to last bed", "rename it to
+  Install next to the last row", "change the description of task T0042 to
+  mulch the second to last bed…" and "create a task to fix the second to
+  last sprinkler head" all do what they say; "Add to it the following: …
+  next to the last step" keeps the estimate you have open. "apply the …
+  template to the estimate next to last" asks which estimate (it created a
+  new one).
+- Fourteenth review: Maple asks "Which one did you mean?" once, before
+  anything else runs, whenever the command counts from the end — so
+  "archive the second to last estimate" no longer archives the estimate
+  you have open, and "apply the … template to the second to last estimate"
+  no longer applies it there. "the second last one", "2nd-last" and "the
+  one before the last one" are the same kind of phrase (they were read as
+  the last row). In a new value it is content: "…the second one to install
+  next to the last row" picks row 2, and "change the description to Install
+  the gate next to the last fence post" sets the description.
+- Thirteenth review: a position counted from the end — "the second to last
+  one", "the next-to-last task", "the third from last row" — is never read as
+  a row on any list; Maple asks which one. It is never "the newest" either
+  ("mark the second to last task done" no longer marks the newest task).
+  "…the second one to install next to the last row" still picks row 2. A
+  colon inside a note's body stays in the body ("…for Smith saying call at
+  3:30", "…that says gate code: 4412", "…that the gate code is: 1234").
+- ⚠️ Gap (not supported): counting from the end ("rename the second to last
+  estimate to …", "delete the next-to-last task", "the second last one",
+  "the one before the last one") — say the row's number, code or name
+  instead. "first" and "last" work.
+- ⚠️ Gap: a note to an estimate whose title contains "that", "says" or
+  "saying" by its "for/called" form ("add a note to the estimate called Walk
+  That Way: …") — the title stops before "that"; use its code, or "the Walk
+  That Way estimate: …".
+- Twelfth review: "add a work item for the estimate for Smith" / "…to the
+  estimate for John Smith Patio" adds a work item to Smith's estimate — it
+  was priced as a scope on the open one. "add a note to the estimate called
+  Oak Street - Phase 2: …" keeps the whole title (a colon ends it). With no
+  list shown, "the second estimate" asks which estimate rather than taking
+  the newest.
+
+**2026-09-25 — routing convergence: final review fixes**
+
+- "Yes, go ahead", "Sure, go ahead", "yes, delete it" answer a yes/no
+  question (they were read as new requests).
+- A title no longer keeps "thanks", curly quotes or a trailing "on E0042";
+  "set the title to Spring Cleanup on E0042" targets E0042.
+- Adding a work item, renaming, a note, a status change and the other direct
+  writes ask "Just to check: apply this to E0042?" when the estimate came from
+  an anchor the user hasn't touched this turn or last — as line edits
+  already did.
+- "add a note to this work-item: …" (hyphen) goes on the work item.
+- "set the price of mulch in the catalog to $5" edits the catalog even when
+  the open work item has mulch.
+- "add a task: lower the markup to 10% on work item 2" creates a task.
+- "Add a new work item to it. The client wants to build a patio in their
+  backyard. It will be about 900 sq ft in size." prices the described patio
+  as a new work item on the estimate "it" refers to — it was read as "add a
+  client" and asked for a contact's name. A command's target comes from the
+  sentence holding its verb; later sentences describe the job
+  (`command_sentence()` in `agents/text_utils.py`). "it" is the last record
+  worked with: after a material or contact, it isn't the estimate.
+- "set description on this estimate: Same scope as E0017" / "change the
+  write-up to …" are no longer read as a status change (the text after "as" /
+  "to" was taken as a status and refused with the status list): a message
+  naming the description, notes, write-up or overview is a status change
+  only when it says "status".
+- Tenth review: "the current / the same / the estimate" is the open estimate
+  and "the latest / the second estimate" is found by recency or Maple's last
+  list — never looked up as a title; "…on estimate E 0 0 4 2" / "#E0042" is a
+  code; "set the description of this estimate to … on E0017" keeps "on E0017"
+  in the description; "add a work item called Fence for E0042" goes on E0042;
+  "add a note to the Smith estimate: …" and "…to work item 2 on E0042: …" are
+  filed, not refused; "add a work item for the Smith estimate please" is not a
+  scope; "Add a new work item called Spring Cleanup" is a work item, not a
+  contact; "Add a new contact named Mary Jones. Set the email to …" creates
+  the contact.
+- Eleventh review: after a list, "the last estimate" is its last row, not
+  the newest estimate. "the sixth estimate" / "the 6th estimate" is a
+  list pick, never a title. "rename the Back to Basics estimate to Spring
+  Cleanup" writes "Spring Cleanup" (a title holding "to" or "as" was cut in
+  the wrong place). "…on estimate Smith Residence." / "…please", "…on the
+  estimate for Smith to 20%" and "add a note to the estimate for Smith that
+  says …" find Smith (the period, "please", "for" or "to" was read as part
+  of the title).
+- Ninth review (structural): a listed command's estimate is the one the
+  grammar parsed — a code or title inside a note, new value or scope never
+  moves the write; "change the title to Spring Cleanup" renames the open
+  estimate (the leftover "to" was read as a title); `Add a note "…" to E0042`
+  keeps its target after a quoted body; "add a work item for a cedar fence on
+  E0042" prices it on E0042; "add a work item for the Johnson Residence
+  estimate" is not a scope; "the current / the same work item" asks like
+  "this work item" when stale; "Add a new work item to it. Mary Johnson
+  wants …" is not a contact; "Add St. Mary's Church as a property" is a
+  property.
+- ⚠️ Gap: "mark the Garden Overview estimate as won" — a message naming
+  notes/description/write-up/overview is a status change only when it says
+  "status"; a title containing one of those words needs "set the status of …
+  to won".
+- Seventh review: a delete or "Just to check" question left unanswered across
+  a help question no longer waits for a later "ok"; an estimate code inside a
+  note or new value ("…: same fix as E0017") no longer moves the write to
+  that estimate; "apply the Driveway template to the estimate", "set this
+  work item to recur monthly" and "Add to it the following: …" ask first when
+  the estimate or work item came from an anchor the user hasn't touched
+  lately; an estimate picked from Maple's list is never questioned.
+
+**2026-09-25 — routing convergence: rules are a written list**
+
+Six review passes kept finding new phrasings because the rules were
+open-ended regexes spread over five layers. Now every estimate phrasing a rule
+handles is an entry in `platform/agents/estimate/command_grammar.py` (§1.0
+below); everything else goes to the edit planner (🤖) or the classifier. What
+changes for a user:
+- Material and activity line edits ("add 10 mulch to work item 2", "make the
+  excavation activity 6 hours", "set the price of pavers to $4.25") are the
+  planner's; the router still sends a line edit to the estimate when the open
+  work item has that line.
+- A reply to Maple's question is decided in one place: "list my contacts"
+  typed at a yes/no or a description prompt is a new request, "no" or "not
+  now" cancels, a reply after switching estimate pages never confirms the old
+  question.
+- A guessed target that isn't fresh asks first ("Just to check: apply this to
+  the "Front patio" work item on E0042?"); "delete it" / "rename it" follow
+  whichever anchor was touched last.
+- "jot down a note for John Doe: …" goes to John Doe; a note for a material or
+  role gets "Materials and roles don't take notes."
+- "set the markup to 20%" after touching a contact still sets the estimate's
+  markup (only estimates have one).
+Routing snapshot: `platform/tests/test_maple_routing_snapshot.py` (1,145
+phrasings × 4 states, plus decisions for 3 question kinds).
+
+**2026-09-25 — fifth review of multi-turn estimate editing**
+
+From the fifth `/code-review` (fixed #1–#13 and #15; the rest are follow-ups
+#646–#661). "delete estimate E0042" → "confirm" now follows the same rule as
+the Delete button: only the estimate's creator or an Owner, and the estimate's
+notes go with it. With a Maple question open, "delete all work items" or "add
+equipment to the patio" is still refused, and small talk is no longer taken as
+an estimate edit. After opening a material or a contact, "set the price of
+mulch to $5" or "set the markup to 25%" no longer lands on the last estimate.
+"rename the patio work item within/inside/under the Smith estimate to X" and
+"…work item E0042 estimate…" rename the work item. A menu reply that is a
+row's own description ("Add mulch beds", "Remove stump") picks it. A
+description that mentions a quote, a count or a code ("Show homeowner the
+revised quote before starting") is kept. "set the overhead on the lawn job to
+12%, same as the first one" edits the lawn. "add a note to the patio work item
+please" → the reply is filed on the patio work item. A work-item note
+mentioned inside another request is part of that request. "the pavers cost us
+$3.50 now" gets the cost refusal instead of a price change. "set the overhead
+lighting work item's markup to 20%" sets the markup. Tests sit beside each fix
+(`test_agent_helpers_fuzzy_confirmation.py`, `test_orchestrator_endpoint.py`,
+`test_maple_estimate_targeting.py`, `test_maple_work_item_context.py`,
+`test_maple_work_item_edits.py`, `test_work_item_edit_detectors.py`,
+`test_maple_edit_planner.py`).
+
+**2026-09-25 — fourth review of multi-turn estimate editing**
+
+From the fourth `/code-review` (fixed #1–#6, #10, #12–#16, #18; the rest are
+follow-ups #627–#645). "rename the patio work item on the Smith estimate to
+Back Patio" renames the work item, never the estimate. With "which work item?"
+open, only a bare pick answers it ("2", "work item 2", "the back one"); "set
+the markup on work item 1 to 15%" or "show me the 2nd estimate" is a new
+request. "What should the description be?" can be left: "cancel" / "no" /
+"never mind" answer "No problem, I've left it as is", and "list my estimates",
+"how many estimates do I have" or "show me estimate E0004" go where they
+would have gone. "set the tax on the lawn work item on the patio job to 13%" edits
+the lawn. "add a task to follow up on E0042" creates a task and "add Bob as
+the contact on E0042" a contact. Estimates named "Final Grading", "Far Hills"
+or "Full Service" are found by name. A rename or division change no longer
+re-prices a work item. Tests sit beside each fix
+(`test_maple_work_item_context.py`, `test_maple_estimate_targeting.py`,
+`test_estimate_edit_executor.py`, `test_estimate_title_reference.py`,
+`test_orchestrator_endpoint.py`).
+
+**2026-09-24 — third review of multi-turn estimate editing**
+
+From the third `/code-review` (findings #1–#40). "yes" to a removal removes
+the item Maple named even if the list changed in between, and nothing if that
+item is gone. Work-item edit phrasings only count when they ARE the request:
+"create a task to set the markup to 20%", "don't drop the markup", "remind me
+to drop the tax", "if we set the markup to 20% …" and "Hey Maple, add a note:
+drop the tax" no longer change the estimate. "raise the markup by 5%" (with or
+without "also"/"ok") asks for the new value; "change the markup by 5%" too.
+"set the markup on all work items to 20%" and two edits in one message
+("remove work item 1 and set the markup on work item 2 to 20%") are asked
+about instead of half-applied. A target after the value is kept ("change the
+markup to 20% on estimate E0042", "change the name to Front Yard for property
+Oak Villa"). "add 500 sq ft of sod to E0001" adds to E0001 instead of creating
+an estimate. A bare "Yes" never repeats a delete from earlier in the chat.
+"add a note to work item 2 about drainage" files a work-item note. Estimates
+titled "Back Yard Materials" or "Activity Center" can be renamed again. "show
+me the estimate again" / "the full estimate" show the open estimate. "I'd like
+a 20% markup", "give me a 10% markup on the patio work item", "set markup =
+20" and material names like `3/4" gravel` or "1.5 inch pipe" work. "generate
+a scope for …" with nothing open starts a new estimate. Tests sit beside each
+fix (`test_work_item_edit_detectors.py`, `test_maple_estimate_targeting.py`,
+`test_maple_assigned_value_routing.py`, `test_maple_work_item_context.py`,
+`test_estimate_edit_executor.py`, `test_maple_work_item_edits.py`).
+
+**2026-09-24 — second review of multi-turn estimate editing**
+
+From the second `/code-review` (findings #1–#42). Adding a catalog material
+through Maple works again: a real catalog size carries a unit id, and the line
+now gets the unit's label. "yes" to a work-item removal removes exactly the
+item it named, on the estimate it named, even if you opened another estimate
+in between. "set the hours on the overhead pruning activity to 6" edits the
+activity, not the overhead; questions and remarks ("why is the markup 20%?",
+"i think the markup of 20% is too high") write nothing; "reduce the markup 5%"
+asks for the new value instead of setting 5%. "bid" matches whole words only
+(Rabideau, Bidwell stay contacts). Catalog and company edits ("the hourly rate
+of the Foreman role", "the cost of the mulch material", "my company tax rate")
+stay with their agents while an estimate is open. After a work-item list,
+"rename the second one to Front Patio Scope" renames that work item, and an
+ordinal rename never retitles the estimate. "rename the grading activity to …"
+says Maple can't rename a line from chat, rather than retitling the estimate.
+"add a note to the patio work item" with no text asks "What should the note
+say?" and files the reply. "the patio job" also picks the patio work item, and
+matches whole words only. "show me the smith job" with no Smith estimate
+offers the open one instead of showing it. "hey maple, add a note: …", "just
+add a note: …" and "add a reminder note: …" go to the open estimate; "add a
+note task" creates a task. A value containing "to" ("update the title to Send
+estimate to Bob") stays the value. Tests sit beside each fix
+(`test_work_item_edit_detectors.py`, `test_maple_estimate_targeting.py`,
+`test_maple_work_item_context.py`, `test_estimate_edit_executor.py`,
+`test_maple_work_item_edits.py`, `test_agent_helpers_finalize_result.py`,
+`test_maple_assigned_value_routing.py`).
+
+**2026-09-24 — review fixes to multi-turn estimate editing**
+
+From the `/code-review` of the multi-turn work (findings #1–#56):
+note, title and description text is never read as a pricing edit ("add a
+note: drop the tax" files the note); a name containing "to" keeps its target
+("rename the Back to Basics estimate to …", "update the Walk to Work contact
+phone to …"); "create a note task" / "note estimate" are creates again;
+"add X to the estimate as a new work item" is no longer a material add;
+"the patio job" means the open estimate's patio work item when it has one; a
+list pick ("the second one") only applies to the estimate it was listed for,
+never over a named work item or estimate; "which estimate?" is answered only
+by a bare code; a "yes" names exactly the work items it removes; out-of-range
+percentages are explained ("Markup can be set between -100% and 500%").
+Tests sit beside each fix (`test_work_item_edit_detectors.py`,
+`test_maple_work_item_context.py`, `test_estimate_edit_executor.py`,
+`test_maple_assigned_value_routing.py`, `test_maple_estimate_targeting.py`).
+
+**2026-09-24 — a near-miss division gets a best guess**
+
+`Change the division for Work Item #1 to Special Project` was refused with the
+whole division list for one missing letter. Maple now proposes the closest
+division and applies it on "yes" (§1.5 division rows). Found on the way: a
+work-item edit the Estimate agent recognizes (division, markup, a line's
+quantity) was sent to the "do it in the estimate editor" refusal before the
+agent was asked — only the edit planner's hand-back rescued it, so with the
+planner off every such edit was refused. `run_update_estimate` now asks the
+agent first. Tests: `tests/test_division_best_guess.py`, the endpoint replay
+in `tests/test_maple_description_after_remove.py`.
+
+**2026-09-24 — a field's new value never picks the resource; stray replies are never priced**
+
+Reported: after removing a work item, `Update the description to "A job for
+Mr. X"` went to the Property agent ("What property fields should I
+update?"), and the reply `The description` then appended an AI-generated
+mowing work item to the estimate. Three fixes:
+
+- **The new value is content.** `strip_assigned_value`
+  (`agents/text_utils.py`) drops everything after the first `to`/`as` of a
+  `set/change/update/edit/rename … to …` before the orchestrator looks for a
+  domain — "job" in the value is a property hint, and "Mr. X" read as a
+  person. A target named before the value (`the description of the 12 Oak St
+  property to …`, `the status of E0042 to …`) still routes. Same rule
+  `strip_dictated_payload` applies after a colon.
+- **Only new work is priced.** An `update_estimate` message that no edit rule
+  claims reaches AI generation only when `describes_new_work`
+  (`agents/estimate/text_helpers.py`) says it asks for work — a leading
+  add/price/include/"we need" verb with a scope. Anything else gets "what
+  would you like to change?" (or the edit planner).
+- **A "yes" confirms one removal, not the next.** `confirmed`,
+  `orchestrator_intent` and `orchestrator_confidence` are per-turn and are no
+  longer saved into the conversation; a saved `confirmed` let the next
+  "remove work item …" skip its confirmation.
+
+Gap noted: `set the description to …` (verb `set`, no estimate noun) is still
+unrouted on the rule tier, as it was before; `update`/`change` work.
+Tests: `tests/test_maple_description_after_remove.py` (endpoint replay of the
+reported conversation), `tests/test_maple_assigned_value_routing.py`.
+
+**2026-09-24 — a note with no target annotates the entity in play**
+
+`Add a note that says: …` / `add a note: …` / `leave a note that …` name no
+resource, so the orchestrator borrows the domain from the active anchor — and
+read `add` as CREATE. With an estimate open, Maple started a brand-new
+estimate instead of filing the note (same for property, contact and task). A
+note always hangs off something that exists, so `is_note_add_request`
+(`agents/orchestrator/intents.py`) now makes it an update of the anchored
+entity, on both the rule and the LLM path. The same goes when the resource
+IS named: `create a note for this estimate: …`, `make a note on E0053 that …`,
+`new note for this quote: …` used to resolve to `create_estimate` (with any
+anchor or none), and the equivalents to `create_property` / `create_contact`
+/ `create_task`. The note must be the object of the leading verb, so
+`create a new estimate with a note: …` stays a create. The estimate note
+extractor drops the lead-in (`saying`, `that says`, `- `, `that`) and the
+target (`for this estimate that says …`), and the work-item note detector
+accepts `create`/`make`/`drop` and `… that …`. Tests:
+`tests/test_maple_bare_note_routing.py`, `tests/test_maple_work_item_edits.py`.
+
+**2026-09-24 — multi-turn estimate & work-item editing**
+
+Maple keeps track of "this estimate" and "this work item" across turns, and
+edits everything on a work item a user can edit by hand
+(plan: `plans/2026-09-23-maple-estimate-multi-turn-editing.md`).
+
+- **Which estimate:** opening an estimate in the portal makes it "this
+  estimate" (most recent signal wins against Maple's own last action). A named
+  code or title still beats it; names may now be lowercase or one word ("the
+  smith job", "the Henderson proposal"), including a customer or property name.
+  A name that matches nothing offers the open estimate as a yes/no.
+  `bid`/`proposal` are estimate synonyms.
+- **Which work item:** "this work item" / "it" follow the last work item
+  resolved (by its stable id); "the second one" follows the list Maple just
+  showed; "which work item?" menus and "what should I call it?" prompts resume
+  the original request.
+- **New edits (§1.5.5–§1.5.8, §1.11):** material quantity/price, activity
+  effort/rate/role, markup/overhead/tax, gross margin (writes the markup that
+  delivers it), work-item notes, pricing a new scope with AI. Set-total now
+  back-calculates the markup like the Adjust pill. Labor burden and a
+  material's cost stay refused.
+- **Edit planner (🤖 planner):** requests no rule recognizes go to a
+  worker-model planner that emits the same typed commands; see §1.11.
+- Coverage matrix: new `estimate_work_item_edits` category (8/8 both tiers).
 
 **2026-09-23 — estimate notes → Notes feed (Option C)**
 
@@ -637,6 +1086,12 @@ Equipment is **explicitly blocked** via `is_equipment_request()` at the orchestr
 
 ## How to add new use cases
 
+**Estimates:** a phrasing a rule should handle becomes an entry in
+`platform/agents/estimate/command_grammar.py` with accept/reject examples in
+`tests/test_command_grammar.py` and a row in §1.0 — never a regex elsewhere
+(design 2026-09-25). A phrasing no entry covers is the planner's (🤖) or the
+classifier's; mark it ⚠️ gap only if the live suite shows they miss it.
+
 1. Add the phrasing under the appropriate resource section with status ⚠️ gap. Include the intended intent/agent if you have one.
 2. Ping Claude with "add these phrasings to Maple" — Claude will write failing tests, implement the rule, and flip the status to ✅ here.
 3. For phrasings that should be refused, add under §9 with status 🛑 and note why.
@@ -648,6 +1103,45 @@ Tests live in `platform/tests/test_maple_crud_coverage.py` (matrix) and `platfor
 # 1. Estimates
 
 Estimate is not in the CRUD coverage matrix — its generation is multi-turn and its operations (status transitions, work items, linking) don't fit the generic category templates. These are curated.
+
+## 1.0 The written command list *(2026-09-25)*
+
+The complete set of estimate phrasings a rule handles
+(`agents/estimate/command_grammar.py`). Anything not here is 🤖 planner (edits)
+or the classifier (routing) — where the sections below still say ✅ rule for a
+material/activity line edit, read 🤖 planner.
+
+**Shared pieces:** up to three openers (hey, hi, maple, ok, yes, great,
+perfect, thanks, please, now, also, and, actually, just, never mind, one more
+thing, quick, can you, could you); a trailing please/thanks. An estimate is
+named by an E-code, "this/the estimate", "the <title> estimate|job|quote" or
+"the estimate for <name>". A work item is "work item N" / "the Work Item #N",
+"the second work item", "the <label> work item", "work item <label>", "this/my
+work item"; a work-item command may end "… on/from E0042" or "… on the Smith
+estimate".
+
+| Entry | Example | Routes to |
+|---|---|---|
+| list_estimates | "show me my estimates", "how many estimates do I have?" | list_estimates |
+| get_estimate | "open E0042", "show me the estimate for the Smith property" | get_estimate |
+| list_work_items / get_work_item | "show the work items on E0042", "show work item 2" | update_estimate (renders them) |
+| create_estimate | "create an estimate for sod at 12 Oak St" | create_estimate |
+| rename_estimate / set_estimate_field | "rename this estimate to Spring Cleanup", "update the description to Front yard refresh" | update_estimate (no estimate named: only while it's in focus) |
+| add_work_item | "add a work item called Fence to E0042", 'add a work item "Build stone patio" to E0043', "add a work item to E0042" (asks the name), "Add a new work item to it." (asks the name; "it" = the last record worked with — the estimate or one of its work items; with a material or contact in focus it isn't the estimate's) | update_estimate |
+| add_described_work_item | "Add a new work item to it. The client wants to build a patio in their backyard. It will be about 900 sq ft in size.", "add a work item to E0042: 200 sq ft paver patio with edging", "Add a new work item to it for 900 sq ft. The client wants a patio.", "add a work item for a cedar fence along the back and price it" (prices the description as new work; 15+ characters after the separator or "for") | update_estimate |
+| remove_work_item / remove_pronoun | "delete work item 2", "remove the patio work item from E0043", "delete it" | update_estimate — "it" is the freshest anchor; the estimate itself → delete_estimate |
+| rename_work_item / rename_pronoun | "rename work item 2 to Back Fence", "rename it to Back Fence" | update_estimate |
+| set_work_item_field | "set the division of work item 1 to Maintenance", "update the description on work item 2" (asks the value), "change my work item division to Design/Build" | update_estimate |
+| set_percentage | "set the markup on work item 2 to 20%", "set tax rate on the patio work item to 7% on E0043" | update_estimate |
+| set_gross_margin | "make the gross margin 30%", "set the profit margin on the patio work item to 20%" | update_estimate |
+| set_total | "set the total on work item 1 to $1,000" | update_estimate |
+| add_note | "add a note to work item 2: check drainage", "leave a note on this estimate that says: …", "add a note: call Bob" (the record in focus) | update_estimate |
+| *(ported)* set_status, set_estimate_description, set_estimate_title, estimate_note, generate_work_item, list_work_item_lines, query_work_item_field, adjust_assumption, apply_template, link_property | the older detectors, unchanged: "mark E0042 as sent", "retitle E0042 as …", 'Set note on E0059 to "…"', "generate a work item for …", "apply the Driveway Maintenance template to E0042" | the Estimate Agent (the orchestrator's own rules route these) |
+
+**Refused by rule:** bulk delete and equipment (orchestrator, on the command
+part only — never on a note body, a new name or a reply to Maple's question);
+a note to a material or role. **Refused by the planner:** labor burden
+(`labor_burden`) and a stated material cost (`material_cost`).
 
 ## 1.1 Count & status queries
 
@@ -845,6 +1339,7 @@ The fallback scorer ranks evidence in tiers: **the company's own description** f
 | `which division does {WI} belong to?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `set all work items in {EST} to Maintenance` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `set the division of {WI} to {custom division}` (a division the company added or renamed) | `update_estimate` → Estimate Agent | ✅ rule *(2026-07-31 — was a ⚠️ gap earlier the same day: the handler validated against the `EstimateDivision` enum only and answered "isn't a recognized division" for a company's own rows. It now validates against the company's live divisions, canonicalizes casing/punctuation to the stored spelling, and lists the company's own divisions when it refuses.)* |
+| `set the division of {WI} to Special Project` — a near miss (missing plural, typo, leading part of the name like `snow`) | asks "Did you mean Special Projects? Say yes and I'll use it."; **yes** applies it | ✅ rule *(2026-09-24 — was a flat refusal listing every division. `closest_division_name` (`routers/estimate_helpers/division.py`) proposes the single closest division; the batch is stashed as a `sub_op="edit_commands"` confirmation with the guess substituted, so "no" cancels and nothing is written until "yes". Two about-equally-close divisions (`Care` → Tree Care / Turf & Plant Care) or nothing close keeps the refusal and its list.)* |
 | `move {WI} to {custom division}` — **without** the word "division" | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-07-31 — the op detector (`work_item_handlers.py::_detect_work_item_field_op`) still gates on a hardcoded alternation of the seven seeded names, so a bare custom name isn't recognized as a division op at all. Any phrasing that includes the word "division" works for every value.)* |
 
 ### 1.5.3 Description
@@ -860,27 +1355,27 @@ The rename handler already covers description updates. These phrasings extend th
 | `describe {WI} as "Remove existing pavers and re-lay"` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `what's the description of {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
 
-### 1.5.4 Recurring schedule
+### 1.5.4 Recurring schedule (🛑 deferred)
 
 `JobItem.recurring` (bool) + `JobItem.recurrence` (`RecurrenceSchedule`) control repeat billing. `RecurrenceSchedule` supports three end types: `DATE_RANGE` (start/end month+year), `TOTAL_OCCURRENCES` (fixed count), and `SPECIFIC_MONTHS` (named months across years). Currently only `month` period is supported.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `make {WI} recurring` | `update_estimate` → Estimate Agent | ✅ rule |
-| `set {WI} to recur monthly` | `update_estimate` → Estimate Agent | ✅ rule |
-| `set {WI} to repeat every month` | `update_estimate` → Estimate Agent | ✅ rule |
-| `make {WI} recurring from April to October` | `update_estimate` → Estimate Agent | ✅ rule |
-| `set {WI} to 6 occurrences` | `update_estimate` → Estimate Agent | ✅ rule |
-| `make {WI} recurring in April, May, June, July, August` | `update_estimate` → Estimate Agent | ✅ rule |
-| `turn off recurring on {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `remove the recurring schedule from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `stop {WI} from recurring` | `update_estimate` → Estimate Agent | ✅ rule |
-| `is {WI} recurring?` | `update_estimate` → Estimate Agent | ✅ rule |
-| `how many occurrences does {WI} have?` | `update_estimate` → Estimate Agent | ✅ rule |
-| `what's the recurring schedule on {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
-| `change the recurrence on {WI} to 12 occurrences` | `update_estimate` → Estimate Agent | ✅ rule |
+| `make {WI} recurring` | — | 🛑 deferred |
+| `set {WI} to recur monthly` | — | 🛑 deferred |
+| `set {WI} to repeat every month` | — | 🛑 deferred |
+| `make {WI} recurring from April to October` | — | 🛑 deferred |
+| `set {WI} to 6 occurrences` | — | 🛑 deferred |
+| `make {WI} recurring in April, May, June, July, August` | — | 🛑 deferred |
+| `turn off recurring on {WI}` | — | 🛑 deferred |
+| `remove the recurring schedule from {WI}` | — | 🛑 deferred |
+| `stop {WI} from recurring` | — | 🛑 deferred |
+| `is {WI} recurring?` | — | 🛑 deferred |
+| `how many occurrences does {WI} have?` | — | 🛑 deferred |
+| `what's the recurring schedule on {WI}?` | — | 🛑 deferred |
+| `change the recurrence on {WI} to 12 occurrences` | — | 🛑 deferred |
 
-`recurring` and `recurrence` removed from `_WORK_ITEM_REFUSED_FIELDS` in `text_helpers.py`. Handlers parse three `RecurrenceSchedule` shapes: total occurrences, date range (month-to-month), and specific months.
+**🛑 Deferred 2026-09-26 (user decision):** Maple no longer sets, clears or answers a work item's recurring schedule — set it on the estimate page. The `set_recurring` ported entry, its detector (`recurring_enable/disable/query`), the three handlers, their schedule parsing and the orchestrator's recurring routing rule were removed; a recurring request gets the ordinary "What would you like to change?" reply (or the edit planner's, which already treated recurrence as out of scope). Recurrence itself — the model, templates, grand-total math, the document generator and the portal — is unchanged, and work-item details still show "Recurring: Yes/No".
 
 ### 1.5.5 Materials within a work item
 
@@ -894,8 +1389,12 @@ The rename handler already covers description updates. These phrasings extend th
 | `add {material} with quantity 20 and size 12x12 to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `remove concrete blocks from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `remove all materials from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `change the quantity of concrete blocks in {WI} to 100` | `update_estimate` → Estimate Agent | ✅ rule |
-| `update the price of {material} in {WI} to $12` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the quantity of concrete blocks in {WI} to 100` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24 — now actually edits the line; it used to list the materials)* |
+| `update the price of {material} in {WI} to $12` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24 — was misread as a set-total)* |
+| `change the mulch quantity in {WI} to 8` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
+| `set the price of pavers to $4.25` (no work item named) | `update_estimate` → Estimate Agent | ✅ rule + context *(2026-09-24 — only while a work item is in play; otherwise it is the catalog edit in §4. The work item holding that line is found automatically)* |
+| `add mulch to the front patio work item` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24 — multi-word work-item names before the noun)* |
+| `set the cost of {material} in {WI} to $3` | `update_estimate` → Estimate Agent | 🛑 refused *(a line's cost is the catalog snapshot; Maple offers price/quantity or the catalog)* |
 | `how many materials are in {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `what materials does {WI} have?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `list the materials in {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
@@ -914,10 +1413,12 @@ The rename handler already covers description updates. These phrasings extend th
 | `add activity "Planting" with 8 hours of effort to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `remove the Excavation activity from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `remove all activities from {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
-| `change the role on the Excavation activity to Foreman` | `update_estimate` → Estimate Agent | 🤖 LLM |
-| `set the effort on the Grading activity in {WI} to 12 hours` | `update_estimate` → Estimate Agent | 🤖 LLM |
-| `update the rate for the Planting activity to $45/hr` | `update_estimate` → Estimate Agent | 🤖 LLM |
-| `assign an effort rate card to the Excavation activity in {WI}` | `update_estimate` → Estimate Agent | 🤖 LLM |
+| `change the role on the Excavation activity to Foreman` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24 — re-snapshots rate and cost basis from the role's Rate)* |
+| `assign the Landscaper role to the cleanup activity` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
+| `set the effort on the Grading activity in {WI} to 12 hours` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
+| `make the excavation activity 6 hours` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
+| `update the rate for the Planting activity to $45/hr` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24 — a hand-set rate keeps the role's cost basis)* |
+| `assign an effort rate card to the Excavation activity in {WI}` | `update_estimate` → Estimate Agent | ⚠️ gap *(no chat command for rate cards; the planner answers out-of-scope)* |
 | `what activities are in {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `list the activities on {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `how many activities does {WI} have?` | `update_estimate` → Estimate Agent | ✅ rule |
@@ -928,21 +1429,31 @@ The rename handler already covers description updates. These phrasings extend th
 
 **Naming:** the persisted field is still `profit_margin`, but it is a **markup** — applied to the subtotal and added on top — and the UI labels it **Markup %**. The field was not renamed (a migration across estimates, templates and company defaults for no user benefit). The **Gross Margin** shown beside it is computed in the frontend and is not stored, which is why Maple cannot report its value — editing it in the UI writes back to `profit_margin`, so there is still exactly one stored number.
 
-**Current policy:** these fields are in `_WORK_ITEM_REFUSED_FIELDS` — the agent directs users to the UI because financial changes have dollar-impact visibility concerns. The phrasings below are defined for review; implementation would require lifting the refusal.
+**Current policy (2026-09-24, reversing the 2026-04-21 UI-only decision):**
+markup, overhead and tax are set directly and the reply echoes the new
+work-item total. A **gross margin** ("margin", "gross margin", "profit
+margin") writes the markup that delivers it — the margin itself is never
+stored (server port of the portal math in
+`routers/estimate_helpers/calculations.py`). Labor burden stays refused: the
+estimate page doesn't edit it either.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `set the markup on {WI} to 20%` | `update_estimate` → Estimate Agent | 🛑 refused |
-| `set the profit margin on {WI} to 20%` | `update_estimate` → Estimate Agent | 🛑 refused |
-| `change the margin on {WI} to 25%` | `update_estimate` → Estimate Agent | 🛑 refused |
-| `set overhead allocation on {WI} to 10%` | `update_estimate` → Estimate Agent | 🛑 refused |
-| `change the overhead on {WI} to 15%` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `set the markup on {WI} to 20%` | `update_estimate` → Estimate Agent | ✅ rule |
+| `put a 15% markup on it` | `update_estimate` → Estimate Agent | ✅ rule + context |
+| `set the profit margin on {WI} to 20%` | `update_estimate` → Estimate Agent | ✅ rule *(gross margin → markup)* |
+| `change the margin on {WI} to 25%` | `update_estimate` → Estimate Agent | ✅ rule *(gross margin → markup)* |
+| `I want a 30% margin on the patio work item` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set overhead allocation on {WI} to 10%` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the overhead on {WI} to 15%` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set the overhead to 10%` (work item in play) | `update_estimate` → Estimate Agent | ✅ rule + context |
+| `set tax on {WI} to 13%` | `update_estimate` → Estimate Agent | ✅ rule |
+| `change the tax rate on {WI} to 8.25%` | `update_estimate` → Estimate Agent | ✅ rule |
+| `drop the tax on {WI}` | `update_estimate` → Estimate Agent | ✅ rule *(sets 0%)* |
 | `set the labor burden on {WI} to 12%` | `update_estimate` → Estimate Agent | 🛑 refused |
 | `change the labor burden on the Foundation scope to 18%` | `update_estimate` → Estimate Agent | 🛑 refused |
-| `set tax on {WI} to 13%` | `update_estimate` → Estimate Agent | 🛑 refused |
-| `change the tax rate on {WI} to 8.25%` | `update_estimate` → Estimate Agent | 🛑 refused |
-| `what's the profit margin on {WI}?` | `update_estimate` → Estimate Agent | 🛑 refused *(value not stored — see below)* |
-| `what's the markup on {WI}?` | `update_estimate` → Estimate Agent | 🛑 refused |
+| `what's the profit margin on {WI}?` / `what's the gross margin on {WI}?` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24 — computed from the lines; explains a missing activity cost basis)* |
+| `what's the markup on {WI}?` / overhead / tax | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
 | `what's the subtotal of {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `how much is {WI}?` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `what's the total for {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
@@ -967,7 +1478,7 @@ fixed, that test flips red and this row gets updated.
 
 ### 1.5.8 Total amount adjustment
 
-Direct override of a work item's `sub_total`. Unlike the percentage-based cost parameters in §1.5.7, this sets an absolute dollar amount on the work item, which then rolls up into `Estimate.grand_total`. Useful for rounding, flat-rate pricing, or manual corrections.
+Sets a work item's total to an absolute dollar amount by **back-calculating its markup**, like the portal's Adjust pill (2026-09-24; it used to overwrite `sub_total`, which the next portal save recomputed from the lines and silently undid). The markup before the first adjustment is kept in `original_profit_margin`. Useful for rounding, flat-rate pricing, or manual corrections.
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
@@ -995,19 +1506,22 @@ Direct override of a work item's `sub_total`. Unlike the percentage-based cost p
 | `assign {EST} to the {property} property` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `assign` in `_LINK_PROPERTY_PATTERN`; deliberately NOT in the bare-name pattern, so "assign" only links when "property" or an address is present)* |
 | `change the property on the {title} quote to {property}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06)* |
 | `set the job site for this estimate to {address}` | `update_estimate` → Estimate Agent | ⚠️ gap *(routes to `update_estimate` ("job site" is a routing field token), but `_is_property_link_request` has no "job site" cue, so it falls to the generic clarification. Implementation: add a `job\s*site` alternation to `_LINK_PROPERTY_PATTERN`.)* |
-| `the {title} job is at {address}` / `this estimate goes with {address}` | `update_estimate` → Estimate Agent | ⚠️ gap *("the {X} job" isn't an estimate reference (job-name resolution is the Task-8 stretch) and "goes with"/"is at" aren't link cues yet)* |
+| `the {title} job is at {address}` / `this estimate goes with {address}` | `update_estimate` → Estimate Agent | ⚠️ gap *("the {X} job" now resolves as an estimate reference (2026-09-24, Task 8 closed), but "goes with"/"is at" aren't link cues yet)* |
 
 **Implementation note (shipped 2026-06-06):** estimate resolution on the linking path is code → `active_estimate_code` anaphora → "latest" → bare/quoted title (shared `_resolve_estimate_code_or_title`). Property resolution is name or bare address (`_extract_property_name` / `_extract_property_address`); possessive nicknames ("Bob's place") remain a softer follow-on gap. Routing note: the orchestrator's bare link-verb arm is deliberately broad — the `_estimate_ref` gate (estimate/quote/bid/proposal/EST-code) is the load-bearing guard, and the contact↔property link rules earlier in `_classify_specific_phrasings` still win for contact links.
 
 ## 1.7 Anaphora / active estimate
 
-When session context carries `active_estimate_code` (user recently worked on an estimate):
+"This estimate" is whichever was touched most recently: the estimate open in the portal (sent every turn as `client_context.viewed_estimate`; a new page visit takes the anchor) or the last one Maple acted on. A code or name in the message always wins (2026-09-24, `routers/agent_helpers/active_estimate.py`).
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
 | `add a Landscaper to the estimate` | `update_estimate` → Estimate Agent | 🤖 LLM + context |
 | `update the estimate` | `update_estimate` → Estimate Agent | 🤖 LLM + context |
-| `show me the estimate` | `get_estimate` → Estimate Agent | 🤖 LLM + context |
+| `show me the estimate` / `show me this estimate` | `get_estimate` → Estimate Agent | ✅ rule + context *(2026-09-24 — the router's get path now reads the anchor)* |
+| `open the second one` (after a list of estimates) | `get_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
+| `add a work item called Fence` while viewing an estimate in the portal | `update_estimate` → Estimate Agent | ✅ rule + context *(2026-09-24 — the viewed estimate)* |
+| `update the henderson job` (no estimate titled that, one is open) | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24 — "I couldn't find … Did you mean E0042, the estimate you're working on?"; "yes" re-runs the request there)* |
 | `this estimate` / `the last estimate` / `that one` | resolves via `active_estimate_code` | 🤖 LLM + context |
 | `the same estimate` / `that estimate` / `the previous estimate` (after a note/description/work-item edit) | resolves via `active_estimate_code` | ✅ rule *(2026-06-07 — flat-result estimate updates now persist `active_estimate_code` in `finalize_result`, so anaphora anchors on the just-edited estimate; previously these asked "Which estimate?")* |
 
@@ -1090,9 +1604,11 @@ These edit **top-level `Estimate` fields** (`title`, `description`) — distinct
 | `update the write-up/overview for {EST} to "..."` | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — `write-up`/`overview` are description-cue synonyms)* |
 | `put "..." as the overview for the estimate` | `update_estimate` → Estimate Agent | ⚠️ gap *(value-**before**-cue word order — the extractors expect the cue before the value; needs a `put "X" as the description/overview` pattern)* |
 | `describe the {title} estimate as "..."` / `the description for the {title} job should be "..."` | `update_estimate` → Estimate Agent | ⚠️ gap *(`describe ... as` and `... should be` shapes have no extractor; "the {X} job" also isn't an estimate reference)* |
-| `make a note on {EST} that ...` / `leave a note on {EST}: "..."` / `tack a note onto the {title} quote: "..."` | `update_estimate` → Estimate Agent | ⚠️ gap *(corrected 2026-06-06: the routing verb list lacks `make`/`leave`/`tack`, so these never reach the agent on a fresh turn; "make a note ... that X" additionally needs a generic `note ... that` tail extractor (only `remember ... that` exists). Reachable today only when the orchestrator already routed to `update_estimate` for another reason.)* |
+| `make a note on {EST} that ...` / `leave a note on {EST}: "..."` / `tack a note onto the {title} quote: "..."` | `update_estimate` → Estimate Agent | ✅ rule for `make`/`leave` *(2026-09-24 — `is_note_add_request` routes them and `_NOTE_TARGETED_LEAD_IN` extracts the `... that X` body; `tack` is still a gap.)* ⚠️ *(historical, corrected 2026-06-06: the routing verb list lacks `make`/`leave`/`tack`, so these never reach the agent on a fresh turn; "make a note ... that X" additionally needs a generic `note ... that` tail extractor (only `remember ... that` exists). Reachable today only when the orchestrator already routed to `update_estimate` for another reason.)* |
 | `note on the {title} job: ...` | `update_estimate` → Estimate Agent | ⚠️ gap *(verbless + "the {X} job" isn't an estimate reference — Task-8 stretch)* |
 | `jot down on the {title} estimate: "..."` / `remember on this estimate that ...` / `FYI on the {title} job: "..."` (with an estimate/quote token) | `update_estimate` → Estimate Agent | ✅ rule *(2026-06-06 — informal cues `jot`/`fyi`/`remember`/`write down` in `_NOTE_UPDATE_CUES` + value extractors (`_NOTE_WITH_COLON_SEP` broadened, new `_NOTE_REMEMBER_TAIL`); routed end-to-end by the orchestrator's value-bearing `_informal_note` arm. 2026-09-23 — always **adds** a `Note` to the estimate's Notes feed; `Estimate.notes` is untouched. Note: the phrase still needs an estimate/quote/EST token — "the Smith job" alone doesn't reference an estimate.)* |
+| `create a note for this estimate: …` / `create a note on E0053: …` / `make a note on this estimate that …` / `new note for this quote: …` | `update_estimate` → Estimate Agent (estimate-level Note) | ✅ rule *(2026-09-24 — was `create_estimate`. `create a note for this work item: …` files a work-item Note.)* |
+| `Add a note that says: …` / `add a note: …` / `create a note: …` / `leave a note that …` / `add note - …` — **no target at all**, estimate in play | `update_estimate` → Estimate Agent (estimate-level Note, even with a work item anchored) | ✅ rule *(2026-09-24 — was `create_estimate`: "add" plus the borrowed estimate domain read as a create)* |
 | `write down on the {title} estimate that ...` | `update_estimate` → Estimate Agent | ⚠️ gap *(`write down` is a cue, but only `remember` has a `... that ...` tail extractor; needs the tail generalized)* |
 
 **Title-vs-target trap (2026-07-30):** the rename handler must resolve its target from the message **head**, never the raw query. `_resolve_estimate_code_or_title` treats the bare word "title" as an explicit name cue (`_TITLE_BARE_RE`), so `change the title of this estimate to Patio Rebuild` would otherwise hunt for an estimate literally named *"of this estimate to Patio Rebuild"*, miss, and refuse instead of falling back to the active estimate. `_detect_estimate_title_update` returns `(new_title, target_text)` for exactly this reason. Two exclusions run against that **head**, never the new value (an estimate may legitimately be titled "Scope of Work"): a work-item noun in the head (`rename the patio work item|scope to X`) leaves the message to the work-item op, and a *qualified* name field (`set the name **of the property** on {EST} to X`) leaves it to the property-link branch — without that second guard the value was silently written into `Estimate.title` instead.
@@ -1102,6 +1618,65 @@ These edit **top-level `Estimate` fields** (`title`, `description`) — distinct
 **Implementation note (shipped 2026-06-06; notes behavior changed 2026-09-23):** all update sub-handlers (description / notes / property-link) resolve the estimate by **code → `active_estimate_code` anaphora → "latest" → quoted-or-bare title** via the shared `_resolve_estimate_code_or_title`. The verb (`set`/`change`/`replace`/`overwrite`/`rewrite` + note vs. everything else, incl. all informal cues) still selects a "mode," but as of 2026-09-23 (Option C) every mode **adds** a `Note` via `_handle_add_estimate_note` → `create_note_as` — nothing ever writes `Estimate.notes` again, and the note ignores the Draft/Review edit lock. Dispatcher order in `_handle_update_estimate`: work-item ops → status → **description** → notes → property link → template (description sits above notes so a "description" cue never lands in the notes branch; work-item ops stay first so `description of {WI}` is untouched). **Remaining ⚠️ in this section:** value-before-cue (`put "X" as the overview`), `describe ... as` / `should be`, routing verbs `make`/`leave`/`tack`, a generalized `note ... that` tail, and "the {X} job" as an estimate reference (Task-8 stretch).
 
 ---
+
+
+## 1.11 Multi-turn work-item conversation *(2026-09-24)*
+
+Work items have no names, only a description and a position, so Maple keeps
+three kinds of memory (`agents/estimate/work_item_context.py`): an anchor on
+the last work item resolved (by its stable `JobItem.id`), the list it last
+showed, and the question it last asked.
+
+| Phrasing (turn by turn) | What happens | Status |
+|---|---|---|
+| `show work item #2` → `rename it to Patio lights` | the rename lands on #2 (the anchor), even if items were reordered | ✅ rule |
+| `list the work items` → `delete the second one` | removes the 2nd row shown (asks to confirm first) | ✅ rule |
+| `list the work items` → `rename the fifth one to X` (only 3 listed) | "I only listed 3 work items — which one did you mean?" | ✅ rule |
+| `rename the patio work item to X` → *(two patios)* → `2` / `the front one` | the menu answer resumes the rename on that item | ✅ rule |
+| `add a work item` → *"what should I call it?"* → `Retaining wall` | creates it and anchors it | ✅ rule |
+| `update the description of work item 2` → *"what should it be?"* → `Patio string lights` | sets it | ✅ rule |
+| `rename work item 3 to X` → *"which estimate?"* → `E0042` | resumes on E0042 | ✅ rule |
+| `add a note to work item 2: check drainage` / `note on this work item: …` | files a work-item Note (outside the edit lock) | ✅ rule |
+| `add a note to the patio work item` → *"What should the note say?"* → `check the grade` | files the reply as a note on the patio work item | ✅ rule |
+| `add a note to work item 2 about drainage` / `… to check drainage` / `…the patio scope, check drainage` | files a work-item note (no ":" needed) | ✅ rule |
+| `set the markup on all work items to 20%` / `… for work items 1 and 2 …` | "I can change one work item at a time — which one?" | ✅ rule |
+| `remove work item 1 and set the markup on work item 2 to 20%` | the edit planner types both; without it, "I can make one change at a time here — which should I do first?" | 🤖 planner |
+| `also raise the markup by 5%` / `change the markup by 5%` | "What should the new markup be?" | ✅ rule |
+| `create a task to set the markup to 20%` / `don't drop the markup on work item 2` / `if we set the markup to 20% …` | not an estimate edit; nothing is written | ✅ rule |
+| `add 500 sq ft of sod to E0001` | prices the scope into E0001 (never a new estimate) | ✅ rule |
+| `delete work item 1 and …` → *question* → `Yes` | a bare yes/no never repeats a delete from the chat history | ✅ rule |
+| `list the work items` → `rename the second one to Front Patio Scope` | renames that work item; a work-item word in the new name doesn't stop the pick, and an ordinal rename never retitles the estimate | ✅ rule |
+| `list the work items` → `add a note to the second one: check the line item` | files the note on the second work item | ✅ rule |
+| `set the markup on the patio job to 20%` (open estimate has one "patio" work item) | sets it on that work item, not the anchored one | ✅ rule |
+| `set the tax on the lawn work item on the patio job to 13%` / `remove work item 1 from the patio job` | the work item the message names, not the patio one | ✅ rule |
+| `rename the patio work item to X` → *(menu)* → `set the markup on work item 1 to 15%` / `show me the 2nd estimate` | a new request, not a menu pick; only a bare pick answers the menu | ✅ rule |
+| `update the description on work item 2` → *"what should it be?"* → `cancel` / `no` / `never mind` | "No problem, I've left it as is." — nothing is written | ✅ rule |
+| `update the description on work item 2` → *"what should it be?"* → `list my estimates` / `show me estimate E0004` | the question is dropped and the request runs | ✅ rule |
+| `rename the patio work item on the Smith estimate to Back Patio` | renames the work item; never retitles the estimate | ✅ rule |
+| `add a task to follow up on E0042` / `add Bob as the contact on E0042` | creates the task / contact; E0042 is not priced | ✅ rule |
+| `rename the patio work item to X` → *(menu "Add mulch beds / Remove stump")* → `Remove stump` | picks that row — a row's own description is always a pick | ✅ rule |
+| `update the description on work item 2` → `Show homeowner the revised quote before starting` | sets it as the description | ✅ rule |
+| `add a note to the patio work item please` → *"What should the note say?"* → `gate code 1234` | filed on the patio work item | ✅ rule |
+| *(menu open)* → `delete all work items` / `add equipment to the patio` | the bulk-delete / equipment refusal — an open question never takes them | 🛑 refused |
+| *(material or contact opened last)* → `set the price of mulch to $5` / `set the markup to 25%` | goes to that record's agent, not the estimate left earlier | ✅ rule |
+| `the pavers on the front patio actually cost us $3.50 now` (planner) | the material-cost refusal; a cost is never written as the price | 🛑 refused |
+| `set the overhead lighting work item's markup to 20%` | sets the markup on "Overhead lighting" — a field word in a name is never the field | ✅ rule |
+| `delete estimate E0042` → `confirm` (Member, not the creator) | "Only the estimate's creator or an Owner can delete …" — the Delete button's rule | 🛑 refused |
+| `reduce the markup 5%` / `raise the tax 2%` | "What should the new markup be?" — a change BY 5 is never applied as the new value | ✅ rule |
+| `why is the markup 20%?` / `i think the markup of 20% is too high` | not an edit; nothing is written | ✅ rule |
+| `set the hours on the overhead pruning activity to 6` | edits the activity's hours; "overhead" is part of its name | ✅ rule |
+| `rename the grading activity to Rough Grade` | "I can't rename an activity from chat yet" — never retitles the estimate | 🛑 refused |
+| `add a work item Patio, add 10 pavers to it` (planner) | the pavers go on the new Patio work item | 🤖 planner |
+| `generate a work item for installing 200 sq ft of pavers` / `add a scope for … and price it` | runs the estimate pipeline for that scope and appends it (15–30 s) | ✅ rule |
+| `show work item #1` | description, division, materials, activities, markup/overhead/tax, gross margin, sub-total | ✅ rule |
+| anything else about an open estimate that no rule recognizes (`we'll need twelve dozen pavers after all and the customer is tax exempt`) | the edit planner proposes typed commands; validated against the estimate and applied all-or-nothing | 🤖 planner |
+
+**Edit planner guardrails** (`agents/estimate/edit_planner.py`): runs only
+after the estimate is resolved and editable; at most 5 commands; every
+work-item target must exist in the snapshot it was shown or the whole plan is
+rejected; it cannot name another estimate (it says `different_estimate`);
+reads get the capability message; removals still ask for confirmation.
+Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
 # 2. Properties
 
@@ -1550,7 +2125,7 @@ Additive is the default, matching estimate notes (§5.x) — a drive-by note nev
 | `add a note to the task: {text}` / `append to the task notes: {text}` | `update_task` (notes append) → Task Agent | ✅ rule |
 | `add notes to the {task} task: {text}` | `update_task` (notes append) → Task Agent | ✅ rule |
 | `add a note to it: {text}` (pronoun only) | `update_task` (notes append) → Task Agent | 🤖 LLM *(agent handler wired; routing needs the LLM tier so an active estimate keeps priority)* |
-| `Add another note: {text}` / `add a note: {text}` — **no target at all** | `update_task` (notes append) → Task Agent | ✅ agent-side *(2026-07-25 smoke-test fix — the active task is implied, same as the pronoun forms; routing is LLM-tier for the same reason)* |
+| `Add another note: {text}` / `add a note: {text}` — **no target at all** | `update_task` (notes append) → Task Agent | ✅ rule *(2026-07-25 smoke-test fix — the active task is implied, same as the pronoun forms. 2026-09-24 — routing is now rule-tier: `is_note_add_request` sends a targetless note to whichever domain was touched most recently; before, the borrowed domain plus `add` resolved to `create_task`.)* |
 | `replace the notes on the task with: {text}` / `set the notes on the task to: {text}` | `update_task` (notes **set**) → Task Agent | ✅ rule |
 | `add a task with the notes: {text}` | `create_task` → Task Agent | ✅ rule *(create shape — the notes-update rule explicitly excludes it)* |
 
@@ -2221,7 +2796,7 @@ These read like questions *about* Maple but are really **capability / CRUD** req
 | `platform/tests/test_estimate_agent.py` | Estimate Agent handler integration |
 | `platform/tests/test_orchestrator_intents.py` | Orchestrator intent resolution |
 | `platform/tests/test_maple_template_crud.py` | Template CRUD — routing, refusals, apply-to-estimate (§6) |
-| `platform/tests/test_maple_work_item_ops.py` | Work-item field operations — routing, op detection, regression, recurring param parsing (§1.5) |
+| `platform/tests/test_maple_work_item_ops.py` | Work-item field operations — routing, op detection, regression (§1.5; recurring deferred) |
 | `platform/tests/test_maple_new_phrasings.py` | May 2026 expansion — clear bug, win alias, age filter, analytics, material/role field queries, cross-resource "linked to" |
 | `platform/tests/test_maple_phrasing_expansion.py` | June 2026 expansion — status ratios/comparisons, age/staleness (`updated_at`), status-`in`, material name∪category qualifier (routing + pure parsers/formatter) |
 | `platform/tests/test_maple_listed_positional_reference.py` | Positional follow-ups to a result list — "show me the fourth one" (§10.5): per-resource round trips, orchestrator routing, estimate-code resolution |
@@ -2257,11 +2832,17 @@ cd platform
 | material_query_variants | 5/5 | 5/5 | covered (Wave 3 Workstream B) |
 | estimate_outbound | 5/5 | 5/5 | covered (Wave 4 + 4.1 — orchestrator routing + Property/Contact/Estimate agent cross-resource branches; contact-anchored variant gated on person-name shape) |
 | assumption_adjustment | 4/4 | 4/4 | covered (2026-07-26) |
+| estimate_work_item_edits | 8/8 *(2026-09-24)* | 8/8 *(2026-09-24)* | covered (work-item edit detectors + `OrchestratorAgent._is_work_item_edit`) |
 | task_operations | 8/8 | 8/8 | covered |
 | equipment_blocked | 3/3 | 3/3 | refused correctly |
 | calculator | 8/8 | 7/8 | 1 LLM miss ("how much topsoil do I need for 1000 sq ft") |
 
-**Totals: Tier 1 163/174 · Tier 2 165/174** *(both 2026-07-29, live)*.
+**Totals: Tier 1 171/182 · Tier 2 173/182** *(2026-09-24, live; the other rows are the 2026-07-29 counts, unchanged)*.
+
+*2026-09-24 run: Tier 2's 9 misses are the same classes as below, with one
+swap — `verbless/property` "tell me about 123 Main St" missed once (the model
+call returned no intent; it passed 3/3 on rerun) while `possessive/property`
+"what's 123 Main St's city" passed. Both are standing LLM-tier variance.*
 
 *Unchanged by the 2026-09-13 Markup/Margin split or the 2026-09-14 Gross
 Margin rename: neither change was
