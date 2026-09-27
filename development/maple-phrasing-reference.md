@@ -46,6 +46,10 @@ Headlines, 2026-09-27 (multi-turn everywhere — design
   rename / list a size; category moves; a new role or material asked for one
   field at a time; "list my roles" and the Heavy Equipment Operator role;
   templates filtered by name.
+- **Dashboard** (§1.9, §7.5) — pipeline, backlog, completed, a summary,
+  status and division breakdowns, recent estimates, "what's upcoming?"
+  (overdue first) and "what's on my plate?", each in the dashboard's own
+  terms; "and last month?" repeats the question for that period.
 - **Across records** (§8) — "which properties use Black Mulch?", "which
   estimates use the Foreman role?", "what materials does E0042 use?" read the
   estimates' work items and answer (they were always empty, #682).
@@ -625,7 +629,7 @@ Closed in xfail-wave-4 + 4.1 (plan: [maple-xfail-wave-4-estimate-outbound.md](pl
 
 ## 1.9 Dashboard / analytics queries
 
-Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orchestrator to a new `analytics_estimates` intent handled by the Estimate Agent. Runs before `is_help_query` so question-word phrasings aren't swallowed by the help classifier.
+Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orchestrator to a new `analytics_estimates` intent handled by the Estimate Agent. Runs before `is_help_query` so question-word phrasings aren't swallowed by the help classifier — and since 2026-09-27 the router delegates a help-shaped message the orchestrator routed to an agent, rather than answering it from the help pre-check (#682). The chat answers are the dashboard's own cards: Pipeline, Backlog and Completed values, value by division, the pipeline-status chart, Recent Estimates, and Upcoming Tasks (§7.5).
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
@@ -645,6 +649,11 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `draft vs approved estimates` / `compare won and lost estimates` | `analytics_estimates` → Estimate Agent (generic pair) | ✅ rule *(2026-06-02 — explicit "X vs Y" / "compare X and Y"; no win-rate framing for non-WON/LOST pairs)* |
 | `what's my win rate?` / `what's my win rate this month?` | `analytics_estimates` → Estimate Agent (WON vs LOST, window-aware) | ✅ rule *(2026-06-02)* |
 | `how am I doing on bids?` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02 — landscaper-friendly win-rate cue)* |
+| `what's my pipeline?` / `how's my pipeline looking?` / `what's in my backlog?` / `how much have I completed this month?` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-27, design §7.5 — they went to the user guide)* |
+| `show me my dashboard` / `give me a summary` / `how's business?` | `analytics_estimates` → Estimate Agent (Pipeline / Backlog / Completed) | ✅ rule *(2026-09-27 — they were unknown or help. A summary of one estimate — "give me a summary of E0042" — is not this.)* |
+| `how many estimates are in each status?` / `pipeline by status` / `estimates by status` / `estimate value by division` | `analytics_estimates` → Estimate Agent (breakdown) | ✅ rule *(2026-09-27 — "in each status" counted all estimates; "by division" was unknown)* |
+| `what's my pipeline?` → `and last month?` | the same question for last month | ✅ rule *(2026-09-27 — a read that named no period takes the new one, §10.8; it became a material lookup)* |
+| `what are my recent estimates?` / `show me my most recent estimates` | `list_estimates`, the newest 8 — the dashboard's Recent Estimates | ✅ rule *(2026-09-27 — help, or one row for a plural ask)* |
 | `how is the backlog value calculated?` / `what does pipeline value mean?` / `how is the completed value calculated?` | `help` → Orchestrator Agent | ✅ rule *(2026-06-20 — explanatory/definitional phrasing about a metric routes to HELP, not a value lookup. `_match_analytics_query` now redirects a recognized metric phrased with an explanatory cue (`calculated`/`computed`/`defined`/`mean`/…) to help; `calculated`/`computed` also added to `HELP_INSTRUCTIONAL_PATTERNS` for metrics without an analytics keyword.)* |
 
 **Status comparisons / ratios:** `compute_status_comparison` counts each status (all-time unless a date window is given, in which case it constrains `updated_at`). `format_status_comparison` renders a reduced `A:B` ratio; the WON-vs-LOST pair additionally reports a win-rate percentage (`won / (won + lost)`). Generic pairs ("draft vs approved") report counts + ratio only.
@@ -1257,7 +1266,8 @@ Bare-title possessives carry no "task" keyword for the rule tier to anchor on, a
 | `show open tasks` / `what's still to do?` | `list_tasks` leaving out finished tasks (a status named Done / Completed / Finished / Closed / Cancelled) | ✅ rule *(2026-09-27)* |
 | `show my overdue tasks` / `what's overdue?` | `list_tasks`, due before today and not finished, soonest first with each due date | ✅ rule *(2026-09-27)* |
 | `what's due today?` / `tasks due tomorrow` / `tasks due this week` / `tasks due next week` / `tasks due by Friday` / `tasks due on Oct 3` / `today's tasks` / `tasks for next week` | `list_tasks` with a `due_date` window, soonest first | ✅ rule *(2026-09-27 — no "task" word needed: only tasks have due dates. A week runs Monday to Sunday.)* |
-| `upcoming tasks` / `what's coming up this week?` / `anything due soon?` | `list_tasks`, due in the next 7 days and not finished | ✅ rule *(2026-09-27 — the dashboard's Upcoming Tasks card in words)* |
+| `upcoming tasks` / `what's upcoming?` / `what's coming up this week?` / `anything due soon?` | `list_tasks`, overdue or due in the next 7 days and not finished — overdue first, each row saying whether it's overdue | ✅ rule *(2026-09-27 — the dashboard's Upcoming Tasks card in words; overdue tasks were left out)* |
+| `what's on my plate?` / `what's on my to-do list?` | the same, assigned to you — the card's default view | ✅ rule *(2026-09-27 — went to the user guide)* |
 | `show archived tasks` | `list_tasks` with archived-only filter | ✅ rule |
 | `find tasks about fencing` | `list_tasks` with title/description search | ✅ rule *(named/matching/about/containing/called all apply the search term)* |
 | `list my tasks` (more than 20) → *"That's 1–20 of 24 … say "show more" for the next 4."* → `show more` / `next page` / `the rest` | the same list, from where it stopped — filters included | ✅ rule *(2026-09-27 — good for the next turn only; "show more" with no longer list open says so)* |

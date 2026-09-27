@@ -81,6 +81,13 @@ platform `3526a08` … `67892ec`)
   Paver" and "which templates have … in the name?" filter. Possessive looks
   ("show me Bob Lee's details", "what's the phone number for Bob Lee?",
   "update Bob Lee's record") reach the record — they routed but found no one.
+- Dashboard (§1.9, §7.5; platform `6fcdff9`): "what's my pipeline?",
+  "what's in my backlog?", "how much have I completed this month?", "show me
+  my dashboard", "give me a summary", "how's business?", status and division
+  breakdowns reach the analytics handler; "and last month?" repeats a period-
+  less read for that period; "what are my recent estimates?" lists the newest
+  eight. "what's upcoming?" includes overdue tasks, overdue first, and "what's
+  on my plate?" is that list for you.
 - Across records (§8; platform `634703f`, `695e0f8`): "which properties use
   Black Mulch?", "which properties need a Foreman?", "what estimates use the
   Foreman role?", "what materials does E0042 use?" and "which roles are on
