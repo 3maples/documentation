@@ -2078,12 +2078,14 @@ The calculator's pending question releases only on an action+domain pivot (`plat
 
 **Resolved 2026-09-27** (platform `f75f549`): property and contact lists filter by city, and contacts by role ("how many properties are in Toronto?", "list homeowners", "which contacts are administrators?"); a city nobody has is said so. With the task (`00c17d8`) and estimate (`00d88a6`) halves, no list drops a filter it recognises. Pinned by `tests/test_record_lists.py` and corpus rows `property-count-by-city`, `contacts-by-city-then-pick`, `contacts-by-role`, `properties-in-a-city-nobody-has`.
 
-### 690. [MEDIUM] `_prefer_explicit_rule_match` demotes correct LLM answers to off_topic
+### 690. ~~[MEDIUM] `_prefer_explicit_rule_match` demotes correct LLM answers to off_topic~~ — RESOLVED 2026-09-27
 `platform/agents/orchestrator/service.py:1712` — when a message has no action or domain keyword and history resolution finds nothing, the LLM's CRUD intent is overwritten with `off_topic` (`:1764-1777`). "what's its price?" and "link Carla Diaz to 12 Oak St" lose a correct LLM answer this way; "link" isn't in `ACTION_HINTS` (`agents/orchestrator/intents.py:143`). MEDIUM: a right answer thrown away for a canned one.
 
 **Suggested fix:** Rules decide what they parse, the LLM decides the rest, and a weaker rule never overwrites a correct LLM answer (design churn guard §3.5). Add "link" as an action.
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (platform `47b2319`): an LLM read (`get_`/`list_`) about a field of the domain it chose — "what's its price?" as `get_material`, "what's the wage on that one?" as `get_labour` — is kept instead of demoted; a read writes nothing, and one that finds nothing says so. The guard still demotes writes, reads that name no field of their own ("what's the weather today?"), and a field of another domain, so its original purpose holds. "link" was not added to `ACTION_HINTS`: link phrasings are answered by the router's link handler before classification on both tiers (`agents/conversation/record_links.py`, §3.9), so they no longer reach the guard, and adding the word would have re-routed existing link rules. Pinned by `test_an_llm_read_about_its_own_field_is_not_demoted` in `tests/test_orchestrator_intents.py`.
 
 ### 691. ~~[MEDIUM] The help short-circuit swallows record questions and shows an "Intent identified" placeholder~~ — RESOLVED 2026-09-27
 `platform/routers/agents.py:1093` — `is_help_query` runs before classification and never delegates, so "what's the status of E0042?" is answered by the user-guide responder instead of from the estimate. Separately, CRUD intents that end in the orchestrator's own envelope get the placeholder reply "Intent identified: `get_material` via Material Agent." (`agents/orchestrator/service.py:1379, :1526, :2038, :2294`). MEDIUM: a question about a record gets a generic or internal-looking answer.
@@ -2486,12 +2488,14 @@ geocode and note it in the comment.
 
 *(Review 2026-09-24 fourth pass #17.)*
 
-### 689. [MEDIUM] ConversationContext has no concurrency control
+### 689. ~~[MEDIUM] ConversationContext has no concurrency control~~ — RESOLVED 2026-09-27
 `platform/routers/agents.py:677-713` — `_save_conversation_context` loads the user's single `ConversationContext`, modifies it and saves it back with no version check, so two overlapping turns (a double-send, two tabs) each write their own copy: the later save wins and the other turn's questions and anchors are lost. Nothing marks a create as in flight either, so a double-sent create request makes two billed estimates. MEDIUM: rare, but it bills.
 
 **Suggested fix:** Give `ConversationContext` a `version` and save it with a conditional write (the `find_one_and_update` idiom #490 uses); on a conflict, reload and re-apply the turn's changes or drop them and say so. Reject a duplicate in-flight message for the same user.
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (platform `c478a53`): `ConversationContext` carries a `version`, and a save is a `find_one_and_update` conditional on the version the turn loaded (`routers/agent_helpers/conversation_store.py`; a document from before versions matches version 0). On a conflict the turn's changes are merged onto the newer copy and the save retried: keys it changed or removed win, keys it left alone keep the other turn's value, and its new chat lines are appended after the other turn's (capped at 40). An identical message still in flight — the double-send that billed twice — is claimed first and refused with "I'm still working on that one"; different messages may overlap (and merge). A claim a crashed turn left expires after three minutes. Both fail open. The endpoint's body moved to `_orchestrate_turn`, wrapped by the claim. Pinned by `tests/test_conversation_store.py` (merge rules, the conditional save against the local test Mongo, the claim, and the endpoint's duplicate reply).
 
 ## Platform — services, scripts and integrations
 
