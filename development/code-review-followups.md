@@ -1648,13 +1648,15 @@ a record-noun nearby.
 
 **Update 2026-09-27:** inbound translation now fails **closed** (`detect_and_translate_to_english` raises and the canned message is returned), so this is no longer a fail-open path. Untranslated Spanish reaches the guard only on a **prefilter miss** — `prefilter_language` (`services/translation.py:269`) judging the message English. The pattern is `agents/text_utils.py:241, :247`.
 
-### 334. [LOW] `_TITLE_TAIL_STOP` excludes mid-title connector words
+### 334. ~~[LOW] `_TITLE_TAIL_STOP` excludes mid-title connector words~~ — RESOLVED 2026-09-27
 A real title like "Edge of the Garden" won't bare-extract (the tail stops at
 "of"); quoted and `called X` forms still work, and the failure mode is the
 standard ask-for-code clarification. Documented tradeoff in the phrasing
 reference — revisit only if real titles hit it.
 
 **Update 2026-09-27:** the constant is now `TITLE_TAIL_STOP` (`agents/estimate/title_reference.py:66`), and the failure is no longer a clean miss: "Edge of the Garden" now extracts a fragment ("Garden") that the title ladder can match — the same fragment-then-substring family as #673. Fix it with #673's four-part fix.
+
+**Resolved 2026-09-27** with #673 (platform `69fd512`).
 
 ### 346. [LOW] Redundant double resolution in `apply_template`
 Added 2026-06-09. `agents/estimate/crud_handlers.py` (~L631): computing
@@ -1907,7 +1909,7 @@ bring back copying.
 
 **Update 2026-09-27:** fix approach revised. `pending_estimate_fuzzy_confirmation` has **eight** writers (`routers/agent_helpers/delegate_estimate_ops.py:121, :249`; `agents/estimate/edit_executor.py:468, :559`; `work_item_handlers.py:819`; `work_item_context.py:293`; `crud_handlers.py:2379, :2474`), so a snapshot-at-load comparison is fragile. Stamp at finalize instead, which covers all eight: `finalize_orchestrate_result` stamps the turn on an unstamped record and drops a record stamped on an earlier turn that this turn didn't answer. In a multi-intent turn, drop the delete question and say so. This is the question registry's one-turn rule (2026-09-27-maple-multi-turn-everywhere-design.md §5.1, §4). The six early returns are at `routers/agents.py:1109, :1115, :1126, :1137, :1143, :1147`.
 
-### 672. [HIGH] A task whose title starts with "Last" is taken as "the newest task", so another task is edited
+### 672. ~~[HIGH] A task whose title starts with "Last" is taken as "the newest task", so another task is edited~~ — RESOLVED 2026-09-27
 `platform/agents/task/resolver.py:204` — Step 2 (recency) fires on any "last/latest/newest/previous" in the message, before the title step, and returns the newest task. Reproduced on local Mongo: tasks "Last mow of the season" (older) and "Send contract to Lisa" (newer) → "archive the last mow of the season task" resolves to "Send contract to Lisa"; the note and "mark … as done" versions write to it too, and "Last walkthrough" behaves the same. "First/Second/Next/Final…" titles resolve by title correctly. Older than the 2026-09-26 routing work.
 
 **Suggested fix:** Take step 2 only when the task reference (`title_hint` or `extract_reference_hint(text)`, which is "last mow of the season" here) holds nothing but recency words, "my", "the" and "task" ("the last task", "my latest task", "most recent task"). Otherwise fall through to the title step. Add regression rows for "Last mow of the season" and "Last walkthrough".
@@ -1916,7 +1918,9 @@ bring back copying.
 
 **Update 2026-09-27:** wider than a title starting with "Last": `_LAST_TASK_RE.search(text)` (`resolver.py:204`) fires on a recency word *anywhere* in the message, and step 2 ignores `allow_recent_fallback=False`. Get, delete and convert pass an empty hint, so the "only recency words" test has nothing to read there: for an empty hint require adjacency — `(?:last|latest|newest|most recent|previous)\s+(?:one|task)`. Otherwise take step 2 only when the hint holds nothing but recency words, "my", "the", "task" and "one" (a sibling of `_only_position_words`, `:53`).
 
-### 673. [HIGH] An address-style estimate name drops its house number, so another address's estimate is written
+**Resolved 2026-09-27** (platform `f924d4f`): the recency step fires only when the reference is nothing but recency words ("the last task", "my latest task", "delete the latest one"); a title holding one resolves by title, and "the task called X" reads X. Pinned by `tests/test_task_resolver.py::TestRecencyWordsInsideATitle` and corpus row `safety-task-title-with-last`.
+
+### 673. ~~[HIGH] An address-style estimate name drops its house number, so another address's estimate is written~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/title_reference.py:163` — `_is_stop` treats a digit as a stop word, so the loose extractor stops before the house number: `extract_named_title("rename the 4 Elm St estimate to Spring Cleanup")` → "Elm St". With only "14 Elm St Front Walk" in the company, the agent renamed that estimate to "Spring Cleanup" with no question. The customer fallback does the same: `_names_whole` matches "elm st" whole-word inside the street "14 Elm St", and the router returns it as exact. "12 Oak St" matches "112 Oak St Patio" the same way. If 4 Elm St has its own estimate, both match and Maple asks; the silent wrong write happens when it has none, or when its only estimate is archived and the live-wins tie rule (round 33 #3) picks the other address.
 
 **Suggested fix:** In the loose extractor (`_loose_pre_noun`), keep a number that directly precedes the collected words ("4 Elm St"), so the candidate carries the house number; whole-word matching then keeps "4 elm st" from matching "14 Elm St". Add rows: "the 4 Elm St estimate" with only "14 Elm St Front Walk" → no match (asks); with a "4 Elm St" estimate → that one.
@@ -1924,6 +1928,8 @@ bring back copying.
 *(Review 2026-09-26 round 34 #3; deferred at /fix-issues none.)*
 
 **Update 2026-09-27:** two tiers drop the number. The strict tier `TITLE_PRE_NOUN_RE` (`title_reference.py:71-74`) needs a capitalized first word, so "4 Elm St" can't open a title; and a listed rename resolves through `_match_estimates_by_title`, whose rung 3 is a raw substring (`:354-355`) — "4 elm st" ⊂ "14 elm st front walk". Four-part fix: (1) the strict pre-noun pattern allows `\d+[A-Za-z]?\s+` before the capitalized word; (2) the loose pre/post extractors keep a number when a non-stop word follows it; (3) rung 3 gets digit guards, `(?<!\d)…(?!\d)`; (4) `_names_whole` then needs no change once the candidate carries the number. Fix #334 in the same change.
+
+**Resolved 2026-09-27** (platform `69fd512`): the strict and loose extractors keep a house number ("4 Elm St"), and the title ladder's substring rung never matches inside a longer number. #334 fixed in the same change: connectors between capitalized words stay in the name ("Edge of the Garden"). Pinned by `tests/test_estimate_title_reference.py` and corpus row `safety-address-estimate-keeps-house-number`.
 
 ### 674. ~~[HIGH] Catalog delete confirmation is a substring test, so "delete it" deletes at once~~ — RESOLVED 2026-09-27
 `platform/agents/property/text_helpers.py:100` — `_is_confirm_text` is true when the message *contains* "confirm", "yes", "yep", "proceed", "delete it" or "do it" (twins: `contact/text_helpers.py:86`, `labour/text_helpers.py:91`, `material/text_helpers.py:139`, `equipment/text_helpers.py:68`). It is OR'd into `confirm_delete` on the first delete turn (`property/service.py:1394, :2025`; `contact/service.py:958, :1447`; `labour/service.py:1090`; `material/service.py:1497, :2307`), so "delete it" and "delete item 3" delete without asking, "no, don't delete it" confirms, and a name containing "yes" — "Yesler", "Yesenia", "Reyes" — confirms too. A property delete is hard and cascades its notes (`property/service.py:490-513`). HIGH: an irreversible delete nobody confirmed, from ordinary phrasings.
@@ -1957,12 +1963,14 @@ Catalog anchors never go stale: an update with no target falls back to `active_*
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
-### 678. [HIGH] Maple's material and labour writes call route functions without the signed-in user
+### 678. ~~[HIGH] Maple's material and labour writes call route functions without the signed-in user~~ — RESOLVED 2026-09-27
 `platform/agents/material/service.py:651, :655` and `platform/agents/labour/service.py:405, :409` call the routers' `update_material`/`delete_material` and `update_labour`/`delete_labour` directly without `current_user`, so the parameter keeps its `Depends(...)` default object. With auth enabled, `assert_user_company_access` (`dependencies.py:139`) reads `.company` on that object and raises `AttributeError`; the test suite runs with `firebase_auth_disabled`, where the check returns early, so nothing fails. The call shape dates from aad01b8 (2026-04-10). **Not verified end to end** — confirm on Dev. HIGH: if confirmed, every Maple material/labour edit and delete fails in production.
 
 **Suggested fix:** Pass the verified user through and keep the manager gate on delete (design §4). Per decision 9, the fix lands with a test that runs with auth enabled and fails today.
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (platform `6dfb5b0`): the orchestrate and estimate endpoints set the verified user for the turn (`services/acting_user.py`) and the material/labour agents pass it to the route functions; a write outside a signed-in turn raises `NoActingUser` instead of an `AttributeError`. Pinned with auth ON by `tests/test_maple_catalog_writes_auth.py`. Found while fixing it: Maple's property, contact, material, labour and equipment deletes had no role check at all, so a Member could delete through chat what the REST routes (`assert_is_manager`) forbid — every catalog delete now checks the role before it asks (`agents/conversation/delete_confirmation.py::delete_role_refusal`; corpus rows `safety-member-cannot-delete-*`).
 
 ### 679. [HIGH] "remove X from Y" and note edit/delete phrasings delete the parent record
 Reproduced end to end on the rules tier: "remove Carla Diaz from 12 Oak St" classifies as `delete_property` before the LLM runs, and "yes" deletes the property and its notes; "remove Ana Reyes from this property" deletes with no question at all, because "Reyes" contains "yes" (#674). "delete the last note on 12 Oak St" and "delete that note" also become `delete_property`, and "update the gate code note … to 5522" becomes `update_property`. The same parent-record misread turns "delete the Rv Yard estimate" into `delete_property`. There is no unlink capability, and notes can't be edited or deleted from chat. The property delete is hard and cascades notes (`platform/agents/property/service.py:490-513`). HIGH: the user asked to detach a person or remove a note and lost the property.
@@ -1971,12 +1979,14 @@ Reproduced end to end on the rules tier: "remove Carla Diaz from 12 Oak St" clas
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
-### 680. [HIGH] Maple writes a material's price equal to its cost
+### 680. ~~[HIGH] Maple writes a material's price equal to its cost~~ — RESOLVED 2026-09-27
 `platform/agents/material/service.py:111` — `MATERIAL_FIELD_ALIASES` maps `cost` → `price`, and normalization then sets `cost = price` (`:411-417`). `routers/materials.py:_normalize_size_entry` (`:93-124`) derives `price = cost × (1 + material_markup%)` only when no price is sent, so every Maple create or cost edit stores a price equal to the cost and the company's material markup is lost. An edit that names no size changes only the first size. HIGH: silently wrong customer prices on every estimate that later uses the material (see the pricing model in CLAUDE.md).
 
 **Suggested fix:** Cost is cost: stop aliasing it to price, send the cost alone and let the server derive the price; ask which size when the material has several (design §4).
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (platform `d17e460`): "cost" is no longer aliased to price in the agent or in the rules extractor; a cost edit sends only the cost and the server derives the price from the markup; a price edit keeps the cost; an edit naming no size on a material with several asks which size. Pinned by `tests/test_material_pricing_edits.py` and corpus rows `safety-material-cost-edit-keeps-markup`, `material-price-edit-keeps-cost`, `material-several-sizes-asks-which`. Still open, not part of this entry: the "which size?" answer does not resume the edit (question registry, design §5.1); a create or edit that gives only a price (no cost) still sets cost = price (`_should_default_cost_to_price`); "change the cost of Topsoil to 20" without the word "material" doesn't route on the rules tier (design §7.4).
 
 ### 681. [HIGH] A refusal is overridden by an unfinished create
 After an incomplete "create a new material", "create a new category called Hardscape" is refused — but the refusal returns intent `unknown` (`platform/agents/orchestrator/service.py:420`), so the router's pending fallback (`routers/agents.py:1462`) hands the message to the Material agent's pending create, and `_find_or_create_category` (`agents/material/service.py:507`, called at :955) inserts the category. The equipment and template-create refusals fall through the same way, and `_find_or_create_unit` (:527, also called on update at :1684) creates units silently. HIGH: a policy refusal (phrasing reference §9.3) is bypassed and the catalog written.
