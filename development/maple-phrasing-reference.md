@@ -1807,11 +1807,20 @@ Every question Maple asks — a yes/no, a numbered menu, a value ("What's the ne
 | a delete question left open beside another question | set aside, so a stray "yes" can't confirm it | ✅ rule |
 | a question asked under another company | dropped unread | ✅ rule |
 
+**The portal shows the open question** (2026-09-27, #696): while one is open the composer reads "Waiting for your answer · Cancel" (Cancel sends "cancel"), a yes/no question offers Yes/No chips, and a reload restores it.
+
 **Creates ask one field at a time** (2026-09-27): a contact, property, role or material create that is missing details asks for the next one alone and takes a bare reply as its value — "Dan Park" for the name, "30" for a wage, "Bulk Materials" for a category (§3, §2, §5.10, §4.11).
 
 ## 10.7 The record in focus *(2026-09-27)*
 
 Each `active_<domain>_id` anchor records the turn it was set on. An anchor set this turn or last — or the record the portal page is showing — is fresh, and "it" acts on it. An edit that would reach an older anchor only through "it" or no name at all asks first: *"Just to check — do you mean Ana Reyes?"* (#677, `agents/conversation/focus.py`). Deletes (their confirmation names the record already) and notes (they overwrite nothing) don't ask. Pronouns pick the domain before recency does: "him"/"her" mean the contact, "there" the property. A record the message names always beats the one in focus ("show me contact Bob Lee" with Ana in focus shows Bob).
+
+**The record open on the page** (2026-09-27, design §8): the Contacts and Properties pages announce their selected record and the Tasks page the task open in its dialog; the Maple panel sends it as `client_context.viewed_record` (`routers/agent_helpers/viewed_record.py`), as the estimate page has always sent its estimate. A new visit makes that record the fresh anchor for its domain — loaded company-scoped, never from another company's id — and the same visit never pulls the focus back from a record the chat moved on to.
+
+| With Ana Reyes open on the Contacts page | Behavior | Status |
+|---|---|---|
+| `add a note: prefers mornings` | the note is filed on Ana | ✅ rule *(it asked "which fields?", even right after "show me contact Ana Reyes")* |
+| `what's her phone?` / `what's the city?` (a property open) | that record's details | ✅ rule *(it went to the user guide)* |
 
 ## 10.8 "What about X?" *(2026-09-27)*
 

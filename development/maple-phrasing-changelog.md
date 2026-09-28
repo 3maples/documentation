@@ -88,6 +88,14 @@ platform `3526a08` … `67892ec`)
   less read for that period; "what are my recent estimates?" lists the newest
   eight. "what's upcoming?" includes overdue tasks, overdue first, and "what's
   on my plate?" is that list for you.
+- The portal (§10.6, §10.7; platform `c478a53`, `9f657b4`, `d608e74`; portal
+  `97c87f4`, `19257da`, `dd54cd3`): "Waiting for your answer · Cancel" while
+  a question is open, Yes/No chips on a yes/no question; the contact,
+  property or task open on the page is "this one" ("add a note: …", "what's
+  her phone?"); catalog pages refresh quietly after a Maple write, and
+  template, link and note writes refresh what they change; a restored chat
+  reads in the language it was held in; two overlapping turns keep each
+  other's state, and a double-sent message isn't run twice.
 - Across records (§8; platform `634703f`, `695e0f8`): "which properties use
   Black Mulch?", "which properties need a Foreman?", "what estimates use the
   Foreman role?", "what materials does E0042 use?" and "which roles are on
