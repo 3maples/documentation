@@ -1773,7 +1773,7 @@ cannot see anywhere in the UI.
 into `description`. Touches `_resolve_create_title` / `_CREATE_TITLE_PENDING_ID` /
 `_stash_awaiting_title` plus three agent test files; the branch is rare, hence deferred.
 
-### 495. [LOW] platform/agents/material/service.py:1899 — `narrow_to_changes` call lacks `always=fields.keys()`, unlike every sibling agent
+### 495. ~~[LOW] platform/agents/material/service.py:1899 — `narrow_to_changes` call lacks `always=fields.keys()`, unlike every sibling~~ — RESOLVED 2026-09-27 agent
 Contact, labour, and property agents force-keep explicitly-requested fields so an idempotent
 "set cost to 14" (already 14) still writes; the material agent drops it. Harmless today
 (response is still correct), but the asymmetry will surprise the next reader and diverges the
@@ -1781,6 +1781,8 @@ audit trail.
 **Suggested fix:** pass `always=fields.keys()` to match the siblings.
 
 **Update 2026-09-27:** the call is now `agents/material/service.py:1908`. `always=fields.keys()` alone isn't enough here: in the material agent `cost`, `price` and `size` map onto `sizes`, not onto top-level keys, so the forced keys wouldn't name what the user asked to write. Fix it with #680, which changes the same cost/price mapping.
+
+**Resolved 2026-09-27** (platform `ffbc3b0`): the call passes `always=_forced_payload_keys(fields)`, which maps the fields a message set onto payload keys — `cost`, `price`, `size` and `unit` write `sizes` — so an idempotent edit is kept, as in the sibling agents. Pinned by `test_an_idempotent_edit_still_writes_what_was_asked` and `test_forced_payload_keys_name_what_the_fields_write` in `tests/test_material_agent.py`.
 
 ### 565. [MEDIUM] The reuse removal's cost to estimate generation is unmeasured
 
@@ -1854,12 +1856,14 @@ bring back copying.
 
 *(Review 2026-09-25 fifth pass #29.)*
 
-### 663. [LOW] The "Just to check" question names the open work item, not one forced by a "… job" name
+### 663. ~~[LOW] The "Just to check" question names the open work item, not one forced by a "… job" name~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/crud_handlers.py:167` — `_anchored_work_item_stash` always takes `active_work_item`. When `_resolve_listed_estimate` has already forced a work item for this turn (a "<name> job" reference matching an open item), the executor writes to the forced one, but the question names and pins the anchor. Verified: work item 3 renamed "Paint second last coat", work item 1 open, then "set the markup to 20% on the second last coat job" → "Just to check: apply this to the "Front patio pavers" work item on E0042 …?", and "yes" would pin Front patio pavers. The wrong item is named in the question, so it is not silent, and the trigger needs a work-item name that itself contains a from-end phrase.
 
 **Suggested fix:** In `_anchored_work_item_stash`, prefer `context[FORCED_WORK_ITEM_ID_KEY]` (and `FORCED_WORK_ITEM_FALLBACK_KEY`) over `active_work_item` — the same precedence `_anchored_index` uses — so the question names exactly the item the write will land on. Test: the case above names and pins "Paint second last coat".
 
 *(Review 2026-09-26 round 21 #1.)*
+
+**Resolved 2026-09-27** (platform `17eea39`): `_anchored_work_item_stash` prefers the turn's forced work item over the anchor; the two places a "<name> job" forces one now record its label in `FORCED_WORK_ITEM_FALLBACK_KEY`, and with no label the question names no work item, so "yes" re-runs the message and forces the same item again. Pinned by `test_the_just_to_check_question_names_the_work_item_the_write_lands_on` in `tests/test_maple_estimate_targeting.py`.
 
 ### 664. ~~[MEDIUM] An estimate note addressed by code or "that estimate" asks unless its separator is a colon~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/command_grammar.py:472` — `_addresses_a_non_estimate` strips the estimate reference but leaves the preposition before it, and `_NOTE_ADDRESS_RE` then reads that preposition plus the next word (only `with`/`as` are excused) as a target. Verified: "add a note to that estimate saying call the client", "add a note to our estimate that says call the client", "drop a note on E0042 saying the gate sticks", "new note for this estimate saying call Bob" and "add a note to E0042 about the gate: code 1234" all ask "Which estimate or work item should the note go on?". Before round 27 they filed, and the colon forms still do. No write goes wrong (it asks), but the user has to retype a supported note. A regression from the round-27 fix.
@@ -1888,21 +1892,25 @@ bring back copying.
 
 **Resolved 2026-09-27** (platform `71473ce`): the body-head check runs only when nothing but whitespace separates "note" from the body. Pinned by the "note: on Friday - bring the trailer" row.
 
-### 668. [LOW] A work-item field question reads the field as the work item's name
+### 668. ~~[LOW] A work-item field question reads the field as the work item's name~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/work_item_field_handlers.py:63` — `_extract_wi_hint` tries the words after "work item" before the name in front of it, so "what is the patio work item division" / "…subtotal" look for a work item called "division" / "subtotal" and answer "I couldn't find a work item matching …". Read-only: no write. Round 31 #1 reported the same misread on the recurring commands, where it wrote to the wrong work item; the user resolved that by deferring recurring from chat (2026-09-26), which removed the write path — this read path remains.
 
 **Suggested fix:** Keep the leading number check first ("work item 2 …"). Then read the name before the noun: "this"/"that" directly before it returns "" (the anchor); otherwise the name left after stripping `_WI_HINT_PRE_STOP`; only then the words after the noun ("rename work item Front patio to Fence"). Add `test_work_item_hint_extraction` rows ("patio" for "what is the patio work item division").
 
 *(Review 2026-09-26 round 31 #1, residual after the recurring deferral.)*
 
+**Resolved 2026-09-27** (platform `07935d7`): `_extract_wi_hint` takes a number after the noun, then the name before it ("this"/"that" → the anchor), and only then the words after it. New `test_work_item_hint_extraction` rows: "what is the patio work item division" → "patio", "rename work item Front patio to Fence" → "Front patio".
+
 **Update 2026-09-27:** `_extract_wi_hint` is now `work_item_field_handlers.py:51`. "this work item division" misreads too: the field word after the noun is taken as the name even when "this" points at the anchored work item.
 
-### 670. [LOW] A customer name that starts or ends with punctuation never matches
+### 670. ~~[LOW] A customer name that starts or ends with punctuation never matches~~ — RESOLVED 2026-09-27
 `platform/agents/estimate/title_reference.py:368` — `_names_whole` bounds the candidate (and, since round 33 #5, the stored name) with `\b`, which can't match next to a non-word character at the edge. A candidate like "Acme Inc." never matches a property named "Acme Inc." (verified: the finder returns it, the filter drops it, 0 resolved). LOW: Maple asks instead of answering.
 
 **Suggested fix:** Use `(?<!\w)` + `re.escape(text)` + `(?!\w)` instead of `\b…\b`, in both directions. Add a row for "Acme Inc.".
 
 *(Review 2026-09-26 round 33 #6.)*
+
+**Resolved 2026-09-27** (platform `e376e0e`): `_names_whole` uses `(?<!\w)…(?!\w)` in both directions. Pinned by `test_names_meet_as_whole_words_even_with_punctuation` ("Acme Inc.", "(Acme)"; "lee" still never matches "Kathleen").
 
 **Update 2026-09-27:** mostly masked in practice: the extractor trims a trailing "." ("the estimate for Acme Inc." → "Acme Inc"), so the candidate itself no longer ends in punctuation. What still fails is a name that *starts* with a non-word character — "the estimate for #1 Landscaping" extracts nothing, so it can never match.
 
