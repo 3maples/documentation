@@ -758,7 +758,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** #696 (portal), and older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #697, #334, #436.
+**Open gaps:** older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
 
 # 2. Properties
 
@@ -1201,7 +1201,7 @@ Orchestrator routing, refusal guard, and Template Agent are implemented. Possess
 
 Additional cross-resource phrasings (e.g. `which templates include {material}?`) are future candidates — not tracked here yet.
 
-**Open gaps:** #695 (portal) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681; `find templates named X` (§6.5).
+**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681, #695; `find templates named X` (§6.5).
 
 ---
 

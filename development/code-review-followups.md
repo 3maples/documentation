@@ -2928,7 +2928,7 @@ row count first — this may be years away.
 
 **Suggested fix:** When `image.mode == "RGB"` and `image.info["transparency"]` has any component above 255, scale the key down to 8-bit (`>> 8`) before the convert to RGBA. Test: a 16-bit RGB PNG with a magenta key comes out with no magenta pixels.
 
-### 688. [MEDIUM] Maple forgets the conversation's language between turns
+### 688. ~~[MEDIUM] Maple forgets the conversation's language between turns~~ — RESOLVED 2026-09-27
 `platform/services/translation.py:269` — `prefilter_language` doesn't flag short replies, and the detected language isn't persisted, so in a Spanish conversation a one- or two-word reply is processed as English and answered in English. `is_negative_text("No.")` is False — an exact match on `_NEGATIVE_VALUES` with no punctuation trim (`routers/agent_helpers/text_helpers.py:97`). A restored transcript is English, because `chat_history` is persisted in English. MEDIUM: the conversation switches language mid-flow.
 
 **Suggested fix:** Persist `conversation_lang`; in a non-English conversation, translate short replies too (design §5.6). Normalize trailing punctuation in the yes/no checks (the registry's normalized yes/no, §5.1).
@@ -2938,6 +2938,8 @@ row count first — this may be years away.
 ## Portal — estimate builder
 
 **Update 2026-09-27** (platform `a612723`, `3526a08`): the server half is fixed — the conversation remembers its language (`conversation_lang`), a short reply in a non-English conversation is detected and translated, a code/email/number reply is answered in the conversation's language, and "No."/"No, thanks." read as a no. Still open (portal, design §8): the restored transcript shows the English history.
+
+**Resolved 2026-09-27** (platform `9f657b4`, portal `97c87f4`): a non-English turn's chat lines carry `display_text` — the user's own words and the reply as sent — written by a second, conditional save after the reply is translated; the restored transcript shows `display_text` over the English `text` the pipeline keeps. Pinned by `tests/test_conversation_display_text.py` and `useMapleAgent.test.tsx`.
 
 ### 131. [MEDIUM] `saveError` displayed far from origin
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
@@ -3475,12 +3477,14 @@ oversight.
 
 *(Review 2026-09-25 fifth pass #31.)*
 
-### 696. [MEDIUM] No "waiting for your answer" state, wrong chips on confirmations, and a send before restore is lost (portal)
+### 696. ~~[MEDIUM] No "waiting for your answer" state, wrong chips on confirmations, and a send before restore is lost (portal)~~ — RESOLVED 2026-09-27
 The Maple panel never shows that Maple is waiting for an answer, and offers no Cancel. `platform/routers/agent_helpers/finalize_result.py:286-291` attaches the agent's suggestion chips even when the turn is a clarification, so a yes/no question gets unrelated chips rather than Yes/No. A message sent before the restored history finishes loading is wiped when the restore lands (`portal/src/components/Layout/useMapleAgent.ts`). Also: `_aiConversationId` is dead state (`useMapleAgent.ts:90`), and the server echoes the full context back to the client. MEDIUM: users can't tell a question is open, which is how stale answers get applied (#671, #675).
 
 **Suggested fix:** A "Waiting for your answer · Cancel" strip and Yes/No chips on yes/no questions; restored history never wipes a message sent before the restore finished (design §8). Drop the dead state and trim the echoed context.
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (platform `9f657b4`, portal `97c87f4`): the reply and `GET /agents/conversation` carry `open_question` (`{"kind": …}` from the question gate); the composer shows "Waiting for your answer · Cancel" while one is open, restored on reload, and Cancel sends "cancel". A yes/no question's chips are Yes/No, and no clarification gets agent action chips. A message sent before the restored history lands is kept after it (a turn already in the restored lines isn't shown twice). The dead `_aiConversationId` state and `createConversationId` are gone, and `/agents/orchestrate` no longer echoes the conversation state to the browser (`response_model_exclude={"context"}`; in-process callers still see it). Pinned by `tests/test_agent_helpers_finalize_result.py`, `tests/test_conversation_api.py`, and the portal's `useMapleAgent.test.tsx` and `AiPanel.test.tsx`.
 
 ## Portal — settings, billing, onboarding and ops
 
@@ -3651,12 +3655,14 @@ rather than a performance defect. It is still an unguarded forced-layout read in
 **Suggested fix:** coalesce with `requestAnimationFrame` — keep the pending frame id in a ref, skip
 if one is already scheduled, clear it in the callback, and cancel it in the existing effect cleanup.
 
-### 695. [MEDIUM] Maple writes remount the catalog pages, and several writes fire no refresh (portal)
+### 695. ~~[MEDIUM] Maple writes remount the catalog pages, and several writes fire no refresh (portal)~~ — RESOLVED 2026-09-27
 `portal/src/pages/ContactsPage.tsx:231` sets `isLoading` on every refetch and `:647` then renders a `LoadingState` instead of the page, so each Maple write remounts the list and loses scroll, open dialogs and filters. Same in `PropertiesPage.tsx:105/:370`, `MaterialsPage.tsx:118/:544` and `PeoplePage.tsx:98/:328`. `src/components/Layout/agentMutationEvents.ts` has no entry for `create_estimate_from_template` or `delete_template`, and the dashboard and `PropertyActivityPanel` don't listen for Maple writes at all. MEDIUM: lost UI state, and screens that stay stale after Maple changes them.
 
 **Suggested fix:** A quiet refresh on catalog pages (no `isLoading` swap after the first load); refresh events for template-created estimates, template deletes, the dashboard and the property activity panel (design §8).
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+**Resolved 2026-09-27** (portal `19257da`): Contacts, Properties, Materials, People and Settings → Templates reload quietly after a Maple write — no `isLoading` swap, so the page, open dialogs and sheets, filters and scroll stay, and a failed refresh keeps what is shown; the first load still shows the spinner. `agentMutationEvents.ts` maps `create_estimate_from_template`, `delete_template` (new `portal:templates:changed`), `link_contact` (both Properties and Contacts) and Maple's `add_note`/`delete_note` (new `portal:notes:changed`, which the notes panel on that record listens for); `dispatchAgentMutation` fires every matching event. The dashboard reloads its lists and cards on an estimate change and its Upcoming Tasks card on a task change; the property activity panel also listens for estimate and task changes. Pinned by the quiet-refresh tests in `tests/{Contacts,Materials,People}PageDiffSave.test.tsx`, `PropertiesPageMobileSheet.test.tsx` and `TemplatesTabMapleRefresh.test.tsx`, plus `agentMutationEvents.test.ts`, `DashboardPage.test.tsx`, `UpcomingTasksCard.test.tsx`, `NotesPanel.test.tsx` and `PropertyActivityPanel.test.tsx`.
 
 ## Website
 
