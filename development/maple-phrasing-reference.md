@@ -1315,6 +1315,7 @@ The `the {task} task` keyword forms are ✅ rule; bare-title forms (`change the 
 | `make it due Friday` / `push it to next week` / `reschedule the {task} task to Oct 3` / `it's due in 3 days` / `due Friday` (task in focus) | `update_task` (due date) → Task Agent | ✅ rule *(2026-09-27 — dates also accept `next week`, `in N days/weeks`, `end of the week/month`, `Oct 3` / `3rd of October`)* |
 | `clear the due date` / `remove the due date from the {task} task` | `update_task` (due date cleared) → Task Agent | ✅ rule *(2026-09-27)* |
 | `link it to 12 Oak St` / `link the {task} task to the Elm House property` / `set the property of the {task} task to Elm House` | `update_task` (property) → Task Agent | ✅ rule *(2026-09-27)* |
+| `set task {T0001} description\|notes\|due date\|title to {value}` / `change T0001's due date to Friday` / `set task {T0001} property\|address to Elm House` | `update_task` → Task Agent | ✅ rule *(2026-09-28 — target before the field (`_TARGET_FIRST_LEAD`); previously asked "What would you like to update on the task?", and the due-date form read its value as "date to …". Description here overwrites, like `set the description of …`)* |
 | `remove the property from the task` / `unlink it from the property` | `update_task` (property cleared) → Task Agent | ✅ rule *(2026-09-27 — unlinking a task is Maple's; unlinking a contact from a property is still done in the app, §9)* |
 
 ## 7.6.1 Notes on an existing task (append by default)
@@ -1360,6 +1361,7 @@ Either step can be entered directly: `description` on its own selects the field 
 | `update the task` → *"What would you like to update…?"* → `description` → *"What would you like me to add…?"* → `{text}` | `update_task` field-then-value → Task Agent | ✅ rule *(2026-07-25)* |
 | `add to the description` → *"What would you like me to add…?"* → `{text}` | `update_task` (notes append) → Task Agent | ⚠️ only as a reply to the field question *(2026-09-27 review)* |
 | bare `title` / `due date` / `status` / `assignee` → value | `update_task` field-then-value → Task Agent | ✅ rule *(status resolves per-company names; assignee takes an email, "me" or a teammate's name; due date takes any §7.6 date phrase, and an unreadable one asks again)* |
+| *"Which status…?"* / *"Who should I assign it to?"* → the command restated: `set status to In Progress` / `mark it as done` / `change it to Done` / `assign it to Jordan` | `update_task` field-then-value → Task Agent | ✅ rule *(2026-09-28 — only the value is read (`restated_field_value`); one naming another task (`set T0002 status to Done`) is a new request)* |
 | `assign it` / `change the assignee` / `change the status` / `move it` / `set a due date` / `reschedule it` → the value | `update_task` → Task Agent asks for that one value | ✅ rule *(2026-09-27 — no "what would you like to update?" first; #692)* |
 
 ## 7.7 Status changes
@@ -1371,7 +1373,8 @@ Either step can be entered directly: `description` on its own selects the field 
 | `mark it as done` (active task) | `update_task` (status) → Task Agent | ✅ rule with a task anchor *(2026-09-27 review)* |
 | `mark the {task} task as done` | `update_task` (status) → Task Agent | ✅ rule |
 | `move the {task} task to In Progress` | `update_task` (status) → Task Agent | ✅ rule |
-| `set the status of the {task} task to {status}` | `update_task` (status) → Task Agent | ✅ rule *(unknown names get a clarification listing the company's statuses; done/complete/finished + in-progress/started + to-do/open synonyms map to the default names when present)* |
+| `set the status of the {task} task to {status}` | `update_task` (status) → Task Agent | ✅ rule *(unknown names get a clarification listing the company's statuses — since 2026-09-28 a registered question, so the bare reply (`In Progress`) sets it on the same task; done/complete/finished + in-progress/started + to-do/open synonyms map to the default names when present)* |
+| `set task {T0001} status to {status}` / `change T0001's status to done` / `set the {task} task status to done` | `update_task` (status) → Task Agent | ✅ rule *(2026-09-28 — target before the field; previously asked "What would you like to update on the task?")* |
 | `I finished it` / `it's done` / `complete the {task} task` / `start it` / `reopen it` | `update_task` (status) → Task Agent | ✅ rule *(2026-09-27 — "reopen" moves it back to the company's first status)* |
 
 ## 7.8 Assignee operations
@@ -1384,6 +1387,7 @@ Assignees are stored as emails (`assigned_to_email`); an email is taken as given
 | `assign the {task} task to me` | `update_task` (assign, current user) → Task Agent | ✅ rule |
 | `assign the {task} task to {email}` / `reassign …` | `update_task` (assign) → Task Agent | ✅ rule |
 | `give it to Jordan` / `hand the {task} task over to Ana` / `assign it to Jordan` | `update_task` (assign by teammate name) → Task Agent | ✅ rule *(2026-09-27 — two teammates with that name get a question listing both)* |
+| `set task {T0001} assignee\|owner to {email or name}` / `change T0001's owner to Jordan` | `update_task` (assign) → Task Agent | ✅ rule *(2026-09-28 — target before the field)* |
 | `unassign it` / `assign the {task} task to nobody` / `remove the assignee` | `update_task` (assignee cleared) → Task Agent | ✅ rule *(2026-09-27)* |
 | `who is the {task} task assigned to?` | `get_task` → Task Agent | ⚠️ gap *(details view already shows Assigned to; the who-question routing is unwired)* |
 
