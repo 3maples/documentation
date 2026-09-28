@@ -758,7 +758,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** #683, #689, #696, and older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659, #663, #668, #670 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #664, #665, #666, #671, #673, #677, #682, #684, #685, #686, #687, #691, #697, #334, #436.
+**Open gaps:** #696 (portal), and older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #697, #334, #436.
 
 # 2. Properties
 
@@ -918,7 +918,7 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `link Zed Quill to 12 Oak St` (no such contact) | "I couldn't find a contact or a property called Zed Quill." | ✅ rule |
 | `remove Ana Reyes from 12 Oak St` / `unlink …` | done in the app — §9.8 | 🛑 redirect |
 
-**Open gaps:** #690 (LLM tier) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687.
+**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690.
 
 ---
 
@@ -1039,7 +1039,7 @@ A create that is missing details asks for the next one alone, remembers which, a
 | `5` | created — cost 5.00, price 5.50 at a 10% markup | ✅ rule |
 | a category or unit the company doesn't have | says so and asks again, never creates one (#681) | ✅ rule |
 
-**Open gaps:** #690 (LLM tier), and older #495 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #678, #680, #681, #682, #683, #694, #697.
+**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697.
 
 ---
 
@@ -1113,7 +1113,7 @@ As for materials (§4.11): `create a new role called Arborist` → *"What's the 
 
 Cross-resource phrasings (e.g. `which properties need a {role}?`) are tracked under §8.
 
-**Open gaps:** #690 (LLM tier) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #678, #682, #683, #693.
+**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #678, #682, #683, #690, #693.
 
 ---
 
@@ -1422,7 +1422,7 @@ Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-sup
 
 Task details (2026-09-27) also show the linked property, the estimate it was converted into, and how many photos and videos it has.
 
-**Open gaps:** #683, and older #442, #447, #470 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676 and #692 were resolved 2026-09-27; #687's task half is done.
+**Open gaps:** older #442, #447, #470 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27.
 
 ---
 
