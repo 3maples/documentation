@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **699**. Never
+- **Entries are numbered and permanent.** Next free number: **777**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -111,30 +111,32 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 
 | Lines | File | Note |
 |------:|------|------|
-| 3,658 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin |
-| 3,422 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net); +70 by 2026-09-27 — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py` |
-| 2,788 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | |
-| 2,567 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug |
+| 3,770 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push) |
+| 3,577 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net); +70 by 2026-09-27 — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py`; +155 on 2026-09-27 (multi-turn push: cross-record joins, dashboard, named creates) |
+| 3,210 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | +366 on 2026-09-27 (multi-turn push: size commands, one-question creates); +123 in the 2026-09-27/28 review fixes (3,087 at `main` then) — the material in focus, size-label refusals, "which material?". `_handle_size_command` is 105 lines — split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` (review 2026-09-27 #29) |
+| 2,637 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug; +70 on 2026-09-27 |
 | 2,561 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
-| 2,375 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | |
-| 2,223 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam |
-| 1,766 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. `orchestrate_agent_endpoint` alone is 607 lines (functions table) |
+| 2,498 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | +123 on 2026-09-27 |
+| 2,282 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam |
+| 1,987 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. was `orchestrate_agent_endpoint` at 607 lines; +221 on 2026-09-27 (open question, conversation store, page signals); the endpoint body is now `_orchestrate_turn` (#689), 729 lines (functions table) |
+| 1,720 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24, +156 by 2026-09-27. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73); +89 on 2026-09-27 |
 | 1,644 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
-| 1,631 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24, +156 by 2026-09-27. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73) |
-| 1,559 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | |
-| 1,544 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | |
+| 1,586 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | +42 on 2026-09-27 |
+| 1,565 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | |
 | 1,284 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
+| 1,274 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
 | 1,246 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | −153 by 2026-09-27 |
-| 1,234 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
 | 1,210 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below |
-| 1,195 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
-| 1,195 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | |
+| 1,206 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | +11 on 2026-09-27 |
+| 1,201 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
+| 1,177 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
 | 1,163 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | +48 over the 2026-09-24 review passes; +15 by 2026-09-27 |
-| 1,155 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | |
-| 1,065 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py` |
+| 1,130 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46) |
+| 1,072 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27 |
+| 944 | [platform/agents/task/service.py](../../platform/agents/task/service.py) | **crossed the line 2026-09-27** (was 688). **Next step:** a `TaskListBase` layer in `agents/task/listing.py` holding `_handle_list_tasks`, `_due_note`, `_resolve_list_ask` and `_FINISHED_STATUS_NAMES`; move `_handle_task_due_change` into operations.py; split `_handle_update_subop` into a detector table plus a named-target helper — about 600 lines left (review 2026-09-27 #47) |
+| 903 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
 | 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
-| 867 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | |
-| 856 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
+| 860 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
@@ -142,6 +144,14 @@ lifecycle into `routers/invitations.py` (~400 lines, a clean seam, leaves
 `auth.py` near the threshold).
 
 #### Test files over 800 lines
+
+**Stale since 2026-09-28** (review 2026-09-28 #11, deferred): the source table
+above was re-measured that day, this one was not. Thirteen counts are out of
+date (e.g. test_material_agent.py is 2,193, test_orchestrator_intents.py
+2,580, test_property_agent.py 2,278, test_maple_task_operations.py 2,023), and
+three files over 800 lines are missing: `tests/maple_conversations/corpus.py`
+(1,354), `test_command_grammar.py` (957), `test_address_service.py` (855).
+Re-measure with `wc -l`, add the three rows, re-sort.
 
 Softer guideline — inline-explicit setup is a deliberate trade against hidden
 fixtures — but these are past the point of scanning.
@@ -185,7 +195,7 @@ seams that already exist as separate classes.
 
 | Lines | Function |
 |------:|----------|
-| 607 | `orchestrate_agent_endpoint` — routers/agents.py:876 (the router's god-handler; first measured 2026-09-27. The multi-turn design (2026-09-27 §5.1) turns its seven statement-ordered pending handlers into answer dispatchers behind one gate, which is the natural first cut) |
+| 729 | `_orchestrate_turn` — routers/agents.py:942 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) |
 | 376 | `update_estimate` — routers/estimates.py:1042 (grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
 | 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
@@ -238,6 +248,12 @@ seams that already exist as separate classes.
 | 55 | `sync_user_stage` — services/brevo_contacts.py:361 |
 | ~54 | `formatOrchestratorReply` — portal/src/lib/orchestratorReply.ts:39 |
 | 53 | `_run` — scripts/backfill_task_readable_ids.py:70 |
+| 171 | `_handle_update_subop` — agents/task/service.py:605 (new 2026-09-27; a detector table plus a named-target helper — review 2026-09-27 #47) |
+| 104 | `_handle_list_tasks` — agents/task/service.py:282 (new 2026-09-27; moves with `TaskListBase`, #47) |
+| 89 | `_resolve_list_ask` — agents/task/service.py:399 (new 2026-09-27; make its `teammate()` closure a method, #47) |
+| 105 | `_handle_size_command` — agents/material/service.py:1693 (new 2026-09-27; +30 on 2026-09-28 for the material in focus and its "which material?" question; split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` — review 2026-09-27 #29) |
+| 70 | `parse_task_list_ask` — agents/task/list_filters.py:139 (new 2026-09-27; one reader per filter phrase) |
+| 63 | `open_questions` — routers/agent_helpers/open_question.py:235 (new 2026-09-27; one small reader per question kind — pending intents, delete records, router flows — concatenated — review 2026-09-27 #56) |
 | — | seven functions in `platform/agents/task/` (see archive for the list) |
 | — | two handlers in `agents/estimate/assumption_handlers.py:257,415` |
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
@@ -526,6 +542,26 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 
 *(Review 2026-09-26 round 32 #2, cost of the fix.)*
 
+### 709. [MEDIUM] Each turn loads the whole catalog, up to twice, plus every contact and property
+`platform/agents/conversation/catalog_names.py:96` — `_catalog` reads every material, role and template in the company (up to 5,000 each) to compare names in Python. `_record_kind` (:138) and `_kind_of` (:157) each call it, and each also runs the whole-collection contact and property finders. `_GET_RE` / `_QUESTION_RE` match most short messages, so most turns run 3–6 catalog scans before routing. Related to tracked #26 (`find_contacts_by_name` fetches the whole company), but this is a new caller multiplying it. (review 2026-09-27 #36)
+
+**Suggested fix:** Look names up with an indexed, anchored, escaped, case-insensitive query per model with `limit(2)`, and resolve the kind once per message.
+
+### 715. [MEDIUM] No `company` index, so `_teammate_email` scans users across tenants on the chat path
+`platform/models/user.py:89` — `User.find(User.company == …)` in `_teammate_email` (operations.py:302) runs on every assignment or teammate filter, but `users` indexes only `email`, so each lookup scans the whole collection. (review 2026-09-27 #42)
+
+**Suggested fix:** Add `IndexModel([("company", ASCENDING)])` to `User.Settings.indexes`.
+
+### 716. [MEDIUM] `due_date` is filtered and sorted with no index, and the docstring says otherwise
+`platform/models/task.py:74` — The new `extra` conditions filter on `due_date` and sort by `+due_date` (agents/task/base.py:216-217, :259), but no index covers `(company, due_date)`, while `_list_conditions` says "All fields used here are indexed". MEDIUM rather than HIGH: the company-prefixed indexes keep the scan to one tenant. (review 2026-09-27 #43)
+
+**Suggested fix:** Add `IndexModel([("company", 1), ("due_date", 1)])`, or correct the docstring.
+
+### 776. [LOW] The material-name lookup silently stops at 5000 names, in no set order
+`platform/routers/agent_helpers/named_answers.py:36` — `_material_names` reads `find({"company": company}, {"name": 1})` with no sort, then `to_list(length=_NAME_CAP)` with a cap of 5000. For a company with more than 5000 materials, the names past the cap are dropped without any log, and which ones are dropped is whatever order Mongo returns. A dropped name that opens with a command verb ("Clear Stone") then reads as a new request again. It also reads up to 5000 rows on every turn where "Which material do you mean?" is open. LOW because no company is near 5000 materials, and a missed name falls back to the checks Maple used before names were looked up. (review 2026-09-28 seventh round #1)
+
+**Suggested fix:** Look up only the reply instead of loading the catalog, as [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md) §3.2 proposes: have the router pass `name_in_reply(message)` and run one `find_one({"company": company, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}})`, answering when it hits. Deferred (2026-09-28) to phase 1 of that plan, which replaces this loader; the minimum change in the meantime is a warning when the cap is reached.
+
 ## Silently swallowed errors
 
 Paths that discard the real failure. #64 is the anchor; #430 is the standing
@@ -709,6 +745,21 @@ pattern is near-identical across the six files.
 `platform/agents/estimate/edit_executor.py:219` — `logger.warning(..., code)` makes version conflicts and outages indistinguishable.
 
 **Suggested fix:** Log `type(exc).__name__` (still no exc_info, to keep note bodies out of logs).
+
+### 714. [MEDIUM] `_teammate_email` hides database errors
+`platform/agents/task/operations.py:303` — `except Exception: return None, []` has no logging. A Mongo failure is reported as "I couldn't find a teammate called Jordan", or on create quietly assigns the task to the creator. (review 2026-09-27 #41)
+
+**Suggested fix:** Remove the try/except, or log `type(err).__name__` at warning level and re-raise.
+
+### 747. [LOW] `except Exception: return None` hides errors without logging
+`platform/agents/conversation/catalog_names.py:171` — A programming error in the rewrite is silently dropped, and the message routes as if no rewrite applied. (review 2026-09-27 #77)
+
+**Suggested fix:** Log `type(err).__name__` at warning level before returning None, as viewed_record.py does.
+
+### 748. [LOW] `except Exception: return None` hides errors without logging
+`platform/agents/conversation/record_lists.py:180` — Same pattern as #747 in the city/role list filter. (review 2026-09-27 #78)
+
+**Suggested fix:** Log `type(err).__name__` at warning level before returning None.
 
 ## Duplicated code and twin files
 
@@ -993,6 +1044,26 @@ treatment has to be made twice and can silently drift.
 **Suggested fix:** extract an `AddRowButton` component (`label`, `disabled`, `disabledHint`,
 `onClick`) into `src/components/estimates/` or `src/components/common/`, and render it from
 both tables' headers.
+
+### 744. [LOW] `_UNLINK_REDIRECT` duplicates `out_of_chat._UNLINK`
+`platform/agents/conversation/delete_confirmation.py:59` — The same user-facing unlink redirect text lives in two modules and will drift. (review 2026-09-27 #74)
+
+**Suggested fix:** Export one constant from out_of_chat.py and import it here.
+
+### 750. [LOW] Private `_EMAIL_RE` imported across modules, and two email regexes disagree
+`platform/agents/task/create.py:24` — create.py imports operations' private `_EMAIL_RE` (operations.py:45), which disagrees with the bounded one in list_filters.py:55. (review 2026-09-27 #80)
+
+**Suggested fix:** Share one public `EMAIL_RE` and use `email_in()` everywhere.
+
+### 767. [LOW] The task command lead is a third lead-word list, drifted from the shared one
+`platform/agents/task/text_helpers.py:109` — `agents/estimate/lead_words.py` exists so the lead words are written once ("so the two can't drift apart"), but `_LEAD_FILLER` is a separate list. "perfect, mark it done", "one more thing, archive it" and "quick, archive it" return None, though the shared list has perfect / one more thing / quick. (review 2026-09-28 third round #6)
+
+**Suggested fix:** Build `_LEAD_FILLER` from `lead_words.LEADS` (move the module to `agents/lead_words.py` if a task import from `agents/estimate` is unwanted), add task-only words there, and add the three cases to `test_a_polite_edit_still_counts`. Keep "I need to" out (user decision 2026-09-28).
+
+### 768. [LOW] The size-command `_LEAD` is a fourth lead-word list
+`platform/agents/material/size_commands.py:32` — "thanks, remove size 1 yd from it", "great. …", "actually …" and "then remove size 1 yd from it" return None; with Topsoil in focus "thanks, remove size 1 yd from it" dead-ends at "Please specify which fields to update." (writes nothing). (review 2026-09-28 third round #7)
+
+**Suggested fix:** Build `_LEAD` from the same shared list as #767; add a lead-word case to test_material_size_commands.py.
 
 ## Accessibility
 
@@ -1298,6 +1369,11 @@ happens on the phone (where the image is genuinely secondary) rather than on des
 `portal/src/components/estimates/DocVersionList.tsx:43` — The delete-confirm modal returns focus to the trash button, whose row no longer exists, so focus lands on `<body>`.
 
 **Suggested fix:** When `versions` shrinks, move focus to the next row's trash button or to the "Generated versions" heading (`tabIndex={-1}`).
+
+### 757. [LOW] The `role="status"` live region is added to the page already containing its text
+`portal/src/components/Layout/AiPanel.tsx:432` — `{openQuestion && <div role="status">…}` mounts the region with its text in one render; NVDA/JAWS generally don't announce a region that appears already filled. (review 2026-09-27 #87)
+
+**Suggested fix:** Always render an empty `<div role="status" aria-live="polite">` and toggle only its contents.
 
 ## Responsive and breakpoint drift
 
@@ -2139,6 +2215,248 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 **Suggested fix:** One out-of-chat table (`agents/conversation/out_of_chat.py`, design §5.7) that refuses with a redirect to the page or user-guide section for everything in design §2.3, plus a meta layer ahead of classification for cancel / thanks / repeat / show more / clear chat (§5.6).
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+### 699. [MEDIUM] The display-text save for non-English turns can erase another turn's chat lines
+`platform/routers/agents.py:705` — `_save_display_text` saves again, conditional on the version just written. If another turn saved during the outbound translation call, `merge_turn` looks for `base[-1]` in ours, which now has an extra `display_text` key, finds no match, treats the history as rewritten and keeps only ours. The other turn's lines are dropped: the #689 loss again, for non-English conversations. Also, if the first save failed, the pre-turn snapshot's lines are stamped with this turn's text. MEDIUM: needs a non-English user with two overlapping turns. (review 2026-09-27 #25)
+
+**Suggested fix:** In `_new_lines`, match history lines on (role, text) only and carry `display_text` onto `latest`'s matching lines. Better, translate before the turn's single save. Skip `_save_display_text` when the first save returned "".
+
+### 700. [MEDIUM] Removing or renaming a size the material doesn't have replies "I've updated the material"
+`platform/agents/material/service.py:1769` — `_handle_size_command` never checks that `command.size` exists for remove or rename; `_build_sizes_from_fields` returns the sizes unchanged and the success reply (2192-2196) still goes out. "delete size 1 yd for Black Mulch" when the size is "1 cu yd" claims success. (review 2026-09-27 #26)
+
+**Suggested fix:** Look the size up on `target.sizes` with `_normalize_size_text` (case-insensitive). If it's missing, reply "X doesn't come in … — it comes in …", as the read op does.
+
+### 701. [MEDIUM] The size-command branch skips `process()`'s error handling
+`platform/agents/material/service.py:3079` — `return await self._handle_size_command(...)` sits before the `try/except` around `_dispatch_intent_to_handler` (3054-3086). A DB error, an `HTTPException(404)` when the material is deleted between resolve and write, or `NoActingUser` escapes, and routers/agents.py:1666-1670 turns it into a 500 instead of "I could not complete the material request." MEDIUM: failure paths only. (review 2026-09-27 #27)
+
+**Suggested fix:** Move the size branch inside the existing try, or wrap it in the same failure reply.
+
+### 702. [MEDIUM] A category id typed into the message skips the company check, and the details lookup reads it unscoped
+`platform/agents/material/service.py:1949` — The update-path resolver resolves only category values that aren't 24-hex; a hex id passes straight to `UpdateMaterialRequest`, and routers/materials.py:516-548 doesn't check the category's company. `_with_catalog_names` (807/812) then loads it with an unscoped `MaterialCategory.get` / `MaterialUnit.get` and prints the name. This exposes another tenant's category name to anyone holding its ObjectId. (review 2026-09-27 #28)
+
+**Suggested fix:** Resolve hex ids with `find_one(id == oid, company == company_oid)`, here and in `_resolve_create_category_unit_ids`. Scope both lookups in `_with_catalog_names` to `material_doc["company"]`.
+
+### 703. [MEDIUM] "show me his contact info" / "delete it" look up a contact named by the pronoun
+`platform/agents/contact/service.py:2238` — This diff removed `and not active_contact_id` from the get/delete fallback gate (also :2322), so `_extract_name_from_message` runs for pronoun references. "show me his contact info" → "His", which substring-matches "Chris"; "delete that one" → "One". The wrong contact is shown and becomes focus, so the next "change the phone to …" edits it. A delete asks first but names the wrong contact. MEDIUM: the write needs a second turn that names the contact. (review 2026-09-27 #30)
+
+**Suggested fix:** Keep the fallback, but discard an extracted name that is only a pronoun or "one" before setting `parsed["full_name"]`. Leave the "notes" stopword in contact/utils.py alone (CLAUDE.md Notes item 2).
+
+### 704. [MEDIUM] "it/this/that" anywhere in a message picks the focused template over one the user named
+`platform/agents/template/service.py:205` — `_POINTS_AT_FOCUS_RE` is an unanchored search that runs before `_extract_name_hint`. "delete template Old Patio, it's a duplicate" asks to delete the focused "Patio", so a quick "yes" deletes the wrong one. This breaks "a name in the message beats the anchor", and `active_template_id` has no staleness check. (review 2026-09-27 #31)
+
+**Suggested fix:** Use the anchor only when `_extract_name_hint` finds no name, and anchor the regex to the whole reference, e.g. `^\s*(?:delete|remove|show(?:\s+me)?|get|open)\s+(?:it|this(?:\s+one)?|that(?:\s+one)?)\s*[.!?]?\s*$`.
+
+### 705. [MEDIUM] "delete my note" offers an Owner someone else's note and calls it "your note"
+`platform/agents/conversation/record_notes.py:326` — The "my" in `_DELETE_RE` is non-capturing. When the requester has no notes on the record, `chosen` falls back to every note they may delete, which for an Owner is all of them. The confirmation (:345) says "Delete your note on Ana Reyes: …?", so "yes" deletes an employee's note under a misleading prompt. Untested: the corpus seeds only Owner-written notes. (review 2026-09-27 #32)
+
+**Suggested fix:** Capture "my" in `NoteRequest`; when present, never fall back to other authors' notes. Name the author in the confirmation whenever it isn't the requester.
+
+### 706. [MEDIUM] Requests starting with no / don't / keep it / wait are answered "I'm not waiting on an answer"
+`platform/agents/conversation/meta.py:74` — `meta_reply` uses `is_decline_text`, which treats any message opening with a decline word as a decline. "No, set the markup to 25%", "keep it at 20% markup", "don't forget to call Bob Lee tomorrow" and "Do not charge tax on work item 2" all return NOT_WAITING and never reach an agent. (review 2026-09-27 #33)
+
+**Suggested fix:** Use the closed lists (`is_negative_text(bare) or bare in _DECLINE_HEADS`) instead of `is_decline_text`, and add the "no, …" counterpart to the existing "yes, delete contact Bob" test.
+
+### 707. [MEDIUM] `_BARE_GET_RE` runs before the 80-character guard
+`platform/agents/conversation/record_lists.py:155` — `_BARE_GET_RE.match(text)` runs before `len(text) > 80` (:156). Its `\s*[?.!]?\s*$` tail after a 60-char group backtracks quadratically: about 0.48 s on a crafted 2,000-char message, on every turn that isn't answering a question. (review 2026-09-27 #34)
+
+**Suggested fix:** Check the length before matching.
+
+### 708. [MEDIUM] `rewrite_focus_question` has no length cap
+`platform/agents/conversation/catalog_names.py:264` — `_FOCUS_QUESTION_RE` takes about 0.16 s on "the a" + 1995 spaces + "b", and runs on every turn that isn't answering a question. (review 2026-09-27 #35)
+
+**Suggested fix:** Return None when `len(message) > 80` before matching, as the neighbouring rewrites do.
+
+### 710. [MEDIUM] A due-date question becomes a write
+`platform/agents/task/text_helpers.py:817` — The due-change patterns (818-821) end in `(?P<value>.+)$`, and `_clean_value` strips "?". With a task in focus, "due today?" → `('', 'today')` sets its due date. The status-verb patterns deliberately exclude "?"; these don't. (review 2026-09-27 #37)
+
+**Suggested fix:** Use `(?P<value>[^?]+?)\s*[.!]?$` in the four due-change patterns, and add "due today?" reject tests.
+
+### 711. [MEDIUM] Status columns named like dates now set a due date instead
+`platform/agents/task/service.py:635` — The due-date reading of "move it to …" is tried before the status reading. For a company with a column called "Next Week", "Today" or "Monday", "move it to Next Week" now sets the due date to next Monday; before this diff it moved the card. (review 2026-09-27 #38)
+
+**Suggested fix:** Before treating a move/push value as a date, check whether it exactly names one of the company's statuses; if so, route to the status change.
+
+### 712. [MEDIUM] "for X" at the end of a create silently links a property
+`platform/agents/task/text_helpers.py:1078` — A non-explicit "for X" tail links a property on a single whole-word match with no question. "create a task to pick up mulch for Jordan" links "14 Jordan Rd"; "for the crew" links any property named with "crew" (create.py:206-213). (review 2026-09-27 #39)
+
+**Suggested fix:** Link from a non-explicit tail only for "at X" or an address-shaped value (contains a digit). Treat "for X" as property-or-person, as the list parser does, or ask.
+
+### 713. [MEDIUM] The new "which one?" questions store no pending record
+`platform/agents/task/operations.py:344` — "More than one teammate is called Jordan…", "More than one property matches…" (:450, :459) and "I couldn't find a property called X. Which property did you mean?" (service.py:418, :474) go through `_clarify`, which stores nothing. The next reply is routed as a brand-new request, against the CLAUDE.md rule that every question goes through `open_question`. (review 2026-09-27 #40)
+
+**Suggested fix:** Record a `pending_intents` entry with `choices` (task id, field, candidate ids), as `_stash_candidates_and_ask` does.
+
+### 717. [MEDIUM] "assigned to <name>" swallows the next word
+`platform/agents/task/list_filters.py:56` — The optional surname `(?:\s[A-Z][A-Za-z'-]{0,30})?` is compiled with IGNORECASE, so it takes any word. "tasks assigned to Jordan due today" → assignee "Jordan due", and Maple replies "I couldn't find a teammate called Jordan due." An assignee can't be combined with any other filter. (review 2026-09-27 #44)
+
+**Suggested fix:** Make the surname part case-sensitive (`(?-i:\s[A-Z][A-Za-z'-]{0,30})`) and add `(?!\s(?:due|at|and|in|for|with|marked|status|that|which)\b)`. Add these cases to test_task_list_filters.py.
+
+### 718. [MEDIUM] Due questions without a parseable date list every task
+`platform/agents/task/list_filters.py:44` — The catch-all `when` branch of `_DUE_RE` captures non-dates; the window comes back None, but line 192 still deletes the match. So "what's due for Jordan?" loses both the date and the person. It, "what's due?" and "anything due?" produce an empty filter, and the reply is "Here are your tasks:" with every task, including finished ones — a wrong answer that looks right. (review 2026-09-27 #45)
+
+**Suggested fix:** Remove the `_DUE_RE` match only when its window parses. When a due question yields no window, default to the upcoming window (overdue plus the next 7 days) or ask; `TaskListAsk.any` is there for the check.
+
+### 719. [MEDIUM] With an estimate in focus, help and catalog questions get that estimate's figures
+`platform/agents/estimate/focus_questions.py:92` — `estimate_question` runs before the help check and accepts any question containing a field word and no capitalised word:
+
+- "what is markup?" → the estimate's markup;
+- "what's the difference between markup and gross margin?" → its margin;
+- "how much does mulch cost?" → its total;
+- "what's the address for bob lee?" → its property.
+
+It is also a new regex outside command_grammar.py deciding estimate phrasings (contract 1). MEDIUM: read-only, visibly off. (review 2026-09-27 #48)
+
+**Suggested fix:** Reject definitional or comparative questions ("what is (a|an)? <field>?" with no target, "difference between") and superlatives. Take the no-reference fallback only with "it", "this" or "the estimate", or for exactly "what's the <field>?". Move the phrasings into a listed grammar entry with accept/reject tests.
+
+### 720. [MEDIUM] "which estimate has the highest total?" now asks "Which estimate would you like to view?"
+`platform/agents/estimate/focus_questions.py:84` — With nothing in focus, line 84 treats any singular "estimate/quote" as naming one estimate and returns `('total', False)`. `delegate_get_estimate` finds none and asks which estimate. Before this diff the message listed estimates sorted by `grand_total`. (review 2026-09-27 #49)
+
+**Suggested fix:** Don't match superlatives (highest|biggest|largest|most|lowest). Add these as reject rows in the routing corpus.
+
+### 721. [MEDIUM] The pipeline/backlog analytics patterns catch estimate writes and value replies
+`platform/agents/orchestrator/intents.py:761` — `\b(?:my|our|the)\s+(?:sales\s+)?(?:pipeline|backlog)\b` matches anywhere, and analytics routing runs before `_route_listed_command`. "add a note to this estimate: locate the pipeline before digging" and "rename work item 2 to the pipeline trench" route to `analytics_estimates`, and nothing is written. The same function is the new-request test in open_question.py:345, so "check the pipeline under the driveway" as a note reply drops the question. (review 2026-09-27 #50)
+
+**Suggested fix:** Anchor to a question or command head (`^\s*(?:what'?s|show(?: me)?|how'?s)\s+(?:in\s+)?(?:my|our|the)\s+(?:sales\s+)?(?:pipeline|backlog)\s*\??$`), and skip analytics when `match_command(message)` is not None.
+
+### 722. [MEDIUM] "show me estimates with the highest total" is read as a material join
+`platform/agents/orchestrator/service.py:685` — In the "find/show/list estimates with …" pattern, the exclusion lookahead comes after an optional article. The regex skips the article, the lookahead sees "the", and status/total words are never excluded. The result is `filter_by {material: 'highest total'}` → "I couldn't find a material or role matching 'highest total'", where the message used to list estimates sorted by total. (review 2026-09-27 #51)
+
+**Suggested fix:** Put the lookahead before the article: `(?!(?:(?:the|a|an|any)\s+)?(?:status|…|highest|largest|biggest|most|lowest|latest|newest|been)\b)`. Add reject rows.
+
+### 723. [MEDIUM] "which estimates have been sent?" is read as a material join
+`platform/agents/orchestrator/service.py:711` — The "which estimates use/include/has/have …" pattern has no exclusions. "which estimates have been sent?" → `{material: 'been sent'}`, and "which estimates have the highest totals?" → `'highest totals'`. Both reach the material-not-found reply. (review 2026-09-27 #52)
+
+**Suggested fix:** Apply the same exclusions as #722 to this pattern, or drop `ha(?:s|ve)` from its verbs. Add reject rows.
+
+### 724. [MEDIUM] "show me recent draft estimates" is cut to one row
+`platform/agents/estimate/crud_helpers.py:433` — This diff added bare `recent` to `date_kw`. The plural branch needs the noun right after the keyword, so "recent draft estimates", "recent won estimates" and "recent sent quotes" fall through to `limit = 1`, titled "Your latest estimate:". Before, these listed every matching estimate. (review 2026-09-27 #53)
+
+**Suggested fix:** Allow up to two words between the keyword and the noun (`\b{kw}\s+(?:\w+\s+){0,2}(?:estimates|quotes)\b`) → `_RECENT_ESTIMATES_LIMIT`. Add these cases to test_estimate_list_sort_words.py.
+
+### 725. [MEDIUM] An estimate code before "work item" is taken as the work item's name
+`platform/agents/estimate/work_item_field_handlers.py:72` — The #668 reorder reads the words before the noun first, and E-codes aren't stop words. "what's the markup on E0042 work item Patio?" now gives hint "E0042" (was "Patio"), so the handler looks for a work item named E0042. Read-only. (review 2026-09-27 #54)
+
+**Suggested fix:** In the before-noun branch, treat `[Ee]-?\d{4,7}` as a stop and fall through to the words after the noun. Add the case to the #668 tests.
+
+### 726. [MEDIUM] `pronoun_domain` reads the dictated note body
+`platform/agents/orchestrator/service.py:3521` — `_resolve_intent_with_history` strips the dictated payload for routing but passes the raw message to `pronoun_domain`. With a task in focus and an older contact anchor, "add a note: she wants the gate locked" routes to `update_contact` ("…wants the gate locked" routes to `update_task`). "there is a dog" pulls a note to a property the same way. (review 2026-09-27 #55)
+
+**Suggested fix:** `pronoun_domain(strip_assigned_value(strip_dictated_payload(message)), context or {})`.
+
+### 737. [LOW] A turn's chat lines are lost on merge when its last line repeats the previous last line
+`platform/routers/agent_helpers/conversation_store.py:82` — `_new_lines` matches `base[-1]` by value, scanning from the end, and lines carry no timestamp. If this turn's last line equals the previous last line ("thanks" → "You're welcome!" twice), it matches at the end, returns [], and a concurrent merge drops this turn's lines. (review 2026-09-27 #67)
+
+**Suggested fix:** Match the whole base tail (last 2 lines) at its known offset, or take `ours[len(base):]` after aligning for the 40-line cap.
+
+### 738. [LOW] A turn that overlaps Clear brings the cleared conversation back
+`platform/routers/agent_helpers/conversation_store.py:151` — When the document vanished mid-turn, the loop re-inserts the whole `ours`: pre-clear history, anchors and questions. Same as the old code; reachable only from a second tab or the TTL. (review 2026-09-27 #68)
+
+**Suggested fix:** Insert `merge_turn(base.snapshot, ours, {})`, which keeps only this turn's changed keys and new lines.
+
+### 740. [LOW] After a task list, any "what is/are …" question becomes a task filter
+`platform/agents/conversation/followup.py:104` — `_REFINE_RE` accepts `(which|what) … (is|are) <anything>`, and `_refined_tasks` adds any `q`. After "list my tasks", "what is the rate for Foreman?" becomes "list my tasks, only the rate for Foreman", and the rewrite stays `list_tasks` so it repeats. Read-only. (review 2026-09-27 #70)
+
+**Suggested fix:** Give tasks the closed vocabulary `_refined_estimates` uses (statuses, overdue, due-when, assignee).
+
+### 741. [LOW] "and her email is …" is swallowed by the "what about X?" rewrite
+`platform/agents/conversation/followup.py:53` — `_looks_like_a_target` accepts "her email is ana@new.example.com", and `rewrite_elliptical` runs before `rewrite_field_statement`, so after "show me contact Ana Reyes" the update becomes the garbled read "show me contact her email is …". (review 2026-09-27 #71)
+
+**Suggested fix:** Reject targets containing " is ", "=" or "should be", or try `rewrite_field_statement` first.
+
+### 742. [LOW] "Please note: …" is filed as a note
+`platform/agents/conversation/record_notes.py:50` — The targetless note rule makes the verb optional (`(?:<verb> …)?note\s*[:-]`), so "Please note: I want to change the markup to 20%" files a note on the record in focus and the request isn't carried out. The written entry (§10.7) is "add a note: …", and the estimate grammar requires a verb. (review 2026-09-27 #72)
+
+**Suggested fix:** Require the verb, as `_NOTE_VERB` does in command_grammar.
+
+### 743. [LOW] `NOTE_DELETE_REDIRECT` still says notes can't be deleted from chat
+`platform/agents/conversation/delete_confirmation.py:54` — record_notes now deletes notes ("delete my note on Bob Lee"), but a phrasing it doesn't parse ("delete Bob Lee's note") reaches the agent's delete and gets "I can't delete or edit notes from chat yet". (review 2026-09-27 #73)
+
+**Suggested fix:** Point the copy at the working form: "Say 'delete my note on <name>' and I'll find it."
+
+### 745. [LOW] The saved `note_ids` are never read
+`platform/agents/conversation/record_notes.py:303` — `_remember_list` stores the listed ids, but `_delete` (319-323) indexes a fresh `list_notes` result, so a note added in between shifts "delete note 2". The confirmation preview limits the harm. (review 2026-09-27 #75)
+
+**Suggested fix:** Resolve the position against the saved `note_ids` while the list is still current.
+
+### 746. [LOW] Linking rewrites the whole `contacts` array
+`platform/agents/conversation/record_links.py:141` — `fresh.set({"contacts": [*fresh.contacts, id]})` reads, modifies and writes, so a concurrent link (another turn or a portal edit) is overwritten. The docstring (13-14) says the write goes through the property agent; it doesn't. (review 2026-09-27 #76)
+
+**Suggested fix:** Use `{"$addToSet": {"contacts": contact.id}}` with an `updated_at` `$set`, and correct the docstring.
+
+### 751. [LOW] A teammate's name with punctuation isn't recognised
+`platform/agents/task/field_flow.py:277` — The prompt now says "A teammate's name or email works", but the raw reply goes to `_teammate_email` uncleaned, so "Jordan." never matches and falls back to "An email address works best." (review 2026-09-27 #81)
+
+**Suggested fix:** Apply `_clean_value` to the reply, or strip `.,!?` in `_teammate_email`.
+
+### 752. [LOW] An ambiguous teammate is reported as "not found"
+`platform/agents/task/service.py:482` — When `teammate()` returns "More than one teammate…" on the property-or-person path, the reply replaces it with "I couldn't find a property or a teammate called X." (review 2026-09-27 #82)
+
+**Suggested fix:** Return the ambiguity message when that is what `teammate()` found.
+
+### 758. [LOW] The positional note delete also says "your note" for someone else's note
+`platform/agents/conversation/record_notes.py:350` — "delete note 2" on a list containing another author's note (an Owner may delete it) asks "Delete your note on …?", the same wrong wording as #705 through the positional path. (review 2026-09-27 #88)
+
+**Suggested fix:** Name the author in the confirmation whenever it isn't the requester (same change as #705).
+
+### 760. [LOW] Space grouping merges two numbers into one cost
+`platform/agents/conversation/create_questions.py:48` — `(?:[, ]\d{3})` reads a space followed by three digits as a thousands separator. "$20 100lb bag" gives 20100 and "45 100" gives 45100, and the material is created at that cost without a question. Before the 2026-09-27 fix it read 20. LOW because it needs an unusual reply to the cost question. (review 2026-09-27, second round #7)
+
+**Suggested fix:** Require a word boundary after the grouped form (`…){1,2}\b`), or accept only a comma, NBSP or thin space as a group separator. Add "$20 100lb bag" to test_create_questions.py.
+
+### 761. [LOW] The overdue midnight keeps `fold` and disagrees with the other midnight helpers
+`platform/agents/task/service.py:458` — `user_now(ctx).replace(hour=0, …)` keeps `fold=1` when now falls in a repeated hour. On a day whose midnight repeats (America/Havana 2026-11-01), `today` becomes the second midnight, one hour late, and the overdue query then includes tasks due today. `_midnight` (list_filters.py:102) and `parse_due_phrase` build `datetime(y, m, d, tzinfo=zone)` (fold 0), which matches the portal. (review 2026-09-27, second round #9)
+
+**Suggested fix:** Build `today` with the same constructor, e.g. reuse `list_filters._midnight(user_now(working_context))`.
+
+### 762. [HIGH] Negated rename, field and notes edits still write
+`platform/agents/task/text_helpers.py:178` — `_RENAME_RE`, `_FIELD_OF_RE`, `_FIELD_BARE_RE`, `_SET_NOTES_RE` and the notes-append patterns (`_ADD_NOTES_RE`, `_ADD_NOTES_TRAILING_RE`, `_ADD_BARE_NOTES_RE`) are still unanchored `\b<verb>` searches, so a sentence that merely mentions the verb writes: `detect_update_op("don't rename the fence task to Gate")` → ('title', 'fence', 'Gate'); "I won't change the due date of the fence task to Friday" sets the due date; `detect_notes_update("don't add a note to it: call Bob")` appends; "we shouldn't set the notes on the fence task to foo" replaces the notes. The other task edits were anchored at the message start in the 2026-09-28 rounds (`_COMMAND_LEAD`). (review 2026-09-28 #2)
+
+**Decision (user, 2026-09-28):** "negation should not be part of the commands.... so it should not get confused with notes." No negation-specific rule goes into the command patterns — a negated sentence is simply not a command — and a note's own text ("add a note: don't park on the lawn") must never be read as a negated command. Deferred, not fixed, in that round.
+
+**Suggested fix:** Anchor these patterns with `_COMMAND_LEAD`, as the other edits are — that adds no negation logic (a negation is just not a lead), and the anchor sits before the verb, so a note body is untouched. Add the phrasings above to `_NEGATED_EDITS` in tests/test_task_verbs.py (asserting `detect_update_op` / `detect_notes_update` return None), plus a note whose body contains "don't" that still appends. Confirm the approach with the user first.
+
+### 763. [LOW] "what sizes does it come in?" is claimed for materials whatever is in focus
+`platform/agents/orchestrator/service.py:2669` — `parse_size_command` yields a pronoun "sizes"/"read" command (material "") and the orchestrator always routes it to get_material, so with a task, contact or estimate in focus Maple asks "Which material do you mean?" and opens a material question that catches the next message. (review 2026-09-28 third round #2)
+
+**Tried and backed out (2026-09-28):** letting it fall through when another domain is in focus is worse — on the rules tier, with a task in focus, "what sizes does it come in?" fell to the task creator ("What should the task be called?") and the next turn, "mark it as done", created a task named "mark it as done". Asking which material is the safer answer.
+
+**Suggested fix:** Only with a real destination for the other domain: answer a pronoun sizes question about a task / contact / estimate with "Only materials have sizes — which material do you mean?" (still the material question), or leave as is. The fall-through must not reach create_task.
+
+### 764. [LOW] The size-command pronoun set misses they / these / those and "it please"
+`platform/agents/material/size_commands.py:89` — "what sizes do they come in?", "remove size 1 yd from those" and "… from it please" parse as names ('they', 'those', 'it please') and answer "No material found matching 'They'" — the same name-lookup path as review 2026-09-27 #18. (review 2026-09-28 third round #3)
+
+**Suggested fix:** `^(?:(?:this|that|the)\s+)?(?:it|this|that|they|them|these|those|one|material)$`, and strip a trailing "please" before the check; add the cases to `test_a_pronoun_is_the_material_in_focus`.
+
+### 765. [LOW] A material literally named "One", "Material" or "It" can't be named in a size command
+`platform/agents/material/size_commands.py:89` — "… from one" and "… from material one" both become the material in focus. (review 2026-09-28 third round #4)
+
+**Decision (user, 2026-09-28):** accepted — "yes, this is an unlikely case". No change; kept for the record.
+
+### 766. ~~[LOW] "Black Mulch?" as the reply to "Which material do you mean?" abandons the size change~~ — RESOLVED 2026-09-28
+
+**Resolved 2026-09-28** for the company's own materials: a reply that is one of them answers the question before the "ends in ?" check (`routers/agent_helpers/named_answers.py`), pinned by `tests/test_open_question.py::test_a_known_material_name_answers_before_the_command_checks`. An unknown "X?" is still read as a new request, by design.
+
+`platform/agents/material/service.py:1676` — the question gate treats a reply ending in "?" as a new request, so it shows Black Mulch's details and the size removal is lost. (review 2026-09-28 third round #5)
+
+**Suggested fix:** Optional. In `open_question._is_new_request`, don't count a trailing "?" as new when the open question is a value question in `_NAME_VALUE_FIELDS` and the reply is short (≤ 4 words).
+
+### 773. ~~[LOW] "now Topsoil" answers "Which material do you mean?" but isn't cleaned~~ — RESOLVED 2026-09-28
+
+**Resolved 2026-09-28:** the reply is cleaned by the shared `replies.name_in_reply`, which strips "now", "ok" and "please" too; pinned by `tests/test_open_question.py::test_the_name_in_a_reply`.
+
+`platform/agents/material/service.py:161` — the question gate's `_POLITE_LEADS` strips "now ", so "now Topsoil" is judged an answer, but `_SIZE_REPLY_WRAPPER_RE` doesn't strip "now": "No material found matching name 'Now Topsoil'". The two lead lists disagree. (review 2026-09-28 fourth round #2)
+
+**Suggested fix:** Add `now|ok(?:ay)?|please` to the leading alternatives of `_SIZE_REPLY_WRAPPER_RE` (or strip with `replies._without_polite_leads`); add "now Topsoil" to a unit test.
+
+### 774. [LOW] "I need you to mark it done" no longer counts as a command
+`platform/agents/task/text_helpers.py:114` — with a task in focus it shows the task's details and writes nothing; HEAD's unanchored `\bmark` matched it. "I need to archive the fence gate task" replies "What would you like to update on the task?" (no write, confusing). "I need to …" was deliberately dropped from the lead (user decision 2026-09-28: it notes work still to do). (review 2026-09-28 fourth round #3)
+
+**Suggested fix:** Accept `i\s+need\s+you\s+to` — it requires "you", so plain "I need to" stays excluded — and add "I need you to mark it done" to `test_a_polite_edit_still_counts`.
+
+### 775. [MEDIUM] The reply cleaner also cuts real names, so an exact name can still dead-end
+`platform/agents/conversation/replies.py:178` — `_NAME_REPLY_WRAPPER_RE` strips a leading no / nope / sorry / now / ok / please / the / it's / "I meant" from every name, stored ones included, and with `[,.!]?` also takes "No." off "No. 57 Stone": `name_in_reply("No. 57 Stone")` → "57 Stone", "Please Stone" → "Stone", "Okay Mix" → "Mix", "The Good Stuff" → "Good Stuff". The folded keys still agree, so the gate answers "Which material do you mean?", but the agent then looks the cut name up by substring — with "No. 57 Stone" and "Washed 57 Stone" seeded, the exact reply "No. 57 Stone" answers "Multiple materials matched. Please specify the exact material name." and no size is removed; that reply stores no record, so it is a dead end. (review 2026-09-28 sixth round #1)
+
+**Suggested fix:** Fold stored names with whitespace + casefold only (never the cleaner); in the gate, match either the whole tidied reply or the cleaned one; in `_resume_size_command`, try the whole reply as an exact name before the cleaned one; drop "." from the separator after no/nope. Add "No. 57 Stone" and "The Good Stuff" to the gate test and to `test_the_name_in_a_reply`.
 
 ## Platform — API, models and data
 
@@ -3486,6 +3804,46 @@ The Maple panel never shows that Maple is waiting for an answer, and offers no C
 
 **Resolved 2026-09-27** (platform `9f657b4`, portal `97c87f4`): the reply and `GET /agents/conversation` carry `open_question` (`{"kind": …}` from the question gate); the composer shows "Waiting for your answer · Cancel" while one is open, restored on reload, and Cancel sends "cancel". A yes/no question's chips are Yes/No, and no clarification gets agent action chips. A message sent before the restored history lands is kept after it (a turn already in the restored lines isn't shown twice). The dead `_aiConversationId` state and `createConversationId` are gone, and `/agents/orchestrate` no longer echoes the conversation state to the browser (`response_model_exclude={"context"}`; in-process callers still see it). Pinned by `tests/test_agent_helpers_finalize_result.py`, `tests/test_conversation_api.py`, and the portal's `useMapleAgent.test.tsx` and `AiPanel.test.tsx`.
 
+### 727. [MEDIUM] `mergeRestored` can wipe the restored transcript when the pending message repeats an earlier one
+`portal/src/components/Layout/useMapleAgent.ts:356` — `restored.findIndex(m => m.role === "user" && m.text === firstLocalUser.text)` finds the first earlier occurrence anywhere in history, and :357 drops every restored line from there on. Reload mid-question and type "yes" (already earlier in history): the panel shows only `[yes, Thinking…]`, and the question being answered is gone. MEDIUM rather than HIGH: display only — the server keeps the history and a reload restores it. (review 2026-09-27 #57)
+
+**Suggested fix:** Treat the local turn as already restored only when it is the tail of `restored` (check `restored[restored.length - 2]` is that user line); otherwise append. Add a test with a repeated earlier message.
+
+### 733. [MEDIUM] A successful quiet reload never clears an earlier load error
+`portal/src/pages/DashboardPage.tsx:84` — Same defect as #728 in the dashboard list loader (81-108); the page stays on the error state (235). (review 2026-09-27 #63)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`. Consider one shared quiet-load helper, since the pattern is now pasted six times.
+
+### 734. [MEDIUM] The question-strip Cancel button takes focus off the composer
+`portal/src/components/Layout/AiPanel.tsx:435` — The button has no `onMouseDown={keepComposerFocus}`, against the file's own rule (336-347). On a phone, blur brings the tab bar back (PortalLayout 426), lifting the composer about 64px between press and click, so the tap misses. The strip appears right after a reply, when the textarea has just been refocused. (review 2026-09-27 #64)
+
+**Suggested fix:** Add `onMouseDown={keepComposerFocus}`, as the other composer controls do.
+
+### 735. [MEDIUM] Cancel doesn't stop a pending voice auto-send
+`portal/src/components/Layout/AiPanel.tsx:437` — `onClick={() => onCancelQuestion?.()}` bypasses `cancelAutoSend()`. If a voice transcript is counting down ("Sending in 3…"), it can still fire after the "cancel" turn — the double-send `submitDirectMessageCancellingAutoSend` (187-190) exists to prevent. (review 2026-09-27 #65)
+
+**Suggested fix:** `onClick={() => { cancelAutoSend(); onCancelQuestion?.(); }}`.
+
+### 753. [LOW] A failed analytics refetch after a Maple write shows $0
+`portal/src/pages/DashboardPage.tsx:145` — The analytics effects now re-run on `reloadToken`, and on failure they `setDivisionAnalytics(null)` / `setStatusAnalytics(null)` (145, 160), so the headline cards read 0, contradicting the "every card reload quietly" comment. (review 2026-09-27 #83)
+
+**Suggested fix:** On a reload (`reloadToken > 0`), keep the previous analytics when the fetch fails.
+
+### 754. [LOW] A reload can return the numbers from before the write
+`portal/src/pages/DashboardPage.tsx:117` — `fetchAnalytics` reuses an in-flight promise for the same period, so a `reloadToken` bump that lands while the mount fetch is still in flight gets pre-write data. (review 2026-09-27 #84)
+
+**Suggested fix:** Bypass the in-flight map when the fetch is triggered by a reload.
+
+### 755. [LOW] The list reload has no `cancelled` guard
+`portal/src/pages/DashboardPage.tsx:81` — Unlike its neighbours (139, 154), the main list effect doesn't cancel on re-run, so an older response can land after a newer one. (review 2026-09-27 #85)
+
+**Suggested fix:** Add the same `let cancelled = false` / cleanup guard.
+
+### 756. [LOW] A restored `open_question` can overwrite the result of a turn that already finished
+`portal/src/components/Layout/useMapleAgent.ts:307` — `setOpenQuestion((current) => current ?? waiting)` can't tell "never set" from "the last reply closed it". Answer "yes" before a slow restore lands: the POST reply sets null, then the older GET sets `{kind:"yes_no"}`, and the strip shows "Waiting for your answer" with nothing open. (review 2026-09-27 #86)
+
+**Suggested fix:** Set a ref when any local turn completes, and skip the restored `open_question` once it is set.
+
 ## Portal — settings, billing, onboarding and ops
 
 ### 206. [MEDIUM] Generalize `PlanPickerGrid` button label
@@ -3557,6 +3915,11 @@ field differently again if asked.
 **Suggested fix:** align the onboarding label and the guide glossary entry to "Unbillable Time".
 Deferred deliberately: it touches onboarding wizard copy outside the scope of the Markup change,
 and will be resolved as part of the planned onboarding-flow overhaul.
+
+### 732. [MEDIUM] A successful quiet reload never clears an earlier load error
+`portal/src/components/settings/TemplatesTab.tsx:50` — Same defect as #728 in the templates loader (49-62); the tab stays on `<ErrorState>` (183). (review 2026-09-27 #62)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`.
 
 ## Portal — tasks, properties, contacts and materials
 
@@ -3663,6 +4026,40 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
 **Resolved 2026-09-27** (portal `19257da`): Contacts, Properties, Materials, People and Settings → Templates reload quietly after a Maple write — no `isLoading` swap, so the page, open dialogs and sheets, filters and scroll stay, and a failed refresh keeps what is shown; the first load still shows the spinner. `agentMutationEvents.ts` maps `create_estimate_from_template`, `delete_template` (new `portal:templates:changed`), `link_contact` (both Properties and Contacts) and Maple's `add_note`/`delete_note` (new `portal:notes:changed`, which the notes panel on that record listens for); `dispatchAgentMutation` fires every matching event. The dashboard reloads its lists and cards on an estimate change and its Upcoming Tasks card on a task change; the property activity panel also listens for estimate and task changes. Pinned by the quiet-refresh tests in `tests/{Contacts,Materials,People}PageDiffSave.test.tsx`, `PropertiesPageMobileSheet.test.tsx` and `TemplatesTabMapleRefresh.test.tsx`, plus `agentMutationEvents.test.ts`, `DashboardPage.test.tsx`, `UpcomingTasksCard.test.tsx`, `NotesPanel.test.tsx` and `PropertyActivityPanel.test.tsx`.
+
+### 728. [MEDIUM] A successful quiet reload never clears an earlier load error
+`portal/src/pages/ContactsPage.tsx:251` — `setError("")` now runs only when `!quiet`. If the first load failed, the page shows `<ErrorState>` (671). A later Maple write triggers a quiet reload that succeeds, but the error stays and the page stays on the error screen. Before this diff, a Maple write reset the error and the page recovered. (review 2026-09-27 #58)
+
+**Suggested fix:** Call `setError("")` after the successful `set*` calls in `try`, as TasksPage.tsx:151 does.
+
+### 729. [MEDIUM] A successful quiet reload never clears an earlier load error
+`portal/src/pages/MaterialsPage.tsx:121` — Same defect as #728 in the materials loader (120-134); the page stays on `<ErrorState>` (551) after a successful Maple-triggered reload. (review 2026-09-27 #59)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`.
+
+### 730. [MEDIUM] A successful quiet reload never clears an earlier load error
+`portal/src/pages/PeoplePage.tsx:101` — Same defect as #728 in the roles loader (100-114); the page stays on `<ErrorState>` (335). (review 2026-09-27 #60)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`.
+
+### 731. [MEDIUM] A successful quiet reload never clears an earlier load error
+`portal/src/pages/PropertiesPage.tsx:125` — Same defect as #728 in the properties loader (122-156); the page stays on `<ErrorState>` (394). (review 2026-09-27 #61)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`.
+
+### 771. [LOW] A `?contactId=` link on a phone-sized screen lands on the list with no sheet
+`portal/src/pages/ContactsPage.tsx:527` — following a contact link (from a property's sheet or an estimate) while stacked (a phone, or a desktop the Maple panel squeezes) selects and announces the contact to Maple, but shows the list, not its detail; `?open=` opens the sheet. Removing the param with `replace` also means Back from the next page lands on `/contacts` with the first row, as `?open=` already does. (review 2026-09-28 third round #11)
+
+**Decision (user, 2026-09-28):** "when do we have link to a phone number? I don't think we need this case." — deferred. Note: the case is a contact link followed *on a phone-sized screen*, not a link to a phone number; confirm before closing.
+
+**Suggested fix (if wanted):** open the sheet when stacked, as the `?open=` effect does (`if (isStacked) setIsDetailSheetOpen(true)`, gated on `isMeasured`).
+
+### 772. [LOW] A `?propertyId=` link on a phone-sized screen lands on the list with no sheet
+`portal/src/pages/PropertiesPage.tsx:307` — same as #771 for a property linked from a contact's sheet or an estimate. (review 2026-09-28 third round #12)
+
+**Decision (user, 2026-09-28):** deferred with #771 (same note).
+
+**Suggested fix (if wanted):** as #771.
 
 ## Website
 
@@ -4200,6 +4597,26 @@ total row count rather than blank-row count.
 **Suggested fix:** Replace the code block with `cd platform && ./run_bandit.sh` (the script activates the venv and pins `-c bandit.yaml`).
 
 *(Review 2026-09-26 round 20 #2.)*
+
+### 736. [MEDIUM] The "without the loading screen" assertion cannot fail
+`portal/tests/DashboardPage.test.tsx:262` — `window.dispatchEvent(...)` runs outside `act`, so the re-render hasn't happened when `queryByText("Loading dashboard...")` is checked; the assertion passes trivially. The `waitFor` on the analytics call count would pass for a non-quiet reload too. (review 2026-09-27 #66)
+
+**Suggested fix:** Make `estimatesApi.list` return a pending promise, dispatch inside `await act(async () => …)`, then assert no spinner, as the Contacts, Materials and Templates tests do.
+
+### 759. [LOW] Corpus row `contact-stale-anchor-asks` passes for the wrong reason
+`platform/tests/maple_conversations/corpus.py` (row `contact-stale-anchor-asks`) — its last turn, "change the homeowner's phone to 416-555-9999", is meant to prove the stale-anchor question, but "the homeowner's" is read as a contact named "Homeowner" and the reply is "No contact found with name 'Homeowner'." — which also satisfies `clarify=True` and the unchanged-phone check. Found while writing the stale-anchor answer rows (review 2026-09-27 #12), which use "her phone" and assert "Just to check".
+
+**Suggested fix:** Add `has=("Just to check",)` to that turn. It will then fail — a role word ("the homeowner", "the manager") naming the contact in focus is a gap in `agents/contact/`; record it in the phrasing reference (⚠️) or mark the row `gap=` until the contact agent reads a role word as the anchored contact.
+
+### 769. [LOW] The `?contactId=` announce test never checks the link is consumed
+`portal/tests/ContactsPageDiffSave.test.tsx:194` — with no sheet the `if (close)` branch is skipped, so the test only checks "announced c2, never unannounced"; deleting `setSearchParams(... delete("contactId"))` (the snap-back fix) leaves it green, and the `?open=` case never asserts the sheet opened. (review 2026-09-28 third round #9)
+
+**Suggested fix:** Put the expected sheet state in the `each` table and assert it (a dialog for `?open=`, none for `?contactId=`); for `?contactId=`, tap c1, fire the contacts-changed event (a quiet reload), and assert the last announced id is c1.
+
+### 770. [LOW] The `?propertyId=` announce test never checks the link is consumed
+`portal/tests/PropertiesPageMobileSheet.test.tsx:365` — same gap as #769: deleting `delete("propertyId")` leaves it green, and the `?open=` case never asserts the sheet. (review 2026-09-28 third round #10)
+
+**Suggested fix:** As #769: assert the sheet state per case, tap prop-1, trigger a quiet reload, assert prop-1 stays announced.
 
 ## Codebase hygiene (batchable)
 
@@ -4954,4 +5371,14 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `platform/agents/estimate/work_item_edit_handlers.py:55` — The entry point for rule-detected work-item edits isn't documented.
 
 **Suggested fix:** Add a one-line docstring.
+
+### 739. [LOW] `load_conversation` is used only by tests
+`platform/routers/agent_helpers/conversation_store.py:75` — Production re-implements it in `routers/agents.py:_load_conversation_context` (`find_one` + `loaded_from`), so the tests cover a path production never calls. (review 2026-09-27 #69)
+
+**Suggested fix:** Have `_load_conversation_context` call `load_conversation`, keeping its try/except and ContextVar set.
+
+### 749. [LOW] The `assigned_to` parameter is now unused
+`platform/agents/task/base.py:204` — No caller passes `assigned_to` to `_list_conditions`, `_list_tasks_db` (:243) or `_count_tasks_db` (:275) any more; `extra` replaced it. (review 2026-09-27 #79)
+
+**Suggested fix:** Remove the parameter from all three.
 

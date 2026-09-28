@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-27
+**Last updated:** 2026-09-28
 
 ### Recent changes
 
@@ -12,7 +12,33 @@ file 2026-09-27). **2026-09-27:** a multi-turn audit corrected rows found wrong
 against the code and added an **Open gaps** line to each resource section
 (§1–§7) citing the follow-ups in
 [`code-review-followups.md`](code-review-followups.md); the fixes are planned in
-[`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md).
+[`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md). **Review fixes, same day:** a task edit that names no task and has none in
+focus asks "Which task?" instead of changing the newest one, and a stale task
+in focus asks "Just to check — do you mean …?"; a status verb is a command
+only at the start of the message ("I can't finish the fence task" changes
+nothing); "it", "the last" and the like are never read as a line's or
+record's name ("remove it from work item 2", "the address for it"); "her city
+is Guelph" is the contact's; task days follow the user's time zone (the portal
+sends it); a task Maple creates for a teammate notifies them; a material
+rename onto a size it already has, or a remove whose label two sizes share,
+is refused.
+
+**2026-09-28 (second review):** every task edit — give, unassign, due date,
+property, status, assign, archive — is a command only at the start of the
+message, after at most a lead ("hey Maple,", "and", "also", "thanks!",
+"please", "can you", "I'd like to" — never "I need to", which is work
+still to do), so "don't give it to Jordan" changes
+nothing; "could you complete it?" is a request. A create's assignee followed
+by another sentence stays in the note, unassigned. A material size of "it" /
+"the one" / "this material" is the material in focus ("Which material do you
+mean?" when there is none; a reply that is one of the company's materials
+finishes it however it reads — "Show Stone", "Clear 3/4 Stone" — while a
+request such as "change the cost of Topsoil to 20" is taken as a request); "what sizes does
+it come in?" lists them. On the portal, stacked (a phone, or a desktop the
+Maple panel squeezes), only a contact or property the user picked — a tap, an
+`?open=` or `?contactId=` / `?propertyId=` link — is "this one" to Maple, and
+it stays so after its sheet closes. Negated renames, field and notes edits
+still write — follow-up #762.
 
 Headlines, 2026-09-27 (multi-turn everywhere — design
 [`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md)):
@@ -918,7 +944,7 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `link Zed Quill to 12 Oak St` (no such contact) | "I couldn't find a contact or a property called Zed Quill." | ✅ rule |
 | `remove Ana Reyes from 12 Oak St` / `unlink …` | done in the app — §9.8 | 🛑 redirect |
 
-**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690.
+**Open gaps:** #703 (a pronoun contact looked up by name), #705 and #758 (an Owner offered someone else's note as "your note"), #741, #742 ("Please note: …" filed as a note), #745, #746 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690.
 
 ---
 
@@ -1039,7 +1065,7 @@ A create that is missing details asks for the next one alone, remembers which, a
 | `5` | created — cost 5.00, price 5.50 at a 10% markup | ✅ rule |
 | a category or unit the company doesn't have | says so and asks again, never creates one (#681) | ✅ rule |
 
-**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697.
+**Open gaps:** #700 (a size the material doesn't have "updated"), #701, #760 (space-grouped costs), #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697.
 
 ---
 
@@ -1201,7 +1227,7 @@ Orchestrator routing, refusal guard, and Template Agent are implemented. Possess
 
 Additional cross-resource phrasings (e.g. `which templates include {material}?`) are future candidates — not tracked here yet.
 
-**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681, #695; `find templates named X` (§6.5).
+**Open gaps:** #704 ("it" picks the focused template over a named one) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681, #695; `find templates named X` (§6.5).
 
 ---
 
@@ -1397,7 +1423,7 @@ Resolver: `agents/task/resolver.py::find_task_from_context_or_message` — order
 | By title (fuzzy) | `the fence gate task` (typos tolerated) | ✅ |
 | By property | `the task at {property}` | ✅ |
 | Anaphora (active task) | `mark it as done` / `convert it` / `rename it to {new}` | ✅ agent-side *(pronoun-only messages route via the LLM tier + active-task context. 2026-07-30 — two routing bugs used to steal these: a stale `active_estimate_code` from earlier in the session out-ranked the just-created task, and a Capitalized new value was mined as a person name and sent to Contact. The anchor is now chosen by recency (`active_entity_domain`), and a pronoun-targeted edit's payload is never read as a domain signal.)* |
-| Anaphora (bare determiner) | `mark the task as done` / `assign my task to {email}` / `archive the task` / `rename the task to {new}` | ✅ agent-side *(2026-07-25 — "the/my task" with no name in between is anaphora: the target hint collapses to empty and resolution goes through the active-task context. Previously the stray determiner leaked into the title matcher and could hit ANY title containing "the".)* |
+| Anaphora (bare determiner) | `mark the task as done` / `assign my task to {email}` / `archive the task` / `rename the task to {new}` | ✅ agent-side *(2026-07-25 — "the/my task" with no name in between is anaphora: the target hint collapses to empty and resolution goes through the active-task context. Previously the stray determiner leaked into the title matcher and could hit ANY title containing "the".)* *(2026-09-28 — with no task in focus Maple asks "Which task?" rather than editing the most recently updated task; notes appends still fall back to it, #447.)* |
 | Ambiguity → confirmation | two similar titles → numbered clarification, reply `1` / `the second one` / `T0004` / words from one title (`the paint one`) / `no` | ✅ *(2026-09-27 — the readable id and title words; the question gate reads a reply naming a choice as the answer, #692)* |
 
 ## 7.12 Task refusals — 🛑
@@ -1422,7 +1448,7 @@ Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-sup
 
 Task details (2026-09-27) also show the linked property, the estimate it was converted into, and how many photos and videos it has.
 
-**Open gaps:** older #442, #447, #470 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27.
+**Open gaps:** #710 ("due today?" writes), #740 ("what is/are …" after a task list), #767 ("perfect," / "quick," / "one more thing," before a command), #774 ("I need you to …"), #711, #712, #713, #717, #718, #751, #752, #761, #762 (negated rename / field / notes edits write); older #442, #447, #470 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27.
 
 ---
 
