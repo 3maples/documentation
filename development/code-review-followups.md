@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **778**. Never
+- **Entries are numbered and permanent.** Next free number: **779**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2468,6 +2468,13 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/agents/conversation/replies.py:178` — `_NAME_REPLY_WRAPPER_RE` strips a leading no / nope / sorry / now / ok / please / the / it's / "I meant" from every name, stored ones included, and with `[,.!]?` also takes "No." off "No. 57 Stone": `name_in_reply("No. 57 Stone")` → "57 Stone", "Please Stone" → "Stone", "Okay Mix" → "Mix", "The Good Stuff" → "Good Stuff". The folded keys still agree, so the gate answers "Which material do you mean?", but the agent then looks the cut name up by substring — with "No. 57 Stone" and "Washed 57 Stone" seeded, the exact reply "No. 57 Stone" answers "Multiple materials matched. Please specify the exact material name." and no size is removed; that reply stores no record, so it is a dead end. (review 2026-09-28 sixth round #1)
 
 **Suggested fix:** Fold stored names with whitespace + casefold only (never the cleaner); in the gate, match either the whole tidied reply or the cleaned one; in `_resume_size_command`, try the whole reply as an exact name before the cleaned one; drop "." from the separator after no/nope. Add "No. 57 Stone" and "The Good Stuff" to the gate test and to `test_the_name_in_a_reply`.
+
+### 778. [LOW] The work-item question lane routes by regex outside `command_grammar.py`
+`platform/agents/orchestrator/service.py:279` — `_is_work_item_question` is an orchestrator rule that sends messages to the Estimate Agent without an entry in `agents/estimate/command_grammar.py`. The convergence design (§5.3) says only §4 commands route to the Estimate Agent by rule, and CLAUDE.md says "a rule that isn't there doesn't exist". The lane predates the 2026-09-28 change, which overall narrowed it: a question must now open with a question word, so a bare "is", a relative "which" or a "?" on a request no longer counts. That change also let it accept messages opening with are / was / were / who / whose / when / where, which the old `what|which|is` test never matched. No probe changed routing ("are there any tasks for the patio work item?", "who owns the patio work item?", "when did I add the patio work item?" route the same with the lane on, off, or on the old logic), and the snapshot showed no change to an existing row. (review 2026-09-28 work-item question lane, second round #2)
+
+**Decision (user, 2026-09-28):** keep the lane and its openers as they are (they follow the user's rule: "Is, Are, What, When, Who, etc."), and register it in the written list rather than trimming or retiring it.
+
+**Suggested fix:** Register the lane as a ported entry in `command_grammar.py` §4.3, wrapping `_is_work_item_question` unchanged, with accept/reject tests and a row in the design's ported table, so it's part of the written list. Mind the interaction: the `process()` lane currently runs only when `match_command(...) is None`, and ported entries are tried only when an agent is passed to `match_command`, so decide whether the orchestrator's three call sites read the entry or keep calling the helper. Either way, the routing snapshot must not change.
 
 ## Platform — API, models and data
 

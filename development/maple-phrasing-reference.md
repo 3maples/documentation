@@ -38,7 +38,17 @@ it come in?" lists them. On the portal, stacked (a phone, or a desktop the
 Maple panel squeezes), only a contact or property the user picked — a tap, an
 `?open=` or `?contactId=` / `?propertyId=` link — is "this one" to Maple, and
 it stays so after its sheet closes. Negated renames, field and notes edits
-still write — follow-up #762.
+still write — follow-up #762. A create that describes a size ("a bed that
+is 5 feet by 15 feet") and asks for "a separate work item" creates the
+estimate: a listed create is no longer read as a question about a work item,
+which turned it into a fuzzy update of whichever estimate's title it
+resembled (§1.3). A message that mentions a work item is read as a question
+about it only when it opens with a question word ("what", "which", "is",
+"are", "when", "who" …, after at most a "hey,") — a bare "is" or a relative
+"which" further in, or a "?" on a request, doesn't make one. So "remind me to
+call Bob about the patio work item, it is urgent" and "create a task for the
+fence work item?" are tasks and "add a contact named Ana Reyes, she is the
+owner, for the patio work item" a contact, not estimate edits (§1.5.2).
 
 Headlines, 2026-09-27 (multi-turn everywhere — design
 [`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md)):
@@ -299,6 +309,7 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `I need an estimate for [job description]` / `I need a quote for a new patio at 12 Oak St` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27)* |
 | `can you put together / draw up / write up / work up / prepare / price out an estimate for …` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — "put together …" went to get_estimate)* |
 | `quote a fence for Bob Lee` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — was unknown)* |
+| `create an estimate for a planting bed that is 5 feet by 15 feet with 8 boxwood and mulch … Also as a separate work item build a 10 by patio using Cambridge pavers` — several work items in one request, one of them described with "is" | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-28 — was a fuzzy `update_estimate` of an estimate titled like "Cambridge Paver Patio Installation"; the generation itself remains 🤖 LLM)* |
 | `create a residential estimate` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `new commercial quote` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `create an estimate to plant six hydrangea at the {property} residence` — property auto-linked at creation; "six" stays a plant quantity, never an area | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — property link + area grounding guard; the generation itself remains 🤖 LLM)* |
@@ -434,6 +445,10 @@ The fallback scorer ranks evidence in tiers: **the company's own description** f
 | `put {WI} under Irrigation & Lighting` | `update_estimate` → Estimate Agent | ✅ rule |
 | `what division is {WI} in?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `which division does {WI} belong to?` | `update_estimate` → Estimate Agent | ✅ rule |
+| `which division is the patio work item in?` / `hey, what division is work item 1 in?` — a question about a work item: it opens with a question word (what / which / who / whose / when / where / is / are / was / were), after at most a greeting. how / why / can / do don't count — `how do I add a work item?` is help | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-28 — the lane is `_is_work_item_question` in `agents/orchestrator/service.py`, shared by all three places that used to carry their own copy of the regex. A "?" alone never makes a question.)* |
+| `is work item 2 taxable?` / `are the patio work item and work item 2 in the same division?` — a leading "is" / "are" | `update_estimate` → Estimate Agent | ⚠️ routes only *(2026-09-28 — reaches the Estimate Agent, but work items have no taxable field and no handler compares two items' divisions)* |
+| `remind me to call Bob about the patio work item, it is urgent` / `create a task: the fence work item is late` / `add a contact named Ana Reyes, she is the owner, for the patio work item` / `create a task for the fence work item, which is late` / `remind me to ask Bob what the patio work item costs` — a statement or request that mentions a work item and uses "is" / "which" / "what" further in | routes by its own request (`create_task` → Task Agent, `create_contact` → Contact Agent) | ✅ rule *(2026-09-28 — any "is", "what" or "which" beside a work-item word made the message a work-item question, and all of these went to `update_estimate`)* |
+| `create a task for the fence work item?` / `create a property for the scope?` / `create a new estimate with a patio work item?` — a request with a "?" | routes by its own request (`create_task`, `create_property`, `create_estimate`) | ✅ rule *(2026-09-28 — a "?" is not a question unless the message opens with a question word)* |
 | `set all work items in {EST} to Maintenance` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `set the division of {WI} to {custom division}` (a division the company added or renamed) | `update_estimate` → Estimate Agent | ✅ rule *(2026-07-31 — was a ⚠️ gap earlier the same day: the handler validated against the `EstimateDivision` enum only and answered "isn't a recognized division" for a company's own rows. It now validates against the company's live divisions, canonicalizes casing/punctuation to the stored spelling, and lists the company's own divisions when it refuses.)* |
 | `set the division of {WI} to Special Project` — a near miss (missing plural, typo, leading part of the name like `snow`) | asks "Did you mean Special Projects? Say yes and I'll use it."; **yes** applies it | ✅ rule *(2026-09-24 — was a flat refusal listing every division. `closest_division_name` (`routers/estimate_helpers/division.py`) proposes the single closest division; the batch is stashed as a `sub_op="edit_commands"` confirmation with the guess substituted, so "no" cancels and nothing is written until "yes". Two about-equally-close divisions (`Care` → Tree Care / Turf & Plant Care) or nothing close keeps the refusal and its list.)* |
