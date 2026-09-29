@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-28
+**Last updated:** 2026-09-29
 
 ### Recent changes
 
@@ -49,6 +49,11 @@ about it only when it opens with a question word ("what", "which", "is",
 call Bob about the patio work item, it is urgent" and "create a task for the
 fence work item?" are tasks and "add a contact named Ana Reyes, she is the
 owner, for the patio work item" a contact, not estimate edits (§1.5.2).
+"How many did I sell?" counts Won, Scheduled and Completed — there is no Sold
+status — with or without a count before it, and a count that follows a
+customer's list keeps the customer. Every estimate count names what it
+counted ("You have 2 sold estimates for Bob Lee."), and "for Bob Lee" now
+narrows a count or a status list instead of being dropped (§1.1).
 
 Headlines, 2026-09-27 (multi-turn everywhere — design
 [`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md)):
@@ -258,6 +263,12 @@ a note to a material or role. **Refused by the planner:** labor burden
 | after a list: `just the drafts` / `which ones are on hold?` / `only the ones over $1000` / `only the ones from last month` / `only for Bob Lee` | the same list, narrowed | ✅ rule *(2026-09-27 — refinements chain; §10.8)* |
 | after a list: `sort them by total` / `sort them by date` | the same list, highest value / newest first | ✅ rule *(2026-09-27)* |
 | after a list: `what's the total of those?` / `add them up` / `how many is that?` | the combined value / the count of that list | ✅ rule *(2026-09-27)* |
+| `how many estimates have been sold?` / `how many sold estimates do I have` / `how many estimates did I sell?` / `how many did I sell?` / `what's the total value of my sold estimates?` | `list_estimates` over **Won + Scheduled + Completed** — "sold" is no status of its own: everything a customer bought, however far it has since moved | ✅ rule *(2026-09-28 — "sold" was no filter, so it counted every estimate. `_SOLD_ESTIMATE_QUERY_PATTERN` needs the estimate noun, so "what unit is River Rock sold by?" is untouched; a named status still wins — "won estimates" is Won only)* |
+| `how many did I sell?` / `how many have been sold` / `how many were sold` / `how many did we sell this month?` — with nothing before it | `list_estimates` → sold count | ✅ rule *(2026-09-29 — was help: "how many" is a count, never a help question. A `list_estimates` grammar entry built on `SOLD_VERB`, shared with the agent's sold filter)* |
+| after an estimate count or list: `how many have been sold?` / `how many are won?` / `how many are on hold?` | a count by that status that keeps the customer, property, period or amount the last read was narrowed to — after "list my estimates for Bob Lee": *"You have 2 sold estimates for Bob Lee."* | ✅ rule *(2026-09-29 — the first version counted company-wide after a customer's list. `followup.py::_count_by_status`; when the last read had a status AND a scope ("how many estimates did I win this month?") the rule steps aside, since which words to swap is a guess. "how many of those are won?" narrows the list instead and is not this rule)* |
+| `how many estimates for Bob Lee?` / `how many won estimates for Bob Lee?` / `how many sold estimates for Bob Lee this year?` / `how many estimates for Bob Lee in draft status?` / `how many estimates for Bob Lee that are won?` / `… in review?` / `… on hold?` / `… over $1000?` / `show me draft estimates for Bob Lee` | `list_estimates` for that customer (or property), with the status and period | ✅ rule *(2026-09-29 — the customer was dropped from every count and every status list, so each counted the whole company. The `list_estimates` entry takes a status before "estimates" and a name after "for"; a trailing period, amount or status — "this year", "over $1000", "with status X", "in draft status", "that are won", in any order — is read off the name, and a status read off it is the one applied: `agents/estimate/list_query.py::read_list_query` reads name, status and status set in one pass. `tests/test_estimate_list_answers.py` checks what was actually counted against a seeded database)* |
+| any estimate count, list, empty list or total | the reply names everything it was narrowed by — *"You have 2 sold estimates for Bob Lee in the last year."*, *"Here are your won estimates for Bob Lee:"*, *"You don't have any sold estimates in the last month."*, *"The combined value of your 2 sold estimates in the last month is $1,500.00."* | ✅ rule *(2026-09-29 — a scoped count read as company-wide, and "show me won estimates for Bob Lee" was headed "Estimates for Bob Lee:". An unfiltered reply reads as before)* |
+| `what's the total value of sold estimates for Bob Lee?` / `total value of estimates for Bob Lee` | the total over **every** customer — the name is not read | ⚠️ gap *(2026-09-29 — a total never reads a customer name; the reply at least doesn't claim Bob)* |
 
 ## 1.2 Value / total queries for a specific estimate
 
