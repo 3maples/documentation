@@ -255,6 +255,7 @@ seams that already exist as separate classes.
 | 70 | `parse_task_list_ask` — agents/task/list_filters.py:139 (new 2026-09-27; one reader per filter phrase) |
 | 63 | `open_questions` — routers/agent_helpers/open_question.py:235 (new 2026-09-27; one small reader per question kind — pending intents, delete records, router flows — concatenated — review 2026-09-27 #56) |
 | 132 | `_handle_awaited_field_value` — agents/task/field_flow.py:117 (about 120 before 2026-09-28; +6 then for replies that restate the command. Extract `_read_awaited_value(field, message)` for the cancel check and restated value, and turn the per-field if-chain into a dispatch dict of `_apply_awaited_<field>` coroutines — review 2026-09-28 #4) |
+| 676 | `TasksPage` component body — portal/src/pages/TasksPage.tsx:64 (637 before 2026-09-28; +39 then for Maple's `?open=` task links — the fetch-by-id fallback, its ref guard and the dialog shared with the error state. **Next step:** move the deep-link handling into `portal/src/hooks/useTaskDeepLink.ts` taking `{ tasks, isLoading, onOpen: setEditingTask }` and returning `requestedTaskId` for the two initializers; `tests/TasksPageDeepLink.test.tsx` covers it unchanged — review 2026-09-28 #1) |
 | — | seven functions in `platform/agents/task/` (see archive for the list) |
 | — | two handlers in `agents/estimate/assumption_handlers.py:257,415` |
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
@@ -263,6 +264,10 @@ seams that already exist as separate classes.
 
 `platform/agents/estimate/catalog_matching.py` is at 793 — seven lines under.
 The next change to it crosses the line.
+
+`portal/src/pages/TasksPage.tsx` is at 739 — 61 under, after +39 on
+2026-09-28. The `useTaskDeepLink` extraction in the functions table above takes
+it back under 720.
 
 ## Query efficiency — scans, N+1 and missing indexes
 
@@ -4007,7 +4012,11 @@ The scroll listener is registered with `capture: true` and calls `setPosition` o
 event, re-rendering the menu for every scroll frame while it is open.
 **Suggested fix:** throttle with `requestAnimationFrame`, or close the menu on scroll.
 
-### 475. [LOW] portal/src/pages/TasksPage.tsx:199 — taskId param never clears when the list is empty
+### 475. ~~[LOW] portal/src/pages/TasksPage.tsx:199 — taskId param never clears when the list is empty~~ — RESOLVED 2026-09-28
+Resolved: the deep-link effect now waits on `isLoading` rather than the row count, and clears
+`open`/`taskId` whatever the list holds (a task it lacks is fetched by id). Pinned by
+`tests/TasksPageDeepLink.test.tsx` ("the param clears even when the filtered list is empty").
+
 The effect returns early when `tasks.length === 0`, so `?taskId=` stays in the URL when
 the filtered list has no rows. A later filter change that produces rows can then open a
 dialog the user did not ask for.
