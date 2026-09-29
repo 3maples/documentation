@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **777**. Never
+- **Entries are numbered and permanent.** Next free number: **778**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -131,7 +131,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,201 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
 | 1,177 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
 | 1,163 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | +48 over the 2026-09-24 review passes; +15 by 2026-09-27 |
-| 1,130 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46) |
+| 1,195 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases; +65 on 2026-09-28 for the target-first field shapes and `restated_field_value`. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46) |
 | 1,072 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27 |
 | 944 | [platform/agents/task/service.py](../../platform/agents/task/service.py) | **crossed the line 2026-09-27** (was 688). **Next step:** a `TaskListBase` layer in `agents/task/listing.py` holding `_handle_list_tasks`, `_due_note`, `_resolve_list_ask` and `_FINISHED_STATUS_NAMES`; move `_handle_task_due_change` into operations.py; split `_handle_update_subop` into a detector table plus a named-target helper — about 600 lines left (review 2026-09-27 #47) |
 | 903 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
@@ -254,6 +254,7 @@ seams that already exist as separate classes.
 | 105 | `_handle_size_command` — agents/material/service.py:1693 (new 2026-09-27; +30 on 2026-09-28 for the material in focus and its "which material?" question; split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` — review 2026-09-27 #29) |
 | 70 | `parse_task_list_ask` — agents/task/list_filters.py:139 (new 2026-09-27; one reader per filter phrase) |
 | 63 | `open_questions` — routers/agent_helpers/open_question.py:235 (new 2026-09-27; one small reader per question kind — pending intents, delete records, router flows — concatenated — review 2026-09-27 #56) |
+| 132 | `_handle_awaited_field_value` — agents/task/field_flow.py:117 (about 120 before 2026-09-28; +6 then for replies that restate the command. Extract `_read_awaited_value(field, message)` for the cancel check and restated value, and turn the per-field if-chain into a dispatch dict of `_apply_awaited_<field>` coroutines — review 2026-09-28 #4) |
 | — | seven functions in `platform/agents/task/` (see archive for the list) |
 | — | two handlers in `agents/estimate/assumption_handlers.py:257,415` |
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
@@ -1064,6 +1065,11 @@ both tables' headers.
 `platform/agents/material/size_commands.py:32` — "thanks, remove size 1 yd from it", "great. …", "actually …" and "then remove size 1 yd from it" return None; with Topsoil in focus "thanks, remove size 1 yd from it" dead-ends at "Please specify which fields to update." (writes nothing). (review 2026-09-28 third round #7)
 
 **Suggested fix:** Build `_LEAD` from the same shared list as #767; add a lead-word case to test_material_size_commands.py.
+
+### 777. [LOW] `_SET_TARGET_STATUS_RE` repeats `_TARGET_FIRST_LEAD` inline
+`platform/agents/task/text_helpers.py:333` — The status pattern copies the "task before the field" lead (`_COMMAND_LEAD` + verbs + `_TARGET_OR_PRONOUN` + optional possessive) instead of using `_TARGET_FIRST_LEAD`; the only difference is two extra verbs (move, mark). A later change to the shared lead — a new verb, say — would leave the status form behind. (review 2026-09-28 #6)
+
+**Suggested fix:** Build both from one helper, e.g. `def _target_first(verbs: str) -> str: return _COMMAND_LEAD + rf"(?:{verbs})\s+" + _TARGET_OR_PRONOUN + r"(?:['’]s)?\s+"`, with `_TARGET_FIRST_LEAD = _target_first("set|change|update|edit|modify")` and the status pattern using `_target_first("set|change|update|edit|modify|move|mark")`.
 
 ## Accessibility
 
