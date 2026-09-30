@@ -99,7 +99,12 @@ a task is a command only at the start of the message, after at most a lead,
 like every other task edit — so "don't rename the fence task to Gate", "I won't
 change the due date of the fence task to Friday" and "don't add a note to it:
 call Bob" change nothing (#762). A note's own words are still its content: "add
-a note to it: don't park on the lawn" appends (§7.6, §7.6.1).
+a note to it: don't park on the lawn" appends (§7.6, §7.6.1). "Pipeline"
+and "backlog" are a metric only in a question ("what's in my backlog?", "how
+big is my backlog?") or alone ("pipeline"): "rename work item 2 to the
+pipeline trench" and "add a note to this estimate: locate the pipeline" write,
+and a reply "check the pipeline under the driveway" answers the question it
+was asked (#721, §1.9).
 
 **2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
 the name, however it reads — an activity ("Remove Sod"), a role ("Load
@@ -777,6 +782,9 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `what's my pipeline?` / `how's my pipeline looking?` / `what's in my backlog?` / `how much have I completed this month?` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-27, design §7.5 — they went to the user guide)* |
 | `show me my dashboard` / `give me a summary` / `how's business?` | `analytics_estimates` → Estimate Agent (Pipeline / Backlog / Completed) | ✅ rule *(2026-09-27 — they were unknown or help. A summary of one estimate — "give me a summary of E0042" — is not this.)* |
 | `how many estimates are in each status?` / `pipeline by status` / `estimates by status` / `estimate value by division` | `analytics_estimates` → Estimate Agent (breakdown) | ✅ rule *(2026-09-27 — "in each status" counted all estimates; "by division" was unknown)* |
+| `what is my pipeline worth` / `how big is my backlog?` / `hey maple, what's in the pipeline?` / `can I see my pipeline?` / `pipeline` / `backlog?` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-30, #721 — a pipeline/backlog question opens with a question or show word after at most a lead, or is the bare noun)* |
+| `rename work item 2 to the pipeline trench` / `add a note to this estimate: locate the pipeline before digging` / `remove the pipeline flush activity from work item 2` | the command — never analytics | ✅ rule *(2026-09-30, #721 — they routed to `analytics_estimates` and nothing was written. A message the estimate grammar parses is never a metric, and "pipeline"/"backlog" mid-sentence is an ordinary word)* |
+| `check the pipeline under the driveway` / `we cleared our backlog of pavers` as a reply to Maple's question | the answer to the question | ✅ rule *(2026-09-30, #721 — read as a new analytics request, which dropped the question)* |
 | `what's my pipeline?` → `and last month?` | the same question for last month | ✅ rule *(2026-09-27 — a read that named no period takes the new one, §10.8; it became a material lookup)* |
 | `what are my recent estimates?` / `show me my most recent estimates` | `list_estimates`, the newest 8 — the dashboard's Recent Estimates | ✅ rule *(2026-09-27 — help, or one row for a plural ask)* |
 | `how is the backlog value calculated?` / `what does pipeline value mean?` / `how is the completed value calculated?` | `help` → Orchestrator Agent | ✅ rule *(2026-06-20 — explanatory/definitional phrasing about a metric routes to HELP, not a value lookup. `_match_analytics_query` now redirects a recognized metric phrased with an explanatory cue (`calculated`/`computed`/`defined`/`mean`/…) to help; `calculated`/`computed` also added to `HELP_INSTRUCTIONAL_PATTERNS` for metrics without an analytics keyword.)* |

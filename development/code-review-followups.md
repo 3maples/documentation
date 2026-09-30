@@ -2368,7 +2368,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Don't match superlatives (highest|biggest|largest|most|lowest). Add these as reject rows in the routing corpus.
 
-### 721. [MEDIUM] The pipeline/backlog analytics patterns catch estimate writes and value replies
+### 721. ~~[MEDIUM] The pipeline/backlog analytics patterns catch estimate writes and value replies~~ — RESOLVED 2026-09-30
+
+**Resolution:** `match_analytics_query` returns None when `match_command` parses the message, and the three unanchored pipeline/backlog patterns now need a question or show head after at most a shared `LEAD` (`_METRIC_QUESTION_HEAD`), or the bare noun alone — a little wider than the suggested exact-match anchor, so "how big is my backlog?" and "can I see my pipeline?" still work. `tests/test_orchestrator_intents.py`: five commands, four replies, seven questions. Routing snapshot unchanged.
+
 `platform/agents/orchestrator/intents.py:761` — `\b(?:my|our|the)\s+(?:sales\s+)?(?:pipeline|backlog)\b` matches anywhere, and analytics routing runs before `_route_listed_command`. "add a note to this estimate: locate the pipeline before digging" and "rename work item 2 to the pipeline trench" route to `analytics_estimates`, and nothing is written. The same function is the new-request test in open_question.py:345, so "check the pipeline under the driveway" as a note reply drops the question. (review 2026-09-27 #50)
 
 **Suggested fix:** Anchor to a question or command head (`^\s*(?:what'?s|show(?: me)?|how'?s)\s+(?:in\s+)?(?:my|our|the)\s+(?:sales\s+)?(?:pipeline|backlog)\s*\??$`), and skip analytics when `match_command(message)` is not None.
