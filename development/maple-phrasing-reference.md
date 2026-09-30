@@ -131,7 +131,9 @@ biggest estimate named is the one in focus next; "which one?" and "couldn't
 find" take a name in reply; "and last year?" and "what about Elm House?"
 repeat the question; the public widget refuses. "What's its status?" about the
 open estimate works again — the #719 fix had stopped reading "its" as "it"
-(§1.2).
+(§1.2). Task 13: a paraphrase no rule reads — "what has Bob Lee bought from
+us over the years?" — is read by the LLM tier into the same fixed choices, and
+the engine answers it (§1.12).
 
 **2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
 the name, however it reads — an activity ("Remove Sod"), a role ("Load
@@ -975,6 +977,7 @@ never by the LLM, and every reply names what it counted.
 | `how much have I sold to Bob Lee this year?` → `and last year?` / `what's the lifetime won amount from 12 Oak St?` → `what about Elm House?` | the same question for the new period or the new place | ✅ rule *(task 12 — §10.8)* |
 | a total that includes recurring work | *"… including tax. Recurring work is counted for every visit it's scheduled for."* | ✅ rule *(task 12)* |
 | `how much have I sold this year?` on the **public** widget | *"I can't see anyone's estimates from here — I'm in read-only demo mode. Sign up …"* | 🛑 refusal *(task 12 — the widget has no company; a figure would be made up)* |
+| `what has Bob Lee bought from us over the years?` / `which job this year brought in the most money?` — no grammar entry reads it | the classifier picks `analytics_metric`; a worker model fills the same fixed choices (`agents/estimate/metric_spec.py`, fenced, usage-tagged `orchestrator.metric_spec`) and the engine answers | 🤖 LLM *(task 13 — off in tests; "not a metric" falls back to the dashboard answers. Coverage matrix `metrics_paraphrase`)* |
 | `what's the total for Smith?` (an **estimate** titled Smith) | read as a customer or property named Smith | ⚠️ gap *(2026-09-30 — it was help; an estimate title is not a metric subject)* |
 
 **Not metrics** — each keeps its own answer: `how much is E0042?` and `what's
@@ -2380,8 +2383,10 @@ cd platform
 | task_operations | 8/8 | 8/8 | covered |
 | equipment_blocked | 3/3 | 3/3 | refused correctly |
 | calculator | 8/8 | 7/8 | 1 LLM miss ("how much topsoil do I need for 1000 sq ft") |
+| metrics *(2026-09-30)* | 6/6 | not yet run | covered (the `analytics_metric` grammar entries, §1.12) |
+| metrics_paraphrase *(2026-09-30)* | 0/3 (known gap) | not yet run | LLM tier's by design: classifier + metric spec (§1.12) |
 
-**Totals: Tier 1 171/182 · Tier 2 173/182** *(2026-09-24, live; the other rows are the 2026-07-29 counts, unchanged)*.
+**Totals: Tier 1 177/191 · Tier 2 173/182 + 9 not yet run** *(Tier 1 2026-09-30 — the two metrics categories added 9 cases, 6 passing and 3 known rule-tier gaps; Tier 2 last live run 2026-09-24, the other rows are the 2026-07-29 counts, unchanged)*.
 
 *2026-09-24 run: Tier 2's 9 misses are the same classes as below, with one
 swap — `verbless/property` "tell me about 123 Main St" missed once (the model
