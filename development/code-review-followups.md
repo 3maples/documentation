@@ -1734,7 +1734,10 @@ LLM extraction usually overrides nonsense. If false positives surface in
 production, anchor the pattern to the start of a line or after a verb hint
 (`at|address[: ]`).
 
-### 322. [LOW] `find_property_by_name_or_address` auto-matches a blank-street property to any query
+### 322. ~~[LOW] `find_property_by_name_or_address` auto-matches a blank-street property to any query~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 7): a blank name or street is no match; the characterization test was flipped deliberately (`test_find_property_blank_street_never_matches_an_unrelated_query`).
+
 **Where:** `platform/routers/agent_helpers/pending_estimate_follow_up.py:101-110`
 
 **Issue:** The contains-match block tests `_property_address_of(item).lower() in query`. When a property's `street` is blank, `"" in query` is always true, so a property with no street is treated as a substring-match candidate for *every* property query. With a single such property in the company, the estimate-link follow-up will silently link the new estimate to it even for an unrelated reply. Surfaced and characterized while backfilling #303 (`test_find_property_blank_street_contains_matches_any_query`).
@@ -1820,7 +1823,10 @@ apply to those phrasings.
 **Suggested fix:** thread the label into the sorted/aggregate lead-ins too, or
 hoist the disclosure ahead of the response-shape branch so it cannot be skipped.
 
-### 439. [LOW] platform/routers/agent_helpers/pending_property_link.py — `_is_pivot` exempts any action on the `property` domain
+### 439. ~~[LOW] platform/routers/agent_helpers/pending_property_link.py — `_is_pivot` exempts any action on the `property` domain~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 7): a property-domain message that opens with a request verb (create, add, delete, remove, list, show, find) releases the turn; a property named in answer — "the new Downtown property" — still doesn't.
+
 The exemption exists so a property name ("the Downtown property") reads as an
 answer rather than a pivot. It is coarser than that: a genuine pivot such as
 *"create a new property at 42 Elm St"* mid-confirmation also fails to release the
@@ -2364,12 +2370,18 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Anchor to a question or command head (`^\s*(?:what'?s|show(?: me)?|how'?s)\s+(?:in\s+)?(?:my|our|the)\s+(?:sales\s+)?(?:pipeline|backlog)\s*\??$`), and skip analytics when `match_command(message)` is not None.
 
-### 722. [MEDIUM] "show me estimates with the highest total" is read as a material join
+### 722. ~~[MEDIUM] "show me estimates with the highest total" is read as a material join~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 7): one lookahead, `_NOT_AN_ESTIMATE_LINE` in `agents/orchestrator/service.py`, placed before the optional article, excludes list-filter, sort and status words. Pinned in `test_list_worded_line_join_leaves_list_filters_alone`.
+
 `platform/agents/orchestrator/service.py:685` — In the "find/show/list estimates with …" pattern, the exclusion lookahead comes after an optional article. The regex skips the article, the lookahead sees "the", and status/total words are never excluded. The result is `filter_by {material: 'highest total'}` → "I couldn't find a material or role matching 'highest total'", where the message used to list estimates sorted by total. (review 2026-09-27 #51)
 
 **Suggested fix:** Put the lookahead before the article: `(?!(?:(?:the|a|an|any)\s+)?(?:status|…|highest|largest|biggest|most|lowest|latest|newest|been)\b)`. Add reject rows.
 
-### 723. [MEDIUM] "which estimates have been sent?" is read as a material join
+### 723. ~~[MEDIUM] "which estimates have been sent?" is read as a material join~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 7): the same lookahead covers "which estimates have …"; and the status reader now takes "have/has been" and a bare "were/is/was" (`crud_helpers._build_status_patterns`), so "which estimates have been sent?" lists the Sent ones instead of every estimate.
+
 `platform/agents/orchestrator/service.py:711` — The "which estimates use/include/has/have …" pattern has no exclusions. "which estimates have been sent?" → `{material: 'been sent'}`, and "which estimates have the highest totals?" → `'highest totals'`. Both reach the material-not-found reply. (review 2026-09-27 #52)
 
 **Suggested fix:** Apply the same exclusions as #722 to this pattern, or drop `ha(?:s|ve)` from its verbs. Add reject rows.

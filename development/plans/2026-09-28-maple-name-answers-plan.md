@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-28 · **Revised:** 2026-09-29 (re-checked against `fae429e`;
 material-management questions and multi-match "please specify" deferred, §7)
-· **Status:** in progress — phases 0, 1, 3, 4 and 5 done; next phase 7 · **Builds on:**
+· **Status:** in progress — phases 0, 1, 3, 4, 5 and 7 done; next phase 8 · **Builds on:**
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
 (one question gate, `routers/agent_helpers/open_question.py`)
 
@@ -238,7 +238,7 @@ value (#713). Widened
 
 **Phase 6: multi-match "please specify".** *Deferred — see §7.*
 
-**Phase 7: estimate-side lookups**: list filters, property linking,
+**Phase 7: estimate-side lookups** ✅ *Done 2026-09-29.* Built differently from the text below: the estimate agent drops its questions on a list intent, and a list's filter comes from the classifier, so an agent-side resume would list every estimate. Instead `record_names.ask_to_rewrite` stores a question whose answer the router writes into the request that asked ("…the Pea Gravel role" → "Foreman" → "…the Foreman role") and runs as a new message — owner `Maple`, intent `name_answer`, so a command in reply stays a new request. Used by the list filters, property linking and the material swap. "Which material should I replace?" is a dead-end statement, not a lookup, and was left. Found and logged: "show me estimates for Elm House" is read as a contact.: list filters, property linking,
 assumption materials. These are Estimate-agent questions (§3.4): new
 `_stash_estimate_pending` ops, registered in `_estimate_question_for`. A
 list-filter answer re-runs the original request with the unmatched name
@@ -343,7 +343,7 @@ entries themselves stay in that file.
 | 3 | #715, #714, #751, #752, #711 (adjacent: #750, #777, #717) | #715, #714, #751, #752, #711 resolved 2026-09-29; adjacent ones left in the backlog |
 | 4 | #759 | resolved 2026-09-29 (row tightened and marked `gap=`) |
 | 5 | #713 (task questions, and the Task agent's property questions) | resolved 2026-09-29 |
-| 7 | #722, #723 (prerequisites), #322, #439 (adjacent: #159, #779) | all still apply |
+| 7 | #722, #723 (prerequisites), #322, #439 (adjacent: #159, #779) | #722, #723, #322, #439 resolved 2026-09-29; adjacent ones left in the backlog |
 | 8 | #470 | still applies |
 
 Close each entry in the follow-ups file in the phase's own commit.

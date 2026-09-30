@@ -88,6 +88,12 @@ phone", #759) and "the city there".
 that reads as a request included — finishes the request, and a value given
 about a task that has gone is kept for the task named next (#713) (§7.11).
 
+**2026-09-29 (phase 7):** an estimate list filter, a property link or a
+material swap that names nothing asks which, and the name in reply is
+written into the request, which runs again (§1.8). "with the highest total"
+and "which estimates have been sent?" are no longer material joins (#722,
+#723), and "have been / were sent" filters by the status.
+
 **2026-09-29 (deferred):** answering a question with a record's name, from
 [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md),
 leaves material-catalog management and the multi-match "please specify"
@@ -714,6 +720,12 @@ Closed in xfail-wave-4 + 4.1 (plan: [maple-xfail-wave-4-estimate-outbound.md](pl
 | `estimates linked to {property}` / `what estimates are for property {property}` | same as above | ✅ rule *(Workstream B)* |
 | `show me estimates for {property} property` (suffix form, e.g. `Bob Residential property`) | `list_estimates` → Estimate Agent (suffix `property` strips from captured name) | ✅ rule *(Wave 4.1 follow-up)* |
 | `show me estimates for {contact}` (capitalized name) | `list_estimates` → Estimate Agent (transitive: resolve contact → properties → estimates) | ✅ rule *(Wave 4.1)* |
+| a list filter that names nothing → *"Which role / property / contact / material or role did you mean?"* → a name | the list runs with the name given — `which estimates use the Pea Gravel role?` → `Foreman`; `show me estimates for 99 Pine St` → `12 Oak St`; `show me estimates for Zed Zedson` → `Bob Lee` | ✅ rule *(2026-09-29, name-answers plan phase 7 — the question wasn't remembered, and the name was read as a request of its own)* |
+| `link estimate {EST} to property 99 Pine St` → *"Which property did you mean?"* → `9 Maple Ave` | linked to 9 Maple Ave | ✅ rule *(2026-09-29, phase 7)* |
+| a material swap naming no catalog material → *"Which material should I use?"* → a name | the swap runs with it | ✅ rule *(2026-09-29, phase 7)* |
+| `show me estimates with the highest total` / `find estimates with the largest total` | the sorted list, not a material | ✅ rule *(2026-09-29, #722 — "I couldn't find a material or role matching 'highest total'")* |
+| `which estimates have been sent?` / `which estimates were lost?` | the estimates in that status | ✅ rule *(2026-09-29, #723 — a material join, then every estimate)* |
+| `show me estimates for Elm House` (a property name of two capitalised words) | should list its estimates; read as a contact ("I couldn't find a contact matching 'elm house'") — `show estimates for Elm House` works | ⚠️ gap *(found 2026-09-29)* |
 
 **Empty-result copy** (so the user sees why nothing matched, instead of an empty list):
 - Estimate not found → *"I couldn't find an estimate with code '{EST}'."*
