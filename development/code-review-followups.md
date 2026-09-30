@@ -558,7 +558,10 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 
 **Suggested fix:** Look names up with an indexed, anchored, escaped, case-insensitive query per model with `limit(2)`, and resolve the kind once per message.
 
-### 715. [MEDIUM] No `company` index, so `_teammate_email` scans users across tenants on the chat path
+### 715. ~~[MEDIUM] No `company` index, so `_teammate_email` scans users across tenants on the chat path~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 3): `User.Settings.indexes` has `company`.
+
 `platform/models/user.py:89` — `User.find(User.company == …)` in `_teammate_email` (operations.py:302) runs on every assignment or teammate filter, but `users` indexes only `email`, so each lookup scans the whole collection. (review 2026-09-27 #42)
 
 **Suggested fix:** Add `IndexModel([("company", ASCENDING)])` to `User.Settings.indexes`.
@@ -571,6 +574,7 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 ### 776. ~~[LOW] The material-name lookup silently stops at 5000 names, in no set order~~ — RESOLVED 2026-09-29
 
 **Resolved 2026-09-29** (name-answers plan phase 0): the loader is gone. `named_answers` looks the reply up with one anchored, escaped, case-insensitive `find_one` per candidate, projected to `name` so the `(company, name)` index answers it (`agents/conversation/name_lookup.py`); sources are keyed by (owner, field).
+
 `platform/routers/agent_helpers/named_answers.py:36` — `_material_names` reads `find({"company": company}, {"name": 1})` with no sort, then `to_list(length=_NAME_CAP)` with a cap of 5000. For a company with more than 5000 materials, the names past the cap are dropped without any log, and which ones are dropped is whatever order Mongo returns. A dropped name that opens with a command verb ("Clear Stone") then reads as a new request again. It also reads up to 5000 rows on every turn where "Which material do you mean?" is open. LOW because no company is near 5000 materials, and a missed name falls back to the checks Maple used before names were looked up. (review 2026-09-28 seventh round #1)
 
 **Suggested fix:** Look up only the reply instead of loading the catalog, as [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md) §3.2 proposes: have the router pass `name_in_reply(message)` and run one `find_one({"company": company, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}})`, answering when it hits. Deferred (2026-09-28) to phase 0 of that plan (renumbered 2026-09-29), which replaces this loader; the minimum change in the meantime is a warning when the cap is reached.
@@ -759,7 +763,10 @@ pattern is near-identical across the six files.
 
 **Suggested fix:** Log `type(exc).__name__` (still no exc_info, to keep note bodies out of logs).
 
-### 714. [MEDIUM] `_teammate_email` hides database errors
+### 714. ~~[MEDIUM] `_teammate_email` hides database errors~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 3): `_teammate_email` runs one company-scoped query (`agents/task/teammates.py::find_teammates`) and logs a failure (`Teammate lookup failed: <type>`) before reading it as "no one". Pinned by `test_a_failed_teammate_lookup_is_logged_not_swallowed`.
+
 `platform/agents/task/operations.py:303` — `except Exception: return None, []` has no logging. A Mongo failure is reported as "I couldn't find a teammate called Jordan", or on create quietly assigns the task to the creator. (review 2026-09-27 #41)
 
 **Suggested fix:** Remove the try/except, or log `type(err).__name__` at warning level and re-raise.
@@ -1675,6 +1682,7 @@ treating it as a value, or extend `_NEGATIVE_VALUES` prefix-matching.
 ### 22. ~~[LOW] "Last estimate" with zero estimates falls back to generic "Which estimate?"~~ — RESOLVED 2026-09-29
 
 **Resolved 2026-09-29** (name-answers plan phase 1): `_handle_get_estimate` and `_resolve_estimate_code_or_title` answer "You don't have any estimates yet." (`_no_estimates_yet`) when "the last estimate" finds none. Pinned by `test_the_last_estimate_with_none_says_there_are_none`.
+
 **File**: `agents/estimate/service.py` — the `_handle_get_estimate` branch
 that falls through when `_resolve_latest_estimate` returns `None`.
 **Severity**: LOW (UX polish)
@@ -1930,6 +1938,7 @@ bring back copying.
 ### 615. ~~[LOW] Several title matches collapse to "not found" on update/delete~~ — RESOLVED 2026-09-29
 
 **Resolved 2026-09-29** (name-answers plan phase 1): `find_estimate_from_context_or_message(..., several_out=)` receives the live matches; the router's update lists them and remembers the menu, the delete lists them without remembering (the estimate agent that reads an answer doesn't delete). Pinned in `test_agent_helpers_estimate_resolver.py` and `test_agent_helpers_delegate_estimate_ops.py`.
+
 `platform/routers/agent_helpers/estimate_resolver.py:184` — `_from_named_title` returns `(None, False)` on more than one match, so update/delete ask a generic "Which estimate…?" without listing the candidates (get does list them).
 
 **Suggested fix:** Return the matches, or a sentinel, so callers can show the codes.
@@ -1937,6 +1946,7 @@ bring back copying.
 ### 616. ~~[LOW] A named title with no match still reaches the loose substring rung~~ — RESOLVED 2026-09-29
 
 **Resolved 2026-09-29** (name-answers plan phase 1): step 3 of `delegate_get_estimate` is gated on `not names_title`; the not-found reply now also remembers "Which estimate?". Pinned by `test_a_named_title_that_matches_nothing_is_not_answered_loosely`.
+
 `platform/routers/agent_helpers/delegate_get_estimate.py:252` — With `names_title` true and zero named matches, step 3 can still answer with a different estimate. The resolver treats this case as the end of the search.
 
 **Suggested fix:** Gate step 3 on `not names_title`, or return the not-found clarification.
@@ -2301,7 +2311,10 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Use `(?P<value>[^?]+?)\s*[.!]?$` in the four due-change patterns, and add "due today?" reject tests.
 
-### 711. [MEDIUM] Status columns named like dates now set a due date instead
+### 711. ~~[MEDIUM] Status columns named like dates now set a due date instead~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 3): a move/push value that is exactly one of the company's status names (`_names_a_status` — no synonyms, no fuzzy match) goes to the status change. Pinned by `task-move-to-a-status-named-like-a-date`.
+
 `platform/agents/task/service.py:635` — The due-date reading of "move it to …" is tried before the status reading. For a company with a column called "Next Week", "Today" or "Monday", "move it to Next Week" now sets the due date to next Monday; before this diff it moved the card. (review 2026-09-27 #38)
 
 **Suggested fix:** Before treating a move/push value as a date, check whether it exactly names one of the company's statuses; if so, route to the status change.
@@ -2413,12 +2426,18 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Use `{"$addToSet": {"contacts": contact.id}}` with an `updated_at` `$set`, and correct the docstring.
 
-### 751. [LOW] A teammate's name with punctuation isn't recognised
+### 751. ~~[LOW] A teammate's name with punctuation isn't recognised~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 3): the teammate lookup tidies the reply (`replies.tidy_reply`), so "Jordan." and "Jordan Crew." match. Pinned by the corpus row `task-assign-asks-who-then-a-full-name-with-a-full-stop`.
+
 `platform/agents/task/field_flow.py:277` — The prompt now says "A teammate's name or email works", but the raw reply goes to `_teammate_email` uncleaned, so "Jordan." never matches and falls back to "An email address works best." (review 2026-09-27 #81)
 
 **Suggested fix:** Apply `_clean_value` to the reply, or strip `.,!?` in `_teammate_email`.
 
-### 752. [LOW] An ambiguous teammate is reported as "not found"
+### 752. ~~[LOW] An ambiguous teammate is reported as "not found"~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 3): the property-or-person path returns the ambiguity question (`_several_teammates`). Pinned by `task-list-for-an-ambiguous-teammate-says-so`.
+
 `platform/agents/task/service.py:482` — When `teammate()` returns "More than one teammate…" on the property-or-person path, the reply replaces it with "I couldn't find a property or a teammate called X." (review 2026-09-27 #82)
 
 **Suggested fix:** Return the ambiguity message when that is what `teammate()` found.
@@ -2486,6 +2505,7 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 ### 775. ~~[MEDIUM] The reply cleaner also cuts real names, so an exact name can still dead-end~~ — RESOLVED 2026-09-29
 
 **Resolved 2026-09-29** (name-answers plan phase 0): the router looks the reply up whole first, then cleaned (`replies.reply_name_candidates`, `routers/agent_helpers/named_answers.py`); no stored name is cleaned any more; `_resume_size_command` resolves an exact whole reply to the material's id (`SizeCommand.material_id`), since `_normalize_material_name` would strip "The" again; "." no longer ends a leading "no". Pinned by `tests/test_named_answers.py`, `test_the_answer_to_which_material_is_tried_whole_first`, and the corpus rows `material-which-material-answered-by-a-name-starting-no` / `-the`.
+
 `platform/agents/conversation/replies.py:178` — `_NAME_REPLY_WRAPPER_RE` strips a leading no / nope / sorry / now / ok / please / the / it's / "I meant" from every name, stored ones included, and with `[,.!]?` also takes "No." off "No. 57 Stone": `name_in_reply("No. 57 Stone")` → "57 Stone", "Please Stone" → "Stone", "Okay Mix" → "Mix", "The Good Stuff" → "Good Stuff". The folded keys still agree, so the gate answers "Which material do you mean?", but the agent then looks the cut name up by substring — with "No. 57 Stone" and "Washed 57 Stone" seeded, the exact reply "No. 57 Stone" answers "Multiple materials matched. Please specify the exact material name." and no size is removed; that reply stores no record, so it is a dead end. (review 2026-09-28 sixth round #1)
 
 **Suggested fix:** Fold stored names with whitespace + casefold only (never the cleaner); in the gate, match either the whole tidied reply or the cleaned one; in `_resume_size_command`, try the whole reply as an exact name before the cleaned one; drop "." from the separator after no/nope. Add "No. 57 Stone" and "The Good Stuff" to the gate test and to `test_the_name_in_a_reply`.

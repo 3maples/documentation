@@ -69,6 +69,14 @@ estimates share lists them (#615; a delete lists them without remembering),
 a named title that matches nothing never shows a different estimate (#616),
 and "the last estimate" with none says so (#22) (§1.7).
 
+**2026-09-29 (phase 3):** a task status or teammate the company has answers
+Maple's question even when it reads as a request ("New Request", "Create
+Estimate"); both assignee questions are remembered, and the teammate lookup
+is one indexed, company-scoped query that tidies the reply ("Jordan.") and
+logs a failure instead of hiding it. A status column named like a date
+moves the card (#711); an ambiguous teammate in a list says so (#752) (§7.7,
+§7.8).
+
 **2026-09-29 (deferred):** answering a question with a record's name, from
 [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md),
 leaves material-catalog management and the multi-match "please specify"
@@ -1444,6 +1452,8 @@ Either step can be entered directly: `description` on its own selects the field 
 | `set the status of the {task} task to {status}` | `update_task` (status) → Task Agent | ✅ rule *(unknown names get a clarification listing the company's statuses — since 2026-09-28 a registered question, so the bare reply (`In Progress`) sets it on the same task; done/complete/finished + in-progress/started + to-do/open synonyms map to the default names when present)* |
 | `set task {T0001} status to {status}` / `change T0001's status to done` / `set the {task} task status to done` | `update_task` (status) → Task Agent | ✅ rule *(2026-09-28 — target before the field; previously asked "What would you like to update on the task?")* |
 | `I finished it` / `it's done` / `complete the {task} task` / `start it` / `reopen it` | `update_task` (status) → Task Agent | ✅ rule *(2026-09-27 — "reopen" moves it back to the company's first status)* |
+| *"Which status should I set it to?"* or *"I don't recognize 'X'… Which one?"* → `New Request` / `Create Estimate` — a custom status that reads as a request | the status is set on that task | ✅ rule *(2026-09-29, name-answers plan phase 3 — read as a new request)* |
+| `move it to Next Week` where "Next Week" is one of the company's statuses | the card moves to that status; the due date is untouched | ✅ rule *(2026-09-29, #711 — it set the due date to next Monday)* |
 
 ## 7.8 Assignee operations
 
@@ -1457,6 +1467,10 @@ Assignees are stored as emails (`assigned_to_email`); an email is taken as given
 | `give it to Jordan` / `hand the {task} task over to Ana` / `assign it to Jordan` | `update_task` (assign by teammate name) → Task Agent | ✅ rule *(2026-09-27 — two teammates with that name get a question listing both)* |
 | `set task {T0001} assignee\|owner to {email or name}` / `change T0001's owner to Jordan` | `update_task` (assign) → Task Agent | ✅ rule *(2026-09-28 — target before the field)* |
 | `unassign it` / `assign the {task} task to nobody` / `remove the assignee` | `update_task` (assignee cleared) → Task Agent | ✅ rule *(2026-09-27)* |
+| `give it to Jordan` (two Jordans) → *"More than one teammate is called Jordan: … Which one? Their full name or email works."* → `Jordan Park` | assigned to Jordan Park | ✅ rule *(2026-09-29, phase 3 — the question wasn't remembered)* |
+| `give it to Zed` (no such teammate) → *"Who should I assign the task to?"* → `Jordan` | assigned to Jordan | ✅ rule *(2026-09-29, phase 3)* |
+| `assign it` → *"Who should I assign it to?"* → `Jordan Crew.` | assigned — the reply is tidied first | ✅ rule *(2026-09-29, #751 — "Jordan." never matched)* |
+| `list tasks for Jordan` (two Jordans) | *"More than one teammate is called Jordan: …"* | ✅ rule *(2026-09-29, #752 — "I couldn't find a property or a teammate called Jordan")* |
 | `who is the {task} task assigned to?` | `get_task` → Task Agent | ⚠️ gap *(details view already shows Assigned to; the who-question routing is unwired)* |
 
 ## 7.9 Archive / unarchive

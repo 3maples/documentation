@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-28 · **Revised:** 2026-09-29 (re-checked against `fae429e`;
 material-management questions and multi-match "please specify" deferred, §7)
-· **Status:** in progress — phases 0–1 done; next phase 3 · **Builds on:**
+· **Status:** in progress — phases 0, 1 and 3 done; next phase 4 · **Builds on:**
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
 (one question gate, `routers/agent_helpers/open_question.py`)
 
@@ -187,7 +187,7 @@ before "Which estimate?"); #346 (`names_target` resolves the title twice).
 
 **Phase 2: material category and unit.** *Deferred — see §7.*
 
-**Phase 3: task status and teammates.** First add a `company` index to `User`
+**Phase 3: task status and teammates.** ✅ *Done 2026-09-29.* Two changes from the text below: the teammate-ambiguity question is a value question listing each teammate with their email (a `choices` menu on a task record is read as a *task* pick by `menu_pick`), so the full name or the email answers it, not a number; and the task is resolved before the assignee, so each question is remembered against its task. "New Request" is refused only with the router's command rule, which the unit tests now pass. The "a command-led reply is a request" rule stays material-only (`_COMMAND_IS_A_REQUEST`): the Task agent reads "set status to In Progress" as its answer. First add a `company` index to `User`
 (#715). Sources `TaskStatus.name` and `User`
 (email, first, last, full name). Both status questions already store records;
 the teammate-ambiguity and "Who should I assign the task to?" asks get
@@ -340,7 +340,7 @@ entries themselves stay in that file.
 |---|---|---|
 | 0 | #776, #775; #709 optional | #776, #775 resolved 2026-09-29; #709 left in the backlog |
 | 1 | #669, #615, #616, #22, #346 | #615, #616, #22 resolved 2026-09-29; #669 avoided, not fixed (no new full load); #346 left as is — the pre-check carries a distinction the resolver doesn't return |
-| 3 | #715, #714, #751, #752, #711 (adjacent: #750, #777, #717) | all still apply |
+| 3 | #715, #714, #751, #752, #711 (adjacent: #750, #777, #717) | #715, #714, #751, #752, #711 resolved 2026-09-29; adjacent ones left in the backlog |
 | 4 | #759 | still applies |
 | 5 | #713 (task questions, and the Task agent's property questions) | still applies |
 | 7 | #722, #723 (prerequisites), #322, #439 (adjacent: #159, #779) | all still apply |
