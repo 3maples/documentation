@@ -332,7 +332,7 @@ time, phrasing reference in the same commit as the phrasing.
 | 8 | **Subjects**: company, property, customer (contact → properties, estimate ids deduped), division; a name resolved like the list's (exact whole name first, #779); "this property" / "them" from focus and `viewed_record`, never for "my / all my". Not-found vs nothing-to-count replies. Tests: two-contact property, two-property contact, a property open on the page. | M | platform |
 | 9 | **Maple's sums onto the engine**: the list handler's aggregate branch and `_analytics_headline_value` / `_analytics_total_value` / `_analytics_windowed_summary`. Fix the division aggregate if it overstates (test first). Existing analytics tests unchanged except where a figure was wrong. | M | platform |
 | 10 | **Dashboard onto the engine** — `compute_analytics`, `compute_status_comparison` — with the Completed card on `status_changed_at` (decision 5). Parity tests updated to the new meaning; every other card unchanged to the cent. Portal: the Completed tooltip says "marked Completed in the last 30 days" (copy only). | M | platform, portal |
-| **1b — Maple** ||||
+| **1b — Maple** — tasks 11–14 done 2026-09-30 (`4c1a29c`, `d49c964`, `5030b8a`, task 14) ||||
 | 11 | **Routing.** `analytics_metric` in the intent registry (→ Estimate Agent); grammar entries in `command_grammar.py` (`READ_IDS`) for the §4 Phase 1 table, with accept/reject tests — rejects for "how much is E0042?", "how much mulch do I need …", "average wage", "the total on it", "the total of those", "show me estimates with the highest total"; `_route_listed_command` sends them to the new intent. Reviewed routing-snapshot diff. | M | platform |
 | 12 | **Handler and replies**: the Estimate Agent answers `analytics_metric` from the engine — statuses, scope, period and tax named; recurring note; a single-estimate answer recorded as a listed row and anchored. Follow-ups "and last year?" / "what about Elm House?" replay (the `analytics_` prefix). Public Maple refuses metric questions. | M | platform |
 | 13 | **LLM tier**: the classifier learns the intent; a structured-output call fills `MetricQuery` when the grammar can't, usage-tagged `orchestrator.metric_spec`, off in tests; an ambiguous spec asks through the question gate. Live-tier rows in the coverage matrix. | M | platform |
@@ -344,6 +344,19 @@ early). 5–8 have no user-visible effect. 9–10 move existing figures onto the
 engine; 10 changes the Completed card, so it's its own release note. 11–14
 switch the feature on. Tasks 11–13 are the ones to review most carefully:
 they change routing.
+
+**Phase 1 done, 2026-09-30.** What changed on the way, against the table above:
+
+- "What's the value of Landscaping vs Hardscape?" moved to Phase 2 (a
+  two-division breakdown); one division's total shipped.
+- Two latent bugs fixed in passing: a list total summed only the first page
+  of 20, and a division total summed each estimate's whole value (task 9).
+- A Phase 0 regression caught and fixed: the #719 fix stopped reading "its"
+  as "it" ("what's its status?"), task 12.
+- The router's generation-shaped fallback for Estimate intents dropped the
+  metric result; `analytics_metric` now returns whole (task 12).
+- Left open: #783 (an estimate title as a subject), #784 (won in counts vs
+  money); the LLM tier's live run of `metrics_paraphrase` is the user's.
 
 ### Phase 2 — Rankings and breakdowns
 - `who are my top 5 customers by won value?`, `which property has the most

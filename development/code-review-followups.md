@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **783**. Never
+- **Entries are numbered and permanent.** Next free number: **785**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2569,6 +2569,16 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/agents/estimate/focus_questions.py` — "what's the total on it?", "who's the customer?", "is it sent?" are estimate phrasings decided by the module's own regexes (`_QUESTION_RE`, `_FIELDS`, `_BARE_FIELD_QUESTION_RE`, `_NOT_ONE_ESTIMATE_RE`), which contract 1 of the routing-convergence design says belong in `command_grammar.py`. #719 and #720 tightened them in place (2026-09-30) and left the move. The router asks `estimate_question` before classification (`routers/agents.py`), so a grammar entry must be read there too, and `match_command` returning these would also change the #721 analytics gate and `_route_listed_command`. (split from #719, 2026-09-30)
 
 **Suggested fix:** Add `READ_IDS` entries for the field questions with accept/reject tests in `tests/test_command_grammar.py` (the rows in `tests/test_estimate_focus_questions.py` port one-to-one), have `estimate_question` read the matched entry instead of its own patterns, and check the routing snapshot diff.
+
+### 783. [LOW] An estimate's title is not a metric subject, so "what's the total for Smith?" looks for a customer
+`platform/agents/estimate/metric_subject.py` — `resolve_subject` looks a name up among contacts, properties and divisions only. "What's the total for Smith?" (in the routing snapshot) now routes to `analytics_metric`; with an estimate titled "Smith" and no contact or property of that name it answers "I couldn't find a customer, property or division called Smith." Before, it went to help or a material lookup, so this is not a regression, but the user meant the estimate. (Maple metrics plan Phase 1 task 11, 2026-09-30)
+
+**Suggested fix:** When no customer, property or division matches, try an exact estimate title (the `(ESTIMATE_AGENT_LABEL, "estimate")` name source) and answer as the single-estimate focus question does ("The total on E0042 'Smith' is …"), or ask "Did you mean the estimate 'Smith'?".
+
+### 784. [LOW] "Won" means the sold set in a money question but the Won status in a count or a list
+`platform/agents/estimate/metric_query.py` vs `platform/agents/estimate/list_query.py` — decision 8 (2026-09-30) made "won" in money and win-rate questions Won + Scheduled + Completed; counts and lists kept "won estimates" as the literal status (§1.1: "a named status still wins"). So "how much did I win?" can cover more estimates than "how many won estimates do I have?". Every reply names the statuses it counted, so the difference is visible, but it is a difference. (Maple metrics plan, decision 8)
+
+**Suggested fix:** A user decision, not a code one: either align counts and lists with decision 8 (a behaviour change to §1.1 rows and `tests/test_estimate_list_answers.py`), or keep the split and say "won (Won status)" in count replies. Phase 3's win-rate change is the natural moment.
 
 ## Platform — API, models and data
 

@@ -925,7 +925,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
+**Open gaps:** #783, #784 (metrics, §1.12); older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
 
 ## 1.12 Metrics — totals, averages and the biggest, over many estimates *(2026-09-30)*
 
@@ -989,7 +989,10 @@ month?`, `what's my completed value?` (the dashboard, §1.9); `how much mulch do
 I need …` (the Calculator, §10.3); `what's the average wage for Foreman?`
 (§5.8). Tests: `tests/test_metric_query.py` (accept / reject / reading /
 routing / answers), `tests/test_maple_metrics.py`,
-`tests/test_metric_subject.py`, `tests/test_metric_periods.py`.
+`tests/test_metric_subject.py`, `tests/test_metric_periods.py`,
+`tests/test_metric_spec.py`; multi-turn: the `METRICS` conversations in
+`tests/maple_conversations/corpus.py`. Open: #783 (an estimate title is not a
+subject), #784 ("won" in a count is the Won status).
 
 
 # 2. Properties
