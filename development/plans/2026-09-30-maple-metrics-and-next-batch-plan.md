@@ -296,6 +296,55 @@ The scopes that already resolve by name: **company, property, customer
 - Closes §1.1 row 323 and the "Elm House" gap (row 734), since the subject
   resolver is shared.
 
+### Phase 1 — task breakdown *(2026-09-30)*
+
+Checked against the code before writing. Two findings shape it:
+
+- **Inserts run model hooks; `.set()` does not.** Every new estimate goes
+  through `insert` — the portal POST, the clone, AI generation
+  (`ai_generation.py`, which also inserts the generation shells) and Maple's
+  create (`crud_handlers.py:792`). So a `before_event(Insert)` hook stamps
+  both dates on every new estimate, and only **four** `.set()` sites need the
+  helper: Maple's transition (`crud_handlers.py:3548`), the PUT
+  (`update_data["status"]`), archive and unarchive. The delete soft-mark is
+  exempt (the document is removed next). The clone builds a fresh `Estimate`
+  and copies no dates.
+- **#721's gate and the metric grammar collide.** Since #721,
+  `match_analytics_query` returns None for any message `match_command`
+  parses. Metric phrasings become grammar entries, so they must route through
+  `_route_listed_command` to the new intent — not through the analytics
+  matcher, which would now skip them.
+
+One commit per task, failing test first, related tests plus mypy/ruff each
+time, phrasing reference in the same commit as the phrasing.
+
+| # | Task | Size | Repos |
+|---|---|---|---|
+| **1a — the dates** ||||
+| 1 | **Fields and helper.** `Estimate.status_changed_at` / `sold_at` (`Optional[datetime]`). Move the sold set to `models/estimate.py` (`SOLD_STATUSES`) so services can use it; `agents/estimate/text_helpers._SOLD_ESTIMATE_STATUSES` reads it. `services/estimate_status.py::status_patch(current, new, now)` → `{"status"}` plus `status_changed_at` when the status moves, plus `sold_at` when it enters the sold set from outside. A `before_event(Insert)` hook stamps both on a new estimate. Tests: every transition shape (move, no move, into / within / out of / back into the sold set), insert into Draft and into Won. | S | platform |
+| 2 | **Wire the four write sites** and a **guard test** that fails if a module writes an estimate's `status` without `status_patch` (allowlist: `services/estimate_delete.py`). Endpoint tests: a PUT status change sets the date; a PUT re-sending the same status keeps it; archive / unarchive; Won → Scheduled keeps `sold_at`; a client-sent `status_changed_at` is ignored. Maple: a chat transition sets both. | M | platform |
+| 3 | **Maple status transitions write an audit entry** (`ESTIMATE_STATUS_CHANGE`, before/after status), as the portal's do. | S | platform |
+| 4 | **Indexes** `(company, status, status_changed_at)` and `(company, sold_at)`; non-unique, safe at boot. CLAUDE.md: the two dates, the helper rule, the `updated_at` fallback. | S | platform, workspace |
+| **1b — the engine** ||||
+| 5 | **Periods.** Move `_period_range` out of `routers/estimates.py` into the metrics service, add the user's time zone (`agents/local_time.user_zone`, UTC fallback) and "last N days". Tests include a month boundary in a non-UTC zone. | S | platform |
+| 6 | **Engine core**, `services/maple_metrics.py`: `MetricQuery` (Pydantic, enum fields) → `MetricResult` (value, count, statuses summed, period, rows for largest/smallest). Estimate-level `$match` + `$group` on `grand_total`: total, average, largest, smallest; status or set (won/sold = sold set, decision 8); period on `sold_at` / `status_changed_at` / `created_at` with the `$or` fallback to `updated_at`; default set excludes Archived, Generating, Failed, Deleted. Tests against the local Mongo with a seeded company: each metric × status × period, the fallback (documents without the fields), empty set, rounding. | L | platform |
+| 7 | **Work-item figures**: division sums (`effective_sub_total`, Lost out), "before tax" (pre-tax revenue from `work_item_breakdown` × occurrences), via a projection. Tests: a two-division estimate, a recurring item, tax on and off. | M | platform |
+| 8 | **Subjects**: company, property, customer (contact → properties, estimate ids deduped), division; a name resolved like the list's (exact whole name first, #779); "this property" / "them" from focus and `viewed_record`, never for "my / all my". Not-found vs nothing-to-count replies. Tests: two-contact property, two-property contact, a property open on the page. | M | platform |
+| 9 | **Maple's sums onto the engine**: the list handler's aggregate branch and `_analytics_headline_value` / `_analytics_total_value` / `_analytics_windowed_summary`. Fix the division aggregate if it overstates (test first). Existing analytics tests unchanged except where a figure was wrong. | M | platform |
+| 10 | **Dashboard onto the engine** — `compute_analytics`, `compute_status_comparison` — with the Completed card on `status_changed_at` (decision 5). Parity tests updated to the new meaning; every other card unchanged to the cent. Portal: the Completed tooltip says "marked Completed in the last 30 days" (copy only). | M | platform, portal |
+| **1b — Maple** ||||
+| 11 | **Routing.** `analytics_metric` in the intent registry (→ Estimate Agent); grammar entries in `command_grammar.py` (`READ_IDS`) for the §4 Phase 1 table, with accept/reject tests — rejects for "how much is E0042?", "how much mulch do I need …", "average wage", "the total on it", "the total of those", "show me estimates with the highest total"; `_route_listed_command` sends them to the new intent. Reviewed routing-snapshot diff. | M | platform |
+| 12 | **Handler and replies**: the Estimate Agent answers `analytics_metric` from the engine — statuses, scope, period and tax named; recurring note; a single-estimate answer recorded as a listed row and anchored. Follow-ups "and last year?" / "what about Elm House?" replay (the `analytics_` prefix). Public Maple refuses metric questions. | M | platform |
+| 13 | **LLM tier**: the classifier learns the intent; a structured-output call fills `MetricQuery` when the grammar can't, usage-tagged `orchestrator.metric_spec`, off in tests; an ambiguous spec asks through the question gate. Live-tier rows in the coverage matrix. | M | platform |
+| 14 | **Docs and corpus**: phrasing reference §1.12 (new), §1.1 row 323 and §1.8 row 734 ✅, §1.9 Completed meaning, §12.3 counts; `test_maple_conversations.py` rows (lifetime won for a property, sold to a customer this year, "and last year?"); followups. | S | platform, documentation |
+
+**Order and release points.** 1–4 can ship on their own (the dates start
+filling from that deploy, which shortens the fallback period — worth shipping
+early). 5–8 have no user-visible effect. 9–10 move existing figures onto the
+engine; 10 changes the Completed card, so it's its own release note. 11–14
+switch the feature on. Tasks 11–13 are the ones to review most carefully:
+they change routing.
+
 ### Phase 2 — Rankings and breakdowns
 - `who are my top 5 customers by won value?`, `which property has the most
   estimates?`, `which division earns the most?`, `value by month this year`.
