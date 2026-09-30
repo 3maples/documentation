@@ -126,7 +126,12 @@ means marked Completed in the last 30 days, not edited in them (§1.9).
 Task 11: **Maple answers metric questions** — lifetime won for a property,
 sold to a customer this year, averages, the biggest estimate, a status's total
 for a place — each reply naming what it counted (new §1.12). "What's the total
-value of sold estimates for Bob Lee?" now reads Bob (§1.1).
+value of sold estimates for Bob Lee?" now reads Bob (§1.1). Task 12: the
+biggest estimate named is the one in focus next; "which one?" and "couldn't
+find" take a name in reply; "and last year?" and "what about Elm House?"
+repeat the question; the public widget refuses. "What's its status?" about the
+open estimate works again — the #719 fix had stopped reading "its" as "it"
+(§1.2).
 
 **2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
 the name, however it reads — an activity ("Remove Sod"), a role ("Load
@@ -965,6 +970,11 @@ never by the LLM, and every reply names what it counted.
 | `how much have I sold to Ana?` (two Anas) | *"Which one did you mean: Ana Lopez or Ana Reyes?"* | ✅ rule |
 | `how much have I sold to Zed Zedson?` | *"I couldn't find a customer, property or division called Zed Zedson."* | ✅ rule |
 | `how much have I sold to Carla Diaz?` (no property) | *"Carla Diaz has no sold estimates (Won, Scheduled, Completed)."* | ✅ rule |
+| `what's my biggest estimate?` → `what's its status?` / `open it` | the estimate named is the one in focus, and the one row a pick reads | ✅ rule *(task 12)* |
+| `how much have I sold to Ana?` → *"Which one did you mean: Ana Lopez or Ana Reyes?"* → `Ana Reyes` (or `2`) | the question runs again for Ana Reyes | ✅ rule *(task 12 — the name goes into the question, `record_names.ask_to_rewrite`; also after "I couldn't find …" and "Which property do you mean?")* |
+| `how much have I sold to Bob Lee this year?` → `and last year?` / `what's the lifetime won amount from 12 Oak St?` → `what about Elm House?` | the same question for the new period or the new place | ✅ rule *(task 12 — §10.8)* |
+| a total that includes recurring work | *"… including tax. Recurring work is counted for every visit it's scheduled for."* | ✅ rule *(task 12)* |
+| `how much have I sold this year?` on the **public** widget | *"I can't see anyone's estimates from here — I'm in read-only demo mode. Sign up …"* | 🛑 refusal *(task 12 — the widget has no company; a figure would be made up)* |
 | `what's the total for Smith?` (an **estimate** titled Smith) | read as a customer or property named Smith | ⚠️ gap *(2026-09-30 — it was help; an estimate title is not a metric subject)* |
 
 **Not metrics** — each keeps its own answer: `how much is E0042?` and `what's
