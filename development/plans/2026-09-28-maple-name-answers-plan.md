@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-28 · **Revised:** 2026-09-29 (re-checked against `fae429e`;
 material-management questions and multi-match "please specify" deferred, §7)
-· **Status:** in progress — phases 0, 1, 3 and 4 done; next phase 5 · **Builds on:**
+· **Status:** in progress — phases 0, 1, 3, 4 and 5 done; next phase 7 · **Builds on:**
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
 (one question gate, `routers/agent_helpers/open_question.py`)
 
@@ -224,7 +224,7 @@ Follow-ups (§8.1): #759 — corpus row `contact-stale-anchor-asks` passes
 without checking for "Just to check"; tighten it here, since this phase's
 row starts from the same question.
 
-**Phase 5: "Which task did you mean?"** `ask_for_name(domain="task")` at
+**Phase 5: "Which task did you mean?"** ✅ *Done 2026-09-29.* Added one mechanism the text below lacked: the replay sets a one-shot `forced_<domain>_id` that the task resolver and the Task agent's property lookup read first — a request still carrying the unresolved name ("mark the pool task done") would otherwise resolve it again and re-ask. The replay also keeps the asking agent's own anchor fresh ("link it to …" continues on the same task). The Task agent's list-filter property question is covered too. `ask_for_name(domain="task")` at
 all three call sites, with a `Task.title` source (add `(company, title)`;
 the resolver already queries `title` by regex). At `field_flow.py:169`
 the value was already given, so the ask replaces the open value record with
@@ -342,7 +342,7 @@ entries themselves stay in that file.
 | 1 | #669, #615, #616, #22, #346 | #615, #616, #22 resolved 2026-09-29; #669 avoided, not fixed (no new full load); #346 left as is — the pre-check carries a distinction the resolver doesn't return |
 | 3 | #715, #714, #751, #752, #711 (adjacent: #750, #777, #717) | #715, #714, #751, #752, #711 resolved 2026-09-29; adjacent ones left in the backlog |
 | 4 | #759 | resolved 2026-09-29 (row tightened and marked `gap=`) |
-| 5 | #713 (task questions, and the Task agent's property questions) | still applies |
+| 5 | #713 (task questions, and the Task agent's property questions) | resolved 2026-09-29 |
 | 7 | #722, #723 (prerequisites), #322, #439 (adjacent: #159, #779) | all still apply |
 | 8 | #470 | still applies |
 

@@ -83,6 +83,11 @@ the record named — a numbered list when several share it, one more try when
 none does (§10.7). Two gaps logged there: a role word ("the homeowner's
 phone", #759) and "the city there".
 
+**2026-09-29 (phase 5):** "Which task did you mean?" and the Task agent's
+"Which property did you mean?" are remembered too: the name — a task title
+that reads as a request included — finishes the request, and a value given
+about a task that has gone is kept for the task named next (#713) (§7.11).
+
 **2026-09-29 (deferred):** answering a question with a record's name, from
 [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md),
 leaves material-catalog management and the multi-match "please specify"
@@ -1517,6 +1522,9 @@ Resolver: `agents/task/resolver.py::find_task_from_context_or_message` — order
 | Anaphora (active task) | `mark it as done` / `convert it` / `rename it to {new}` | ✅ agent-side *(pronoun-only messages route via the LLM tier + active-task context. 2026-07-30 — two routing bugs used to steal these: a stale `active_estimate_code` from earlier in the session out-ranked the just-created task, and a Capitalized new value was mined as a person name and sent to Contact. The anchor is now chosen by recency (`active_entity_domain`), and a pronoun-targeted edit's payload is never read as a domain signal.)* |
 | Anaphora (bare determiner) | `mark the task as done` / `assign my task to {email}` / `archive the task` / `rename the task to {new}` | ✅ agent-side *(2026-07-25 — "the/my task" with no name in between is anaphora: the target hint collapses to empty and resolution goes through the active-task context. Previously the stray determiner leaked into the title matcher and could hit ANY title containing "the".)* *(2026-09-28 — with no task in focus Maple asks "Which task?" rather than editing the most recently updated task; notes appends still fall back to it, #447.)* |
 | Ambiguity → confirmation | two similar titles → numbered clarification, reply `1` / `the second one` / `T0004` / words from one title (`the paint one`) / `no` | ✅ *(2026-09-27 — the readable id and title words; the question gate reads a reply naming a choice as the answer, #692)* |
+| No match → "Which task did you mean?" | `mark the pool task as done` → *"I couldn't find a task matching 'pool'. Which task did you mean?"* → `Create estimate for Bob` (a title that reads as a request) / its ID | ✅ *(2026-09-29, name-answers plan phase 5 — the question wasn't remembered, and that reply would have started an estimate)* |
+| A value for a task that is gone | `status` → `In Progress` → *"Which task should I update?"* → `Fix the fence gate` | ✅ *(2026-09-29, #713 — the task's name was read as the status)* |
+| The Task agent's property question | `link it to Pine Ridge` → *"I couldn't find a property called Pine Ridge. Which property did you mean?"* → `Elm House`; `list tasks at St` → *"More than one property matches St: … Which one did you mean?"* → `12 Oak St` | ✅ *(2026-09-29, phase 5, #713 — the reply was read as a new request)* |
 
 ## 7.12 Task refusals — 🛑
 

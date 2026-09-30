@@ -2324,7 +2324,10 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Link from a non-explicit tail only for "at X" or an address-shaped value (contains a digit). Treat "for X" as property-or-person, as the list parser does, or ask.
 
-### 713. [MEDIUM] The new "which one?" questions store no pending record
+### 713. ~~[MEDIUM] The new "which one?" questions store no pending record~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phases 3 and 5): the teammate questions store a value record (phase 3); "Which task did you mean?", "Which task should I update?" and the Task agent's property questions store a name question (`record_names.ask_for_name`) that the router answers by replaying the request on the record named, via a one-shot `forced_<domain>_id`. A value asked for about a task that is gone rides along as `resume_record` and is applied to the task named. Pinned by `test_a_value_for_a_task_that_is_gone_asks_which_task_and_keeps_the_value`, `test_a_replay_puts_the_carried_question_back_on_the_record_named` and three corpus rows.
+
 `platform/agents/task/operations.py:344` — "More than one teammate is called Jordan…", "More than one property matches…" (:450, :459) and "I couldn't find a property called X. Which property did you mean?" (service.py:418, :474) go through `_clarify`, which stores nothing. The next reply is routed as a brand-new request, against the CLAUDE.md rule that every question goes through `open_question`. (review 2026-09-27 #40)
 
 **Suggested fix:** Record a `pending_intents` entry with `choices` (task id, field, candidate ids), as `_stash_candidates_and_ask` does.
