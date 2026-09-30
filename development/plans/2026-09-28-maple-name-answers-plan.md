@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-28 · **Revised:** 2026-09-29 (re-checked against `fae429e`;
 material-management questions and multi-match "please specify" deferred, §7)
-· **Status:** in progress — phase 0 done; next phase 1 · **Builds on:**
+· **Status:** in progress — phases 0–1 done; next phase 3 · **Builds on:**
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
 (one question gate, `routers/agent_helpers/open_question.py`)
 
@@ -159,7 +159,7 @@ up the cut name and dead-ends; the lookup should try the whole reply first);
 #709 (`catalog_names._catalog`) is the same load-everything pattern and can
 reuse the lookup, but is optional here.
 
-**Phase 1: estimate titles.** "Which estimate? … or its title." invites a
+**Phase 1: estimate titles.** ✅ *Done 2026-09-29* — also remembers "Which estimate?" at the six sites that stored nothing (reads, the router's update, assumptions); a delete is listed but never remembered. "Which estimate? … or its title." invites a
 title and drops every one. Source `Estimate.title` (company-scoped,
 non-archived first), keyed `(ESTIMATE_AGENT_LABEL, "estimate")`. `estimates`
 has no `(company, title)` index — add one (the existing indexes are all
@@ -339,7 +339,7 @@ entries themselves stay in that file.
 | Phase | Entries | Verified |
 |---|---|---|
 | 0 | #776, #775; #709 optional | #776, #775 resolved 2026-09-29; #709 left in the backlog |
-| 1 | #669, #615, #616, #22, #346 | #615 partly: several matches narrow to the one live estimate when the rest are archived, but several live ones still get the generic prompt; the rest still apply |
+| 1 | #669, #615, #616, #22, #346 | #615, #616, #22 resolved 2026-09-29; #669 avoided, not fixed (no new full load); #346 left as is — the pre-check carries a distinction the resolver doesn't return |
 | 3 | #715, #714, #751, #752, #711 (adjacent: #750, #777, #717) | all still apply |
 | 4 | #759 | still applies |
 | 5 | #713 (task questions, and the Task agent's property questions) | still applies |

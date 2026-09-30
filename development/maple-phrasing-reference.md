@@ -61,6 +61,14 @@ catalog (#776), and a name that opens with words a reply is cleaned of —
 "No. 57 Stone", "The Good Stuff" — now finishes the size change instead of
 dead-ending on "Multiple materials matched" (#775, §4.8).
 
+**2026-09-29 (phase 1):** "Which estimate? … or its title." now takes the
+title — looked up exactly among the company's estimates, so "Remove Sod and
+Reseed" answers instead of being read as "delete contact Sod And Reseed" —
+and every "Which estimate?" is remembered, reads included. A title several
+estimates share lists them (#615; a delete lists them without remembering),
+a named title that matches nothing never shows a different estimate (#616),
+and "the last estimate" with none says so (#22) (§1.7).
+
 **2026-09-29 (deferred):** answering a question with a record's name, from
 [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md),
 leaves material-catalog management and the multi-match "please specify"
@@ -659,6 +667,13 @@ Sets a work item's total to an absolute dollar amount by **back-calculating its 
 | `open the second one` (after a list of estimates) | `get_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
 | `list my estimates` → `delete the first one` (another estimate open) | deletes the first **listed** row, after confirming | ✅ rule *(2026-09-27, #686 — it offered to delete the open estimate)* |
 | `mark the patio estimate as sent` → *"I found 2 estimates… which one?"* → `E0001` / `2` / `the backyard one` | the request runs on that estimate | ✅ rule *(2026-09-27, #685 — the reply dead-ended)* |
+| `mark the estimate as sent` (nothing open) → *"Which estimate? … or its title."* → `Remove Sod and Reseed` / `the Oak St patio please` | the request runs on the estimate with that title — however it reads | ✅ rule *(2026-09-29, name-answers plan phase 1 — a title was read as a new request: "Remove Sod and Reseed" tried to delete a contact)* |
+| … → a title two live estimates share | *"I found 2 estimates matching…"*, then the code or number picks | ✅ rule *(2026-09-29)* |
+| `show me the estimate` (nothing open) → *"Which estimate would you like to view?"* → `Oak St patio` | shows it | ✅ rule *(2026-09-29 — the question wasn't remembered; the title went to the Material agent)* |
+| `add a work item to the Patio estimate` (two live estimates titled Patio) | lists both, and the code or number picks | ✅ rule *(2026-09-29, #615 — "Which estimate would you like to update?" named neither)* |
+| `delete the Patio estimate` (two live estimates titled Patio) | lists both and asks for the code in a new request (`delete E0042`) — a delete is never resumed from a reply | ✅ rule *(2026-09-29, #615)* |
+| `show me the Patio estimate` (no estimate titled that; one titled "Pat") | *"Which estimate would you like to view?"* — never the "Pat" estimate | ✅ rule *(2026-09-29, #616)* |
+| `what is the total of the last estimate` / `mark the last estimate as sent` with no estimates | *"You don't have any estimates yet."* | ✅ rule *(2026-09-29, #22 — it asked which estimate)* |
 | `add a work item called Fence` while viewing an estimate in the portal | `update_estimate` → Estimate Agent | ✅ rule + context *(2026-09-24 — the viewed estimate)* |
 | `update the henderson job` (no estimate titled that, one is open) | `update_estimate` → Estimate Agent | ⚠️ gap *(2026-09-27 review: routes to `update_property` on the rules tier.)* Earlier: *(2026-09-24 — "I couldn't find … Did you mean E0042, the estimate you're working on?"; "yes" re-runs the request there)* |
 | `this estimate` / `the last estimate` / `that one` | resolves via `active_estimate_code` | 🤖 LLM + context |

@@ -545,6 +545,8 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 **Suggested fix:** Pass the loaded `target` into the executor as an optional parameter.
 
 ### 669. [MEDIUM] Maple's named-estimate lookup loads every estimate document in full
+
+**Update 2026-09-29:** name-answers phase 1 added no caller: a title given in answer to "Which estimate?" is looked up exactly and indexed (`title_reference.find_estimates_titled`, index `company_title`). The ladder for titles named inside a request still loads everything; the projection fix is unchanged.
 `platform/routers/agent_helpers/estimate_resolver.py:188` (and `delegate_get_estimate.py:~219`, `agents/estimate/crud_handlers.py` `_match_estimates_by_title`) — to match "the Patio estimate" by title, each path loads every estimate the company has, whole documents with their job items, then filters in Python. Round 32 #2 widened the router's two paths from the newest 100 to the full set, so they agree with the agent's resolver (a capped list matched the wrong estimate as an exact target); the cost grows with the company's estimate count, per named message.
 
 **Suggested fix:** Load a projection for title matching — `_id`, `estimate_id`, `title`, `property` (plus whatever `_effective_title` reads) — with the company filter, and fetch the one matched document afterwards. One shared helper for the router and the agent. Keep the full set (no newest-N cap): the cap is what caused the wrong match.
@@ -1670,7 +1672,9 @@ treating it as a value, or extend `_NEGATIVE_VALUES` prefix-matching.
 
 **Update 2026-09-27:** `_NEGATIVE_VALUES` lives in `routers/agent_helpers/text_helpers.py:27-35` (exact match through `is_negative_text`, `:97`), not in `optional_follow_up.py`, which holds only `_AFFIRMATION_PREFIX` (`:45`). The planned fix is the question registry's normalized yes/no (2026-09-27-maple-multi-turn-everywhere-design.md §5.1).
 
-### 22. [LOW] "Last estimate" with zero estimates falls back to generic "Which estimate?"
+### 22. ~~[LOW] "Last estimate" with zero estimates falls back to generic "Which estimate?"~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 1): `_handle_get_estimate` and `_resolve_estimate_code_or_title` answer "You don't have any estimates yet." (`_no_estimates_yet`) when "the last estimate" finds none. Pinned by `test_the_last_estimate_with_none_says_there_are_none`.
 **File**: `agents/estimate/service.py` — the `_handle_get_estimate` branch
 that falls through when `_resolve_latest_estimate` returns `None`.
 **Severity**: LOW (UX polish)
@@ -1755,6 +1759,8 @@ reference — revisit only if real titles hit it.
 **Resolved 2026-09-27** with #673 (platform `69fd512`).
 
 ### 346. [LOW] Redundant double resolution in `apply_template`
+
+**Update 2026-09-29:** reviewed in name-answers phase 1 and left as is. The `names_target` pre-check is not only a repeat: it separates "the user named an estimate" from "the resolver fell back to the open one", which `_resolve_estimate_code_or_title` does not report. Folding it in means widening that return for every caller to save a regex. Candidate to close as won't-fix.
 Added 2026-06-09. `agents/estimate/crud_handlers.py` (~L631): computing
 `names_target` calls `_resolve_estimate_code(query, None)` and
 `_query_names_estimate_title(query)`, then the subsequent
@@ -1921,12 +1927,16 @@ bring back copying.
 
 **Suggested fix:** Pass `target.estimate_id` from fuzzy_confirmation into `run_confirmed_edits`, or reject when it differs from the stashed code.
 
-### 615. [LOW] Several title matches collapse to "not found" on update/delete
+### 615. ~~[LOW] Several title matches collapse to "not found" on update/delete~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 1): `find_estimate_from_context_or_message(..., several_out=)` receives the live matches; the router's update lists them and remembers the menu, the delete lists them without remembering (the estimate agent that reads an answer doesn't delete). Pinned in `test_agent_helpers_estimate_resolver.py` and `test_agent_helpers_delegate_estimate_ops.py`.
 `platform/routers/agent_helpers/estimate_resolver.py:184` — `_from_named_title` returns `(None, False)` on more than one match, so update/delete ask a generic "Which estimate…?" without listing the candidates (get does list them).
 
 **Suggested fix:** Return the matches, or a sentinel, so callers can show the codes.
 
-### 616. [LOW] A named title with no match still reaches the loose substring rung
+### 616. ~~[LOW] A named title with no match still reaches the loose substring rung~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 1): step 3 of `delegate_get_estimate` is gated on `not names_title`; the not-found reply now also remembers "Which estimate?". Pinned by `test_a_named_title_that_matches_nothing_is_not_answered_loosely`.
 `platform/routers/agent_helpers/delegate_get_estimate.py:252` — With `names_title` true and zero named matches, step 3 can still answer with a different estimate. The resolver treats this case as the end of the search.
 
 **Suggested fix:** Gate step 3 on `not names_title`, or return the not-found clarification.
