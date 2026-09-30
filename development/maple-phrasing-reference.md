@@ -123,6 +123,10 @@ The pipeline and completed windows start at midnight on the boundary day, as
 the dashboard's cards do (§1.1, §1.9). Task 10: the dashboard reads the same
 engine, and "Completed" — the card and "what's my completed value?" — now
 means marked Completed in the last 30 days, not edited in them (§1.9).
+Task 11: **Maple answers metric questions** — lifetime won for a property,
+sold to a customer this year, averages, the biggest estimate, a status's total
+for a place — each reply naming what it counted (new §1.12). "What's the total
+value of sold estimates for Bob Lee?" now reads Bob (§1.1).
 
 **2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
 the name, however it reads — an activity ("Remove Sod"), a role ("Load
@@ -353,7 +357,7 @@ a note to a material or role. **Refused by the planner:** labor burden
 | any estimate count, list, empty list or total | the reply names everything it was narrowed by — *"You have 2 sold estimates for Bob Lee in the last year."*, *"Here are your won estimates for Bob Lee:"*, *"You don't have any sold estimates in the last month."*, *"The combined value of your 2 sold estimates in the last month is $1,500.00."* | ✅ rule *(2026-09-29 — a scoped count read as company-wide, and "show me won estimates for Bob Lee" was headed "Estimates for Bob Lee:". An unfiltered reply reads as before)* |
 | `how many estimates for Min Won?` / `how many draft estimates for Min Won?` / `show me estimates for Min Won` — a surname (or property name) that ends in a status word | that customer's estimates; a status said outside the name still applies | ✅ rule *(2026-09-30, #779 — "Won" was read off the name as a status and "Min" substring-matched other contacts. The whole name is looked up exactly first; the status is read off it only when the whole name is no one's)* |
 | `how many won estimates for Bob Lee in review?` / `how many draft estimates for Bob Lee that are sold?` | *"That asks for two statuses at once — review or won. Which one did you mean? Ask again with just one …"* | ✅ rule *(2026-09-30, #780 — the first status read was counted and the other dropped. Not a resumable question: re-ask with one status)* |
-| `what's the total value of sold estimates for Bob Lee?` / `total value of estimates for Bob Lee` | the total over **every** customer — the name is not read | ⚠️ gap *(2026-09-29 — a total never reads a customer name; the reply at least doesn't claim Bob)* |
+| `what's the total value of sold estimates for Bob Lee?` / `total value of estimates for Bob Lee` | the customer's total — *"Sold value for Bob Lee, all time: $2,000.00 across 2 estimates (Won, Scheduled, Completed), including tax."* | ✅ rule *(2026-09-30 — a metric question, §1.12. It totalled every customer)* |
 
 ## 1.2 Value / total queries for a specific estimate
 
@@ -915,6 +919,65 @@ reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
 **Open gaps:** older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
+
+## 1.12 Metrics — totals, averages and the biggest, over many estimates *(2026-09-30)*
+
+Plan: [`plans/2026-09-30-maple-metrics-and-next-batch-plan.md`](plans/2026-09-30-maple-metrics-and-next-batch-plan.md).
+Grammar entries `analytics_metric` (`command_grammar._METRIC_ENTRIES`), read
+by `agents/estimate/metric_query.py`, answered by
+`agents/estimate/metric_answers.py` from `services/maple_metrics.py` — the
+engine the dashboard reads too. Every number is computed by the database,
+never by the LLM, and every reply names what it counted.
+
+**How it reads a question**
+
+- **Won and sold are the same set** — Won + Scheduled + Completed (decision
+  8): a job the customer said yes to, whatever came after. "Made", "spent",
+  "revenue" and "sales" mean it too. *In Won status* / *currently won* is the
+  literal status.
+- **Money is tax-inclusive** (the estimates' `grand_total`, as the dashboard);
+  *before tax*, *pre-tax* or *excluding tax* sums each work item's
+  `sub_total ÷ (1 + tax%)`. The reply says which.
+- **Periods are calendar periods on the user's clock**: *this month* is since
+  the 1st where they are; *last quarter* is the previous one; *in the last 90
+  days* starts at that day's midnight. With *won* / *sold* a period reads when
+  the estimate was sold (`sold_at`); with another status, when it moved there
+  (`status_changed_at`); with none, when it was created. An estimate from
+  before those dates existed is placed by `updated_at`.
+- **Who or what it is about**: a customer (every property they are on, each
+  once), a property by name or street, a division, or the record in focus —
+  *this property*, *them*, *it*. *My* / *our* / nothing is the whole company,
+  even with a record open. A name that matches several asks which; one that
+  matches nothing says so.
+- **Recurring work items** count every occurrence, as the estimate's total
+  does.
+
+| Phrasing | Answer | Status |
+|---|---|---|
+| `what's the lifetime won amount from 12 Oak St?` / `… for this property` | *"Won value for 12 Oak St, all time: $5,000.00 across 2 estimates (Won, Scheduled, Completed), including tax."* | ✅ rule |
+| `how much have I sold to Bob Lee this year?` / `how much have they spent with us?` | the customer's sold total for the calendar year, across every property they are on | ✅ rule |
+| `how much did I win last quarter?` / `how much have we sold this month?` / `what's our revenue this year?` / `how much did we sell before tax this year?` | the company's sold total for the period | ✅ rule |
+| `what's the total value of won estimates for Bob Lee?` / `what is the won value for Bob Lee last month?` | the customer's total | ✅ rule |
+| `how much is still in draft for Elm House?` / `how much is on hold?` | that status's total | ✅ rule |
+| `what's the value of my Landscaping work?` | that division's work items only | ✅ rule |
+| `what's the average estimate value?` / `what's the average value of my won estimates?` / `what's Bob Lee's average job size?` | *"The average won estimate is $1,750.00, across 4 estimates (Won, Scheduled, Completed), including tax."* | ✅ rule |
+| `what's my biggest estimate?` / `what's my smallest won job?` / `what was the largest estimate for 12 Oak St last year?` / `which estimate has the highest total?` | *"Your biggest estimate is E0042 'Patio' at $3,000.00 (Completed, including tax)."* | ✅ rule *(the last was the sorted list, #720)* |
+| `how much have I sold to Ana?` (two Anas) | *"Which one did you mean: Ana Lopez or Ana Reyes?"* | ✅ rule |
+| `how much have I sold to Zed Zedson?` | *"I couldn't find a customer, property or division called Zed Zedson."* | ✅ rule |
+| `how much have I sold to Carla Diaz?` (no property) | *"Carla Diaz has no sold estimates (Won, Scheduled, Completed)."* | ✅ rule |
+| `what's the total for Smith?` (an **estimate** titled Smith) | read as a customer or property named Smith | ⚠️ gap *(2026-09-30 — it was help; an estimate title is not a metric subject)* |
+
+**Not metrics** — each keeps its own answer: `how much is E0042?` and `what's
+the total on it?` (one estimate, §1.2); `what's the total of those?` (the list
+just shown, §1.1); `what is the total value of the open estimates` and
+`estimates over $10k` (the list's total and filter, §1.1); `what's the value
+of my estimates?`, `what's my pipeline?`, `how much have I completed this
+month?`, `what's my completed value?` (the dashboard, §1.9); `how much mulch do
+I need …` (the Calculator, §10.3); `what's the average wage for Foreman?`
+(§5.8). Tests: `tests/test_metric_query.py` (accept / reject / reading /
+routing / answers), `tests/test_maple_metrics.py`,
+`tests/test_metric_subject.py`, `tests/test_metric_periods.py`.
+
 
 # 2. Properties
 
