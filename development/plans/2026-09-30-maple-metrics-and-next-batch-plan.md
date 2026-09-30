@@ -320,7 +320,7 @@ time, phrasing reference in the same commit as the phrasing.
 
 | # | Task | Size | Repos |
 |---|---|---|---|
-| **1a — the dates** ||||
+| **1a — the dates** — done 2026-09-30 (`b799caf`, `12b4ebe`, `9e42ae1`, task 4) ||||
 | 1 | **Fields and helper.** `Estimate.status_changed_at` / `sold_at` (`Optional[datetime]`). Move the sold set to `models/estimate.py` (`SOLD_STATUSES`) so services can use it; `agents/estimate/text_helpers._SOLD_ESTIMATE_STATUSES` reads it. `services/estimate_status.py::status_patch(current, new, now)` → `{"status"}` plus `status_changed_at` when the status moves, plus `sold_at` when it enters the sold set from outside. A `before_event(Insert)` hook stamps both on a new estimate. Tests: every transition shape (move, no move, into / within / out of / back into the sold set), insert into Draft and into Won. | S | platform |
 | 2 | **Wire the four write sites** and a **guard test** that fails if a module writes an estimate's `status` without `status_patch` (allowlist: `services/estimate_delete.py`). Endpoint tests: a PUT status change sets the date; a PUT re-sending the same status keeps it; archive / unarchive; Won → Scheduled keeps `sold_at`; a client-sent `status_changed_at` is ignored. Maple: a chat transition sets both. | M | platform |
 | 3 | **Maple status transitions write an audit entry** (`ESTIMATE_STATUS_CHANGE`, before/after status), as the portal's do. | S | platform |
