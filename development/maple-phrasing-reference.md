@@ -55,6 +55,12 @@ customer's list keeps the customer. Every estimate count names what it
 counted ("You have 2 sold estimates for Bob Lee."), and "for Bob Lee" now
 narrows a count or a status list instead of being dropped (§1.1).
 
+**2026-09-29:** the answer to "Which material do you mean?" is looked up
+among the company's materials by exact name instead of loading the whole
+catalog (#776), and a name that opens with words a reply is cleaned of —
+"No. 57 Stone", "The Good Stuff" — now finishes the size change instead of
+dead-ending on "Multiple materials matched" (#775, §4.8).
+
 **2026-09-29 (deferred):** answering a question with a record's name, from
 [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md),
 leaves material-catalog management and the multi-match "please specify"
@@ -1048,6 +1054,8 @@ A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft b
 | `how much is {material} in the {size} size?` / `find material {material} with size {size}` | `get_material` — that size's price and cost | ✅ rule |
 | `show all sizes for {material}` / `what sizes does {material} come in?` | `get_material` — *"Black Mulch comes in 2 sizes: 2 cu ft at 4.40, 1 yd at 38.50."* | ✅ rule |
 | `change its price to 5` on a material with several sizes → *"which size?"* → `2 cu ft` | the change, on that size | ✅ rule *(2026-09-27 — the answer didn't resume the edit)* |
+| `remove size 1 yd from it` with nothing in focus → *"Which material do you mean?"* → `Show Stone` / `no, Black Mulch please` | the change, on that material — a reply that is one of the company's materials answers however it reads | ✅ rule *(2026-09-28)* |
+| … → `No. 57 Stone` / `The Good Stuff` — a name that opens with words a reply is cleaned of, beside materials the cut name also matches | the change, on the material named exactly | ✅ rule *(2026-09-29, #775 — "Multiple materials matched", and nothing changed)* |
 
 **Invariants:**
 - **Last-size delete refusal** — cannot remove the only remaining size on a material. Copy: *"I can't remove the last size from this material — it needs at least one size. Add another size first, or delete the material entirely if that's what you mean."*

@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-28 · **Revised:** 2026-09-29 (re-checked against `fae429e`;
 material-management questions and multi-match "please specify" deferred, §7)
-· **Status:** ready — decisions settled (§5); start with phase 0 · **Builds on:**
+· **Status:** in progress — phase 0 done; next phase 1 · **Builds on:**
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
 (one question gate, `routers/agent_helpers/open_question.py`)
 
@@ -144,7 +144,7 @@ lookup). 1 before 7 (`decide()` takes `known_names`). 4 before 5
 (`ask_for_name` and its router branch). #722/#723 before 7. 3 and 8 need only
 phase 0.
 
-**Phase 0: lookup, not load** (§3.1, §3.2). Re-key `NAME_SOURCES` by
+**Phase 0: lookup, not load** (§3.1, §3.2). ✅ *Done 2026-09-29.* Re-key `NAME_SOURCES` by
 `(owner, field)` and replace the material loader with a per-reply lookup:
 one `find_one({"company": …, "name": <anchored, escaped,
 case-insensitive regex>}, {"_id": 0, "name": 1})` per open name question, trying the
@@ -338,7 +338,7 @@ entries themselves stay in that file.
 
 | Phase | Entries | Verified |
 |---|---|---|
-| 0 | #776, #775; #709 optional | all still apply |
+| 0 | #776, #775; #709 optional | #776, #775 resolved 2026-09-29; #709 left in the backlog |
 | 1 | #669, #615, #616, #22, #346 | #615 partly: several matches narrow to the one live estimate when the rest are archived, but several live ones still get the generic prompt; the rest still apply |
 | 3 | #715, #714, #751, #752, #711 (adjacent: #750, #777, #717) | all still apply |
 | 4 | #759 | still applies |

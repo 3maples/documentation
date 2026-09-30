@@ -566,7 +566,9 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 
 **Suggested fix:** Add `IndexModel([("company", 1), ("due_date", 1)])`, or correct the docstring.
 
-### 776. [LOW] The material-name lookup silently stops at 5000 names, in no set order
+### 776. ~~[LOW] The material-name lookup silently stops at 5000 names, in no set order~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 0): the loader is gone. `named_answers` looks the reply up with one anchored, escaped, case-insensitive `find_one` per candidate, projected to `name` so the `(company, name)` index answers it (`agents/conversation/name_lookup.py`); sources are keyed by (owner, field).
 `platform/routers/agent_helpers/named_answers.py:36` — `_material_names` reads `find({"company": company}, {"name": 1})` with no sort, then `to_list(length=_NAME_CAP)` with a cap of 5000. For a company with more than 5000 materials, the names past the cap are dropped without any log, and which ones are dropped is whatever order Mongo returns. A dropped name that opens with a command verb ("Clear Stone") then reads as a new request again. It also reads up to 5000 rows on every turn where "Which material do you mean?" is open. LOW because no company is near 5000 materials, and a missed name falls back to the checks Maple used before names were looked up. (review 2026-09-28 seventh round #1)
 
 **Suggested fix:** Look up only the reply instead of loading the catalog, as [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md) §3.2 proposes: have the router pass `name_in_reply(message)` and run one `find_one({"company": company, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}})`, answering when it hits. Deferred (2026-09-28) to phase 0 of that plan (renumbered 2026-09-29), which replaces this loader; the minimum change in the meantime is a warning when the cap is reached.
@@ -2471,7 +2473,9 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Accept `i\s+need\s+you\s+to` — it requires "you", so plain "I need to" stays excluded — and add "I need you to mark it done" to `test_a_polite_edit_still_counts`.
 
-### 775. [MEDIUM] The reply cleaner also cuts real names, so an exact name can still dead-end
+### 775. ~~[MEDIUM] The reply cleaner also cuts real names, so an exact name can still dead-end~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 0): the router looks the reply up whole first, then cleaned (`replies.reply_name_candidates`, `routers/agent_helpers/named_answers.py`); no stored name is cleaned any more; `_resume_size_command` resolves an exact whole reply to the material's id (`SizeCommand.material_id`), since `_normalize_material_name` would strip "The" again; "." no longer ends a leading "no". Pinned by `tests/test_named_answers.py`, `test_the_answer_to_which_material_is_tried_whole_first`, and the corpus rows `material-which-material-answered-by-a-name-starting-no` / `-the`.
 `platform/agents/conversation/replies.py:178` — `_NAME_REPLY_WRAPPER_RE` strips a leading no / nope / sorry / now / ok / please / the / it's / "I meant" from every name, stored ones included, and with `[,.!]?` also takes "No." off "No. 57 Stone": `name_in_reply("No. 57 Stone")` → "57 Stone", "Please Stone" → "Stone", "Okay Mix" → "Mix", "The Good Stuff" → "Good Stuff". The folded keys still agree, so the gate answers "Which material do you mean?", but the agent then looks the cut name up by substring — with "No. 57 Stone" and "Washed 57 Stone" seeded, the exact reply "No. 57 Stone" answers "Multiple materials matched. Please specify the exact material name." and no size is removed; that reply stores no record, so it is a dead end. (review 2026-09-28 sixth round #1)
 
 **Suggested fix:** Fold stored names with whitespace + casefold only (never the cleaner); in the gate, match either the whole tidied reply or the cleaned one; in `_resume_size_command`, try the whole reply as an exact name before the cleaned one; drop "." from the separator after no/nope. Add "No. 57 Stone" and "The Good Stuff" to the gate test and to `test_the_name_in_a_reply`.
