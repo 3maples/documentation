@@ -114,6 +114,14 @@ counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
 for Bob Lee in review?" asks which status was meant instead of counting won and
 ignoring the rest (#780) (§1.1).
 
+**2026-09-30 (metrics plan, Phase 1 task 9):** estimate totals are summed by
+the new metrics engine. "What's the total of those?" and "the total value of
+my open estimates" now add up every matching estimate — they summed the first
+20 — and "the total value of my maintenance estimates" adds up only the
+Maintenance work, not the whole of each estimate with one Maintenance item.
+The pipeline and completed windows start at midnight on the boundary day, as
+the dashboard's cards do (§1.1, §1.9).
+
 **2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
 the name, however it reads — an activity ("Remove Sod"), a role ("Load
 Truck"). A new task asks *"What should the task say?"* and takes the reply
@@ -335,6 +343,7 @@ a note to a material or role. **Refused by the planner:** labor burden
 | after a list: `just the drafts` / `which ones are on hold?` / `only the ones over $1000` / `only the ones from last month` / `only for Bob Lee` | the same list, narrowed | ✅ rule *(2026-09-27 — refinements chain; §10.8)* |
 | after a list: `sort them by total` / `sort them by date` | the same list, highest value / newest first | ✅ rule *(2026-09-27)* |
 | after a list: `what's the total of those?` / `add them up` / `how many is that?` | the combined value / the count of that list | ✅ rule *(2026-09-27)* |
+| `what's the total value of my maintenance estimates?` / `total value of my open estimates` (more than 20 of them) | the division's work items only; every matching estimate | ✅ rule *(2026-09-30, metrics task 9 — it summed each estimate's whole total, and only the first page of 20. Summed by `services/maple_metrics.py`)* |
 | `how many estimates have been sold?` / `how many sold estimates do I have` / `how many estimates did I sell?` / `how many did I sell?` / `what's the total value of my sold estimates?` | `list_estimates` over **Won + Scheduled + Completed** — "sold" is no status of its own: everything a customer bought, however far it has since moved | ✅ rule *(2026-09-28 — "sold" was no filter, so it counted every estimate. `_SOLD_ESTIMATE_QUERY_PATTERN` needs the estimate noun, so "what unit is River Rock sold by?" is untouched; a named status still wins — "won estimates" is Won only)* |
 | `how many did I sell?` / `how many have been sold` / `how many were sold` / `how many did we sell this month?` — with nothing before it | `list_estimates` → sold count | ✅ rule *(2026-09-29 — was help: "how many" is a count, never a help question. A `list_estimates` grammar entry built on `SOLD_VERB`, shared with the agent's sold filter)* |
 | after an estimate count or list: `how many have been sold?` / `how many are won?` / `how many are on hold?` | a count by that status that keeps the customer, property, period or amount the last read was narrowed to — after "list my estimates for Bob Lee": *"You have 2 sold estimates for Bob Lee."* | ✅ rule *(2026-09-29 — the first version counted company-wide after a customer's list. `followup.py::_count_by_status`; when the last read had a status AND a scope ("how many estimates did I win this month?") the rule steps aside, since which words to swap is a guess. "how many of those are won?" narrows the list instead and is not this rule)* |
