@@ -181,7 +181,12 @@ ends with tests, the phrasing reference updated (§12.3 counts, "Last
 updated"), a `test_maple_conversations.py` row, and a reviewed
 `test_maple_routing_snapshot.py` diff.
 
-### Phase 0 — Make the ground safe (small, do first)
+### Phase 0 — Make the ground safe (small, do first) — **done 2026-09-30**
+
+All five shipped: #762 (`756303b`), #721 (`fae3e11`), #719 + #720 (`77e55ef`,
+the grammar move split out as #781), #779 + #780. Found along the way: #782, a
+pre-existing test failure.
+
 1. **#762** (HIGH) — anchor the task edit patterns with `_COMMAND_LEAD`, no
    negation rules; the phrasings in the entry become `_NEGATED_EDITS` rows, plus
    a note whose body contains "don't" that still appends.

@@ -108,7 +108,11 @@ was asked (#721, §1.9). With an estimate open, only a question about it —
 "what's the total?", "is it sent?" — is answered from it: "what is markup?",
 "how much does mulch cost?" and "what's my average markup?" are not (#719),
 and "which estimate has the highest total?" lists them by total again (#720)
-(§1.2).
+(§1.2). A customer whose surname is a status word counts as the
+customer: "how many estimates for Min Won?" counts Min Won's estimates — it
+counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
+for Bob Lee in review?" asks which status was meant instead of counting won and
+ignoring the rest (#780) (§1.1).
 
 **2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
 the name, however it reads — an activity ("Remove Sod"), a role ("Load
@@ -336,6 +340,8 @@ a note to a material or role. **Refused by the planner:** labor burden
 | after an estimate count or list: `how many have been sold?` / `how many are won?` / `how many are on hold?` | a count by that status that keeps the customer, property, period or amount the last read was narrowed to — after "list my estimates for Bob Lee": *"You have 2 sold estimates for Bob Lee."* | ✅ rule *(2026-09-29 — the first version counted company-wide after a customer's list. `followup.py::_count_by_status`; when the last read had a status AND a scope ("how many estimates did I win this month?") the rule steps aside, since which words to swap is a guess. "how many of those are won?" narrows the list instead and is not this rule)* |
 | `how many estimates for Bob Lee?` / `how many won estimates for Bob Lee?` / `how many sold estimates for Bob Lee this year?` / `how many estimates for Bob Lee in draft status?` / `how many estimates for Bob Lee that are won?` / `… in review?` / `… on hold?` / `… over $1000?` / `show me draft estimates for Bob Lee` | `list_estimates` for that customer (or property), with the status and period | ✅ rule *(2026-09-29 — the customer was dropped from every count and every status list, so each counted the whole company. The `list_estimates` entry takes a status before "estimates" and a name after "for"; a trailing period, amount or status — "this year", "over $1000", "with status X", "in draft status", "that are won", in any order — is read off the name, and a status read off it is the one applied: `agents/estimate/list_query.py::read_list_query` reads name, status and status set in one pass. `tests/test_estimate_list_answers.py` checks what was actually counted against a seeded database)* |
 | any estimate count, list, empty list or total | the reply names everything it was narrowed by — *"You have 2 sold estimates for Bob Lee in the last year."*, *"Here are your won estimates for Bob Lee:"*, *"You don't have any sold estimates in the last month."*, *"The combined value of your 2 sold estimates in the last month is $1,500.00."* | ✅ rule *(2026-09-29 — a scoped count read as company-wide, and "show me won estimates for Bob Lee" was headed "Estimates for Bob Lee:". An unfiltered reply reads as before)* |
+| `how many estimates for Min Won?` / `how many draft estimates for Min Won?` / `show me estimates for Min Won` — a surname (or property name) that ends in a status word | that customer's estimates; a status said outside the name still applies | ✅ rule *(2026-09-30, #779 — "Won" was read off the name as a status and "Min" substring-matched other contacts. The whole name is looked up exactly first; the status is read off it only when the whole name is no one's)* |
+| `how many won estimates for Bob Lee in review?` / `how many draft estimates for Bob Lee that are sold?` | *"That asks for two statuses at once — review or won. Which one did you mean? Ask again with just one …"* | ✅ rule *(2026-09-30, #780 — the first status read was counted and the other dropped. Not a resumable question: re-ask with one status)* |
 | `what's the total value of sold estimates for Bob Lee?` / `total value of estimates for Bob Lee` | the total over **every** customer — the name is not read | ⚠️ gap *(2026-09-29 — a total never reads a customer name; the reply at least doesn't claim Bob)* |
 
 ## 1.2 Value / total queries for a specific estimate

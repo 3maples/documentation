@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **782**. Never
+- **Entries are numbered and permanent.** Next free number: **783**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2547,14 +2547,20 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Register the lane as a ported entry in `command_grammar.py` §4.3, wrapping `_is_work_item_question` unchanged, with accept/reject tests and a row in the design's ported table, so it's part of the written list. Mind the interaction: the `process()` lane currently runs only when `match_command(...) is None`, and ported entries are tried only when an agent is passed to `match_command`, so decide whether the orchestrator's three call sites read the entry or keep calling the helper. Either way, the routing snapshot must not change.
 
-### 779. [MEDIUM] A bare status word is stripped even when it's the customer's surname, and the shortened name substring-matches other contacts
+### 779. ~~[MEDIUM] A bare status word is stripped even when it's the customer's surname, and the shortened name substring-matches other contacts~~ — RESOLVED 2026-09-30
+
+**Resolution:** lookup-first, as suggested. `ListQuery` keeps the name as said (`said`) and the status said outside it (`own`, read from the question with the name cut out — the whole-text reader also took "Won" from "Min Won"). `_handle_list_estimates` tries `said` first through `_exactly_named` — an exact contact full name or property name/street, since the finders' substring and reverse-containment match would take "Bob Lee in review" for a property called "Lee" — and uses `whole_name()` when it matches; otherwise the split name as before. One extra lookup, only when a status was read off the name. `tests/test_estimate_list_answers.py` seeds Min Won and Jasmine Park: "how many estimates for Min Won?", "… won estimates …", "… draft estimates …" and "show me estimates for Min Won" count only Min's.
+
 `platform/agents/estimate/list_query.py:53` — `_STATUS_TAILS`' second pattern (the name-tail status reader; it was `_NAME_QUALIFIER_TAIL_RE` in `crud_handlers.py` until the same day's reader rework) makes its lead-in optional, so a bare status word at the end of any name is removed: "Min Won" → "Min", and the same for a property or person whose name ends in Open, Sent, Review, Draft and so on. `find_contacts_by_full_name` matches by substring (`agents/cross_resource.py:147`), so "min" matches Min Won and also Jasmine, Carmine or Minh, and the count or list silently combines them. Before the 2026-09-29 change "Min Won" was looked up whole and matched only Min Won; a probe returned the right answer only because no other contact contained "min". MEDIUM rather than HIGH because it needs a surname or property name that ends in a status word. (review 2026-09-29 sold estimates, third round #2)
 
 **Decision (user, 2026-09-29):** deferred. If the list/count question reader is rewritten as one parser (status, name, period and amount read together), re-check this against it — lookup-first may fall out of that design.
 
 **Suggested fix:** Look up the whole name first and use the split one only if the whole name matches no contact and no property. `read_list_query` splits the name before `_named_list_constraint` sees it, so keep the unsplit name on `ListQuery` (e.g. a `said` field) and have `_named_list_constraint` try `said` first, then `name` — and apply the trailing status only when the split name is the one used. Alternative: require a lead-in (`in` / `that are` / `with`, or a trailing `status`) for a single bare status word, which drops "for Bob Lee on hold". Lookup-first is preferred: it keeps every phrasing and costs one extra query only when a name doesn't resolve. Test: add "Min Won" and "Jasmine Park" to `tests/test_estimate_list_answers.py`'s seed; "how many estimates for Min Won?" counts only Min's.
 
-### 780. [LOW] When a question names two statuses, one wins silently
+### 780. ~~[LOW] When a question names two statuses, one wins silently~~ — RESOLVED 2026-09-30
+
+**Resolution:** `read_list_query` records every status read (the question's own and each one trailing the name) and sets `ListQuery.conflict` when they differ; the handler answers "That asks for two statuses at once — review or won. Which one did you mean? Ask again with just one, for example "how many won estimates for Bob Lee"." (`needs_clarification`, like the name-not-found reply) instead of counting. Checked after the whole-name lookup, so "draft estimates for Min Won" is one status and a surname. Not a resumable question: the reply asks the user to re-ask. `tests/test_estimate_list_query.py` and `tests/test_estimate_list_answers.py`.
+
 `platform/agents/estimate/list_query.py:99` — `read_list_query` takes the question's own status first, then the one trailing the name, and among trailing statuses keeps the first one read (line 86). The other is dropped without a word. Verified: "how many won estimates for Bob Lee in review?" and "…in review that are won?" both read as Won; "how many draft estimates for Bob Lee that are sold?" reads as Draft. The reply names what it counted ("You have 1 won estimate for Bob Lee."), so the user can see which status was used, but it doesn't say the other was ignored. LOW because the input contradicts itself and the reply is explicit about what it counted. (review 2026-09-29 sold estimates, fourth round #2)
 
 **Suggested fix:** Record every status read (question-wide and trailing) in `ListQuery`. When they differ, the handler answers with a question instead of a count: "Which status did you mean: won or in review?" (`needs_clarification=True`, the same envelope the name-not-found reply uses). Add both probe phrasings to `tests/test_estimate_list_query.py` (reading carries both statuses) and one to `tests/test_estimate_list_answers.py` (reply is the question, not a count).
@@ -4730,6 +4736,11 @@ total row count rather than blank-row count.
 `portal/tests/PropertiesPageMobileSheet.test.tsx:365` — same gap as #769: deleting `delete("propertyId")` leaves it green, and the `?open=` case never asserts the sheet. (review 2026-09-28 third round #10)
 
 **Suggested fix:** As #769: assert the sheet state per case, tap prop-1, trigger a quiet reload, assert prop-1 stays announced.
+
+### 782. [LOW] `test_a_new_command_naming_a_code_does_not_answer_which_estimate` fails on "attached to a different loop"
+`platform/tests/test_maple_work_item_context.py:437` — all three cases ("show E0042", "delete E0042", "open E0042") fail at HEAD (`77e55ef`, verified 2026-09-30), alone and in a combined run: `RuntimeError: … got Future <Future pending> attached to a different loop` from a Beanie cursor under `EstimateAgent.process()` (`agents/estimate/service.py:854`). The test drives the agent with `asyncio.run` through `_say` against a stub world, and the reply path now reaches the database — likely a lookup added by the name-answers phases (the exact title lookup, or `named_answers.py`). The test itself last changed 2026-09-27. (found 2026-09-30 while running the list-estimate suites for #779/#780)
+
+**Suggested fix:** Find the query the reply path now makes (run one case with `-x --tb=long`) and either stub it in `wired` like `_resolve_estimate_code_or_title`, or run `_say` on the client portal's loop as `tests/test_estimate_list_answers.py` does.
 
 ## Codebase hygiene (batchable)
 
