@@ -38,7 +38,7 @@ it come in?" lists them. On the portal, stacked (a phone, or a desktop the
 Maple panel squeezes), only a contact or property the user picked — a tap, an
 `?open=` or `?contactId=` / `?propertyId=` link — is "this one" to Maple, and
 it stays so after its sheet closes. Negated renames, field and notes edits
-still write — follow-up #762. A create that describes a size ("a bed that
+still wrote — follow-up #762, fixed 2026-09-30. A create that describes a size ("a bed that
 is 5 feet by 15 feet") and asks for "a separate work item" creates the
 estimate: a listed create is no longer read as a question about a work item,
 which turned it into a fuzzy update of whichever estimate's title it
@@ -93,6 +93,13 @@ material swap that names nothing asks which, and the name in reply is
 written into the request, which runs again (§1.8). "with the highest total"
 and "which estimates have been sent?" are no longer material joins (#722,
 #723), and "have been / were sent" filters by the status.
+
+**2026-09-30 (metrics plan, phase 0):** a rename, field edit or notes edit on
+a task is a command only at the start of the message, after at most a lead,
+like every other task edit — so "don't rename the fence task to Gate", "I won't
+change the due date of the fence task to Friday" and "don't add a note to it:
+call Bob" change nothing (#762). A note's own words are still its content: "add
+a note to it: don't park on the lawn" appends (§7.6, §7.6.1).
 
 **2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
 the name, however it reads — an activity ("Remove Sod"), a role ("Load
@@ -1422,6 +1429,8 @@ The `the {task} task` keyword forms are ✅ rule; bare-title forms (`change the 
 | `link it to 12 Oak St` / `link the {task} task to the Elm House property` / `set the property of the {task} task to Elm House` | `update_task` (property) → Task Agent | ✅ rule *(2026-09-27)* |
 | `set task {T0001} description\|notes\|due date\|title to {value}` / `change T0001's due date to Friday` / `set task {T0001} property\|address to Elm House` | `update_task` → Task Agent | ✅ rule *(2026-09-28 — target before the field (`_TARGET_FIRST_LEAD`); previously asked "What would you like to update on the task?", and the due-date form read its value as "date to …". Description here overwrites, like `set the description of …`)* |
 | `remove the property from the task` / `unlink it from the property` | `update_task` (property cleared) → Task Agent | ✅ rule *(2026-09-27 — unlinking a task is Maple's; unlinking a contact from a property is still done in the app, §9)* |
+| `hey maple, rename the fence task to Gate` / `could you change the due date of it to Friday` / `I'd like to update the description: bring the ladder` | `update_task` → Task Agent | ✅ rule *(a lead before the verb — fillers, a polite ask, "I'd like to" — is still a command)* |
+| `don't rename the fence task to Gate` / `I won't change the due date of the fence task to Friday` / `we shouldn't update the description of it to foo` / `don't add a description to it: call Bob` | nothing changes — the verb mid-sentence is not a command | ✅ rule *(2026-09-30, #762 — they wrote. Rename, field and add-description shapes are anchored with `_COMMAND_LEAD` like every other task edit; no negation rule)* |
 
 ## 7.6.1 Notes on an existing task (append by default)
 
@@ -1440,6 +1449,8 @@ Additive is the default, matching estimate notes (§5.x) — a drive-by note nev
 | `Add another note: {text}` / `add a note: {text}` — **no target at all** | `update_task` (notes append) → Task Agent | ✅ rule *(2026-07-25 smoke-test fix — the active task is implied, same as the pronoun forms. 2026-09-24 — routing is now rule-tier: `is_note_add_request` sends a targetless note to whichever domain was touched most recently; before, the borrowed domain plus `add` resolved to `create_task`.)* |
 | `replace the notes on the task with: {text}` / `set the notes on the task to: {text}` | `update_task` (notes **set**) → Task Agent | ✅ rule |
 | `add a task with the notes: {text}` | `create_task` → Task Agent | ✅ rule *(create shape — the notes-update rule explicitly excludes it)* |
+| `don't add a note to it: call Bob` / `we shouldn't set the notes on the fence task to foo` / `please don't add to the task: call Bob` / `don't add to T0042 bring the contract` | nothing changes | ✅ rule *(2026-09-30, #762 — they appended or replaced the notes. The notes shapes are anchored with `_COMMAND_LEAD`)* |
+| `add a note to it: don't park on the lawn` / `add to the fence task: we shouldn't dig here` | `update_task` (notes append) — the note's own words are content, never a negated command | ✅ rule *(2026-09-30, #762 — the anchor sits before the verb, so the note body is untouched)* |
 
 ### 7.6.1.1 Dictated payloads — the first intent wins
 
@@ -1566,7 +1577,7 @@ Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-sup
 
 Task details (2026-09-27) also show the linked property, the estimate it was converted into, and how many photos and videos it has.
 
-**Open gaps:** #710 ("due today?" writes), #740 ("what is/are …" after a task list), #767 ("perfect," / "quick," / "one more thing," before a command), #774 ("I need you to …"), #711, #712, #713, #717, #718, #751, #752, #761, #762 (negated rename / field / notes edits write); older #442, #447, #470 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27.
+**Open gaps:** #710 ("due today?" writes), #740 ("what is/are …" after a task list), #767 ("perfect," / "quick," / "one more thing," before a command), #774 ("I need you to …"), #712, #717, #718, #761; older #442, #447 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27; #711, #713, #751 and #752 on 2026-09-29; #470 and #762 on 2026-09-30.
 
 ---
 

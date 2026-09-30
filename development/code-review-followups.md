@@ -2475,7 +2475,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Build `today` with the same constructor, e.g. reuse `list_filters._midnight(user_now(working_context))`.
 
-### 762. [HIGH] Negated rename, field and notes edits still write
+### 762. ~~[HIGH] Negated rename, field and notes edits still write~~ — RESOLVED 2026-09-30
+
+**Resolution:** `_RENAME_RE`, `_FIELD_OF_RE`, `_FIELD_BARE_RE`, `_ADD_DESCRIPTION_RE`, `_SET_NOTES_RE`, `_ADD_NOTES_RE`, `_ADD_NOTES_TRAILING_RE`, `_ADD_BARE_NOTES_RE` and `_ADD_BARE_NOTES_BY_CODE_RE` now start with `_COMMAND_LEAD`, as the other task edits do; no negation rule. `tests/test_task_verbs.py`: the entry's phrasings (and five more) joined `_NEGATED_EDITS`, which now also asserts `detect_update_op` / `detect_notes_update` return None; `test_a_led_field_edit_still_counts` and `test_a_led_notes_edit_still_counts` pin leads and a note body containing "don't" / "shouldn't". Plan: `plans/2026-09-30-maple-metrics-and-next-batch-plan.md` Phase 0.
+
 `platform/agents/task/text_helpers.py:178` — `_RENAME_RE`, `_FIELD_OF_RE`, `_FIELD_BARE_RE`, `_SET_NOTES_RE` and the notes-append patterns (`_ADD_NOTES_RE`, `_ADD_NOTES_TRAILING_RE`, `_ADD_BARE_NOTES_RE`) are still unanchored `\b<verb>` searches, so a sentence that merely mentions the verb writes: `detect_update_op("don't rename the fence task to Gate")` → ('title', 'fence', 'Gate'); "I won't change the due date of the fence task to Friday" sets the due date; `detect_notes_update("don't add a note to it: call Bob")` appends; "we shouldn't set the notes on the fence task to foo" replaces the notes. The other task edits were anchored at the message start in the 2026-09-28 rounds (`_COMMAND_LEAD`). (review 2026-09-28 #2)
 
 **Decision (user, 2026-09-28):** "negation should not be part of the commands.... so it should not get confused with notes." No negation-specific rule goes into the command patterns — a negated sentence is simply not a command — and a note's own text ("add a note: don't park on the lawn") must never be read as a negated command. Deferred, not fixed, in that round.
