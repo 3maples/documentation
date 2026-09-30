@@ -449,6 +449,8 @@ visible; add an Atlas Search index rather than a B-tree one. The same reasoning
 applies to `GET /tasks?search=`, which has the identical shape.
 
 ### 27. [LOW] Inefficient merge pattern in bulk work-item endpoint
+
+**Update 2026-09-29:** the call moved to `platform/routers/agent_helpers/estimate_update.py:116` and is **not** a no-op — each parsed item goes through `_build_extra_parsed_item`, which stamps the company markup/overhead defaults. Dropping the call would regress; only a clarifying comment or rename is safe.
 **File**: `routers/agents.py:1621-1632`
 **Severity**: LOW (code clarity)
 
@@ -567,7 +569,7 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 ### 776. [LOW] The material-name lookup silently stops at 5000 names, in no set order
 `platform/routers/agent_helpers/named_answers.py:36` — `_material_names` reads `find({"company": company}, {"name": 1})` with no sort, then `to_list(length=_NAME_CAP)` with a cap of 5000. For a company with more than 5000 materials, the names past the cap are dropped without any log, and which ones are dropped is whatever order Mongo returns. A dropped name that opens with a command verb ("Clear Stone") then reads as a new request again. It also reads up to 5000 rows on every turn where "Which material do you mean?" is open. LOW because no company is near 5000 materials, and a missed name falls back to the checks Maple used before names were looked up. (review 2026-09-28 seventh round #1)
 
-**Suggested fix:** Look up only the reply instead of loading the catalog, as [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md) §3.2 proposes: have the router pass `name_in_reply(message)` and run one `find_one({"company": company, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}})`, answering when it hits. Deferred (2026-09-28) to phase 1 of that plan, which replaces this loader; the minimum change in the meantime is a warning when the cap is reached.
+**Suggested fix:** Look up only the reply instead of loading the catalog, as [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md) §3.2 proposes: have the router pass `name_in_reply(message)` and run one `find_one({"company": company, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}})`, answering when it hits. Deferred (2026-09-28) to phase 0 of that plan (renumbered 2026-09-29), which replaces this loader; the minimum change in the meantime is a warning when the cap is reached.
 
 ## Silently swallowed errors
 
@@ -812,7 +814,9 @@ Roll into the next OnboardingPage edit.
 
 **Fix:** define an `EstimateAgentHostProtocol(Protocol)` in `agents/estimate/host_protocol.py` (or a shared types module) that captures the cross-mixin contract once. Each mixin can reference the Protocol via `Self` bound or via inheritance from a shared base. Short-term mitigation: per-method docstring pointers (`# See agents/estimate/crud_helpers.py:381 — keep in sync`). Worth doing if the stubs grow further; for now the 23 stubs are stable enough.
 
-### 308. [MEDIUM] Duplicated work-item/help bypass in orchestrator
+### 308. ~~[MEDIUM] Duplicated work-item/help bypass in orchestrator~~ — RESOLVED 2026-09-29
+
+**Resolved** (verified 2026-09-29): the guard is one predicate, `_is_work_item_question` (`platform/agents/orchestrator/service.py:286`), called from all three sites (`6cc41e8`).
 **Where:** `agents/orchestrator/service.py:578` and `:2173`
 
 **Issue:** The `what + work item (excluding definitional)` pre-help guard appears in both `_classify_with_rules` and `process()` with the same 3-regex check. If one is updated the other can drift.
@@ -861,7 +865,9 @@ API object). Divergence bugs get likelier each time. Fix: extract a shared
 `ResourceCatalogTab` parameterized by labels + API object, the same move that
 extracted `ActionsMenu` from `RowActionsMenu`.
 
-### 445. [MEDIUM] platform/agents/estimate/crud_handlers.py:2917 — shared "resolve target estimate" preamble duplicated across three handlers
+### 445. ~~[MEDIUM] platform/agents/estimate/crud_handlers.py:2917 — shared "resolve target estimate" preamble duplicated across three handlers~~ — RESOLVED 2026-09-29
+
+**Resolved** (verified 2026-09-29): `_resolve_update_estimate_code` (`platform/agents/estimate/crud_handlers.py:2626`) is the shared preamble for the title, description and property-link handlers (`7213840`).
 The first ~20 lines of `_handle_update_estimate_title` (resolve code-or-title →
 return clarify → ask-which-estimate envelope → `_load_estimate_for_update`) are
 near-identical to `_handle_update_estimate_description` and

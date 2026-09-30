@@ -55,6 +55,14 @@ customer's list keeps the customer. Every estimate count names what it
 counted ("You have 2 sold estimates for Bob Lee."), and "for Bob Lee" now
 narrows a count or a status list instead of being dropped (§1.1).
 
+**2026-09-29 (deferred):** answering a question with a record's name, from
+[`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md),
+leaves material-catalog management and the multi-match "please specify"
+questions for later. Each is logged as a ⚠️ gap: a verb-led category, unit or
+new material name (§4.9, §4.11), and a bare name in reply to "Multiple …
+matched" for properties, contacts, materials and roles, or to "Which
+template…?" (§2.9, §3.8, §4.9, §5.9, §6.8).
+
 Headlines, 2026-09-27 (multi-turn everywhere — design
 [`plans/2026-09-27-maple-multi-turn-everywhere-design.md`](plans/2026-09-27-maple-multi-turn-everywhere-design.md)):
 
@@ -892,6 +900,7 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 | `remove {contact} from {property}` | nothing is deleted; Maple says the link is removed in the app (§9.8, #679) | 🛑 redirect |
 | a property whose name looks like a person's (`show me Elm House`) | the property, when that is its exact name and no contact's | ✅ rule *(2026-09-27 — it answered "No contact found with name 'Elm House'")* |
 | `N <words> way` / `court` / `ct` phrasings (`60 minutes one way`) | `_ADDRESS_PATTERN` false-matches them as a property lookup (#49) | ⚠️ gap |
+| `12 Oak Street` in reply to *"Multiple properties matched. Please specify the exact property name, address, or owner."* | the question keeps no record, so the reply is read from scratch and the original request is lost | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
 
 Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8.
 
@@ -953,6 +962,7 @@ Routed, but found no one until 2026-09-27 — see §2.3.
 | Phrasing | What happens | Status |
 |---|---|---|
 | `link {contact} to {property}` on the LLM tier | a correct LLM answer can be demoted to `off_topic` (#690) — the rule tier now handles the guide's phrasings first (§3.9) | ⚠️ gap (LLM tier) |
+| `Ana Reyes` in reply to *"Multiple contacts matched. Please specify the exact full name."* (linking a contact to a property) | the matches offered aren't remembered, so the full name isn't read as the pick | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
 
 Cross-resource phrasings (e.g. `where does {contact} live?`) are tracked under §8.
 
@@ -1056,6 +1066,8 @@ A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft b
 | `what is the price of {size} of {material}?` | `get_material` (size-scoped) | ✅ rule *(May expansion)* |
 | `what category is material {material}?` | `get_material` (category focus) | ✅ rule *(May expansion — `_match_field_specific_query` before help classifier)* |
 | `what category is {material}?` | `get_material` (category focus) | ✅ rule *(May expansion)* |
+| `Set Up` / `Clear Coat` (a category or unit whose name opens with a command verb) in reply to *"What's the new category?"* / *"What's the new unit?"* | the reply is read as a new request, not the value | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
+| `Black Mulch 2 cu ft` in reply to *"Multiple materials matched. Please specify the exact material name."* | the matches offered aren't remembered (an update keeps only its own record), so the name isn't read as the pick; a get or delete starts over | ⚠️ gap *(deferred 2026-09-29 — name-answers plan §7)* |
 
 ## 4.10 Qualifier list — "what {X} materials do I have?" *(2026-06-02)*
 
@@ -1090,6 +1102,8 @@ A create that is missing details asks for the next one alone, remembers which, a
 | `2 cu ft` | *"What does River Rock cost you? I'll set the price from your material markup."* | ✅ rule |
 | `5` | created — cost 5.00, price 5.50 at a 10% markup | ✅ rule |
 | a category or unit the company doesn't have | says so and asks again, never creates one (#681) | ✅ rule |
+| `Clear Coat` / `Set Up` — a category or unit the company **has**, whose name opens with a command verb | refused as the answer: `bare_answer` rejects a reply that opens with a command verb | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
+| `Clear Stone` in reply to *"What's the material called?"* | refused as the name for the same reason | ⚠️ gap *(deferred 2026-09-29 — name-answers plan §7)* |
 
 **Open gaps:** #700 (a size the material doesn't have "updated"), #701, #760 (space-grouped costs), #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697.
 
@@ -1158,6 +1172,7 @@ Note: "labor burden" and "unbillable rate" are company-level settings, not per-r
 |---|---|---|
 | `list my roles` / `create a new role called {role}` | lists every role / creates the role | ✅ rule *(2026-09-27 — both were unknown on the rules tier)* |
 | anything about the "Heavy Equipment Operator" role | read, created and edited as a role | ✅ rule *(2026-09-27, #693 — the equipment refusal matched the word "equipment"; an equipment operator is a person)* |
+| `Foreman Hardscape` in reply to *"Multiple labor roles matched. Please specify the exact one."* | the question keeps no record, so the reply is read from scratch and the original request is lost | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
 
 ## 5.10 Create, one question at a time *(2026-09-27)*
 
@@ -1252,6 +1267,10 @@ When a **create-estimate** request names a template, `delegate_create_estimate` 
 Orchestrator routing, refusal guard, and Template Agent are implemented. Possessive (§6.3) and most verbless (§6.6) phrasings are rule-tier since 2026-09-27: the router rewrites a template's exact name kind-first (`catalog_names.py`). Template creation, update, and duplicate are explicitly refused (§9.5).
 
 Additional cross-resource phrasings (e.g. `which templates include {material}?`) are future candidates — not tracked here yet.
+
+| Phrasing | What happens | Status |
+|---|---|---|
+| `{template}` in reply to *"Which template would you like to see?"* / *"Which template should I delete?"* | the question keeps no record, so the reply is read from scratch; a name that opens with a command verb (`Remove Sod`) may be taken as a command | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
 
 **Open gaps:** #704 ("it" picks the focused template over a named one) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681, #695; `find templates named X` (§6.5).
 
