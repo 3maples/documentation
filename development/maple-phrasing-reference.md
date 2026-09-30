@@ -104,7 +104,11 @@ and "backlog" are a metric only in a question ("what's in my backlog?", "how
 big is my backlog?") or alone ("pipeline"): "rename work item 2 to the
 pipeline trench" and "add a note to this estimate: locate the pipeline" write,
 and a reply "check the pipeline under the driveway" answers the question it
-was asked (#721, §1.9).
+was asked (#721, §1.9). With an estimate open, only a question about it —
+"what's the total?", "is it sent?" — is answered from it: "what is markup?",
+"how much does mulch cost?" and "what's my average markup?" are not (#719),
+and "which estimate has the highest total?" lists them by total again (#720)
+(§1.2).
 
 **2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
 the name, however it reads — an activity ("Remove Sod"), a role ("Load
@@ -357,6 +361,8 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `what's the markup on this estimate?` / `what's the gross margin on it?` | per work item | ✅ rule |
 | `when was it created?` / `when was {EST} last updated?` / `what's the code for this estimate?` | the date / the code | ✅ rule |
 | `show me estimate {EST}` | the details now include "Property: 12 Oak St — Ana Reyes" | ✅ rule *(2026-09-27)* |
+| with an estimate open: `what is markup?` / `what's the difference between markup and gross margin?` / `how much does mulch cost?` / `what's the address for bob lee?` / `what's my average markup?` | not a question about that estimate — goes on to help, the catalog or the contact | ✅ rule *(2026-09-30, #719 — each got the open estimate's figure. With no reference, only "it"/"this" or the plainest "what's the <field>?" is about the open estimate)* |
+| `which estimate has the highest total?` / `what's the lowest total on an estimate?` | the estimates sorted by total, not "Which estimate would you like to view?" | ✅ rule *(2026-09-30, #720 — a ranking, average or comparison word is never about one estimate)* |
 
 **Title-based lookup** *(May expansion)*: when no estimate code is found in the query, `_resolve_estimate_by_title` extracts a title from quoted text (`"Untitled Estimate"`) or `title/called/named X` phrasings and searches by substring match. Single match → returns the estimate. Multiple matches → lists them and asks the user to pick by code.
 

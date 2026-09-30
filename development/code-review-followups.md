@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **781**. Never
+- **Entries are numbered and permanent.** Next free number: **782**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2351,7 +2351,10 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Remove the `_DUE_RE` match only when its window parses. When a due question yields no window, default to the upcoming window (overdue plus the next 7 days) or ask; `TaskListAsk.any` is there for the check.
 
-### 719. [MEDIUM] With an estimate in focus, help and catalog questions get that estimate's figures
+### 719. ~~[MEDIUM] With an estimate in focus, help and catalog questions get that estimate's figures~~ — RESOLVED 2026-09-30
+
+**Resolution:** `estimate_question` answers from the open estimate with no reference only for "it"/"this"/"that" or the plainest shape (`_BARE_FIELD_QUESTION_RE`: "what's the total?", "who's the customer?"); "what is markup?", "how much does mulch cost?" and "what's the address for bob lee?" are not that. A ranking, average, lifetime, comparison or definition word (`_NOT_ONE_ESTIMATE_RE`) rejects even a named estimate. `tests/test_estimate_focus_questions.py`: 13 reject and 8 accept rows. The suggested move into a grammar entry is not done here — filed as #781.
+
 `platform/agents/estimate/focus_questions.py:92` — `estimate_question` runs before the help check and accepts any question containing a field word and no capitalised word:
 
 - "what is markup?" → the estimate's markup;
@@ -2363,7 +2366,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Reject definitional or comparative questions ("what is (a|an)? <field>?" with no target, "difference between") and superlatives. Take the no-reference fallback only with "it", "this" or "the estimate", or for exactly "what's the <field>?". Move the phrasings into a listed grammar entry with accept/reject tests.
 
-### 720. [MEDIUM] "which estimate has the highest total?" now asks "Which estimate would you like to view?"
+### 720. ~~[MEDIUM] "which estimate has the highest total?" now asks "Which estimate would you like to view?"~~ — RESOLVED 2026-09-30
+
+**Resolution:** superlatives are in `_NOT_ONE_ESTIMATE_RE` (with #719), so the question falls through to the sorted list again; `test_which_estimate_has_the_highest_total_lists_them_by_total` pins the route. Reject rows are in `tests/test_estimate_focus_questions.py` rather than the routing corpus, since the router asks this module before classification.
+
 `platform/agents/estimate/focus_questions.py:84` — With nothing in focus, line 84 treats any singular "estimate/quote" as naming one estimate and returns `('total', False)`. `delegate_get_estimate` finds none and asks which estimate. Before this diff the message listed estimates sorted by `grand_total`. (review 2026-09-27 #49)
 
 **Suggested fix:** Don't match superlatives (highest|biggest|largest|most|lowest). Add these as reject rows in the routing corpus.
@@ -2552,6 +2558,11 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/agents/estimate/list_query.py:99` — `read_list_query` takes the question's own status first, then the one trailing the name, and among trailing statuses keeps the first one read (line 86). The other is dropped without a word. Verified: "how many won estimates for Bob Lee in review?" and "…in review that are won?" both read as Won; "how many draft estimates for Bob Lee that are sold?" reads as Draft. The reply names what it counted ("You have 1 won estimate for Bob Lee."), so the user can see which status was used, but it doesn't say the other was ignored. LOW because the input contradicts itself and the reply is explicit about what it counted. (review 2026-09-29 sold estimates, fourth round #2)
 
 **Suggested fix:** Record every status read (question-wide and trailing) in `ListQuery`. When they differ, the handler answers with a question instead of a count: "Which status did you mean: won or in review?" (`needs_clarification=True`, the same envelope the name-not-found reply uses). Add both probe phrasings to `tests/test_estimate_list_query.py` (reading carries both statuses) and one to `tests/test_estimate_list_answers.py` (reply is the question, not a count).
+
+### 781. [LOW] Questions about one estimate are decided outside the command grammar
+`platform/agents/estimate/focus_questions.py` — "what's the total on it?", "who's the customer?", "is it sent?" are estimate phrasings decided by the module's own regexes (`_QUESTION_RE`, `_FIELDS`, `_BARE_FIELD_QUESTION_RE`, `_NOT_ONE_ESTIMATE_RE`), which contract 1 of the routing-convergence design says belong in `command_grammar.py`. #719 and #720 tightened them in place (2026-09-30) and left the move. The router asks `estimate_question` before classification (`routers/agents.py`), so a grammar entry must be read there too, and `match_command` returning these would also change the #721 analytics gate and `_route_listed_command`. (split from #719, 2026-09-30)
+
+**Suggested fix:** Add `READ_IDS` entries for the field questions with accept/reject tests in `tests/test_command_grammar.py` (the rows in `tests/test_estimate_focus_questions.py` port one-to-one), have `estimate_question` read the matched entry instead of its own patterns, and check the routing snapshot diff.
 
 ## Platform — API, models and data
 
