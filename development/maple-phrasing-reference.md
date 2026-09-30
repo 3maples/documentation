@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-29
+**Last updated:** 2026-09-30
 
 ### Recent changes
 
@@ -93,6 +93,11 @@ material swap that names nothing asks which, and the name in reply is
 written into the request, which runs again (§1.8). "with the highest total"
 and "which estimates have been sent?" are no longer material joins (#722,
 #723), and "have been / were sent" filters by the status.
+
+**2026-09-30 (phase 8):** a name Maple asks for that doesn't exist yet is
+the name, however it reads — an activity ("Remove Sod"), a role ("Load
+Truck"). A new task asks *"What should the task say?"* and takes the reply
+as its text (#470). The new material's name stays deferred (§4.11).
 
 **2026-09-29 (deferred):** answering a question with a record's name, from
 [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md),
@@ -578,6 +583,7 @@ The rename handler already covers description updates. These phrasings extend th
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
 | `add an activity to {WI}` → *"What's the activity called?"* → `Seeding with role Landscaper for 3 hours` | adds it to that work item | ✅ rule *(2026-09-27)* |
+| … → `Remove Sod` — a name that reads as a command | adds the activity "Remove Sod" | ✅ rule *(2026-09-30, name-answers plan phase 8 — the question wasn't seen as open, and "Remove Sod" tried to delete a contact)* |
 | `add activity "Excavation" to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
 | `add an activity called "Grading" with role Landscaper to {WI}` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-27)* |
 | `add activity "Planting" with 8 hours of effort to {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
@@ -1230,7 +1236,7 @@ Note: "labor burden" and "unbillable rate" are company-level settings, not per-r
 
 ## 5.10 Create, one question at a time *(2026-09-27)*
 
-As for materials (§4.11): `create a new role called Arborist` → *"What's the average wage for Arborist? For example: $30 an hour."* → `30` → *"Is Arborist paid hourly, daily or per job?"* → `hourly` → created. `add a labour role` asks *"What's the role called?"* first; `$30 an hour` answers the wage and the unit together. It said "To create a role, I'll need: unit, wage." and a bare "30" asked again. ✅ rule.
+As for materials (§4.11): `create a new role called Arborist` → *"What's the average wage for Arborist? For example: $30 an hour."* → `30` → *"Is Arborist paid hourly, daily or per job?"* → `hourly` → created. `add a labour role` asks *"What's the role called?"* first — a name that opens with a verb (`Load Truck`) is the name (2026-09-30, phase 8), while a whole request (`list my roles`) is still a request; `$30 an hour` answers the wage and the unit together. It said "To create a role, I'll need: unit, wage." and a bare "30" asked again. ✅ rule.
 
 Cross-resource phrasings (e.g. `which properties need a {role}?`) are tracked under §8.
 
@@ -1345,7 +1351,7 @@ Token conventions: `{task}` = a task title (e.g. `fix the fence gate`); `{status
 | `create a task with title {task}. Add the following notes: {text}` | `create_task` → Task Agent (title + description in one turn) | ✅ rule *(the notes/description clause is split off before title extraction and stored as the task description)* |
 | `add a task to check the retaining wall` / `create a new task to: {text}` / `new task: {text}` | `create_task` → Task Agent | ✅ rule *(2026-07-25 — **content-is-description rule**: with no title cue, the body becomes the DESCRIPTION and the title is derived from it. Previously the "to …" phrase became the title, and a phrasing like `create a new task to: {text}` put the whole command line in the title.)* |
 | `create a task with the notes: {text}` / `Create a task. Add the following notes: {text}` (notes, **no** title) | `create_task` → Task Agent — creates immediately with a **title derived from the notes** | ✅ rule *(2026-07-25 — first sentence of the notes, politeness/reminder preamble stripped ("remind me to call Bob tomorrow" → "Call Bob tomorrow"), truncated to 60 chars on a word boundary; full notes kept as the description. The reply says the title came from the notes so the user can rename it.)* |
-| `create a new task` (no title, **no** notes) → *"What should the task be called?"* → bare reply | `create_task` field-then-value flow (§10.1) — the reply becomes the title; inline notes from the first turn are kept | ✅ rule *(only reached when there are no notes to derive a title from, or the notes yield nothing usable — e.g. `notes: ...`)* |
+| `create a new task` (no title, **no** notes) → *"What should the task say?"* → bare reply | `create_task` field-then-value flow (§10.1) — the reply is the task's text, and its title derives from it; inline notes from the first turn are kept. A reply that reads as a request (`Create estimate for Bob`) is still the text; only another task create (`create a task to …`) starts over | ✅ rule *(only reached when there are no notes to derive a title from, or the notes yield nothing usable — e.g. `notes: ...`. 2026-09-30, #470 — it asked "What should the task be called?", naming a field the portal no longer has, and re-asked on a request-shaped reply)* |
 | `list my tasks` | `list_tasks` → Task Agent | ✅ rule |
 | `show me the {task} task` | `get_task` → Task Agent | ✅ rule |
 | `delete the {task} task` → *"…are you sure?"* → `yes` | `delete_task` → Task Agent (manager-only, confirm first) | ✅ rule *(2026-09-27 — the "yes" now deletes; #692)* |
@@ -1730,7 +1736,7 @@ Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes,
 
 *(2026-07-22: Tasks add a create-side variant — a create request with no
 title stashes an awaiting-title `pending_intents` entry, and the bare
-reply to "What should the task be called?" becomes the title, keeping any
+reply to "What should the task say?" (until 2026-09-30, "…be called?") becomes the text, keeping any
 inline notes from the first turn. See §7.1.)*
 
 User responds to "What fields should I update?" with a bare field name:

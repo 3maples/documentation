@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-28 · **Revised:** 2026-09-29 (re-checked against `fae429e`;
 material-management questions and multi-match "please specify" deferred, §7)
-· **Status:** in progress — phases 0, 1, 3, 4, 5 and 7 done; next phase 8 · **Builds on:**
+· **Status:** done 2026-09-30 — phases 0, 1, 3, 4, 5, 7 and 8; phases 2 and 6 deferred (§7) · **Builds on:**
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
 (one question gate, `routers/agent_helpers/open_question.py`)
 
@@ -254,7 +254,7 @@ link follow-up, so the estimate can be linked to it silently) and #439 (the prop
 "create a new property at 42 Elm St" doesn't back out). Adjacent: #159
 (the list-filter finders load whole collections), #779.
 
-**Phase 8: new-name questions** (§3.5) — the estimate activity and the role
+**Phase 8: new-name questions** (§3.5) ✅ *Done 2026-09-30.* Pinned first: "Remove Sod" as an activity name tried to delete a contact; "Load Truck" as a role and "Create estimate for Bob" as a task were re-asked. The activity question is free text for the gate (`_NEW_NAME_FIELDS`). The role name is not full free text, unlike §3.5: `bare_answer` accepts a verb-led name but a whole request ("list my roles") is still one. #470 as described. — the estimate activity and the role
 create; the material create's "What's the material called?" is deferred
 (§7). Start by pinning today's behaviour for "Remove Sod" as an activity
 name, since the gate does not see that question as open. *Small.*
@@ -344,7 +344,7 @@ entries themselves stay in that file.
 | 4 | #759 | resolved 2026-09-29 (row tightened and marked `gap=`) |
 | 5 | #713 (task questions, and the Task agent's property questions) | resolved 2026-09-29 |
 | 7 | #722, #723 (prerequisites), #322, #439 (adjacent: #159, #779) | #722, #723, #322, #439 resolved 2026-09-29; adjacent ones left in the backlog |
-| 8 | #470 | still applies |
+| 8 | #470 | resolved 2026-09-30 |
 
 Close each entry in the follow-ups file in the phase's own commit.
 

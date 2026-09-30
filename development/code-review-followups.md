@@ -1879,7 +1879,10 @@ Mitigated by the append being additive (never overwrites) and by Maple echoing
 the updated task back. If it bites in practice, gate the plural form on an active
 task being present and fall through to create otherwise.
 
-### 470. [LOW] platform/agents/task/create.py — Maple still asks "What should the task be called?"
+### 470. ~~[LOW] platform/agents/task/create.py — Maple still asks "What should the task be called?"~~ — RESOLVED 2026-09-30
+
+**Resolved 2026-09-30** (name-answers plan phase 8): create asks "What should the task say?", and the reply is the task's text (its title derives from it) unless it is itself a task create. The rename flow's own "What should the task be called? I'll update the first line…" (field_flow) is unchanged: that one names the note's first line.
+
 When a create message carries neither a title cue nor usable content, create falls through
 to asking for a title — a concept the portal no longer exposes. The answer is now folded
 into the note (so the behaviour is correct), but the wording still names a field the user
