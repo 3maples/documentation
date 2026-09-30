@@ -4678,7 +4678,10 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Make `estimatesApi.list` return a pending promise, dispatch inside `await act(async () => …)`, then assert no spinner, as the Contacts, Materials and Templates tests do.
 
-### 759. [LOW] Corpus row `contact-stale-anchor-asks` passes for the wrong reason
+### 759. ~~[LOW] Corpus row `contact-stale-anchor-asks` passes for the wrong reason~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 4): the turn now asserts `has=("Just to check",)` and the row is marked `gap=` (strict xfail), as suggested. The role-word gap itself is logged ⚠️ in the phrasing reference §10.7.
+
 `platform/tests/maple_conversations/corpus.py` (row `contact-stale-anchor-asks`) — its last turn, "change the homeowner's phone to 416-555-9999", is meant to prove the stale-anchor question, but "the homeowner's" is read as a contact named "Homeowner" and the reply is "No contact found with name 'Homeowner'." — which also satisfies `clarify=True` and the unchanged-phone check. Found while writing the stale-anchor answer rows (review 2026-09-27 #12), which use "her phone" and assert "Just to check".
 
 **Suggested fix:** Add `has=("Just to check",)` to that turn. It will then fail — a role word ("the homeowner", "the manager") naming the contact in focus is a gap in `agents/contact/`; record it in the phrasing reference (⚠️) or mark the row `gap=` until the contact agent reads a role word as the anchored contact.

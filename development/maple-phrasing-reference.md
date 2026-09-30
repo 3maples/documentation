@@ -77,6 +77,12 @@ logs a failure instead of hiding it. A status column named like a date
 moves the card (#711); an ambiguous teammate in a list says so (#752) (§7.7,
 §7.8).
 
+**2026-09-29 (phase 4):** after "no" to "Just to check", *"Okay — which
+contact did you mean?"* is a real question: a name finishes the request on
+the record named — a numbered list when several share it, one more try when
+none does (§10.7). Two gaps logged there: a role word ("the homeowner's
+phone", #759) and "the city there".
+
 **2026-09-29 (deferred):** answering a question with a record's name, from
 [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md),
 leaves material-catalog management and the multi-match "please specify"
@@ -1933,6 +1939,19 @@ Each `active_<domain>_id` anchor records the turn it was set on. An anchor set t
 |---|---|---|
 | `add a note: prefers mornings` | the note is filed on Ana | ✅ rule *(it asked "which fields?", even right after "show me contact Ana Reyes")* |
 | `what's her phone?` / `what's the city?` (a property open) | that record's details | ✅ rule *(it went to the user guide)* |
+
+**Answering "Just to check"** (2026-09-29, name-answers plan phase 4): "yes" runs the request on the record asked about; "no" asks *"Okay — which contact did you mean?"*, and — since phase 4 — a name in reply finishes the request on the record named (`agents/conversation/record_names.py`, `routers/agents.py::_answer_name_question`).
+
+| Turns | Behavior | Status |
+|---|---|---|
+| `change her phone to …` → *"Just to check — do you mean Ana Reyes?"* → `no` → `Bob Lee` | Bob's phone changes; Ana's doesn't | ✅ rule *(2026-09-29 — the name was read as a new request and the change was lost)* |
+| … → `no` → `Ana` (two contacts called Ana) | *"I found 2 contacts called Ana: 1. Ana Lopez 2. Ana Reyes"*, and the number or name picks | ✅ rule *(2026-09-29)* |
+| … → `no` → `Zed` (no such contact) | *"I couldn't find a contact called Zed. Which contact did you mean?"* — asked once more, then left | ✅ rule *(2026-09-29)* |
+| … → `no` → `yes` | a stray yes — Maple says it isn't waiting on an answer; a yes names no one | ✅ rule |
+| `change its city to Hamilton` → *"Just to check — do you mean Elm House?"* → `no` → `9 Maple Ave` | the property named by its street (or name) changes | ✅ rule *(2026-09-29)* |
+| the same for a material, role or task in focus | the record named — by exact name, then a whole word | ✅ rule *(2026-09-29; a role or template name that reads as a command, e.g. "Remove Crew", has no name source and may still be read as a request — deferred with phase 6)* |
+| `change the homeowner's phone to …` (Ana in focus) | should ask "Just to check"; reads "the homeowner" as a contact called Homeowner | ⚠️ gap *(#759 — the corpus row is marked `gap=`)* |
+| `change the city there to Hamilton` (a property in focus) | should change its city; the Property agent parses no field from "the city there" | ⚠️ gap *(found 2026-09-29; "change its city to Hamilton" works)* |
 
 ## 10.8 "What about X?" *(2026-09-27)*
 

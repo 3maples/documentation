@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-28 · **Revised:** 2026-09-29 (re-checked against `fae429e`;
 material-management questions and multi-match "please specify" deferred, §7)
-· **Status:** in progress — phases 0, 1 and 3 done; next phase 4 · **Builds on:**
+· **Status:** in progress — phases 0, 1, 3 and 4 done; next phase 5 · **Builds on:**
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
 (one question gate, `routers/agent_helpers/open_question.py`)
 
@@ -206,7 +206,7 @@ ambiguity question with "I couldn't find…"), #711 (a status column named like
 a date — "Next Week", "Today" — is read as a due date: "move it to Next
 Week" sets the due date instead of moving the card). Adjacent, not required: #750, #777, #717.
 
-**Phase 4: "Okay — which {noun} did you mean?"** Introduces `ask_for_name`
+**Phase 4: "Okay — which {noun} did you mean?"** ✅ *Done 2026-09-29.* Built as described, for contact, property, material, role and task anchors (`record_names.find_records_named`: exact name first, then a whole word); a bare "yes" to the name question is a stray yes, not a name. The property row uses "change its city to Hamilton": "the city there" parses no field at all (a separate gap, logged). Found in passing and spun off: the property update reply shows "Contacts: -" though the link is kept. Introduces `ask_for_name`
 and its router branch (§3.4); document both in CLAUDE.md's "Multi-turn,
 every feature" section. After a "no" to the anchor check, store a record
 carrying the original request. The named record then gets the original
@@ -341,7 +341,7 @@ entries themselves stay in that file.
 | 0 | #776, #775; #709 optional | #776, #775 resolved 2026-09-29; #709 left in the backlog |
 | 1 | #669, #615, #616, #22, #346 | #615, #616, #22 resolved 2026-09-29; #669 avoided, not fixed (no new full load); #346 left as is — the pre-check carries a distinction the resolver doesn't return |
 | 3 | #715, #714, #751, #752, #711 (adjacent: #750, #777, #717) | #715, #714, #751, #752, #711 resolved 2026-09-29; adjacent ones left in the backlog |
-| 4 | #759 | still applies |
+| 4 | #759 | resolved 2026-09-29 (row tightened and marked `gap=`) |
 | 5 | #713 (task questions, and the Task agent's property questions) | still applies |
 | 7 | #722, #723 (prerequisites), #322, #439 (adjacent: #159, #779) | all still apply |
 | 8 | #470 | still applies |
