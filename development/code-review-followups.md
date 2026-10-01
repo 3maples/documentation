@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **788**. Never
+- **Entries are numbered and permanent.** Next free number: **789**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2594,6 +2594,11 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/agents/estimate/metric_answers.py:122` — `_cannot_narrow` always says "I can't narrow a total by …", so "what's Bob Lee's average job size since March?" is told about a total. Wording only, no wrong figure. (Third code review of the metrics work, 2026-09-30.)
 
 **Suggested fix:** Pass the metric the grammar matched (read it from the slots as `read_metric_query` does, or have `unread_scope` return it too) and say "an average" / "the biggest estimate" / "a total" accordingly. Add one test for an average.
+
+### 788. [LOW] The comparison pattern slows sharply on long messages, and runs on every "what about X?"
+`platform/agents/conversation/followup.py:83` — `_compared_over` searches `previous` with `_COMPARISON_RE` (two lazy `.*?` gaps and a backreference) before checking whether the new target is a unit at all, so every elliptical follow-up pays for it. Super-linear: 2,000 characters take 0.056 s, 4,000 take 0.44 s (verified), 8,000 about 3.3 s. Messages are capped at 2,000 characters, so today's worst case is ~60 ms on the event loop; a stored rewrite or translation can be longer. Low because the cap bounds it now; the same class of bug as review 2026-09-27 #13. (Second code review of Maple metrics Phase 2, 2026-09-30.)
+
+**Suggested fix:** Check `_NEW_UNIT_RE.match(new_target)` first and return None early; bound the gaps (`.{0,80}?`) so the search is linear. Add a timing test on a 4,000-character previous message.
 
 ## Platform — API, models and data
 

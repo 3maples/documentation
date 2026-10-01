@@ -448,6 +448,11 @@ to review most carefully, since it changes routing. 9 can follow separately.
   Mar 31 compares with all of February, Feb 29 with all of Feb 28.
 - "Show more" uses the task list's wording ("That's 1–5 of 12 — say "show
   more" for the next 5.").
+- **Code review of Phase 2** (2026-09-30): 15 findings, all fixed — "in Won
+  status" honoured by every shape; single-day labels ("Sept 1"); flat
+  comparisons compared in cents; a period after a comparison changes its unit;
+  only the engine's calls sit under the "couldn't reach the database" reply;
+  the LLM step declines an average or biggest of a shape rather than total it.
 - Left open: "just the won ones" after a metric answer (decision 13);
   `$dateTrunc` needs MongoDB 5.0+ — confirm Dev and Prod Atlas before
   release; the live tier of the coverage matrix (`metrics_ranking`,
