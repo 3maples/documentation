@@ -123,6 +123,11 @@ division ("what's the win rate for Bob Lee?") and a calendar period, and
 "and last year?" / "what about Ana Reyes?" repeat them. "Won vs Lost status"
 and "draft vs approved" are still the literal counts. A win rate ranked, by
 month or compared is said back, not answered (decision 18) (§1.9, §1.12).
+**Gross margin and average markup across estimates** — "what's my gross
+margin this year?", "what margin am I making on Bob Lee's jobs?", "what's my
+average markup?" were help. They answer for sold work unless a status is said,
+summing dollars (markup weighted by cost), and say how many work items an
+unpriced activity left out (decisions 15–17) (§1.12).
 
 **2026-09-30 (metrics plan, Phase 2):** Maple **ranks, breaks down by month
 and compares periods**. "Who are my top 5 customers by won value?", "which
@@ -424,7 +429,7 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `what's the markup on this estimate?` / `what's the gross margin on it?` | per work item | ✅ rule |
 | `when was it created?` / `when was {EST} last updated?` / `what's the code for this estimate?` | the date / the code | ✅ rule |
 | `show me estimate {EST}` | the details now include "Property: 12 Oak St — Ana Reyes" | ✅ rule *(2026-09-27)* |
-| with an estimate open: `what is markup?` / `what's the difference between markup and gross margin?` / `how much does mulch cost?` / `what's the address for bob lee?` / `what's my average markup?` | not a question about that estimate — goes on to help, the catalog or the contact | ✅ rule *(2026-09-30, #719 — each got the open estimate's figure. With no reference, only "it"/"this" or the plainest "what's the <field>?" is about the open estimate)* |
+| with an estimate open: `what is markup?` / `what's the difference between markup and gross margin?` / `how much does mulch cost?` / `what's the address for bob lee?` / `what's my average markup?` | not a question about that estimate — goes on to help, the catalog, the contact, or (the last, since 2026-10-01) the company's average markup, §1.12 | ✅ rule *(2026-09-30, #719 — each got the open estimate's figure. With no reference, only "it"/"this" or the plainest "what's the <field>?" is about the open estimate)* |
 | with an estimate open: `how much is the total?` / `what's the status right now?` / `what's the total including tax?` / `what's the customer's name?` / `how much is it altogether?` | answered from the open estimate | ✅ rule *(review 2026-09-30 #5 — the #719 narrowing had sent them to help. `what's the total before tax?` is not: the answer is the tax-inclusive total; `what's the total altogether?`, with no "it", is not about one estimate. `how much is the mulch?` / `how much is the foreman?` is a price, not the estimate's total — second review #1. `how much is E0042 in total?` is E0042's total — second review #8)* |
 | `which estimate has the highest total?` / `what's the lowest total on an estimate?` | the estimates sorted by total, not "Which estimate would you like to view?" | ✅ rule *(2026-09-30, #720 — a ranking, average or comparison word is never about one estimate)* |
 
@@ -962,7 +967,7 @@ Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
 **Open gaps:** #783, #784, #785, #786, #787, #788 (metrics, §1.12); older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
 
-## 1.12 Metrics — totals, averages, the biggest, rankings, by month, comparisons and win rate *(2026-09-30)*
+## 1.12 Metrics — totals, averages, the biggest, rankings, by month, comparisons, win rate, margin and markup *(2026-09-30)*
 
 Plan: [`plans/2026-09-30-maple-metrics-and-next-batch-plan.md`](plans/2026-09-30-maple-metrics-and-next-batch-plan.md).
 Grammar entries `analytics_metric` (`command_grammar._METRIC_ENTRIES`), read
@@ -1024,6 +1029,17 @@ never by the LLM, and every reply names what it counted.
   then lost counts once, as a loss. A customer, property, division and period
   apply as to a total; a status said doesn't change what a win is. Ranked, by
   month or compared, it is said back (decision 18).
+- **Gross margin and average markup** *(Phase 3)* are sold work unless a
+  status is said (decision 15) — "on lost estimates", "in Won status". Each
+  work item is priced from its lines as the estimate page prices it, every
+  occurrence of a recurring one counted, and the dollars are summed: margin =
+  profit ÷ pre-tax selling price (overhead deducted, tax left out), markup =
+  markup dollars ÷ subtotal (decision 17), so with materials at price and
+  labor at its Rate the company's margin is its markup ÷ (1 + markup), as on
+  one work item. A work item with an activity that has no cost rate is left
+  out and the reply says how many (decision 16). "On Bob Lee's jobs" / "on
+  Landscaping work" name whose work it is. Ranked, by month or compared, they
+  are said back (decision 18).
 
 | Phrasing | Answer | Status |
 |---|---|---|
@@ -1063,6 +1079,13 @@ never by the LLM, and every reply names what it counted.
 | `what's my win rate last year?` (nothing sold or lost) | *"Nothing was sold or lost last year, so there's no win rate yet."* | ✅ rule *(Phase 3 — not 0%)* |
 | `what's the win rate for Bob Lee?` → `what about Ana Reyes?` / `what's my win rate this year?` → `and last year?` | the win rate for the new customer or period | ✅ rule *(Phase 3)* |
 | `which customer has the best win rate?` / `who has the best win rate?` / `what's my win rate by customer?` / `win rate by month` / `how does my win rate this month compare to last month?` / `my win rate this year vs last year` | said back — *"I can't rank by win rate yet. Ask for one at a time — "what's the win rate for Bob Lee?""* (by month and compared alike) | ⚠️ gap *(decision 18, 2026-10-01 — a ratio is a single figure in Phase 3; never a company figure in its place)* |
+| `what's my gross margin?` / `what's my gross margin this year?` / `what's my profit margin?` / `what's our overall margin?` / `how much margin am I making?` / `how's my margin looking this quarter?` | *"Gross margin on sold work, all time: 31.8% — $700.00 of profit on $2,200.00 of pre-tax selling price, across 4 estimates (Won, Scheduled, Completed). Overhead is deducted; tax is left out. 1 work item is left out: an activity on it has no cost rate."* | ✅ rule *(Phase 3, 2026-10-01 — they were help)* |
+| `what's the gross margin for Bob Lee?` / `what margin am I making on Bob Lee's jobs?` / `what's my margin on Landscaping work?` / `what's my gross margin on lost estimates?` | that customer's, property's, division's or status's work | ✅ rule *(Phase 3)* |
+| `what's my average markup?` / `what's my average markup this year?` / `what's the average markup for Elm House?` / `what's Bob Lee's average markup?` | *"Average markup on sold work, all time: 29.4% — $500.00 of markup on $1,700.00 of subtotal, across 4 estimates (Won, Scheduled, Completed), weighted by each work item's subtotal."* | ✅ rule *(Phase 3 — they were help; weighted by cost, decision 17)* |
+| `what's my gross margin last year?` (no sold work) / every work item has an unpriced activity | *"There's no sold work last year to measure a gross margin on."* / *"There's no gross margin to give on sold work: every work item in it has an activity with no cost rate (3 work items)."* | ✅ rule *(Phase 3 — not 0%)* |
+| `what's my gross margin this year?` → `and last year?` / `what's the gross margin for Bob Lee?` → `what about Ana Reyes?` | the same question for the new period or customer | ✅ rule *(Phase 3)* |
+| `which customer has the best margin?` / `what's my gross margin by month?` / `markup by division` / `how does my margin this year compare to last year?` | said back — *"I can't rank by gross margin yet. Ask for one at a time — "what's the gross margin for Bob Lee?""* | ⚠️ gap *(decision 18)* |
+| `what's my markup?` (bare) | help — it may mean the default markup setting; ask "what's my average markup?" | ⚠️ gap *(Phase 3 — deliberately not read as the average)* |
 | `win rate by value` / `what share of my quoted dollars did I win?` | not read — a dollar-weighted win rate | ⚠️ gap *(decision 14 — the win rate counts estimates)* |
 | `who are my best customers?` → `just the won ones` | *"I'm not sure how to help with that…"* | ⚠️ gap *(decision 13, 2026-09-30 — a status refinement after a metric answer is not supported yet; ask again with the status: "who are my top customers by won value?")* |
 | `what's the total for Smith?` (an **estimate** titled Smith) | read as a customer or property named Smith | ⚠️ gap *(2026-09-30 — it was help; an estimate title is not a metric subject)* |
@@ -1073,11 +1096,15 @@ just shown, §1.1); `what is the total value of the open estimates` and
 `estimates over $10k` (the list's total and filter, §1.1); `what's the value
 of my estimates?`, `what's my pipeline?`, `how much have I completed this
 month?`, `what's my completed value?`, `won vs lost status` and `draft vs
-approved` (the dashboard, §1.9); `how is my win rate calculated?` (help); `how much mulch do
+approved` (the dashboard, §1.9); `how is my win rate calculated?` (help);
+`what's the gross margin?` / `… on it` / `… on work item 2` / `… on E0042` (one
+estimate or work item, §1.2 / §1.5.7); `what's my material markup?` (a
+setting); `what's the difference between markup and margin?`, `what markup do
+I need for a 20% margin?` (help); `set the margin to 30%` (an edit); `how much mulch do
 I need …` (the Calculator, §10.3); `what's the average wage for Foreman?`
 (§5.8). Tests: `tests/test_metric_query.py` (accept / reject / reading /
-routing / answers), `tests/test_metric_ratios.py` (win rate),
-`tests/test_metric_win_rate.py`, `tests/test_maple_metrics.py`,
+routing / answers), `tests/test_metric_ratios.py` (win rate, margin,
+markup), `tests/test_metric_win_rate.py`, `tests/test_metric_margin.py`, `tests/test_maple_metrics.py`,
 `tests/test_metric_subject.py`, `tests/test_metric_periods.py`,
 `tests/test_metric_spec.py`; multi-turn: the `METRICS` conversations in
 `tests/maple_conversations/corpus.py`. Open: #783 (an estimate title is not a
