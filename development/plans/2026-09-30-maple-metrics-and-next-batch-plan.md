@@ -475,6 +475,57 @@ to review most carefully, since it changes routing. 9 can follow separately.
 - Changes to the math follow CLAUDE.md's rule for the gross-margin port:
   portal and platform change together or not at all.
 
+### Phase 3 — task breakdown *(2026-09-30)*
+
+Checked against the code before writing:
+
+- **Today's win rate is a status count on `updated_at`.** "what's my win
+  rate?", "win-loss ratio", "won vs lost" and "how am I doing on bids?" are
+  `parse_status_comparison` → `compute_status_comparison`, counting current
+  Won against Lost, with a rolling `updated_at` window (`analytics_estimates`,
+  §1.9). It has no subject: "win rate for Bob Lee" isn't read.
+- **The per-item math is done and pinned.** `work_item_breakdown`,
+  `work_item_gross_margin` and `count_activities_missing_cost`
+  (`routers/estimate_helpers/calculations.py`), called on
+  `unburdened(item)` as the page prices. Phase 3 only adds them up, so the
+  portal doesn't change — nothing in the portal adds margins across estimates.
+- **The engine projects too little for margin.** `_ITEM_FIELDS` carries
+  `sub_total`, `tax` and recurrence; the margin needs each item's material
+  and activity lines and its markup, overhead and burden. The functions read
+  attributes, so the projected items become `JobItem`s (or a light stand-in).
+- **Weighting.** Summing dollars, not averaging percentages: margin =
+  Σ gross profit ÷ Σ pre-tax selling price. For markup, Σ markup dollars ÷ Σ
+  subtotal (decision 17) — the one weighting under which the two figures
+  still describe the same dollars: with materials at price and labor at its
+  Rate, the company's margin is exactly its markup ÷ (1 + markup), as on one
+  work item. Recurring items count every occurrence on both sides.
+- **The user guide doesn't mention win rate**, so no help answer changes.
+
+One commit per task, failing test first, related tests plus mypy/ruff each
+time, phrasing reference in the same commit as the phrasing. A `/code-review`
+round before the push.
+
+| # | Task | Size | Repos |
+|---|---|---|---|
+| **3a — the engine** ||||
+| 1 | **Win rate** (decision 8). `run_win_rate(company_id, query)` → sold count, Lost count, rate (None when both are 0). Sold = Won + Scheduled + Completed, dated by `sold_at`; Lost dated by `status_changed_at`; both fall back to `updated_at`. Scoped by property, customer and division as `run_metric` is. Tests: Won → Scheduled → Completed stays a win; a sale in September lost-dated in October; pre-status-date estimates; nothing to count; a subject; a division. | S | platform |
+| 2 | **Margin and markup** (decisions 15–17). `run_margin(company_id, query)` → margin %, markup %, gross profit, pre-tax selling price, estimates and work items counted, work items left out for a missing activity cost, and whether any recur. Per item: `work_item_breakdown` / `work_item_gross_margin` on `unburdened(item)`, × occurrences. Tests: two items at different markups (weighted, not averaged); the markup ÷ (1 + markup) identity across a company; an activity billed off its cost; an item left out; a recurring item; a division; zero revenue. | M | platform |
+| **3b — Maple** ||||
+| 3 | **Win rate moves to the sold set.** The win-rate phrasings become `analytics_metric` entries (`_RATIO_ENTRIES`), answered from task 1: subjects ("win rate for Bob Lee", "this property"), calendar periods on the user's clock, follow-ups. "won vs lost" / "how many did I win vs lose?" count the sold set; "Won vs Lost status", "draft vs approved" stay `analytics_estimates` and literal. §1.9's rows and their tests change. Reviewed routing-snapshot diff. | M | platform |
+| 4 | **Margin and markup routing.** Entries for "what's my gross margin (this year)?", "what's my average markup?", "what margin am I making on Bob Lee's jobs?", "margin on landscaping work". Reject rows: one work item or estimate ("the gross margin on it / on work item 2 / on E0042" stay the focus questions'), help ("what's the difference between markup and margin?", "how is the profit margin calculated?", "what markup do I need for a 20% margin?"), writes ("set the margin to 30%", "I want a 30% margin on …"), and the catalog setting ("what's my material markup?"). Reviewed snapshot diff. | M | platform |
+| 5 | **Reading.** `MetricAsk.metric` gains `win_rate`, `margin` and `markup`; a said status narrows them; "before tax" on a margin is redundant and read silently. A ratio asked as a ranking, by month or a comparison is said back (decision 18). Reading tests per entry. | S | platform |
+| 6 | **Answers.** *"Your win rate this year is 62% — 18 sold (Won, Scheduled, Completed) against 11 Lost. Open estimates aren't counted."* *"Gross margin on sold work this year: 23.4% — $41,200.00 on $176,000.00 of pre-tax selling price, across 31 estimates. Overhead is deducted; tax is left out."* Markup says it's weighted by cost. Items left out are named with the reason; "nothing to measure" is not 0%. Seeded answer tests pin exact figures. | M | platform |
+| 7 | **Follow-ups.** "and last year?", "what about Elm House?" after each; a subject from focus (the property open on the page). Tests only, unless one fails. | S | platform |
+| 8 | **LLM tier.** `MetricSpec.metric` gains the three; `ask_from_spec` declines a ratio in a non-figure shape. | S | platform |
+| 9 | **Docs and corpus.** §1.9 win-rate rows to the sold set; §1.12 rows; the Recent changes paragraph, open gaps, §12.3; a `metrics_ratio` coverage-matrix category; a corpus conversation (win rate → "for Bob Lee?" → "and last year?"); CLAUDE.md's pricing section (cross-estimate weighting) and "Metric questions" bullets; this plan. | S | platform, documentation, workspace |
+
+**Order and release points.** 1–2 add engine functions nothing calls. 3
+changes an answer users already get — the win rate rises for any company
+with Scheduled or Completed work — so it's the one to review most carefully
+and worth a release note. 8 can follow separately.
+
+Decisions 14–18 are in §8.
+
 ### Phase 4 — Other resources (lower value, cheap after the engine)
 - **Line-level:** `how much have I quoted using Black Mulch?`, `how many hours
   of Foreman are in open estimates?`. Reads work items
@@ -613,3 +664,19 @@ Phase 2 decisions, also 2026-09-30:
 12. **List size:** 5 when no number is given, at most 25; "show more" pages.
 13. **"Just the won ones" after a metric answer** is a gap for now (phrasing
     reference ⚠️), not part of Phase 2.
+
+Phase 3 decisions, also 2026-09-30:
+
+14. **Win rate counts estimates.** A dollar-weighted win rate ("win rate by
+    value") is a gap.
+15. **Margin and markup default to the sold set** — what the business is
+    actually making, consistent with decisions 9–10; a said status narrows.
+16. **A work item with an unpriced activity is left out, and the reply says
+    how many.** One legacy item can't blank the company's figure; it's
+    dashed only when nothing is left. (Supersedes the outline's "dashes when
+    any included activity lacks a cost basis".)
+17. **Average markup is weighted by cost** (Σ markup $ ÷ Σ subtotal), so the
+    markup and the margin stay the same dollars. (Supersedes the outline's
+    "weighted the same way" as the margin.)
+18. **Ratios are figures only in Phase 3.** "Which customer has the best
+    margin?", "win rate by month", "win rate this year vs last" are gaps.
