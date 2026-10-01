@@ -435,6 +435,24 @@ round before the push, as for Phase 1.
 they ship without a visible change. 5–8 switch the feature on; 5 is the one
 to review most carefully, since it changes routing. 9 can follow separately.
 
+**Phase 2 done, 2026-09-30** (`f08c68c` … task 10). What changed on the way:
+
+- Tasks 5 and 6 each kept the feature off until the next landed: task 5's
+  reader declined the new shapes and task 6's answer handed them to the
+  dashboard, so no commit could answer a ranking as a single total.
+- "Which property has the most estimates?" and "my best customer" — a
+  singular — answer the top one, not a list of 5.
+- A comparison that also names a period ("this month vs last month this
+  year") is said back as a scope Maple can't narrow by, not guessed.
+- A day the earlier period doesn't have runs to the end of the day it becomes:
+  Mar 31 compares with all of February, Feb 29 with all of Feb 28.
+- "Show more" uses the task list's wording ("That's 1–5 of 12 — say "show
+  more" for the next 5.").
+- Left open: "just the won ones" after a metric answer (decision 13);
+  `$dateTrunc` needs MongoDB 5.0+ — confirm Dev and Prod Atlas before
+  release; the live tier of the coverage matrix (`metrics_ranking`,
+  `metrics_compare`, `metrics_paraphrase`) is the user's to run.
+
 ### Phase 3 — Ratios and margin
 - `win_rate` per customer / property / period: sold ÷ (sold + Lost)
   (decision 8). This **changes the existing answer** to "what's my win

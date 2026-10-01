@@ -114,6 +114,18 @@ counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
 for Bob Lee in review?" asks which status was meant instead of counting won and
 ignoring the rest (#780) (§1.1).
 
+**2026-09-30 (metrics plan, Phase 2):** Maple **ranks, breaks down by month
+and compares periods**. "Who are my top 5 customers by won value?", "which
+property has the most estimates?" and "which division earns the most?" list
+the ranking — sold value unless a status is said (decision 9), 5 rows unless a
+number is, "show more" for the rest, "the second one" opens that customer or
+property, "show me the top 10" resizes it. "Value by month this year" gives
+every month on your clock and the total. "How does this month compare to last
+month?" and "am I up on last year?" compare like with like — the same days of
+the earlier period — and give the change in dollars and percent (decisions 10,
+11). "And last year?" and "what about Ana Reyes?" repeat each. "Just the won
+ones" after a metric answer is not supported yet (decision 13) (§1.12).
+
 **2026-09-30 (review of the metrics work):** a metric question no longer
 answers for the wrong record — "what's our revenue excluding Elm House" was
 Elm House's revenue, and "over the last year" found a customer called Grover;
@@ -941,7 +953,7 @@ Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
 **Open gaps:** #783, #784, #785, #786, #787 (metrics, §1.12); older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
 
-## 1.12 Metrics — totals, averages and the biggest, over many estimates *(2026-09-30)*
+## 1.12 Metrics — totals, averages, the biggest, rankings, by month and comparisons *(2026-09-30)*
 
 Plan: [`plans/2026-09-30-maple-metrics-and-next-batch-plan.md`](plans/2026-09-30-maple-metrics-and-next-batch-plan.md).
 Grammar entries `analytics_metric` (`command_grammar._METRIC_ENTRIES`), read
@@ -988,6 +1000,15 @@ never by the LLM, and every reply names what it counted.
   name. The LLM tier's subject must be words of the message.
 - **Recurring work items** count every occurrence, as the estimate's total
   does.
+- **Rankings** *(Phase 2)* rank customers, properties or divisions — by sold
+  value unless a status is said, by count for "the most estimates", ties by
+  value then name; 5 rows unless a number is said (at most 25). A customer is
+  every property they are on, so a shared property counts for each.
+- **By month** *(Phase 2)* lists every month of the period on the user's
+  clock — this year unless one is said — $0 where nothing counted.
+- **Comparisons** *(Phase 2)* put this week, month, quarter or year against
+  the last, like with like: on Sept 15, Sept 1–15 against Aug 1–15; "all of
+  last month" compares the whole month. Both units must match.
 
 | Phrasing | Answer | Status |
 |---|---|---|
@@ -2430,8 +2451,10 @@ cd platform
 | calculator | 8/8 | 7/8 | 1 LLM miss ("how much topsoil do I need for 1000 sq ft") |
 | metrics *(2026-09-30)* | 6/6 | not yet run | covered (the `analytics_metric` grammar entries, §1.12) |
 | metrics_paraphrase *(2026-09-30)* | 0/3 (known gap) | not yet run | LLM tier's by design: classifier + metric spec (§1.12) |
+| metrics_ranking *(2026-09-30, Phase 2)* | 4/4 | not yet run | covered (rankings and by month, §1.12) |
+| metrics_compare *(2026-09-30, Phase 2)* | 3/3 | not yet run | covered (period comparisons, §1.12) |
 
-**Totals: Tier 1 177/191 · Tier 2 173/182 + 9 not yet run** *(Tier 1 2026-09-30 — the two metrics categories added 9 cases, 6 passing and 3 known rule-tier gaps; Tier 2 last live run 2026-09-24, the other rows are the 2026-07-29 counts, unchanged)*.
+**Totals: Tier 1 184/198 · Tier 2 173/182 + 16 not yet run** *(Tier 1 2026-09-30 — the four metrics categories added 16 cases, 13 passing and 3 known rule-tier gaps; Tier 2 last live run 2026-09-24, the other rows are the 2026-07-29 counts, unchanged)*.
 
 *2026-09-24 run: Tier 2's 9 misses are the same classes as below, with one
 swap — `verbless/property` "tell me about 123 Main St" missed once (the model
