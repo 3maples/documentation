@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-09-30
+**Last updated:** 2026-10-01
 
 ### Recent changes
 
@@ -113,6 +113,16 @@ customer: "how many estimates for Min Won?" counts Min Won's estimates — it
 counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
 for Bob Lee in review?" asks which status was meant instead of counting won and
 ignoring the rest (#780) (§1.1).
+
+**2026-10-01 (metrics plan, Phase 3):** **a win rate counts sold work** —
+Won, Scheduled and Completed against Lost (decision 8). "What's my win rate?",
+"won-lost ratio", "won vs lost", "how many estimates did I win vs lose?" and
+"how am I doing on bids?" counted only estimates still in Won, so a job left
+the wins when it was scheduled; they also take a customer, property or
+division ("what's the win rate for Bob Lee?") and a calendar period, and
+"and last year?" / "what about Ana Reyes?" repeat them. "Won vs Lost status"
+and "draft vs approved" are still the literal counts. A win rate ranked, by
+month or compared is said back, not answered (decision 18) (§1.9, §1.12).
 
 **2026-09-30 (metrics plan, Phase 2):** Maple **ranks, breaks down by month
 and compares periods**. "Who are my top 5 customers by won value?", "which
@@ -834,11 +844,10 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `what's the breakdown of estimates by divisions?` | `analytics_estimates` → Estimate Agent | ✅ rule |
 | `breakdown by divisions last month` / `by statuses last quarter` / `by divisions last year` | `analytics_estimates` → Estimate Agent (bounded previous period) | ✅ rule *(2026-07-08 — previously reported the CURRENT period; "last/previous month|quarter|year" now maps to `last_month`/`last_quarter`/`last_year`)* |
 | `breakdown by statuses for the previous quarter` | `analytics_estimates` → Estimate Agent (bounded previous period) | ✅ rule *(2026-07-08 — "previous …" synonym of "last …")* |
-| `what is my won-lost ratio?` / `win-loss ratio` / `win/loss ratio` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02 — `parse_status_comparison`; count ratio + win-rate %)* |
-| `won vs lost` / `how many estimates did I win vs lose?` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02)* |
-| `draft vs approved estimates` / `compare won and lost estimates` | `analytics_estimates` → Estimate Agent (generic pair) | ✅ rule *(2026-06-02 — explicit "X vs Y" / "compare X and Y"; no win-rate framing for non-WON/LOST pairs)* |
-| `what's my win rate?` / `what's my win rate this month?` | `analytics_estimates` → Estimate Agent (WON vs LOST, window-aware) | ✅ rule *(2026-06-02)* |
-| `how am I doing on bids?` | `analytics_estimates` → Estimate Agent (WON vs LOST) | ✅ rule *(2026-06-02 — landscaper-friendly win-rate cue)* |
+| `what is my won-lost ratio?` / `win-loss ratio` / `win/loss ratio` / `won vs lost` / `how many estimates did I win vs lose?` / `what's my win rate?` / `what's my win rate this month?` / `how am I doing on bids?` | `analytics_metric` → the win rate, sold (Won, Scheduled, Completed) against Lost — §1.12 | ✅ rule *(2026-10-01, metrics Phase 3 — they were `analytics_estimates`, counting estimates still in Won, so a job left the wins when it was scheduled or completed; the window was rolling `updated_at`, now a calendar period dated by when each was sold or lost)* |
+| `won vs lost status` | `analytics_estimates` → Estimate Agent (WON vs LOST, the literal statuses) | ✅ rule *(2026-10-01 — "status" keeps the literal count)* |
+| `draft vs approved estimates` | `analytics_estimates` → Estimate Agent (generic pair) | ✅ rule *(2026-06-02 — explicit "X vs Y" / "compare X and Y"; no win-rate framing for non-WON/LOST pairs)* |
+| `compare won and lost estimates` / `is my win rate any good?` — a win-loss phrasing no metric entry lists | `analytics_estimates` → the same win rate as §1.12 (sold against Lost), over the dashboard's window | ✅ rule *(2026-10-01 — it was the Won-only count)* |
 | `what's my pipeline?` / `how's my pipeline looking?` / `what's in my backlog?` / `how much have I completed this month?` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-27, design §7.5 — they went to the user guide)* |
 | `show me my dashboard` / `give me a summary` / `how's business?` | `analytics_estimates` → Estimate Agent (Pipeline / Backlog / Completed) | ✅ rule *(2026-09-27 — they were unknown or help. A summary of one estimate — "give me a summary of E0042" — is not this.)* |
 | `how many estimates are in each status?` / `pipeline by status` / `estimates by status` / `estimate value by division` | `analytics_estimates` → Estimate Agent (breakdown) | ✅ rule *(2026-09-27 — "in each status" counted all estimates; "by division" was unknown)* |
@@ -849,7 +858,7 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `what are my recent estimates?` / `show me my most recent estimates` | `list_estimates`, the newest 8 — the dashboard's Recent Estimates | ✅ rule *(2026-09-27 — help, or one row for a plural ask)* |
 | `how is the backlog value calculated?` / `what does pipeline value mean?` / `how is the completed value calculated?` | `help` → Orchestrator Agent | ✅ rule *(2026-06-20 — explanatory/definitional phrasing about a metric routes to HELP, not a value lookup. `_match_analytics_query` now redirects a recognized metric phrased with an explanatory cue (`calculated`/`computed`/`defined`/`mean`/…) to help; `calculated`/`computed` also added to `HELP_INSTRUCTIONAL_PATTERNS` for metrics without an analytics keyword.)* |
 
-**Status comparisons / ratios:** `compute_status_comparison` counts each status (all-time unless a date window is given, in which case it constrains `updated_at`). `format_status_comparison` renders a reduced `A:B` ratio; the WON-vs-LOST pair additionally reports a win-rate percentage (`won / (won + lost)`). Generic pairs ("draft vs approved") report counts + ratio only.
+**Status comparisons / ratios:** a win rate is a metric question (§1.12, `maple_metrics.run_win_rate`) since 2026-10-01. What stays here: `compute_status_comparison` counts each status for a literal pair ("won vs lost status", "draft vs approved") — all-time unless a date window is given, in which case it constrains `updated_at` — and `format_status_comparison` renders a reduced `A:B` ratio (with a win-rate percentage for the literal Won/Lost pair). A win-loss phrasing that reaches this handler without "status" is answered with §1.12's win rate.
 
 **Time windows:** Pipeline/backlog/completed headline queries respect user-specified date ranges via `_parse_estimate_date_filter`, in two shapes: **word qualifiers** ("this month", "last week", "past quarter") via `_DATE_RANGE_FILTER_PATTERN`, and **numeric windows** ("last 90 days", "past 6 months", "last 2 weeks") via `_NUMERIC_DATE_RANGE_PATTERN`. *(2026-06-21 — the numeric form was previously unparsed: "completed value for the last 90 days" silently fell back to the 30-day default and answered "in the last 30 days". `_NUMERIC_DATE_RANGE_PATTERN` (`(last|past) <N> day|week|month|quarter|year`) now resolves it to a real window; `_describe_date_window` reports the exact day count ("in the last 90 days") for any span that isn't a canonical named period. Tests: `test_maple_phrasing_expansion.py::TestNumericDateRangeFilter`, `test_dashboard_backlog_parity.py`.)* When no date qualifier is present, the handler falls back to default windows: **pipeline = 90 days, completed = 30 days, backlog = all-time (no recency window)**. An all-time backlog answer reads "… in total" rather than "… in the last N days". *(2026-07-08 — the generic summary and the new total-value metric are window-aware too: `_analytics_windowed_summary` recomputes Pipeline/Backlog/Completed inside an explicit window, and `_analytics_total_value` sums non-archived `grand_total` over the window (all-time when none). Both state the window in the response. Age phrasings now include "N days **or older**".)* Breakdown queries use the `period` parameter passed to `compute_analytics`: the current "month"/"quarter"/"year" or — since 2026-07-08 — the bounded previous "last_month"/"last_quarter"/"last_year" (matched from "last …"/"previous …" phrasings before the bare substring checks, since "last month" contains "month").
 
@@ -953,7 +962,7 @@ Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
 **Open gaps:** #783, #784, #785, #786, #787, #788 (metrics, §1.12); older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
 
-## 1.12 Metrics — totals, averages, the biggest, rankings, by month and comparisons *(2026-09-30)*
+## 1.12 Metrics — totals, averages, the biggest, rankings, by month, comparisons and win rate *(2026-09-30)*
 
 Plan: [`plans/2026-09-30-maple-metrics-and-next-batch-plan.md`](plans/2026-09-30-maple-metrics-and-next-batch-plan.md).
 Grammar entries `analytics_metric` (`command_grammar._METRIC_ENTRIES`), read
@@ -1009,6 +1018,12 @@ never by the LLM, and every reply names what it counted.
 - **Comparisons** *(Phase 2)* put this week, month, quarter or year against
   the last, like with like: on Sept 15, Sept 1–15 against Aug 1–15; "all of
   last month" compares the whole month. Both units must match.
+- **Win rate** *(Phase 3)* is sold ÷ (sold + Lost), counting estimates
+  (decisions 8, 14): sold is Won + Scheduled + Completed, dated by when it was
+  sold; Lost by when it was lost. Open estimates aren't in it, and one won
+  then lost counts once, as a loss. A customer, property, division and period
+  apply as to a total; a status said doesn't change what a win is. Ranked, by
+  month or compared, it is said back (decision 18).
 
 | Phrasing | Answer | Status |
 |---|---|---|
@@ -1043,6 +1058,12 @@ never by the LLM, and every reply names what it counted.
 | `this month vs last month` → `and last year?` / `how does this month compare to last month?` → `what about last quarter?` | the comparison over the new unit — "this year vs last year", "how does this quarter compare to last quarter?" | ✅ rule *(Phase 2 review #8 — the first time phrase alone was swapped: "last year vs last month", which nothing read)* |
 | `top 5 customers in won status` / `sales by month in won status` / `this month vs last month in won status` | Won only, as for a single figure | ✅ rule *(Phase 2 review #1 — each counted the whole sold set)* |
 | `sales by month for all time` / `value by month ever` | every month since the first sale | ✅ rule *(Phase 2 review #10 — the first was refused, the second answered this year)* |
+| `what's my win rate?` / `what's my win rate this month?` / `won vs lost` / `how many estimates did I win vs lose?` / `how am I doing on bids?` / `what is my won-lost ratio?` / `wins vs losses this year` / `win rate this year` / `how's my win rate looking?` / `what's our close rate?` | *"Your win rate, all time, is 80%: 4 sold (Won, Scheduled, Completed) against 1 Lost, a 4:1 win-loss ratio. Open estimates aren't counted."* | ✅ rule *(Phase 3, 2026-10-01 — they were the dashboard's count of estimates still in Won, §1.9)* |
+| `what's the win rate for Bob Lee?` / `what's Bob Lee's win rate this year?` / `win rate for Elm House` | *"The win rate for Bob Lee, all time, is 67%: 2 sold … against 1 Lost, a 2:1 win-loss ratio. …"* | ✅ rule *(Phase 3 — the customer is every property they are on)* |
+| `what's my win rate last year?` (nothing sold or lost) | *"Nothing was sold or lost last year, so there's no win rate yet."* | ✅ rule *(Phase 3 — not 0%)* |
+| `what's the win rate for Bob Lee?` → `what about Ana Reyes?` / `what's my win rate this year?` → `and last year?` | the win rate for the new customer or period | ✅ rule *(Phase 3)* |
+| `which customer has the best win rate?` / `who has the best win rate?` / `what's my win rate by customer?` / `win rate by month` / `how does my win rate this month compare to last month?` / `my win rate this year vs last year` | said back — *"I can't rank by win rate yet. Ask for one at a time — "what's the win rate for Bob Lee?""* (by month and compared alike) | ⚠️ gap *(decision 18, 2026-10-01 — a ratio is a single figure in Phase 3; never a company figure in its place)* |
+| `win rate by value` / `what share of my quoted dollars did I win?` | not read — a dollar-weighted win rate | ⚠️ gap *(decision 14 — the win rate counts estimates)* |
 | `who are my best customers?` → `just the won ones` | *"I'm not sure how to help with that…"* | ⚠️ gap *(decision 13, 2026-09-30 — a status refinement after a metric answer is not supported yet; ask again with the status: "who are my top customers by won value?")* |
 | `what's the total for Smith?` (an **estimate** titled Smith) | read as a customer or property named Smith | ⚠️ gap *(2026-09-30 — it was help; an estimate title is not a metric subject)* |
 
@@ -1051,10 +1072,12 @@ the total on it?` (one estimate, §1.2); `what's the total of those?` (the list
 just shown, §1.1); `what is the total value of the open estimates` and
 `estimates over $10k` (the list's total and filter, §1.1); `what's the value
 of my estimates?`, `what's my pipeline?`, `how much have I completed this
-month?`, `what's my completed value?` (the dashboard, §1.9); `how much mulch do
+month?`, `what's my completed value?`, `won vs lost status` and `draft vs
+approved` (the dashboard, §1.9); `how is my win rate calculated?` (help); `how much mulch do
 I need …` (the Calculator, §10.3); `what's the average wage for Foreman?`
 (§5.8). Tests: `tests/test_metric_query.py` (accept / reject / reading /
-routing / answers), `tests/test_maple_metrics.py`,
+routing / answers), `tests/test_metric_ratios.py` (win rate),
+`tests/test_metric_win_rate.py`, `tests/test_maple_metrics.py`,
 `tests/test_metric_subject.py`, `tests/test_metric_periods.py`,
 `tests/test_metric_spec.py`; multi-turn: the `METRICS` conversations in
 `tests/maple_conversations/corpus.py`. Open: #783 (an estimate title is not a
