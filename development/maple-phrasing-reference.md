@@ -114,6 +114,12 @@ counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
 for Bob Lee in review?" asks which status was meant instead of counting won and
 ignoring the rest (#780) (§1.1).
 
+**2026-10-01 (metrics plan, Phase 4, lines):** **how much of a material or
+role is in your estimates** — "how much Black Mulch is in my open
+estimates?", "how many hours of Foreman have I sold this year?" — per unit,
+never converted, no dollars (§8.4). The second counted open estimates and
+dropped Foreman.
+
 **2026-10-01 (metrics plan, Phase 4, tasks):** **task counts by person and
 by property** — "how many overdue tasks does each person have?", "how many
 tasks per property?", "who has the most overdue tasks?" — open tasks unless
@@ -1906,6 +1912,27 @@ Questions users ask when they think about the domain rather than the database. R
 | `which properties need a {role}?` | `list_properties` joined via estimates | ✅ rule *(2026-09-27, #682)* |
 | `what estimates use the {role} role?` / `which estimates use {role}?` (no "role") | `list_estimates` filtered by role | ✅ rule *(2026-09-27, #682 — it was always empty, and the help pre-check showed "Intent identified: …" instead of delegating)* |
 | `show me jobs needing a {role}` / `list properties that need a {role}` | `list_properties` joined via estimates | ✅ rule *(2026-09-27, #682 — it listed every property)* |
+
+## 8.4 How much of a material or role is in your estimates *(2026-10-01, metrics plan Phase 4)*
+
+`analytics_metric` grammar entries (`command_grammar._LINE_ENTRIES`, an `l_`
+slot), answered by `agents/estimate/metric_lines.py` from
+`maple_metrics.run_line_totals`. **Quantities only, no dollars** (decision 19);
+**per unit, never converted** (decision 21) — a material line's unit is its
+snapshot, or the catalog's unit for its size; a role's is its own. Every
+estimate unless a status is said (decision 20); every occurrence of a
+recurring item counts; a customer, property, division and period apply as to
+any metric (§1.12).
+
+| Phrasing | Answer | Status |
+|---|---|---|
+| `how much Black Mulch is in my estimates?` / `… in my open estimates?` / `… in my estimates for Bob Lee?` / `how much Black Mulch have I quoted this year?` / `how many bags of Black Mulch are in my draft estimates?` | *"Black Mulch in your estimates, all time: 10 bags and 4 cubic yards, across 2 estimates."* | ✅ rule *(a guide answer)* |
+| `how many hours of Foreman are in open estimates?` / `how many hours of Foreman have I sold this year?` / `how much Foreman time did I sell this year?` | *"Foreman in your sold estimates, all time: 8 hours, across 1 estimate (Won, Scheduled, Completed)."* | ✅ rule *(it counted open estimates and dropped Foreman)* |
+| `how many hours of Operator …` (a role priced by the day) | *"Operator is priced by the day, not the hour: 2 days in your estimates, all time, across 1 estimate."* | ✅ rule *(decision 21)* |
+| `how much Mulch is in my estimates?` (Black Mulch and Red Mulch) / `… Bluestone …` (no such record) | *"Which one did you mean: Black Mulch or Red Mulch? Ask again with its full name."* / *"I couldn't find a material or role called Bluestone."* | ✅ rule *(not resumable: ask again)* |
+| `how much have I quoted using Black Mulch?` — the lines' dollars | not read: a guide answer | ⚠️ gap *(decision 19, 2026-10-01 — out of scope)* |
+| `how much Black Mulch is in my estimates?` → `what about Topsoil?` | help — the follow-up swaps a customer or place, not the material | ⚠️ gap *(like #789)* |
+| `how much mulch is in this estimate?` / `which estimates use Black Mulch?` / `how much does Black Mulch cost?` / `how much mulch do I need for 200 sq ft?` | the open estimate, the list, the catalog price, the Calculator — not a line sum | ✅ rule |
 
 ---
 
