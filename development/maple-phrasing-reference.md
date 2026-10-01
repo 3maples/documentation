@@ -114,6 +114,10 @@ counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
 for Bob Lee in review?" asks which status was meant instead of counting won and
 ignoring the rest (#780) (§1.1).
 
+**2026-10-01 (metrics plan, Phase 4, help):** "what can you calculate?" /
+"what numbers can you give me?" answer with the figures Maple gives — the
+user guide gained section 6.6, "Asking for a figure" (§11.1).
+
 **2026-10-01 (metrics plan, Phase 4):** **catalog figures** — "how many
 materials per category?" lists every category with its count (it gave the
 number of categories); "what's my most expensive material?", "what's my
@@ -2322,6 +2326,8 @@ Direct capability questions. Match via `HELP_DIRECT_HINTS` (`intents.py:299`).
 | `what can I ask?` | `capabilities` | ✅ rule |
 | `supported intents` | `capabilities` | ✅ rule |
 | `capabilities` | `capabilities` | ✅ rule |
+| `what can you calculate?` / `what numbers can you give me?` / `what metrics can you show me?` / `what figures can you tell me?` | `general_question` — the guide's §6.6 "Asking for a figure" lists every figure Maple gives (totals, rankings, by month, comparisons, win rate, margin, markup, catalog) and how she reads "sold", tax and periods | ✅ guide *(2026-10-01, metrics plan Phase 4 task 6 — the guide had no figures, so the answer couldn't name them. Not the Calculator: no measurement)* |
+| `can you tell me my sales?` / `what are my sales?` | the sold figure itself (§1.12), not a capability answer | ✅ rule |
 
 ### Feature-definition queries *(2026-07-22)*
 
