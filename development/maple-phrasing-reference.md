@@ -1084,6 +1084,7 @@ never by the LLM, and every reply names what it counted.
 | `what's my average markup?` / `what's my average markup this year?` / `what's the average markup for Elm House?` / `what's Bob Lee's average markup?` | *"Average markup on sold work, all time: 29.4% — $500.00 of markup on $1,700.00 of subtotal, across 4 estimates (Won, Scheduled, Completed), weighted by each work item's subtotal."* | ✅ rule *(Phase 3 — they were help; weighted by cost, decision 17)* |
 | `what's my gross margin last year?` (no sold work) / every work item has an unpriced activity | *"There's no sold work last year to measure a gross margin on."* / *"There's no gross margin to give on sold work: every work item in it has an activity with no cost rate (3 work items)."* | ✅ rule *(Phase 3 — not 0%)* |
 | `what's my gross margin this year?` → `and last year?` / `what's the gross margin for Bob Lee?` → `what about Ana Reyes?` | the same question for the new period or customer | ✅ rule *(Phase 3)* |
+| `what's my win rate?` / `what's our revenue this year?` / `what's my gross margin?` → `what about Bob Lee?` — a company-wide metric question, then a name | help — the follow-up swaps the name the question used, and it used none; ask "what's the win rate for Bob Lee?" | ⚠️ gap *(#789, 2026-10-01 — every metric shape since Phase 1; after a question that names someone, "what about …?" works)* |
 | `which customer has the best margin?` / `what's my gross margin by month?` / `markup by division` / `how does my margin this year compare to last year?` | said back — *"I can't rank by gross margin yet. Ask for one at a time — "what's the gross margin for Bob Lee?""* | ⚠️ gap *(decision 18)* |
 | `what's my markup?` (bare) | help — it may mean the default markup setting; ask "what's my average markup?" | ⚠️ gap *(Phase 3 — deliberately not read as the average)* |
 | `win rate by value` / `what share of my quoted dollars did I win?` | not read — a dollar-weighted win rate | ⚠️ gap *(decision 14 — the win rate counts estimates)* |
@@ -1108,7 +1109,8 @@ markup), `tests/test_metric_win_rate.py`, `tests/test_metric_margin.py`, `tests/
 `tests/test_metric_subject.py`, `tests/test_metric_periods.py`,
 `tests/test_metric_spec.py`; multi-turn: the `METRICS` conversations in
 `tests/maple_conversations/corpus.py`. Open: #783 (an estimate title is not a
-subject), #784 ("won" in a count is the Won status).
+subject), #784 ("won" in a count is the Won status), #789 ("what about Bob
+Lee?" after a company-wide question).
 
 
 # 2. Properties
@@ -2506,8 +2508,9 @@ cd platform
 | metrics_paraphrase *(2026-09-30)* | 0/3 (known gap) | not yet run | LLM tier's by design: classifier + metric spec (§1.12) |
 | metrics_ranking *(2026-09-30, Phase 2)* | 4/4 | not yet run | covered (rankings and by month, §1.12) |
 | metrics_compare *(2026-09-30, Phase 2)* | 3/3 | not yet run | covered (period comparisons, §1.12) |
+| metrics_ratio *(2026-10-01, Phase 3)* | 4/4 | not yet run | covered (win rate, gross margin, average markup, §1.12) |
 
-**Totals: Tier 1 184/198 · Tier 2 173/182 + 16 not yet run** *(Tier 1 2026-09-30 — the four metrics categories added 16 cases, 13 passing and 3 known rule-tier gaps; Tier 2 last live run 2026-09-24, the other rows are the 2026-07-29 counts, unchanged)*.
+**Totals: Tier 1 188/202 · Tier 2 173/182 + 20 not yet run** *(Tier 1 2026-10-01 — the five metrics categories added 20 cases, 17 passing and 3 known rule-tier gaps; Tier 2 last live run 2026-09-24, the other rows are the 2026-07-29 counts, unchanged)*.
 
 *2026-09-24 run: Tier 2's 9 misses are the same classes as below, with one
 swap — `verbless/property` "tell me about 123 Main St" missed once (the model

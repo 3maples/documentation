@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **789**. Never
+- **Entries are numbered and permanent.** Next free number: **790**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2599,6 +2599,11 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/agents/conversation/followup.py:83` — `_compared_over` searches `previous` with `_COMPARISON_RE` (two lazy `.*?` gaps and a backreference) before checking whether the new target is a unit at all, so every elliptical follow-up pays for it. Super-linear: 2,000 characters take 0.056 s, 4,000 take 0.44 s (verified), 8,000 about 3.3 s. Messages are capped at 2,000 characters, so today's worst case is ~60 ms on the event loop; a stored rewrite or translation can be longer. Low because the cap bounds it now; the same class of bug as review 2026-09-27 #13. (Second code review of Maple metrics Phase 2, 2026-09-30.)
 
 **Suggested fix:** Check `_NEW_UNIT_RE.match(new_target)` first and return None early; bound the gaps (`.{0,80}?`) so the search is linear. Add a timing test on a 4,000-character previous message.
+
+### 789. [LOW] "What about Bob Lee?" after a company-wide metric question goes to help
+`platform/agents/conversation/followup.py:120` — `rewrite_elliptical` swaps the name the previous read used (`labels`, from the reply's `filter_by.name`). A company-wide metric question ("what's my win rate?", "what's our revenue this year?", "what's my gross margin?") names no one, so there is nothing to swap and "what about Bob Lee?" falls to the guide. After a question that names someone it works. True of every metric shape since Phase 1; found writing the Phase 3 corpus conversation (2026-10-01). Phrasing reference §1.12 ⚠️ row.
+
+**Suggested fix:** For an `analytics_metric` read with no label, append ` for <name>` to the previous message when the new target is a name (not a period) — but only when the previous message has no status subject ("on lost estimates") the appended name would be read into. Tests: win rate, a total and a ranking, each company-wide then "what about Bob Lee?".
 
 ## Platform — API, models and data
 

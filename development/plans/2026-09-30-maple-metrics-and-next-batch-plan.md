@@ -515,7 +515,7 @@ round before the push.
 | 4 | **Margin and markup routing.** Entries for "what's my gross margin (this year)?", "what's my average markup?", "what margin am I making on Bob Lee's jobs?", "margin on landscaping work". Reject rows: one work item or estimate ("the gross margin on it / on work item 2 / on E0042" stay the focus questions'), help ("what's the difference between markup and margin?", "how is the profit margin calculated?", "what markup do I need for a 20% margin?"), writes ("set the margin to 30%", "I want a 30% margin on …"), and the catalog setting ("what's my material markup?"). Reviewed snapshot diff. *Done 2026-10-01 together with tasks 5–6 (reading and answers), as task 3 was; the snapshot didn't move — none of its messages was a margin question. Bare "what's my markup?" stays help (it may mean the default setting).* | M | platform |
 | 5 | **Reading.** `MetricAsk.metric` gains `win_rate`, `margin` and `markup`; a said status narrows them; "before tax" on a margin is redundant and read silently. A ratio asked as a ranking, by month or a comparison is said back (decision 18). Reading tests per entry. | S | platform |
 | 6 | **Answers.** *"Your win rate this year is 62% — 18 sold (Won, Scheduled, Completed) against 11 Lost. Open estimates aren't counted."* *"Gross margin on sold work this year: 23.4% — $41,200.00 on $176,000.00 of pre-tax selling price, across 31 estimates. Overhead is deducted; tax is left out."* Markup says it's weighted by cost. Items left out are named with the reason; "nothing to measure" is not 0%. Seeded answer tests pin exact figures. | M | platform |
-| 7 | **Follow-ups.** "and last year?", "what about Elm House?" after each; a subject from focus (the property open on the page). Tests only, unless one fails. | S | platform |
+| 7 | **Follow-ups.** "and last year?", "what about Elm House?" after each; a subject from focus (the property open on the page). Tests only, unless one fails. *Done with tasks 3–6 (their tests); #789 logged.* | S | platform |
 | 8 | **LLM tier.** `MetricSpec.metric` gains the three; `ask_from_spec` declines a ratio in a non-figure shape. *Done 2026-10-01 — kept rather than declined, so the answer says it back as the rules tier does (a decline fell through to the dashboard's figures). The classifier's description of `analytics_metric` names the ratios too.* | S | platform |
 | 9 | **Docs and corpus.** §1.9 win-rate rows to the sold set; §1.12 rows; the Recent changes paragraph, open gaps, §12.3; a `metrics_ratio` coverage-matrix category; a corpus conversation (win rate → "for Bob Lee?" → "and last year?"); CLAUDE.md's pricing section (cross-estimate weighting) and "Metric questions" bullets; this plan. | S | platform, documentation, workspace |
 
@@ -525,6 +525,24 @@ with Scheduled or Completed work — so it's the one to review most carefully
 and worth a release note. 8 can follow separately.
 
 Decisions 14–18 are in §8.
+
+**Phase 3 done, 2026-10-01** (`78e28a9` … task 9). What changed on the way:
+
+- Tasks 3–6 and 8 carried their own reading and answers, so no commit sent a
+  ratio question somewhere that couldn't answer it: task 3 for the win rate,
+  4–6 together for margin and markup.
+- A win-loss phrasing no entry lists still reaches the dashboard's handler,
+  which answers the same sold-set win rate — there is no second definition.
+- Bare "what's my markup?" stays help: it may mean the default setting.
+- The LLM step keeps a ratio asked as a ranking, by month or compared, so the
+  answer says it back (decision 18) instead of falling to the dashboard.
+- Task 7's follow-ups needed no code. Writing the corpus found #789: "what
+  about Bob Lee?" after a *company-wide* metric question goes to help — true
+  of every metric shape since Phase 1 — logged, not fixed here.
+- A win rate with nothing lost or nothing sold leaves out the "1:0" ratio.
+- Left open: #789; a `/code-review` round before the push; the live tier of
+  `metrics_ratio`; MongoDB 5.0+ on Dev and Prod Atlas (Phase 2's
+  `$dateTrunc`) before release.
 
 ### Phase 4 — Other resources (lower value, cheap after the engine)
 - **Line-level:** `how much have I quoted using Black Mulch?`, `how many hours
