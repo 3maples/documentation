@@ -390,6 +390,51 @@ that change how Phase 2 should be built:
   with like: the same number of days into the period, not a whole year
   against a partial one.
 
+### Phase 2 — task breakdown *(2026-09-30)*
+
+Checked against the code before writing:
+
+- **The division ranking exists in all but name.** `run_division_breakdown`
+  already sums work items by division (Lost left out, as the dashboard's
+  chart). "Which division earns the most?" is that list ranked; "breakdown of
+  estimates by division" and "estimate value by division" stay the dashboard's
+  answer (`analytics_estimates`, §1.9) — reject rows, not new entries.
+- **Month grouping can happen in Mongo, on the user's clock.** `$dateTrunc`
+  takes a time zone (Mongo 5.0+; local is 8.3 — confirm Dev and Prod Atlas
+  before task 2 ships). The date is `$ifNull: [<date field>, "$updated_at"]`,
+  the same fallback the period filter uses.
+- **Follow-ups mostly come free.** `followup.py` replays any `analytics_`
+  read, so "and last year?" and "what about Elm House?" work once a ranking or
+  comparison is an `analytics_metric` answer with `filter_by.name`. Refining
+  ("just the won ones") only knows `list_estimates` / `list_tasks` today —
+  task 8 decides whether a metric answer joins them.
+- **Ranked customers and properties are records.** Recorded with
+  `format_and_record_list_response` as contact / property rows, "the second
+  one" opens the record and "show more" pages, like any list.
+
+One commit per task, failing test first, related tests plus mypy/ruff each
+time, phrasing reference in the same commit as the phrasing. A `/code-review`
+round before the push, as for Phase 1.
+
+| # | Task | Size | Repos |
+|---|---|---|---|
+| **2a — the engine** ||||
+| 1 | **Rankings** (decisions 9, 12). `run_ranking(company_id, query, by, measure, limit, offset)` → rows (id, label, value, count) and the number of rows in all. `by`: property (`$group` on `property`), customer (the properties' `contacts`, one `Property` query; a shared property counts for each customer), division (the breakdown's per-item sums; count = estimates with work in it). `measure`: value or count. Ties by label. Tests: seeded company with a two-contact property, a two-property contact, a contact on none, a division-split estimate, `offset` paging. | M | platform |
+| 2 | **By month.** `run_by_month(company_id, query, zone)` — `$group` on `$dateTrunc` (month, the user's zone) of the date field with the `updated_at` fallback; every month in the period, $0 where empty; value and count. Tests: an estimate sold 11 p.m. Sept 30 in Toronto is September; fallback documents; empty months; a period across New Year. | M | platform |
+| 3 | **Comparison periods** (decision 11). `metric_periods.comparison(name, now, *, whole=False)` → (current, previous): like with like by default — this month so far against the same days of last month; "this year" against the same days last year; a whole previous period only when it is asked for ("all of last month") or the current one is over. Day 31 against a 30-day month ends at the month's end; Feb 29 handled. Labels say the days ("Sept 1–15"). | S | platform |
+| 4 | **Comparisons in the engine** (decision 10). `run_comparison` — two `run_metric` calls (gathered) → both results, the difference in dollars and percent (no percent when the earlier figure is $0). Tests: up, down, flat, from nothing, with a subject and a status. | S | platform |
+| **2b — Maple** ||||
+| 5 | **Routing.** `analytics_metric` grammar entries for rankings ("top 5 customers by won value", "who are my best customers", "which property has the most estimates", "which division earns the most"), by month ("value by month this year", "how much did I sell each month") and comparisons ("how does this month compare to last month", "this quarter vs last quarter", "am I up on last year?"). Reject rows: the sorted estimate list ("show me estimates with the highest total", "top 5 estimates", #722), Phase 1's biggest ("which estimate has the highest total?"), the dashboard breakdowns ("breakdown of estimates by division", "pipeline by status"), status comparisons ("won vs lost", "draft vs approved") and win rate (Phase 3). Reviewed routing-snapshot diff. | M | platform |
+| 6 | **Reading.** `MetricAsk` gains `shape` (figure / ranking / by_month / comparison), `by`, `measure`, `limit` and the comparison's terms; `read_metric_query` fills them from the slots, and every unread word is still refused (`_peel`). Reading tests per entry. | M | platform |
+| 7 | **Answers.** Ranking: numbered rows with value and count, naming statuses, period and tax, and the shared-property note when a property counts twice; rows recorded as records, so "the second one" opens it and "show more" pages. By month: one line per month and the total. Comparison: both figures, their days, and the change — *"Sold this month so far (Sept 1–15): $12,400 across 6 estimates; the same days last month: $9,800 across 5 — up $2,600 (+27%)."* Subject-scoped versions ("by month for Bob Lee", "compare Elm House to last year"). Seeded answer tests pin exact figures. | L | platform |
+| 8 | **Follow-ups.** "and last year?" and "what about Elm House?" for each shape; "top 10" / "show more" after a ranking; "the second one" after a ranking opens the contact or property. "Just the won ones" after a metric answer stays a gap (decision 13) — a ⚠️ row, no code. | M | platform |
+| 9 | **LLM tier.** `MetricSpec` gains `shape`, `by`, `measure`, `limit` and `compare` as fixed choices; prompt and `ask_from_spec` follow; the subject-in-message check still applies. Tests as task 13 of Phase 1. | S | platform |
+| 10 | **Docs and corpus.** Phrasing reference §1.12 (rankings, by month, comparisons, their follow-ups), the "Recent changes" paragraph, open gaps, §12.3; coverage-matrix categories `metrics_ranking` / `metrics_compare`; corpus conversations (top customers → "the second one" → "and last year?"; this month vs last month); CLAUDE.md "Metric questions" bullets; this plan. | S | platform, documentation, workspace |
+
+**Order and release points.** 1–4 add engine functions nothing calls yet, so
+they ship without a visible change. 5–8 switch the feature on; 5 is the one
+to review most carefully, since it changes routing. 9 can follow separately.
+
 ### Phase 3 — Ratios and margin
 - `win_rate` per customer / property / period: sold ÷ (sold + Lost)
   (decision 8). This **changes the existing answer** to "what's my win
@@ -530,3 +575,18 @@ All made 2026-09-30.
    + Completed. "In Won status" / "currently Won" is the literal status. Win
    rate = sold ÷ (sold + Lost). A period on won/sold filters `sold_at`, added
    in Phase 1a. Counts and lists of "won estimates" stay Won-only for now.
+
+Phase 2 decisions, also 2026-09-30:
+
+9. **A ranking with no measure named ranks by sold value** (Won + Scheduled +
+   Completed, decision 8), and the reply says so. "Most estimates" / "most
+   jobs" ranks by count.
+10. **A period comparison with no measure named compares sold value.** The
+    reply names how many estimates each figure covers, as every metric reply
+    does.
+11. **Like with like by default.** "This month vs last month" on Sept 15 is
+    Sept 1–15 against Aug 1–15; "all of last month", or a current period that
+    is over, compares whole periods. The reply names the days.
+12. **List size:** 5 when no number is given, at most 25; "show more" pages.
+13. **"Just the won ones" after a metric answer** is a gap for now (phrasing
+    reference ⚠️), not part of Phase 2.
