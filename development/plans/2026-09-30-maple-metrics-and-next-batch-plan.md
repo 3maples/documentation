@@ -554,6 +554,58 @@ Decisions 14–18 are in §8.
 - **Capability help (§11.1):** "what can you calculate?" / "can you tell me my
   sales?" answer with the metrics Maple has.
 
+### Phase 4 — task breakdown *(2026-10-01)*
+
+Checked against the code before writing:
+
+- **Nothing sums below the work item.** `cross_resource.estimate_line_filter`
+  only finds estimates that *have* a material or role; the list's total over
+  them sums whole `grand_total`s. No handler adds up a material's quantity, a
+  role's effort or their line dollars. `run_margin` already projects the line
+  fields, so a line sum is a projection plus a loop.
+- **Today's answers are wrong, not just missing.** "how many hours of Foreman
+  are in open estimates?" is a plain open-estimate count (Foreman dropped);
+  "how many materials per category?" answers the number of categories; "what's
+  my most expensive role?" / "average wage of my roles" go to help on *contact*
+  roles; "how much have I quoted using Black Mulch?" is a guide answer.
+- **Units don't add.** A material's price is per size and each size has its own
+  unit (bag, yard, pallet); a role's rate is per its unit (Hourly, Daily,
+  Each); activity effort has no unit of its own — it is the role's. So "hours
+  of Foreman" is hours only for an Hourly role, and an average price across
+  bags and yards means nothing (decisions 21, 23).
+- **Tasks have no grouping** and no engine: counts are `Task` queries in
+  `agents/task/service.py` with `list_filters.py`'s filters. "Finished" is a
+  status *name* (Done, Complete, …), since statuses are per company.
+- **The guide has no metrics.** Help answers come from
+  `platform/user_guides/users_guide.md`, which lists no figures, so "what can you
+  calculate?" can't name them until it does. "can you tell me my sales?"
+  already answers the sold figure — that stays.
+
+New engine modules: line sums live in `services/maple_metrics.py` (they read
+estimates); tasks and the catalog get `services/task_metrics.py` and
+`services/catalog_metrics.py` — the same rule (every number from a function,
+never an LLM), not the same collection.
+
+| # | Task | Size | Repos |
+|---|---|---|---|
+| **4a — estimate lines** ||||
+| 1 | **Line sums in the engine.** `run_line_totals(company_id, query, kind, ids)` → for each unit: quantity (material) or effort (role), × occurrences (no dollars — decision 19); estimates counted. Scoped as every metric (status, period, customer, property, division). Tests: two units of one material, a recurring item, a role on two estimates, an unmatched line, a division. | M | platform |
+| 2 | **Maple: routing, reading, answers.** "how much Black Mulch is in my open estimates?", "how many hours of Foreman are in open estimates?", "how much Foreman time did I sell this year?" ("how much have I quoted using Black Mulch?" — dollars — is a gap, decision 19). The name resolves against the catalog (material first, then role, as `_resolve_line_constraint` does). *"Black Mulch in your estimates, all time: 120 bags and 3 yards, across 9 estimates."* Reject rows: the list ("which estimates use Black Mulch?"), the catalog price ("how much does Black Mulch cost?"), the Calculator ("how much mulch do I need …"). Reviewed snapshot diff. | L | platform |
+| **4b — tasks** ||||
+| 3 | **Task counts by assignee and property.** `run_task_counts(company_id, by, filters)` — one `$group` over `Task`, with the list's filters (open, overdue, due windows); assignee labelled by the teammate's name, "Unassigned" a row. Maple: "how many overdue tasks does each person have?", "overdue tasks by assignee", "who has the most overdue tasks?", "how many open tasks per property?", "which property has the most tasks?". Recorded rows, so "the second one" opens it. | M | platform |
+| **4c — catalog** ||||
+| 4 | **Materials.** Per category counts ("how many materials per category?" — fixes today's wrong answer); the priciest / cheapest size and the average price **per unit** ("most expensive material", "average price of my bagged materials") — decision 23. | M | platform |
+| 5 | **Roles.** Highest / lowest rate and average wage or rate, grouped by unit ("most expensive role", "average wage of my roles"); fixes the misroute to contact-role help. *Tasks 4–5 done 2026-10-01 together: `services/catalog_metrics.py` and a router pre-handler, `agents/conversation/catalog_figures.py` (like `record_lists`), so the orchestrator's routing is unchanged; the snapshot didn't move. A category or material narrowing ("average price of my mulch") is a gap.* | S | platform |
+| **4d — capability help** ||||
+| 6 | **The guide learns the metrics.** A "Figures Maple can give you" section in `users_guide.md` (totals, averages, biggest, rankings, by month, comparisons, win rate, margin, markup, and 4a–4c), so "what can you calculate?" / "what numbers can you give me?" answer from it. §11.1 rows. | S | platform |
+| 7 | **Docs and corpus.** Phrasing reference §8 (lines), §7 (tasks), §4 / §5 (catalog), §11.1, Recent changes, §12.3; coverage-matrix categories; corpus conversations; CLAUDE.md; this plan. | S | platform, documentation, workspace |
+
+**Order and release points.** Each sub-phase stands alone. Suggested order by
+value for the effort: 4c and 4d first (they fix wrong answers and are small),
+then 4b, then 4a (the largest). Decision 24 picks the scope.
+
+Decisions 19–24 are in §8. Decision 19 drops the line dollars from tasks 1–2: quantities and effort only.
+
 ### Documentation, per phase
 
 `maple-phrasing-reference.md` is updated **in the same commit** as the code it
@@ -698,3 +750,23 @@ Phase 3 decisions, also 2026-09-30:
     "weighted the same way" as the margin.)
 18. **Ratios are figures only in Phase 3.** "Which customer has the best
     margin?", "win rate by month", "win rate this year vs last" are gaps.
+
+Phase 4 decisions, 2026-10-01:
+
+19. **No dollar sums of a material's or role's lines — out of scope.** Line
+    sums report quantities and effort only; "how much have I quoted using
+    Black Mulch?" is a gap (phrasing reference ⚠️). "Total value of estimates
+    using Black Mulch" stays the estimates' totals, as today.
+20. **Line sums count every estimate unless a status is said** ("quoted",
+    "in my estimates"), the default set, like a total; "sold" / "won" is the
+    sold set.
+21. **Quantities and effort are reported per unit, never converted** — "120
+    bags and 3 yards", "64 hours and 2 days". "Hours of Foreman" counts only
+    an Hourly role's effort as hours and says so for any other unit.
+22. **Task counts by person or property count open tasks** (not finished, not
+    archived) unless "overdue", "all" or a due window is said.
+23. **Catalog prices are compared within a unit**: "most expensive material"
+    names the priciest size with its unit; "average material price" is given
+    per unit ("$12.40 a bag across 18 sizes; $46.00 a yard across 5") — never
+    one average across units. Sizes with no price are left out and counted.
+24. **Scope**: all of 4a–4d, in the order 4c, 4d, 4b, 4a.

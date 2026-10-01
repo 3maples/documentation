@@ -114,6 +114,14 @@ counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
 for Bob Lee in review?" asks which status was meant instead of counting won and
 ignoring the rest (#780) (§1.1).
 
+**2026-10-01 (metrics plan, Phase 4):** **catalog figures** — "how many
+materials per category?" lists every category with its count (it gave the
+number of categories); "what's my most expensive material?", "what's my
+average material price?", "what's my most expensive role?" and "what's the
+average wage of my roles?" answer from the catalog (they were guide answers,
+the role ones about *contact* roles). Prices and rates are compared within a
+unit and never averaged across units (§4.12, §5.11).
+
 **2026-10-01 (metrics plan, Phase 3):** **a win rate counts sold work** —
 Won, Scheduled and Completed against Lost (decision 8). "What's my win rate?",
 "won-lost ratio", "won vs lost", "how many estimates did I win vs lose?" and
@@ -1403,6 +1411,22 @@ A create that is missing details asks for the next one alone, remembers which, a
 | `Clear Coat` / `Set Up` — a category or unit the company **has**, whose name opens with a command verb | refused as the answer: `bare_answer` rejects a reply that opens with a command verb | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
 | `Clear Stone` in reply to *"What's the material called?"* | refused as the name for the same reason | ⚠️ gap *(deferred 2026-09-29 — name-answers plan §7)* |
 
+## 4.12 Catalog figures *(2026-10-01, metrics plan Phase 4)*
+
+Answered by the router pre-handler `agents/conversation/catalog_figures.py`
+from `services/catalog_metrics.py` — every number from a function, as for the
+estimate metrics (§1.12). Prices are compared **within a unit** and never
+averaged across units (decision 23); a size with no price is left out and the
+reply says how many.
+
+| Phrasing | Answer | Status |
+|---|---|---|
+| `how many materials per category?` / `how many materials do I have in each category?` / `materials by category` / `how many materials does each category have?` | *"Your materials by category:\n- Bulk Materials: 2 materials\n- Masonry: 1 material\n- Soil: 1 material\n4 materials in 3 categories."* — every category, an empty one included | ✅ rule *(it answered the number of categories)* |
+| `what's my most expensive material?` / `which material is the priciest?` / `which material costs the most?` / `what's my cheapest material?` | *"Your most expensive material by price is Pea Gravel (1 yd) at $49.50 per Cubic Yard."* — the size and its unit; it is "the first one" next | ✅ rule *(a guide answer with no figure)* |
+| `what's my average material price?` / `what's the average cost of my materials?` | *"Average material price, by unit:\n- Bag: $4.40 across 1 size\n- Cubic Yard: $40.33 across 3 sizes\n- Each: $2.75 across 1 size\nPrices in different units aren't averaged together."* | ✅ rule *(a guide answer)* |
+| `what's the price of Topsoil?` / `how much does mulch cost?` / `how many materials do I have?` / `list my material categories` | one material's price, the count, the categories — not a catalog figure | ✅ rule |
+| `what's the average price of my mulch?` / `most expensive material in Bulk Materials` — a category or material narrowing | not read | ⚠️ gap *(Phase 4 — company-wide figures only)* |
+
 **Open gaps:** #700 (a size the material doesn't have "updated"), #701, #760 (space-grouped costs), #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697.
 
 ---
@@ -1477,6 +1501,19 @@ Note: "labor burden" and "unbillable rate" are company-level settings, not per-r
 As for materials (§4.11): `create a new role called Arborist` → *"What's the average wage for Arborist? For example: $30 an hour."* → `30` → *"Is Arborist paid hourly, daily or per job?"* → `hourly` → created. `add a labour role` asks *"What's the role called?"* first — a name that opens with a verb (`Load Truck`) is the name (2026-09-30, phase 8), while a whole request (`list my roles`) is still a request; `$30 an hour` answers the wage and the unit together. It said "To create a role, I'll need: unit, wage." and a bare "30" asked again. ✅ rule.
 
 Cross-resource phrasings (e.g. `which properties need a {role}?`) are tracked under §8.
+
+## 5.11 Role figures *(2026-10-01, metrics plan Phase 4)*
+
+As for materials (§4.12): rates and wages are compared within a unit —
+an hour against an hour, a day against a day — and a role with no rate is
+left out and counted.
+
+| Phrasing | Answer | Status |
+|---|---|---|
+| `what's my most expensive role?` / `which role has the highest rate?` / `what's my cheapest role?` / `which role costs the most?` | *"Your most expensive role by rate is Heavy Equipment Operator at $64.80 an hour."* — one per unit when the roles are in several (*"…, by unit:\n- Hourly: Foreman at $60.00 an hour\n- Daily: Operator at $480.00 a day"*); it is "the first one" next | ✅ rule *(help about **contact** roles)* |
+| `who's my highest-paid role?` / `which role has the lowest wage?` / `which role gets paid the most?` | the same by average wage — *"Your lowest-paid role by wage is Landscaper at $25.00 an hour."* | ✅ rule *(help about contact roles)* |
+| `what's the average wage of my roles?` / `what's my average labour rate?` / `what's the average rate across my roles?` | *"Average wage of your roles: $36.67 an hour across 3 roles."* — per unit when there are several | ✅ rule *(help about contact roles)* |
+| `what's the average wage for Foreman?` | that role's wage (§5.8) — not a figure across roles | ✅ rule |
 
 **Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #678, #682, #683, #690, #693.
 
