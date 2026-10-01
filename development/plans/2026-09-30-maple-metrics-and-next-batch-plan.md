@@ -598,13 +598,31 @@ never an LLM), not the same collection.
 | 5 | **Roles.** Highest / lowest rate and average wage or rate, grouped by unit ("most expensive role", "average wage of my roles"); fixes the misroute to contact-role help. *Tasks 4–5 done 2026-10-01 together: `services/catalog_metrics.py` and a router pre-handler, `agents/conversation/catalog_figures.py` (like `record_lists`), so the orchestrator's routing is unchanged; the snapshot didn't move. A category or material narrowing ("average price of my mulch") is a gap.* | S | platform |
 | **4d — capability help** ||||
 | 6 | **The guide learns the metrics.** A "Figures Maple can give you" section in `users_guide.md` (totals, averages, biggest, rankings, by month, comparisons, win rate, margin, markup, and 4a–4c), so "what can you calculate?" / "what numbers can you give me?" answer from it. §11.1 rows. *Done 2026-10-01 — guide §6.6 "Asking for a figure" and a "Figures" bullet in "What Maple can help with"; 4a/4b add their lines to §6.6 when they land.* | S | platform |
-| 7 | **Docs and corpus.** Phrasing reference §8 (lines), §7 (tasks), §4 / §5 (catalog), §11.1, Recent changes, §12.3; coverage-matrix categories; corpus conversations; CLAUDE.md; this plan. | S | platform, documentation, workspace |
+| 7 | **Docs and corpus.** Phrasing reference §8 (lines), §7 (tasks), §4 / §5 (catalog), §11.1, Recent changes, §12.3; coverage-matrix categories; corpus conversations; CLAUDE.md; this plan. *Done 2026-10-01 — `metrics_lines` and `task_counts` categories (192/206), four corpus conversations.* | S | platform, documentation, workspace |
 
 **Order and release points.** Each sub-phase stands alone. Suggested order by
 value for the effort: 4c and 4d first (they fix wrong answers and are small),
 then 4b, then 4a (the largest). Decision 24 picks the scope.
 
 Decisions 19–24 are in §8. Decision 19 drops the line dollars from tasks 1–2: quantities and effort only.
+
+**Phase 4 done, 2026-10-01** (`55a2c69` … task 7), in the order 4c, 4d, 4b,
+4a. What changed on the way:
+
+- Catalog figures are a router pre-handler (like `record_lists`), so the
+  orchestrator's routing — and the snapshot — didn't move; the coverage
+  matrix can't score them, the corpus does.
+- Task groups ride the task list's own filters; "each person" / "each
+  property" are never names; the unassigned / no-property row is last, so a
+  recorded row's position is its number.
+- Line sums take the join from the caller (`extra_filters`); a material line
+  with no unit snapshot takes the catalog's unit for its size; a partial name
+  matching several records is asked back, not summed.
+- Gaps recorded: line dollars (decision 19); "what about Topsoil?" after a line
+  question; "who has the fewest tasks?"; a category or material narrowing of
+  catalog figures; the "which one?" for a line name isn't resumable.
+- Left open: a `/code-review` round before the push; the live tier of the new
+  coverage categories.
 
 ### Documentation, per phase
 

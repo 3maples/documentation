@@ -2603,8 +2603,10 @@ cd platform
 | metrics_ranking *(2026-09-30, Phase 2)* | 4/4 | not yet run | covered (rankings and by month, §1.12) |
 | metrics_compare *(2026-09-30, Phase 2)* | 3/3 | not yet run | covered (period comparisons, §1.12) |
 | metrics_ratio *(2026-10-01, Phase 3)* | 4/4 | not yet run | covered (win rate, gross margin, average markup, §1.12) |
+| metrics_lines *(2026-10-01, Phase 4)* | 2/2 | not yet run | covered (a material's quantity, a role's hours, §8.4) |
+| task_counts *(2026-10-01, Phase 4)* | 2/2 | not yet run | covered (by person and by property, §7.4.1); catalog figures are a router pre-handler's — the corpus covers them (§4.12, §5.11) |
 
-**Totals: Tier 1 188/202 · Tier 2 173/182 + 20 not yet run** *(Tier 1 2026-10-01 — the five metrics categories added 20 cases, 17 passing and 3 known rule-tier gaps; Tier 2 last live run 2026-09-24, the other rows are the 2026-07-29 counts, unchanged)*.
+**Totals: Tier 1 192/206 · Tier 2 173/182 + 24 not yet run** *(Tier 1 2026-10-01 — the seven metrics categories added 24 cases, 21 passing and 3 known rule-tier gaps; Tier 2 last live run 2026-09-24, the other rows are the 2026-07-29 counts, unchanged)*.
 
 *2026-09-24 run: Tier 2's 9 misses are the same classes as below, with one
 swap — `verbless/property` "tell me about 123 Main St" missed once (the model
