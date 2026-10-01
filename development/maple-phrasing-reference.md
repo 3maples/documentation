@@ -114,6 +114,12 @@ counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
 for Bob Lee in review?" asks which status was meant instead of counting won and
 ignoring the rest (#780) (§1.1).
 
+**2026-10-01 (metrics plan, Phase 4, tasks):** **task counts by person and
+by property** — "how many overdue tasks does each person have?", "how many
+tasks per property?", "who has the most overdue tasks?" — open tasks unless
+"overdue" or "all" is said (§7.4.1). They were a flat list or one total;
+"each person" was looked up as a teammate.
+
 **2026-10-01 (metrics plan, Phase 4, help):** "what can you calculate?" /
 "what numbers can you give me?" answer with the figures Maple gives — the
 user guide gained section 6.6, "Asking for a figure" (§11.1).
@@ -1662,6 +1668,21 @@ Bare-title possessives carry no "task" keyword for the rule tier to anchor on, a
 ## 7.4 Count (all ✅ rule)
 
 `how many tasks do I have?` · `count my tasks` · `total number of tasks` — `list_tasks` count path → `format_count_response`. Every §7.5 filter applies to a count too: `how many tasks are overdue?` → "You have 1 overdue task." *(2026-09-27, #687)*
+
+### 7.4.1 Counts by person and by property *(2026-10-01, metrics plan Phase 4)*
+
+Counted by one `$group` (`services/task_metrics.py`) over the tasks the list's
+own filters match (`list_filters.task_group_of`). **Open tasks** unless
+"overdue", "all", a status or a due window is said (decision 22); the
+"Unassigned" / "No property" row is always last, and never "the most".
+
+| Phrasing | Answer | Status |
+|---|---|---|
+| `how many tasks does each person have?` / `how many open tasks does everyone have?` / `tasks by person` / `how many tasks are assigned to each person?` | *"Your open tasks by assignee:\n1. Jordan Crew — 2 tasks\n2. Sam Owner — 1 task\n3. Unassigned — 1 task\n4 open tasks in all."* | ✅ rule *(a flat list or one total; "each person" was looked up as a teammate; "tasks by person" was unknown)* |
+| `how many overdue tasks does each person have?` / `overdue tasks by assignee` / `all tasks by assignee` | the same for overdue tasks, or every task not archived | ✅ rule |
+| `how many tasks per property?` / `how many tasks does each property have?` / `count my tasks by property` | *"Your open tasks by property:\n1. Elm House — 2 tasks\n2. 12 Oak St — 1 task\n3. No property — 1 task\n4 open tasks in all."* — properties link to their page and are "the first one", "the second one" next | ✅ rule |
+| `who has the most overdue tasks?` / `who has the most tasks?` / `which property has the most tasks?` | *"Jordan Crew has the most overdue tasks — 1."*; a tie names both (*"… have the most open tasks — 2 each."*) | ✅ rule *(the last was help)* |
+| `who has the fewest tasks?` / `which teammates have no tasks?` | not read — teammates with none aren't in the count | ⚠️ gap |
 
 ## 7.5 Filter / find
 
