@@ -114,6 +114,19 @@ counted Min's won ones, and Jasmine's too (#779); and "how many won estimates
 for Bob Lee in review?" asks which status was meant instead of counting won and
 ignoring the rest (#780) (§1.1).
 
+**2026-09-30 (review of the metrics work):** a metric question no longer
+answers for the wrong record — "what's our revenue excluding Elm House" was
+Elm House's revenue, and "over the last year" found a customer called Grover;
+a scope the rules can't read now goes to the LLM tier, and a part of a name
+matches only whole words. "How much has he spent?" is the customer in focus.
+Two customers with one name are counted together instead of a "which one?"
+that never ended. Answering "Which one did you mean?" with "Tim Hortons" no
+longer rewrites "lifetime". "Whats my pipeline" is the pipeline again, not a
+material; "how much is the total?" about the open estimate is answered again;
+"how many estimates for Min Won this year?" counts Min Won's. The router's
+task-note rule no longer claims "don't add a note to the task" (§1.1, §1.2,
+§1.9, §1.12, §7.6).
+
 **2026-09-30 (metrics plan, Phase 1 task 9):** estimate totals are summed by
 the new metrics engine. "What's the total of those?" and "the total value of
 my open estimates" now add up every matching estimate — they summed the first
@@ -362,7 +375,7 @@ a note to a material or role. **Refused by the planner:** labor burden
 | after an estimate count or list: `how many have been sold?` / `how many are won?` / `how many are on hold?` | a count by that status that keeps the customer, property, period or amount the last read was narrowed to — after "list my estimates for Bob Lee": *"You have 2 sold estimates for Bob Lee."* | ✅ rule *(2026-09-29 — the first version counted company-wide after a customer's list. `followup.py::_count_by_status`; when the last read had a status AND a scope ("how many estimates did I win this month?") the rule steps aside, since which words to swap is a guess. "how many of those are won?" narrows the list instead and is not this rule)* |
 | `how many estimates for Bob Lee?` / `how many won estimates for Bob Lee?` / `how many sold estimates for Bob Lee this year?` / `how many estimates for Bob Lee in draft status?` / `how many estimates for Bob Lee that are won?` / `… in review?` / `… on hold?` / `… over $1000?` / `show me draft estimates for Bob Lee` | `list_estimates` for that customer (or property), with the status and period | ✅ rule *(2026-09-29 — the customer was dropped from every count and every status list, so each counted the whole company. The `list_estimates` entry takes a status before "estimates" and a name after "for"; a trailing period, amount or status — "this year", "over $1000", "with status X", "in draft status", "that are won", in any order — is read off the name, and a status read off it is the one applied: `agents/estimate/list_query.py::read_list_query` reads name, status and status set in one pass. `tests/test_estimate_list_answers.py` checks what was actually counted against a seeded database)* |
 | any estimate count, list, empty list or total | the reply names everything it was narrowed by — *"You have 2 sold estimates for Bob Lee in the last year."*, *"Here are your won estimates for Bob Lee:"*, *"You don't have any sold estimates in the last month."*, *"The combined value of your 2 sold estimates in the last month is $1,500.00."* | ✅ rule *(2026-09-29 — a scoped count read as company-wide, and "show me won estimates for Bob Lee" was headed "Estimates for Bob Lee:". An unfiltered reply reads as before)* |
-| `how many estimates for Min Won?` / `how many draft estimates for Min Won?` / `show me estimates for Min Won` — a surname (or property name) that ends in a status word | that customer's estimates; a status said outside the name still applies | ✅ rule *(2026-09-30, #779 — "Won" was read off the name as a status and "Min" substring-matched other contacts. The whole name is looked up exactly first; the status is read off it only when the whole name is no one's)* |
+| `how many estimates for Min Won?` / `how many draft estimates for Min Won?` / `show me estimates for Min Won` / `how many estimates for Min Won this year?` / `… for Min Won in review?` — a surname (or property name) that ends in a status word | that customer's estimates; a status said outside the name still applies | ✅ rule *(2026-09-30, #779 — "Won" was read off the name as a status and "Min" substring-matched other contacts. The whole name is looked up exactly first; the status is read off it only when the whole name is no one's. Review 2026-09-30 #3: also with a period or status after it, and when the orchestrator's contact rule hands over the whole name)* |
 | `how many won estimates for Bob Lee in review?` / `how many draft estimates for Bob Lee that are sold?` | *"That asks for two statuses at once — review or won. Which one did you mean? Ask again with just one …"* | ✅ rule *(2026-09-30, #780 — the first status read was counted and the other dropped. Not a resumable question: re-ask with one status)* |
 | `what's the total value of sold estimates for Bob Lee?` / `total value of estimates for Bob Lee` | the customer's total — *"Sold value for Bob Lee, all time: $2,000.00 across 2 estimates (Won, Scheduled, Completed), including tax."* | ✅ rule *(2026-09-30 — a metric question, §1.12. It totalled every customer)* |
 
@@ -378,7 +391,7 @@ a note to a material or role. **Refused by the planner:** labor burden
 
 Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads the response with the dollar amount.
 
-**Questions about one estimate** *(2026-09-27, #691)* — answered from the estimate, ahead of the user-guide help that used to take them (`agents/estimate/focus_questions.py`). The estimate is named by code or title, or is the one in focus ("it", or no reference at all). Plural "estimates", a work item, and how-to questions are not these.
+**Questions about one estimate** *(2026-09-27, #691)* — answered from the estimate, ahead of the user-guide help that used to take them (`agents/estimate/focus_questions.py`). The estimate is named by code or title, or is the one in focus ("it", or — with no reference — the plainest shape: "what's the total?", "how much is the total?", "who's the customer?"). Plural "estimates", a work item, and how-to questions are not these.
 
 | Phrasing | Answer | Status |
 |---|---|---|
@@ -390,6 +403,7 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `when was it created?` / `when was {EST} last updated?` / `what's the code for this estimate?` | the date / the code | ✅ rule |
 | `show me estimate {EST}` | the details now include "Property: 12 Oak St — Ana Reyes" | ✅ rule *(2026-09-27)* |
 | with an estimate open: `what is markup?` / `what's the difference between markup and gross margin?` / `how much does mulch cost?` / `what's the address for bob lee?` / `what's my average markup?` | not a question about that estimate — goes on to help, the catalog or the contact | ✅ rule *(2026-09-30, #719 — each got the open estimate's figure. With no reference, only "it"/"this" or the plainest "what's the <field>?" is about the open estimate)* |
+| with an estimate open: `how much is the total?` / `what's the status right now?` / `what's the total including tax?` / `what's the customer's name?` / `how much is it altogether?` | answered from the open estimate | ✅ rule *(review 2026-09-30 #5 — the #719 narrowing had sent them to help. `what's the total before tax?` is not: the answer is the tax-inclusive total; `what's the total altogether?`, with no "it", is not about one estimate. `how much is the mulch?` / `how much is the foreman?` is a price, not the estimate's total — second review #1. `how much is E0042 in total?` is E0042's total — second review #8)* |
 | `which estimate has the highest total?` / `what's the lowest total on an estimate?` | the estimates sorted by total, not "Which estimate would you like to view?" | ✅ rule *(2026-09-30, #720 — a ranking, average or comparison word is never about one estimate)* |
 
 **Title-based lookup** *(May expansion)*: when no estimate code is found in the query, `_resolve_estimate_by_title` extracts a title from quoted text (`"Untitled Estimate"`) or `title/called/named X` phrasings and searches by substring match. Single match → returns the estimate. Multiple matches → lists them and asks the user to pick by code.
@@ -816,7 +830,7 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `what's my pipeline?` / `how's my pipeline looking?` / `what's in my backlog?` / `how much have I completed this month?` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-27, design §7.5 — they went to the user guide)* |
 | `show me my dashboard` / `give me a summary` / `how's business?` | `analytics_estimates` → Estimate Agent (Pipeline / Backlog / Completed) | ✅ rule *(2026-09-27 — they were unknown or help. A summary of one estimate — "give me a summary of E0042" — is not this.)* |
 | `how many estimates are in each status?` / `pipeline by status` / `estimates by status` / `estimate value by division` | `analytics_estimates` → Estimate Agent (breakdown) | ✅ rule *(2026-09-27 — "in each status" counted all estimates; "by division" was unknown)* |
-| `what is my pipeline worth` / `how big is my backlog?` / `hey maple, what's in the pipeline?` / `can I see my pipeline?` / `pipeline` / `backlog?` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-30, #721 — a pipeline/backlog question opens with a question or show word after at most a lead, or is the bare noun)* |
+| `what is my pipeline worth` / `how big is my backlog?` / `hey maple, what's in the pipeline?` / `can I see my pipeline?` / `pipeline` / `backlog?` / `whats my pipeline` / `which estimates are in my backlog?` / `is my pipeline growing?` / `i'd like to see my backlog` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-30, #721 — a pipeline/backlog question opens with a question or show word after at most a lead, or is the bare noun. Review 2026-09-30 #4: "whats", "which", "is/are my/our" and "I'd like to see" open one too — "whats my pipeline" went to the Material agent. "is the pipeline trench on the estimate?" / "are the pipeline fittings included?" are not metrics — second review #6)* |
 | `rename work item 2 to the pipeline trench` / `add a note to this estimate: locate the pipeline before digging` / `remove the pipeline flush activity from work item 2` | the command — never analytics | ✅ rule *(2026-09-30, #721 — they routed to `analytics_estimates` and nothing was written. A message the estimate grammar parses is never a metric, and "pipeline"/"backlog" mid-sentence is an ordinary word)* |
 | `check the pipeline under the driveway` / `we cleared our backlog of pavers` as a reply to Maple's question | the answer to the question | ✅ rule *(2026-09-30, #721 — read as a new analytics request, which dropped the question)* |
 | `what's my pipeline?` → `and last month?` | the same question for last month | ✅ rule *(2026-09-27 — a read that named no period takes the new one, §10.8; it became a material lookup)* |
@@ -925,7 +939,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** #783, #784 (metrics, §1.12); older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
+**Open gaps:** #783, #784, #785, #786, #787 (metrics, §1.12); older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
 
 ## 1.12 Metrics — totals, averages and the biggest, over many estimates *(2026-09-30)*
 
@@ -950,12 +964,28 @@ never by the LLM, and every reply names what it counted.
   days* starts at that day's midnight. With *won* / *sold* a period reads when
   the estimate was sold (`sold_at`); with another status, when it moved there
   (`status_changed_at`); with none, when it was created. An estimate from
-  before those dates existed is placed by `updated_at`.
+  before those dates existed is placed by `updated_at` — and a sale from then
+  is dated once, on its next move within the sold set, so Won → Scheduled →
+  Completed can't carry it from month to month.
 - **Who or what it is about**: a customer (every property they are on, each
   once), a property by name or street, a division, or the record in focus —
   *this property*, *them*, *it*. *My* / *our* / nothing is the whole company,
-  even with a record open. A name that matches several asks which; one that
-  matches nothing says so.
+  even with a record open. *He* / *she* / *they* is the customer in focus. A
+  part of a name counts only as whole words of it ("Lee" is Bob Lee, "Carl" is
+  no one), never a record's name inside what was said. A name that matches
+  several asks which; one that matches nothing says so. Two records with one
+  name — two customers called Dana Wu — are counted together; a customer and
+  a property with one name are offered as *"Birch Hollow (customer)"* /
+  *"Birch Hollow (property)"* (picking one works for "for Birch Hollow", not
+  yet for "how much has Birch Hollow spent" — #785). A full address ("12 Oak
+  St, Toronto") names its property; "in total" / "overall" after a name is all
+  of it, not part of the name.
+- **A scope the choices can't hold is never guessed**: *excluding Elm House*,
+  *since January*, *in 2025* are not read as a name — the rules step aside and
+  the LLM tier reads the question or declines it; declined (or off, as in
+  tests), the reply says what it can't narrow by instead of a wider figure. A
+  name with such a word in it ("Between the Pines", "Bob Till") is still a
+  name. The LLM tier's subject must be words of the message.
 - **Recurring work items** count every occurrence, as the estimate's total
   does.
 
@@ -963,18 +993,23 @@ never by the LLM, and every reply names what it counted.
 |---|---|---|
 | `what's the lifetime won amount from 12 Oak St?` / `… for this property` | *"Won value for 12 Oak St, all time: $5,000.00 across 2 estimates (Won, Scheduled, Completed), including tax."* | ✅ rule |
 | `how much have I sold to Bob Lee this year?` / `how much have they spent with us?` | the customer's sold total for the calendar year, across every property they are on | ✅ rule |
-| `how much did I win last quarter?` / `how much have we sold this month?` / `what's our revenue this year?` / `how much did we sell before tax this year?` | the company's sold total for the period | ✅ rule |
+| `how much did I win last quarter?` / `how much have we sold this month?` / `what's our revenue this year?` / `how much did we sell before tax this year?` / `how much did we sell over the last year` | the company's sold total for the period | ✅ rule *(the last read "over" as a customer — Grover Smith — review 2026-09-30 #1)* |
 | `what's the total value of won estimates for Bob Lee?` / `what is the won value for Bob Lee last month?` | the customer's total | ✅ rule |
 | `how much is still in draft for Elm House?` / `how much is on hold?` | that status's total | ✅ rule |
 | `what's the value of my Landscaping work?` | that division's work items only | ✅ rule |
 | `what's the average estimate value?` / `what's the average value of my won estimates?` / `what's Bob Lee's average job size?` | *"The average won estimate is $1,750.00, across 4 estimates (Won, Scheduled, Completed), including tax."* | ✅ rule |
 | `what's my biggest estimate?` / `what's my smallest won job?` / `what was the largest estimate for 12 Oak St last year?` / `which estimate has the highest total?` | *"Your biggest estimate is E0042 'Patio' at $3,000.00 (Completed, including tax)."* | ✅ rule *(the last was the sorted list, #720)* |
 | `how much have I sold to Ana?` (two Anas) | *"Which one did you mean: Ana Lopez or Ana Reyes?"* | ✅ rule |
+| `how much has he spent?` / `how much has she spent?` (a customer in focus) | that customer's sold total | ✅ rule *(review 2026-09-30 #8 — "he" searched every name containing "he")* |
+| `how much have I sold to Dana Wu?` (two customers called Dana Wu) | both, each property once | ✅ rule *(review 2026-09-30 #9 — "Which one did you mean: Dana Wu?" asked again after every answer)* |
+| `what's our revenue excluding Elm House` / `how much have I made since January` / `… in 2025` | the LLM tier's; without it, *"I can't narrow a total by "since January" yet. I can total by customer, property or division; …"* | ⚠️ gap *(review 2026-09-30 #1 — the first answered FOR Elm House; "since January" and "in 2025" were looked up as names. Second review #2: the fallback was the company-wide dashboard figure)* |
+| `what's the lifetime won amount for Between the Pines?` / `how much have I sold to Elm House in total?` / `… from 12 Oak St, Toronto?` | that property's total | ✅ rule *(second review 2026-09-30 #3, #4, #7)* |
+| `how much has Birch Hollow spent with us?` → *"Which one did you mean: Birch Hollow (customer) or Birch Hollow (property)?"* → `1` | — | ⚠️ gap *(#785 — the option's "(customer)" is written into a question shape that can't hold it)* |
 | `how much have I sold to Zed Zedson?` | *"I couldn't find a customer, property or division called Zed Zedson."* | ✅ rule |
 | `how much have I sold to Carla Diaz?` (no property) | *"Carla Diaz has no sold estimates (Won, Scheduled, Completed)."* | ✅ rule |
 | `what's my biggest estimate?` → `what's its status?` / `open it` | the estimate named is the one in focus, and the one row a pick reads | ✅ rule *(task 12)* |
-| `how much have I sold to Ana?` → *"Which one did you mean: Ana Lopez or Ana Reyes?"* → `Ana Reyes` (or `2`) | the question runs again for Ana Reyes | ✅ rule *(task 12 — the name goes into the question, `record_names.ask_to_rewrite`; also after "I couldn't find …" and "Which property do you mean?")* |
-| `how much have I sold to Bob Lee this year?` → `and last year?` / `what's the lifetime won amount from 12 Oak St?` → `what about Elm House?` | the same question for the new period or the new place | ✅ rule *(task 12 — §10.8)* |
+| `how much have I sold to Ana?` → *"Which one did you mean: Ana Lopez or Ana Reyes?"* → `Ana Reyes` (or `2`) | the question runs again for Ana Reyes | ✅ rule *(task 12 — the name goes into the question, `record_names.ask_to_rewrite`; also after "I couldn't find …" and "Which property do you mean?". The name replaced is the last whole-word one: "the lifetime won amount for Tim" → "Tim Hortons" once made "lifeTim Hortonse", review 2026-09-30 #6)* |
+| `how much have I sold to Bob Lee this year?` → `and last year?` / `what's the lifetime won amount from 12 Oak St?` → `what about Elm House?` | the same question for the new period or the new place | ✅ rule *(task 12 — §10.8. The name swapped is the last whole-word one — review 2026-09-30 #7)* |
 | a total that includes recurring work | *"… including tax. Recurring work is counted for every visit it's scheduled for."* | ✅ rule *(task 12)* |
 | `how much have I sold this year?` on the **public** widget | *"I can't see anyone's estimates from here — I'm in read-only demo mode. Sign up …"* | 🛑 refusal *(task 12 — the widget has no company; a figure would be made up)* |
 | `what has Bob Lee bought from us over the years?` / `which job this year brought in the most money?` — no grammar entry reads it | the classifier picks `analytics_metric`; a worker model fills the same fixed choices (`agents/estimate/metric_spec.py`, fenced, usage-tagged `orchestrator.metric_spec`) and the engine answers | 🤖 LLM *(task 13 — off in tests; "not a metric" falls back to the dashboard answers. Coverage matrix `metrics_paraphrase`)* |
@@ -1559,7 +1594,7 @@ Additive is the default, matching estimate notes (§5.x) — a drive-by note nev
 | `Add another note: {text}` / `add a note: {text}` — **no target at all** | `update_task` (notes append) → Task Agent | ✅ rule *(2026-07-25 smoke-test fix — the active task is implied, same as the pronoun forms. 2026-09-24 — routing is now rule-tier: `is_note_add_request` sends a targetless note to whichever domain was touched most recently; before, the borrowed domain plus `add` resolved to `create_task`.)* |
 | `replace the notes on the task with: {text}` / `set the notes on the task to: {text}` | `update_task` (notes **set**) → Task Agent | ✅ rule |
 | `add a task with the notes: {text}` | `create_task` → Task Agent | ✅ rule *(create shape — the notes-update rule explicitly excludes it)* |
-| `don't add a note to it: call Bob` / `we shouldn't set the notes on the fence task to foo` / `please don't add to the task: call Bob` / `don't add to T0042 bring the contract` | nothing changes | ✅ rule *(2026-09-30, #762 — they appended or replaced the notes. The notes shapes are anchored with `_COMMAND_LEAD`)* |
+| `don't add a note to it: call Bob` / `we shouldn't set the notes on the fence task to foo` / `please don't add to the task: call Bob` / `don't add to T0042 bring the contract` | nothing changes | ✅ rule *(2026-09-30, #762 — they appended or replaced the notes. The notes shapes are anchored with `agents.text_utils.COMMAND_LEAD`, and so are the router's copies of them — review 2026-09-30 #13: they still routed to `update_task`, which asked what to change)* |
 | `add a note to it: don't park on the lawn` / `add to the fence task: we shouldn't dig here` | `update_task` (notes append) — the note's own words are content, never a negated command | ✅ rule *(2026-09-30, #762 — the anchor sits before the verb, so the note body is untouched)* |
 
 ### 7.6.1.1 Dictated payloads — the first intent wins

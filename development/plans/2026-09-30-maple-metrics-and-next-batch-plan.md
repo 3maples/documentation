@@ -358,6 +358,25 @@ they change routing.
 - Left open: #783 (an estimate title as a subject), #784 (won in counts vs
   money); the LLM tier's live run of `metrics_paraphrase` is the user's.
 
+**Code review of Phases 0–1, 2026-09-30** — 20 findings, all fixed. The ones
+that change how Phase 2 should be built:
+
+- **A metric question's tail must be fully read.** `metric_query._peel` now
+  refuses (returns None) when words are left that aren't "for <name>";
+  "excluding X", "since …", "in 2025" were read as names. Phase 2's ranking
+  and comparison entries reuse `_M_TAIL`, so they inherit this.
+- **Subjects match whole words, never the reverse.** `metric_subject._by_name`
+  no longer trusts the finders' two-way substring match; same-named records
+  merge, and a customer/property clash is offered as "X (customer)".
+- **`sold_at` for pre-deploy sales**: `status_patch(..., record=)` dates one on
+  its first move within the sold set (decision 2 refined; still no backfill).
+- **The engine pre-filters a division in Mongo** (`division_clause`, shared
+  with the list filter), computes `has_recurring` in its `$group`, and
+  `run_metric` is split into `_estimate_metric` / `_item_metric` — the place
+  Phase 2's breakdowns attach.
+- **The LLM tier's subject must be words of the message**, and its prompt
+  declines scopes the choices can't express.
+
 ### Phase 2 — Rankings and breakdowns
 - `who are my top 5 customers by won value?`, `which property has the most
   estimates?`, `which division earns the most?`, `value by month this year`.

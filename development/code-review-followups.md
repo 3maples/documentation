@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **785**. Never
+- **Entries are numbered and permanent.** Next free number: **788**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2579,6 +2579,21 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/agents/estimate/metric_query.py` vs `platform/agents/estimate/list_query.py` — decision 8 (2026-09-30) made "won" in money and win-rate questions Won + Scheduled + Completed; counts and lists kept "won estimates" as the literal status (§1.1: "a named status still wins"). So "how much did I win?" can cover more estimates than "how many won estimates do I have?". Every reply names the statuses it counted, so the difference is visible, but it is a difference. (Maple metrics plan, decision 8)
 
 **Suggested fix:** A user decision, not a code one: either align counts and lists with decision 8 (a behaviour change to §1.1 rows and `tests/test_estimate_list_answers.py`), or keep the split and say "won (Won status)" in count replies. Phase 3's win-rate change is the natural moment.
+
+### 785. [MEDIUM] The "X (customer)" / "X (property)" options break three of the four metric question shapes, so choosing one doesn't answer
+`platform/agents/estimate/metric_subject.py:189` — When a customer and a property share a name, the option picked is written back into the question as "Birch Hollow (customer)". The `m_owner` / `m_owner2` / `m_of` grammar slots allow only `[\w&'.-]`, so "how much has Birch Hollow (customer) spent with us?" and "what's Birch Hollow (customer)'s average job size?" no longer match any entry (verified: None), and go to the spec tier or the dashboard. Only the "for/from/at X" tail shape works. A typed "Birch Hollow" rewrites to the same question and asks again. (Second code review of the metrics work, 2026-09-30.)
+
+**Suggested fix:** Don't write the kind into the text. Keep the options as shown, but store `{option: kind}` on the rewrite record. On the answer, write back the bare name and set a one-shot `forced_metric_kind` (transient, like `forced_<domain>_id`) that `resolve_subject` reads first. Map a bare "customer" / "the property" reply to its option. Test with the owner shape and the `m_of` shape.
+
+### 786. [LOW] A city or province name matches every property in it as a metric subject
+`platform/agents/estimate/metric_subject.py:154` — The second round's #7 added "street, city" and the full address to `_names`, and `_names` feeds both the exact rung and the whole-word rung (`_has_words`). So "how much have I made from Guelph?" (or "… from ON") keeps every property in Guelph: an unbounded "Which one did you mean: …?" menu, or, with one property there, an answer labelled with that property's name rather than the city. Verified: `_has_words("14 elm st, guelph", "guelph")` is True. Low because the previous commit (HEAD) gave the same menu through the finder's substring match; the earlier round's fix had briefly made it "couldn't find". (Third code review of the metrics work, 2026-09-30.)
+
+**Suggested fix:** Use the address forms in the exact rung only: split `_names` into the words (name, street) and `_address_forms(doc)` ("street, city", full address), and check `exact` against both but `_has_words` against the words only. Add `resolve("Toronto")` → SubjectNotFound to tests/test_metric_subject.py (the seeded world has Toronto properties).
+
+### 787. [LOW] The "can't narrow" reply says "a total" for an average or a biggest-estimate question
+`platform/agents/estimate/metric_answers.py:122` — `_cannot_narrow` always says "I can't narrow a total by …", so "what's Bob Lee's average job size since March?" is told about a total. Wording only, no wrong figure. (Third code review of the metrics work, 2026-09-30.)
+
+**Suggested fix:** Pass the metric the grammar matched (read it from the slots as `read_metric_query` does, or have `unread_scope` return it too) and say "an average" / "the biggest estimate" / "a total" accordingly. Add one test for an average.
 
 ## Platform — API, models and data
 
