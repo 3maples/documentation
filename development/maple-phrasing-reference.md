@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-01
+**Last updated:** 2026-10-02
 
 ### Recent changes
 
@@ -887,6 +887,8 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `check the pipeline under the driveway` / `we cleared our backlog of pavers` as a reply to Maple's question | the answer to the question | ✅ rule *(2026-09-30, #721 — read as a new analytics request, which dropped the question)* |
 | `what's my pipeline?` → `and last month?` | the same question for last month | ✅ rule *(2026-09-27 — a read that named no period takes the new one, §10.8; it became a material lookup)* |
 | `what are my recent estimates?` / `show me my most recent estimates` | `list_estimates`, the newest 8 — the dashboard's Recent Estimates | ✅ rule *(2026-09-27 — help, or one row for a plural ask)* |
+| `show me recent draft estimates` / `my recent won estimates` / `my latest sent quotes` | the same, with that status | ✅ rule *(2026-10-02, #724 — a word or two between "recent" and the noun cut the list to one row, "Your latest estimate:")* |
+| `show me the last two estimates` / `my three most recent estimates` | that many, newest first | ✅ rule *(2026-10-02 — one to ten in words, as digits; "the last few estimates" is the newest 8. "estimates from the last two weeks" stays a date range, never two rows)* |
 | `how is the backlog value calculated?` / `what does pipeline value mean?` / `how is the completed value calculated?` | `help` → Orchestrator Agent | ✅ rule *(2026-06-20 — explanatory/definitional phrasing about a metric routes to HELP, not a value lookup. `_match_analytics_query` now redirects a recognized metric phrased with an explanatory cue (`calculated`/`computed`/`defined`/`mean`/…) to help; `calculated`/`computed` also added to `HELP_INSTRUCTIONAL_PATTERNS` for metrics without an analytics keyword.)* |
 
 **Status comparisons / ratios:** a win rate is a metric question (§1.12, `maple_metrics.run_win_rate`) since 2026-10-01. What stays here: `compute_status_comparison` counts each status for a literal pair ("won vs lost status", "draft vs approved") — all-time unless a date window is given, in which case it constrains `updated_at` — and `format_status_comparison` renders a reduced `A:B` ratio (with a win-rate percentage for the literal Won/Lost pair). A win-loss phrasing that reaches this handler without "status" is answered with §1.12's win rate.
@@ -1369,6 +1371,7 @@ A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft b
 | `delete size {size} for {material}` / `remove the {size} size from {material}` | `update_material` (remove) | ✅ rule |
 | `update the price for {material} with size {size} to $5` / `change the cost of the {size} size of {material} to 4.50` | `update_material` (one size) | ✅ rule |
 | `rename size {size} of {material} to 1 cubic yard` | `update_material` (rename) | ✅ rule |
+| `delete size 1 cu yd for Topsoil` / `rename size 1 cu yd of Topsoil to …` when Topsoil has no such size | *"Topsoil doesn't come in 1 cu yd — it comes in 1 yd, 2 cu ft, Bag."* — nothing changed | ✅ rule *(2026-10-02, #700 — replied "I've updated the material" and changed nothing. Sizes match whatever their case)* |
 | `how much is {material} in the {size} size?` / `find material {material} with size {size}` | `get_material` — that size's price and cost | ✅ rule |
 | `show all sizes for {material}` / `what sizes does {material} come in?` | `get_material` — *"Black Mulch comes in 2 sizes: 2 cu ft at 4.40, 1 yd at 38.50."* | ✅ rule |
 | `change its price to 5` on a material with several sizes → *"which size?"* → `2 cu ft` | the change, on that size | ✅ rule *(2026-09-27 — the answer didn't resume the edit)* |
@@ -1447,7 +1450,7 @@ reply says how many.
 | `what's the price of Topsoil?` / `how much does mulch cost?` / `how many materials do I have?` / `list my material categories` | one material's price, the count, the categories — not a catalog figure | ✅ rule |
 | `what's the average price of my mulch?` / `most expensive material in Bulk Materials` — a category or material narrowing | not read | ⚠️ gap *(Phase 4 — company-wide figures only)* |
 
-**Open gaps:** #700 (a size the material doesn't have "updated"), #701, #760 (space-grouped costs), #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697.
+**Open gaps:** #701, #760 (space-grouped costs), #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697; #700 on 2026-10-02.
 
 ---
 
@@ -1703,6 +1706,7 @@ own filters match (`list_filters.task_group_of`). **Open tasks** unless
 |---|---|---|
 | `what tasks do we have at {property}?` / `tasks for the {property} property` | `list_tasks` filtered by property | ✅ rule *(2026-09-27; a property that doesn't match is answered — "I couldn't find a property called …")* |
 | `tasks assigned to {email}` / `tasks assigned to me` / `tasks assigned to Jordan` / `Jordan's tasks` | `list_tasks` filtered by assignee | ✅ rule *(2026-09-27 — the email is read whole (it stopped at the first ".", #687); a teammate by first, last or full name; an unknown name is answered, never dropped)* |
+| `tasks assigned to Jordan due today` / `tasks assigned to Jordan Crew at 12 Oak St` / `tasks assigned to Jordan marked done` | `list_tasks` filtered by the assignee and the other filter | ✅ rule *(2026-10-02, #717 — the surname is a capitalised word that opens no other filter; "assigned to Jordan due today" was a teammate called "Jordan due")* |
 | `tasks for Jordan` | property first, then teammate | ✅ rule *(2026-09-27)* |
 | `unassigned tasks` | `list_tasks` with no assignee | ✅ rule *(2026-09-27)* |
 | `list my tasks` | `list_tasks` (ALL tasks — "my" is not an assignee filter, matching every other resource; use "assigned to me" to filter) | ✅ rule |
@@ -1710,6 +1714,12 @@ own filters match (`list_filters.task_group_of`). **Open tasks** unless
 | `show open tasks` / `what's still to do?` | `list_tasks` leaving out finished tasks (a status named Done / Completed / Finished / Closed / Cancelled) | ✅ rule *(2026-09-27)* |
 | `show my overdue tasks` / `what's overdue?` | `list_tasks`, due before today and not finished, soonest first with each due date | ✅ rule *(2026-09-27)* |
 | `what's due today?` / `tasks due tomorrow` / `tasks due this week` / `tasks due next week` / `tasks due by Friday` / `tasks due on Oct 3` / `today's tasks` / `tasks for next week` | `list_tasks` with a `due_date` window, soonest first | ✅ rule *(2026-09-27 — no "task" word needed: only tasks have due dates. A week runs Monday to Sunday.)* |
+| `what's due?` / `anything due?` / `what's due next?` / `what's due now?` / `anything due already?` / `what's due for Jordan?` | the upcoming list below — for Jordan, property first, then teammate | ✅ rule *(2026-10-02, #718 — no date read meant no filter: every task, finished ones included, under "Here are your tasks", and "for Jordan" was dropped with the unread date)* |
+| `what's due for Jordan this week?` | due this week, for Jordan | ✅ rule *(2026-10-02 — "Jordan this week" was read as a place. A bare "this/next week/month" is a window only in a due question)* |
+| `what's due in progress?` / `tasks due marked done` | the status filter, on the upcoming list | ✅ rule *(2026-10-02 — a status after "due" isn't a date)* |
+| `what's due in the next 3 days?` / `tasks due within the next two weeks` / `what's due in the next week` | `list_tasks`, due from today for that many days or weeks | ✅ rule *(2026-10-02 — "in the next 3 days" was read as a status called "next 3 days"; "within the next 3 days" got the 7-day list. "in the …" is a status cue only before a column name)* |
+| `what's due 10/3` | *"I couldn't read '10/3' as a date — …"* | ⚠️ gap *(2026-10-02 — numeric dates aren't read anywhere in tasks: 10/3 is 3 October in the US and 10 March elsewhere, and there is no locale setting. Said back, never swapped for another window. "due Oct 3" works)* |
+| `tasks due whenever` / `what's due on the blue moon?` | *"I couldn't read 'whenever' as a date — try something like "due Friday", "due Oct 3" or "due this week"."* | ✅ rule *(2026-10-02, #718 — a date it can't read is said back, never dropped)* |
 | `upcoming tasks` / `what's upcoming?` / `what's coming up this week?` / `anything due soon?` | `list_tasks`, overdue or due in the next 7 days and not finished — overdue first, each row saying whether it's overdue | ✅ rule *(2026-09-27 — the dashboard's Upcoming Tasks card in words; overdue tasks were left out)* |
 | `what's on my plate?` / `what's on my to-do list?` | the same, assigned to you — the card's default view | ✅ rule *(2026-09-27 — went to the user guide)* |
 | `show archived tasks` | `list_tasks` with archived-only filter | ✅ rule |
@@ -1883,7 +1893,7 @@ Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-sup
 
 Task details (2026-09-27) also show the linked property, the estimate it was converted into, and how many photos and videos it has.
 
-**Open gaps:** #740 ("what is/are …" after a task list), #767 ("perfect," / "quick," / "one more thing," before a command), #774 ("I need you to …"), #717, #718, #761; older #442, #447 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27; #711, #713, #751 and #752 on 2026-09-29; #470 and #762 on 2026-09-30; #710 and #712 on 2026-10-01.
+**Open gaps:** #740 ("what is/are …" after a task list), #767 ("perfect," / "quick," / "one more thing," before a command), #774 ("I need you to …"), #761; older #442, #447 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27; #711, #713, #751 and #752 on 2026-09-29; #470 and #762 on 2026-09-30; #710 and #712 on 2026-10-01; #717 and #718 on 2026-10-02.
 
 ---
 

@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **803**. Never
+- **Entries are numbered and permanent.** Next free number: **805**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -1101,6 +1101,11 @@ both tables' headers.
 `platform/agents/task/text_helpers.py:333` — The status pattern copies the "task before the field" lead (`_COMMAND_LEAD` + verbs + `_TARGET_OR_PRONOUN` + optional possessive) instead of using `_TARGET_FIRST_LEAD`; the only difference is two extra verbs (move, mark). A later change to the shared lead — a new verb, say — would leave the status form behind. (review 2026-09-28 #6)
 
 **Suggested fix:** Build both from one helper, e.g. `def _target_first(verbs: str) -> str: return _COMMAND_LEAD + rf"(?:{verbs})\s+" + _TARGET_OR_PRONOUN + r"(?:['’]s)?\s+"`, with `_TARGET_FIRST_LEAD = _target_first("set|change|update|edit|modify")` and the status pattern using `_target_first("set|change|update|edit|modify|move|mark")`.
+
+### 803. [LOW] A third copy of the small-number words
+`platform/agents/task/list_filters.py:175` — The "wrong answers that look right" batch (#717/#718/#724) added `_SMALL_COUNTS` (list_filters.py:175, one…ten) and `_COUNT_WORDS` (estimate/crud_helpers.py:188, one…ten) beside the existing `_SMALL_NUMBERS` (task/text_helpers.py:992, a/an/one…three). Three maps for one idea drift apart: "in four days" works in a task list but not in a task edit, and the next person to add "eleven" adds it to one of three. LOW: no wrong answer today — each map covers what its parser accepts. (review 2026-10-02 round 3 #1)
+
+**Suggested fix:** Put one `SMALL_NUMBER_WORDS = {"one": 1, … "ten": 10}` in `agents/text_utils.py`, and have all three import it (text_helpers keeps its "a"/"an" → 1 as `{**SMALL_NUMBER_WORDS, "a": 1, "an": 1}` and widens `_IN_N_RE` to the shared words). Rerun test_task_list_filters.py, test_estimate_list_sort_words.py and the due-date tests in test_maple_task_operations.py.
 
 ## Accessibility
 
@@ -2278,7 +2283,10 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** In `_new_lines`, match history lines on (role, text) only and carry `display_text` onto `latest`'s matching lines. Better, translate before the turn's single save. Skip `_save_display_text` when the first save returned "".
 
-### 700. [MEDIUM] Removing or renaming a size the material doesn't have replies "I've updated the material"
+### 700. ~~[MEDIUM] Removing or renaming a size the material doesn't have replies "I've updated the material"~~ — RESOLVED 2026-10-02
+
+**Resolved 2026-10-02:** `_check_size_label_refusal` says a missing size back — "Topsoil doesn't come in 1 cu yd — it comes in 1 yd, 2 cu ft, Bag." — matching labels as `_build_sizes_from_fields` does (normalized, any case), and it now runs before the last-size check, so a one-size material isn't told it "needs at least one size" about a size it never had. It covers the classifier path as well as the size commands. Tests in `tests/test_material_agent.py`.
+
 `platform/agents/material/service.py:1769` — `_handle_size_command` never checks that `command.size` exists for remove or rename; `_build_sizes_from_fields` returns the sizes unchanged and the success reply (2192-2196) still goes out. "delete size 1 yd for Black Mulch" when the size is "1 cu yd" claims success. (review 2026-09-27 #26)
 
 **Suggested fix:** Look the size up on `target.sizes` with `_normalize_size_text` (case-insensitive). If it's missing, reply "X doesn't come in … — it comes in …", as the read op does.
@@ -2362,12 +2370,18 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Record a `pending_intents` entry with `choices` (task id, field, candidate ids), as `_stash_candidates_and_ask` does.
 
-### 717. [MEDIUM] "assigned to <name>" swallows the next word
+### 717. ~~[MEDIUM] "assigned to <name>" swallows the next word~~ — RESOLVED 2026-10-02
+
+**Resolved 2026-10-02:** The surname is case-sensitive (`(?-i:\s[A-Z]…)`) and may not be a word that opens another filter (due, at, for, marked, today, overdue …), so "Tasks Assigned To Jordan Due Today" is Jordan too. A lowercase surname ("assigned to jordan crew") is now just "jordan", which the teammate lookup resolves or asks about. Tests in `tests/test_task_list_filters.py`.
+
 `platform/agents/task/list_filters.py:56` — The optional surname `(?:\s[A-Z][A-Za-z'-]{0,30})?` is compiled with IGNORECASE, so it takes any word. "tasks assigned to Jordan due today" → assignee "Jordan due", and Maple replies "I couldn't find a teammate called Jordan due." An assignee can't be combined with any other filter. (review 2026-09-27 #44)
 
 **Suggested fix:** Make the surname part case-sensitive (`(?-i:\s[A-Z][A-Za-z'-]{0,30})`) and add `(?!\s(?:due|at|and|in|for|with|marked|status|that|which)\b)`. Add these cases to test_task_list_filters.py.
 
-### 718. [MEDIUM] Due questions without a parseable date list every task
+### 718. ~~[MEDIUM] Due questions without a parseable date list every task~~ — RESOLVED 2026-10-02
+
+**Resolved 2026-10-02:** `_DUE_RE`'s catch-all may not start with a filter word, so "what's due for Jordan?" keeps Jordan (property first, then teammate). "due" with no date after it is the upcoming list (overdue plus the next 7 days, not finished) — the dashboard card's. A date it can't read ("tasks due whenever") is `TaskListAsk.due_unread` and said back — "I couldn't read 'whenever' as a date …". The due phrase is scrubbed from the place search only once read. Tests in `tests/test_task_list_filters.py` and `tests/test_maple_task_operations.py::TestDueQuestionsWithoutADate`.
+
 `platform/agents/task/list_filters.py:44` — The catch-all `when` branch of `_DUE_RE` captures non-dates; the window comes back None, but line 192 still deletes the match. So "what's due for Jordan?" loses both the date and the person. It, "what's due?" and "anything due?" produce an empty filter, and the reply is "Here are your tasks:" with every task, including finished ones — a wrong answer that looks right. (review 2026-09-27 #45)
 
 **Suggested fix:** Remove the `_DUE_RE` match only when its window parses. When a due question yields no window, default to the upcoming window (overdue plus the next 7 days) or ask; `TaskListAsk.any` is there for the check.
@@ -2419,7 +2433,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Apply the same exclusions as #722 to this pattern, or drop `ha(?:s|ve)` from its verbs. Add reject rows.
 
-### 724. [MEDIUM] "show me recent draft estimates" is cut to one row
+### 724. ~~[MEDIUM] "show me recent draft estimates" is cut to one row~~ — RESOLVED 2026-10-02
+
+**Resolved 2026-10-02:** Up to two words may sit between the keyword and the plural noun (`\b{kw}\s+(?:\w+\s+){0,2}(?:estimates|quotes)\b`) → `_RECENT_ESTIMATES_LIMIT`; the singular stays one row. Tests in `tests/test_estimate_list_sort_words.py`.
+
 `platform/agents/estimate/crud_helpers.py:433` — This diff added bare `recent` to `date_kw`. The plural branch needs the noun right after the keyword, so "recent draft estimates", "recent won estimates" and "recent sent quotes" fall through to `limit = 1`, titled "Your latest estimate:". Before, these listed every matching estimate. (review 2026-09-27 #53)
 
 **Suggested fix:** Allow up to two words between the keyword and the noun (`\b{kw}\s+(?:\w+\s+){0,2}(?:estimates|quotes)\b`) → `_RECENT_ESTIMATES_LIMIT`. Add these cases to test_estimate_list_sort_words.py.
@@ -2660,6 +2677,11 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/routers/agent_helpers/estimate_resolver.py:46` — The task resolver's `_OBJECT_ID_RE` is `\b[0-9a-f]{24}\b` with IGNORECASE; the estimate side (`_MONGO_OBJECT_ID`, behind `names_a_database_id`) is `[0-9a-f]{24}` — lowercase only, no word boundaries. So an id typed in capitals isn't caught for an estimate (it falls through to the title and open-estimate rungs, as before #798), and any 24+ run of lowercase hex inside a longer token ends the estimate search. LOW: portal URLs carry lowercase ids and no ordinary word is 24 hex characters, so neither happens in practice. (tenant batch 3 review #1)
 
 **Suggested fix:** One definition for both: move `names_a_database_id` to `agents/text_utils.py` with `re.compile(r"\b[0-9a-f]{24}\b", re.IGNORECASE)`, and use it from the task resolver, `estimate_resolver` and `delegate_get_estimate`; add a capitals case to `test_an_estimate_id_in_the_message_names_no_estimate`.
+
+### 804. [LOW] A task-list place starting with "Next" or "This" is never read
+`platform/agents/task/list_filters.py:81` — `_PROPERTY_RE` refuses a place whose first word is `me|myself|today|tomorrow|this|next|the` (IGNORECASE), so "tasks at Next Door Landscaping" or "tasks at This Old House" finds no place and lists every task. Predates the "wrong answers that look right" batch; noticed while probing it. LOW: a place named that way is rare, and "tasks for the Next Door Landscaping property" can't reach it either. (review 2026-10-02 round 3, unnumbered)
+
+**Suggested fix:** Refuse "this"/"next" only when a date word follows — `(?!(?:me|myself|today|tomorrow|the)\b|(?:this|next)\s(?:week|month|year)\b)` — so "for next week" stays a window and "at Next Door Landscaping" is a place. Add both as rows in test_property.
 
 ## Platform — API, models and data
 
