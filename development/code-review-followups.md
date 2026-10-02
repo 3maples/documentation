@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **790**. Never
+- **Entries are numbered and permanent.** Next free number: **801**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -196,7 +196,12 @@ seams that already exist as separate classes.
 | Lines | Function |
 |------:|----------|
 | 729 | `_orchestrate_turn` — routers/agents.py:942 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) |
-| 376 | `update_estimate` — routers/estimates.py:1042 (grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
+| 381 | `update_estimate` — routers/estimates.py:959 (grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation, +5 on 2026-10-01 for the tenant checks; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
+| 124 | `create_estimate` — routers/estimates.py:299 (first measured 2026-10-01: 118 before, +6 for the property and line checks before the slot claim. Extract `_assert_create_refs(company_obj_id, payload)` — tenant batch 1 review #2) |
+| 99 | `duplicate_estimate` — routers/estimates.py:790 (first measured 2026-10-01: 93 before, +6 to drop another company's property from the copy; extract the clone into `_clone_estimate(source, user_email)`) |
+| 195 | `run_task_conversion` — services/task_convert.py:45 (first measured 2026-10-01: 191 before, +4 for the property check before the slot claim; split into claim / generate-and-save / file-photos / link-or-delete helpers) |
+| 62 | `update_task` — routers/tasks.py:308 (first measured 2026-10-01: 59 before, +3 for the property check. Add `_assert_property_belongs_to_company(property_id, company)` beside `_assert_status_belongs_to_company` and use it in both task routes — tenant batch 1 review #3) |
+| 57 | `create_task` — routers/tasks.py:98 (first measured 2026-10-01: 56 before, +1; the same helper — tenant batch 1 review #4) |
 | 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
 | ~264 | `TourRunner` — portal/src/components/tours/TourManager.tsx:83 |
@@ -2608,6 +2613,26 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** For an `analytics_metric` read with no label, append ` for <name>` to the previous message when the new target is a name (not a period) — but only when the previous message has no status subject ("on lost estimates") the appended name would be read into. Tests: win rate, a total and a ranking, each company-wide then "what about Bob Lee?".
 
+### 796. [LOW] The material agent still takes a unit id from the extracted fields
+`platform/agents/material/service.py:129` — `unit_oid` is in the allowed fields and `_normalize_fields` (~474) keeps any 24-hex value, which `text_helpers.py` ~374/402 writes onto a size; `_normalize_sizes_field` (`text_helpers.py` ~355) keeps a raw size `unit`. A typed id can reach `update_material` (the router now confines it to the company, so policy only). (tenant audit 2026-10-01, B1)
+
+**Suggested fix:** Drop `unit_oid` from the fields the classifier can fill (keep it internal-only, set after `_find_unit`), and resolve every size unit by name.
+
+### 797. [LOW] Five agents look a record up by an id the model pulled from the message
+`platform/agents/{material,contact,property,labour,equipment}/service.py` — each classifier schema has a `*_id` field, merged in and used to find the record (material 722–751, contact 809–838, property 891–921, labour 439–465, equipment 375–396), and each echoes "No X found for id '<typed>'". Company-scoped, so policy only. (tenant audit 2026-10-01, B2)
+
+**Suggested fix:** Remove the `*_id` fields from the classifier schemas; resolve by name, with server-owned anchors (`active_*_id`, `forced_*_id`) the only id route.
+
+### 798. [LOW] A 24-hex id in the message is used as a task or estimate reference
+`platform/agents/task/resolver.py:50`, `routers/agent_helpers/estimate_resolver.py:46`, `routers/agent_helpers/delegate_get_estimate.py:51` — explicit ObjectId regexes resolve a typed id (company-scoped via `load_company_estimate` / a compare after an unscoped `Task.get`). Policy only. (tenant audit 2026-10-01, B3)
+
+**Suggested fix:** Remove the ObjectId branches; tasks and estimates are named by readable id (T0001 / E0012) or title.
+
+### 799. [LOW] The estimate extraction lets model output override the company and property
+`platform/agents/estimate/extraction_helpers.py:171` — `payload.get("company") or company` / `payload.get("property") or property`; `merge_with_pending_estimate` (279) and `agents/estimate/text_helpers.py` 1183–1186 accept a typed 24-hex company. No save path persists it today (they use the request's values), but `parsed` is echoed by `/agents/estimate`. (tenant audit 2026-10-01, B4)
+
+**Suggested fix:** Always use the authenticated company and the request's property; never read them from model output.
+
 ## Platform — API, models and data
 
 **Resolved 2026-09-27** (platform `2c2e5d0`): `agents/conversation/out_of_chat.py` answers company default percentages, team/invitations, billing/plan/credits, Load Standard, CSV import, units, divisions, unlink, duplicate, the estimate document and photos with the place in the app where each is done (user-guide wording), as a policy refusal read on the command head only. Pinned by `tests/test_out_of_chat_redirects.py` (including false-positive guards: work-item markup, "the duplicate contact", "the invoice task", note bodies) and corpus rows `boundary-*`. Snapshot: "duplicate it" and "set the company's default markup for work items to 20%" now redirect.
@@ -2972,6 +2997,36 @@ geocode and note it in the comment.
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
 **Resolved 2026-09-27** (platform `c478a53`): `ConversationContext` carries a `version`, and a save is a `find_one_and_update` conditional on the version the turn loaded (`routers/agent_helpers/conversation_store.py`; a document from before versions matches version 0). On a conflict the turn's changes are merged onto the newer copy and the save retried: keys it changed or removed win, keys it left alone keep the other turn's value, and its new chat lines are appended after the other turn's (capped at 40). An identical message still in flight — the double-send that billed twice — is claimed first and refused with "I'm still working on that one"; different messages may overlap (and merge). A claim a crashed turn left expires after three minutes. Both fail open. The endpoint's body moved to `_orchestrate_turn`, wrapped by the claim. Pinned by `tests/test_conversation_store.py` (merge rules, the conditional save against the local test Mongo, the claim, and the endpoint's duplicate reply).
+
+### 790. [LOW] An estimate's activity role and rate card are saved unchecked
+`platform/routers/estimates.py:1169` — `activities[].role` and `activities[].effort_rate_card_id` (and the create path in `job_item_builders.py` ~176) are stored with no company check, so an estimate can link another company's role or rate card. Nothing is shown from them unless the same id is also a labours line, which batch 1 now checks. (tenant audit 2026-10-01, A3)
+
+**Suggested fix:** Check new ids with `dependencies.assert_company_refs` (Labour, RateCard), skipping ids already on the estimate, as `snapshots.assert_own_line_refs` does for lines (CLAUDE.md "Tenant scope of referenced ids").
+
+### 791. [LOW] A template's line ids are saved unchecked
+`platform/routers/templates.py:33` — create/update check `company` but not `materials[].material`, `activities[].role` or `effort_rate_card_id`. Maple's "create estimate from template" copies them as-is (`agents/estimate/crud_handlers.py` ~821); since batch 1 the next portal save of such an estimate is refused (404) rather than leaking, so the user hits an error instead. (tenant audit 2026-10-01, A7)
+
+**Suggested fix:** Check new line ids on template create/update with `assert_company_refs`, keeping ids already on the template.
+
+### 792. [LOW] Category and unit "in use" counts look across every company
+`platform/routers/material_categories.py` delete, `routers/material_units.py` delete, `services/material_category_bootstrap.py` ~63, `services/material_unit_bootstrap.py` ~66 — `Material.find(category == id)` / `{"sizes.unit": id}` have no company filter, so another company's materials pointing at X's category block X's delete and reveal a count. New links are refused since #702; old ones remain. (tenant audit 2026-10-01, A6)
+
+**Suggested fix:** Add `company` to each count query.
+
+### 793. [LOW] Deleting a property clears the property on estimates of any company
+`platform/routers/properties.py:539` — `Estimate.find(Estimate.property == property.id).update(property=None)` has no company filter, so a cross-company link written before batch 1 lets X's delete edit Z's estimate. (tenant audit 2026-10-01, A9)
+
+**Suggested fix:** Filter the cascade on `Estimate.company == property.company`.
+
+### 794. [LOW] Setting the default card doesn't check the card is the company's
+`platform/routers/billing.py:440` — `sync-payment-method` retrieves `body.payment_method_id` and sets it as the default without checking `pm.customer == company.stripe_customer_id`. Stripe should refuse a card not attached to the customer, so likely not exploitable. (tenant audit 2026-10-01, A10)
+
+**Suggested fix:** Refuse (404) when `pm.customer` isn't the company's Stripe customer, before the update call.
+
+### 795. [LOW] Archive/unarchive reveal another company's estimate status; an unscoped helper lingers
+`platform/routers/estimates.py:1390` / `:1469` — the status check runs before the tenant check, so a foreign id answers whether it is archived. `fetch_estimate` (~560) is an unscoped helper only re-exported from `routers/agents.py:153`. More broadly, most routes answer another company's id with 403 and a missing one with 404, which confirms existence. (tenant audit 2026-10-01, A11)
+
+**Suggested fix:** Move the tenant check first; delete `fetch_estimate` and its re-export; switch a route to 404-for-both when it is next touched.
 
 ## Platform — services, scripts and integrations
 
@@ -4779,6 +4834,11 @@ total row count rather than blank-row count.
 `platform/tests/test_maple_work_item_context.py:437` — all three cases ("show E0042", "delete E0042", "open E0042") fail at HEAD (`77e55ef`, verified 2026-09-30), alone and in a combined run: `RuntimeError: … got Future <Future pending> attached to a different loop` from a Beanie cursor under `EstimateAgent.process()` (`agents/estimate/service.py:854`). The test drives the agent with `asyncio.run` through `_say` against a stub world, and the reply path now reaches the database — likely a lookup added by the name-answers phases (the exact title lookup, or `named_answers.py`). The test itself last changed 2026-09-27. (found 2026-09-30 while running the list-estimate suites for #779/#780)
 
 **Suggested fix:** Find the query the reply path now makes (run one case with `-x --tb=long`) and either stub it in `wired` like `_resolve_estimate_code_or_title`, or run `_say` on the client portal's loop as `tests/test_estimate_list_answers.py` does.
+
+### 800. [LOW] The CSV upload test leaves a "Hardscape" category in use
+`platform/tests/test_material_upload_api.py:11` — its "Patio Stone" material stays in the test company, so `test_material_categories_api.py::test_load_standard_categories_removes_non_standard_when_requested` fails when it runs after the upload tests (`skipped_in_use == ['Hardscape']`). Fails on a clean checkout too; order-dependent.
+
+**Suggested fix:** Delete the uploaded materials (and their created categories/units) in the upload tests' teardown.
 
 ## Codebase hygiene (batchable)
 
