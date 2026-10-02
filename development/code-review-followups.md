@@ -202,6 +202,9 @@ seams that already exist as separate classes.
 | 195 | `run_task_conversion` — services/task_convert.py:45 (first measured 2026-10-01: 191 before, +4 for the property check before the slot claim; split into claim / generate-and-save / file-photos / link-or-delete helpers) |
 | 62 | `update_task` — routers/tasks.py:308 (first measured 2026-10-01: 59 before, +3 for the property check. Add `_assert_property_belongs_to_company(property_id, company)` beside `_assert_status_belongs_to_company` and use it in both task routes — tenant batch 1 review #3) |
 | 57 | `create_task` — routers/tasks.py:98 (first measured 2026-10-01: 56 before, +1; the same helper — tenant batch 1 review #4) |
+| 76 | `archive_estimate` — routers/estimates.py:1394 (first measured 2026-10-01, ~+1 for moving the tenant 404 ahead of the status answer — tenant batch 2 review #1. Extract `_archive_actor(decoded_token, estimate) -> User` — the email/user lookup, the tenant 404 and the creator-or-Owner/Admin check — shared with `unarchive_estimate`) |
+| 76 | `unarchive_estimate` — routers/estimates.py:1473 (first measured 2026-10-01; a near-copy of `archive_estimate`'s authorization block — the same `_archive_actor` helper — tenant batch 2 review #2) |
+| 67 | `sync_payment_method` — routers/billing.py:443 (61 before 2026-10-01, +6 for the card-ownership 404 — tenant batch 2 review #3. Move the Stripe calls into `_make_default_card(stripe, company, payment_method_id) -> (brand, last4)`) |
 | 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
 | ~264 | `TourRunner` — portal/src/components/tours/TourManager.tsx:83 |
@@ -2998,32 +3001,44 @@ geocode and note it in the comment.
 
 **Resolved 2026-09-27** (platform `c478a53`): `ConversationContext` carries a `version`, and a save is a `find_one_and_update` conditional on the version the turn loaded (`routers/agent_helpers/conversation_store.py`; a document from before versions matches version 0). On a conflict the turn's changes are merged onto the newer copy and the save retried: keys it changed or removed win, keys it left alone keep the other turn's value, and its new chat lines are appended after the other turn's (capped at 40). An identical message still in flight — the double-send that billed twice — is claimed first and refused with "I'm still working on that one"; different messages may overlap (and merge). A claim a crashed turn left expires after three minutes. Both fail open. The endpoint's body moved to `_orchestrate_turn`, wrapped by the claim. Pinned by `tests/test_conversation_store.py` (merge rules, the conditional save against the local test Mongo, the claim, and the endpoint's duplicate reply).
 
-### 790. [LOW] An estimate's activity role and rate card are saved unchecked
+### 790. ~~[LOW] An estimate's activity role and rate card are saved unchecked~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): `snapshots.assert_own_line_refs` now covers activity roles (Labour) and `effort_rate_card_id` (RateCard) on estimate create/update; ids already stored aren't re-checked.
 `platform/routers/estimates.py:1169` — `activities[].role` and `activities[].effort_rate_card_id` (and the create path in `job_item_builders.py` ~176) are stored with no company check, so an estimate can link another company's role or rate card. Nothing is shown from them unless the same id is also a labours line, which batch 1 now checks. (tenant audit 2026-10-01, A3)
 
 **Suggested fix:** Check new ids with `dependencies.assert_company_refs` (Labour, RateCard), skipping ids already on the estimate, as `snapshots.assert_own_line_refs` does for lines (CLAUDE.md "Tenant scope of referenced ids").
 
-### 791. [LOW] A template's line ids are saved unchecked
+### 791. ~~[LOW] A template's line ids are saved unchecked~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): Template create/update run `assert_own_line_refs` over the template's materials and activities (ids already on the template kept).
 `platform/routers/templates.py:33` — create/update check `company` but not `materials[].material`, `activities[].role` or `effort_rate_card_id`. Maple's "create estimate from template" copies them as-is (`agents/estimate/crud_handlers.py` ~821); since batch 1 the next portal save of such an estimate is refused (404) rather than leaking, so the user hits an error instead. (tenant audit 2026-10-01, A7)
 
 **Suggested fix:** Check new line ids on template create/update with `assert_company_refs`, keeping ids already on the template.
 
-### 792. [LOW] Category and unit "in use" counts look across every company
+### 792. ~~[LOW] Category and unit "in use" counts look across every company~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): Both deletes and both load-standard bootstraps count only the company's own materials.
 `platform/routers/material_categories.py` delete, `routers/material_units.py` delete, `services/material_category_bootstrap.py` ~63, `services/material_unit_bootstrap.py` ~66 — `Material.find(category == id)` / `{"sizes.unit": id}` have no company filter, so another company's materials pointing at X's category block X's delete and reveal a count. New links are refused since #702; old ones remain. (tenant audit 2026-10-01, A6)
 
 **Suggested fix:** Add `company` to each count query.
 
-### 793. [LOW] Deleting a property clears the property on estimates of any company
+### 793. ~~[LOW] Deleting a property clears the property on estimates of any company~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): The cascade filters on `Estimate.company == property.company`.
 `platform/routers/properties.py:539` — `Estimate.find(Estimate.property == property.id).update(property=None)` has no company filter, so a cross-company link written before batch 1 lets X's delete edit Z's estimate. (tenant audit 2026-10-01, A9)
 
 **Suggested fix:** Filter the cascade on `Estimate.company == property.company`.
 
-### 794. [LOW] Setting the default card doesn't check the card is the company's
+### 794. ~~[LOW] Setting the default card doesn't check the card is the company's~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): `sync-payment-method` refuses (404) a payment method whose `customer` isn't the company's Stripe customer, before setting it as default.
 `platform/routers/billing.py:440` — `sync-payment-method` retrieves `body.payment_method_id` and sets it as the default without checking `pm.customer == company.stripe_customer_id`. Stripe should refuse a card not attached to the customer, so likely not exploitable. (tenant audit 2026-10-01, A10)
 
 **Suggested fix:** Refuse (404) when `pm.customer` isn't the company's Stripe customer, before the update call.
 
-### 795. [LOW] Archive/unarchive reveal another company's estimate status; an unscoped helper lingers
+### 795. ~~[LOW] Archive/unarchive reveal another company's estimate status; an unscoped helper lingers~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): Archive/unarchive check the company first and answer another company's estimate with the same 404 as a missing one; `fetch_estimate` and its `routers/agents.py` re-export are deleted.
 `platform/routers/estimates.py:1390` / `:1469` — the status check runs before the tenant check, so a foreign id answers whether it is archived. `fetch_estimate` (~560) is an unscoped helper only re-exported from `routers/agents.py:153`. More broadly, most routes answer another company's id with 403 and a missing one with 404, which confirms existence. (tenant audit 2026-10-01, A11)
 
 **Suggested fix:** Move the tenant check first; delete `fetch_estimate` and its re-export; switch a route to 404-for-both when it is next touched.
