@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **801**. Never
+- **Entries are numbered and permanent.** Next free number: **803**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2616,25 +2616,38 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** For an `analytics_metric` read with no label, append ` for <name>` to the previous message when the new target is a name (not a period) — but only when the previous message has no status subject ("on lost estimates") the appended name would be read into. Tests: win rate, a total and a ranking, each company-wide then "what about Bob Lee?".
 
-### 796. [LOW] The material agent still takes a unit id from the extracted fields
+### 796. ~~[LOW] The material agent still takes a unit id from the extracted fields~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 3): The material agent drops `unit_oid` and any id-shaped size `unit` from the model's reading (`_without_typed_ids`); `unit_oid` is set only after a unit name resolves within the company.
 `platform/agents/material/service.py:129` — `unit_oid` is in the allowed fields and `_normalize_fields` (~474) keeps any 24-hex value, which `text_helpers.py` ~374/402 writes onto a size; `_normalize_sizes_field` (`text_helpers.py` ~355) keeps a raw size `unit`. A typed id can reach `update_material` (the router now confines it to the company, so policy only). (tenant audit 2026-10-01, B1)
 
 **Suggested fix:** Drop `unit_oid` from the fields the classifier can fill (keep it internal-only, set after `_find_unit`), and resolve every size unit by name.
 
-### 797. [LOW] Five agents look a record up by an id the model pulled from the message
+### 797. ~~[LOW] Five agents look a record up by an id the model pulled from the message~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 3): The `*_id` fields are gone from the five agents' classifier and entity schemas (material, contact, property, labour, equipment); ids still come from server-owned anchors, picks and pending questions.
 `platform/agents/{material,contact,property,labour,equipment}/service.py` — each classifier schema has a `*_id` field, merged in and used to find the record (material 722–751, contact 809–838, property 891–921, labour 439–465, equipment 375–396), and each echoes "No X found for id '<typed>'". Company-scoped, so policy only. (tenant audit 2026-10-01, B2)
 
 **Suggested fix:** Remove the `*_id` fields from the classifier schemas; resolve by name, with server-owned anchors (`active_*_id`, `forced_*_id`) the only id route.
 
-### 798. [LOW] A 24-hex id in the message is used as a task or estimate reference
+### 798. ~~[LOW] A 24-hex id in the message is used as a task or estimate reference~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 3): A 24-hex id in the message ends the task and estimate searches and asks for the code or title (`TYPED_ID_CLARIFICATION`, `estimate_resolver.names_a_database_id`); it never falls through to the open record.
 `platform/agents/task/resolver.py:50`, `routers/agent_helpers/estimate_resolver.py:46`, `routers/agent_helpers/delegate_get_estimate.py:51` — explicit ObjectId regexes resolve a typed id (company-scoped via `load_company_estimate` / a compare after an unscoped `Task.get`). Policy only. (tenant audit 2026-10-01, B3)
 
 **Suggested fix:** Remove the ObjectId branches; tasks and estimates are named by readable id (T0001 / E0012) or title.
 
-### 799. [LOW] The estimate extraction lets model output override the company and property
+### 799. ~~[LOW] The estimate extraction lets model output override the company and property~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 3): `ExtractedEstimate` no longer has `company`/`property`, the generation prompt no longer echoes them, `normalize_extracted_estimate` uses the request's values, and a pending `company` is never read from a reply.
 `platform/agents/estimate/extraction_helpers.py:171` — `payload.get("company") or company` / `payload.get("property") or property`; `merge_with_pending_estimate` (279) and `agents/estimate/text_helpers.py` 1183–1186 accept a typed 24-hex company. No save path persists it today (they use the request's values), but `parsed` is echoed by `/agents/estimate`. (tenant audit 2026-10-01, B4)
 
 **Suggested fix:** Always use the authenticated company and the request's property; never read them from model output.
+
+### 802. [LOW] The estimate and task checks read a typed id differently
+`platform/routers/agent_helpers/estimate_resolver.py:46` — The task resolver's `_OBJECT_ID_RE` is `\b[0-9a-f]{24}\b` with IGNORECASE; the estimate side (`_MONGO_OBJECT_ID`, behind `names_a_database_id`) is `[0-9a-f]{24}` — lowercase only, no word boundaries. So an id typed in capitals isn't caught for an estimate (it falls through to the title and open-estimate rungs, as before #798), and any 24+ run of lowercase hex inside a longer token ends the estimate search. LOW: portal URLs carry lowercase ids and no ordinary word is 24 hex characters, so neither happens in practice. (tenant batch 3 review #1)
+
+**Suggested fix:** One definition for both: move `names_a_database_id` to `agents/text_utils.py` with `re.compile(r"\b[0-9a-f]{24}\b", re.IGNORECASE)`, and use it from the task resolver, `estimate_resolver` and `delegate_get_estimate`; add a capitals case to `test_an_estimate_id_in_the_message_names_no_estimate`.
 
 ## Platform — API, models and data
 
@@ -4854,6 +4867,11 @@ total row count rather than blank-row count.
 `platform/tests/test_material_upload_api.py:11` — its "Patio Stone" material stays in the test company, so `test_material_categories_api.py::test_load_standard_categories_removes_non_standard_when_requested` fails when it runs after the upload tests (`skipped_in_use == ['Hardscape']`). Fails on a clean checkout too; order-dependent.
 
 **Suggested fix:** Delete the uploaded materials (and their created categories/units) in the upload tests' teardown.
+
+### 801. [LOW] Three work-item context tests fail on "attached to a different loop"
+`platform/tests/test_maple_work_item_context.py:438` — `test_a_new_command_naming_a_code_does_not_answer_which_estimate` (all three parametrizations) fails with `RuntimeError: … got Future attached to a different loop` inside `EstimateAgent.process()`. It fails at `0bfe2fc` (before the 2026-10-01 tenant work) and every commit since, run alone or in a batch, so it predates that work; it was missed because the related-test runs didn't include this file.
+
+**Suggested fix:** Find what the `wired` fixture's `_say` drives through `asyncio.run` that reaches a Motor client bound to the TestClient's loop (likely a real DB call the stubs don't cover), and stub it or run the turn on the client's portal.
 
 ## Codebase hygiene (batchable)
 
