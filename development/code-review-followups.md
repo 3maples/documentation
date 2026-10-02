@@ -2296,7 +2296,9 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Resolve hex ids with `find_one(id == oid, company == company_oid)`, here and in `_resolve_create_category_unit_ids`. Scope both lookups in `_with_catalog_names` to `material_doc["company"]`.
 
-### 703. [MEDIUM] "show me his contact info" / "delete it" look up a contact named by the pronoun
+### 703. ~~[MEDIUM] "show me his contact info" / "delete it" look up a contact named by the pronoun~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (Maple data-safety batch): `_extract_name_from_message` skips a name made only of pronouns/"one" (`_POINTING_WORDS` in contact/text_helpers.py; utils.NAME_STOPWORDS untouched), so the contact in focus answers.
 `platform/agents/contact/service.py:2238` — This diff removed `and not active_contact_id` from the get/delete fallback gate (also :2322), so `_extract_name_from_message` runs for pronoun references. "show me his contact info" → "His", which substring-matches "Chris"; "delete that one" → "One". The wrong contact is shown and becomes focus, so the next "change the phone to …" edits it. A delete asks first but names the wrong contact. MEDIUM: the write needs a second turn that names the contact. (review 2026-09-27 #30)
 
 **Suggested fix:** Keep the fallback, but discard an extracted name that is only a pronoun or "one" before setting `parsed["full_name"]`. Leave the "notes" stopword in contact/utils.py alone (CLAUDE.md Notes item 2).
@@ -2306,12 +2308,16 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Use the anchor only when `_extract_name_hint` finds no name, and anchor the regex to the whole reference, e.g. `^\s*(?:delete|remove|show(?:\s+me)?|get|open)\s+(?:it|this(?:\s+one)?|that(?:\s+one)?)\s*[.!?]?\s*$`.
 
-### 705. [MEDIUM] "delete my note" offers an Owner someone else's note and calls it "your note"
+### 705. ~~[MEDIUM] "delete my note" offers an Owner someone else's note and calls it "your note"~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (Maple data-safety batch): "delete my note" never falls back to other authors' notes (`NoteRequest.mine`), and the confirmation and the "deleted" reply name the author when it isn't the requester (`record_notes._whose`).
 `platform/agents/conversation/record_notes.py:326` — The "my" in `_DELETE_RE` is non-capturing. When the requester has no notes on the record, `chosen` falls back to every note they may delete, which for an Owner is all of them. The confirmation (:345) says "Delete your note on Ana Reyes: …?", so "yes" deletes an employee's note under a misleading prompt. Untested: the corpus seeds only Owner-written notes. (review 2026-09-27 #32)
 
 **Suggested fix:** Capture "my" in `NoteRequest`; when present, never fall back to other authors' notes. Name the author in the confirmation whenever it isn't the requester.
 
-### 706. [MEDIUM] Requests starting with no / don't / keep it / wait are answered "I'm not waiting on an answer"
+### 706. ~~[MEDIUM] Requests starting with no / don't / keep it / wait are answered "I'm not waiting on an answer"~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (Maple data-safety batch): `meta_reply` uses `replies.is_plain_no` (the closed no-list and bare no-heads), so "No, set the markup to 25%" and friends reach an agent.
 `platform/agents/conversation/meta.py:74` — `meta_reply` uses `is_decline_text`, which treats any message opening with a decline word as a decline. "No, set the markup to 25%", "keep it at 20% markup", "don't forget to call Bob Lee tomorrow" and "Do not charge tax on work item 2" all return NOT_WAITING and never reach an agent. (review 2026-09-27 #33)
 
 **Suggested fix:** Use the closed lists (`is_negative_text(bare) or bare in _DECLINE_HEADS`) instead of `is_decline_text`, and add the "no, …" counterpart to the existing "yes, delete contact Bob" test.
@@ -2326,7 +2332,9 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Return None when `len(message) > 80` before matching, as the neighbouring rewrites do.
 
-### 710. [MEDIUM] A due-date question becomes a write
+### 710. ~~[MEDIUM] A due-date question becomes a write~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (Maple data-safety batch): The four due-change patterns end `(?P<value>[^?]+?)\s*[.!]?$`; a polite "could you push it to Friday?" still reads (its "?" is removed by `_as_request`).
 `platform/agents/task/text_helpers.py:817` — The due-change patterns (818-821) end in `(?P<value>.+)$`, and `_clean_value` strips "?". With a task in focus, "due today?" → `('', 'today')` sets its due date. The status-verb patterns deliberately exclude "?"; these don't. (review 2026-09-27 #37)
 
 **Suggested fix:** Use `(?P<value>[^?]+?)\s*[.!]?$` in the four due-change patterns, and add "due today?" reject tests.
@@ -2339,7 +2347,9 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Before treating a move/push value as a date, check whether it exactly names one of the company's statuses; if so, route to the status change.
 
-### 712. [MEDIUM] "for X" at the end of a create silently links a property
+### 712. ~~[MEDIUM] "for X" at the end of a create silently links a property~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (Maple data-safety batch): A bare "for …" create tail links a property only when the value has a digit (an address); "at …" and "the … property" are unchanged.
 `platform/agents/task/text_helpers.py:1078` — A non-explicit "for X" tail links a property on a single whole-word match with no question. "create a task to pick up mulch for Jordan" links "14 Jordan Rd"; "for the crew" links any property named with "crew" (create.py:206-213). (review 2026-09-27 #39)
 
 **Suggested fix:** Link from a non-explicit tail only for "at X" or an address-shaped value (contains a digit). Treat "for X" as property-or-person, as the list parser does, or ask.
@@ -2480,7 +2490,9 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Return the ambiguity message when that is what `teammate()` found.
 
-### 758. [LOW] The positional note delete also says "your note" for someone else's note
+### 758. ~~[LOW] The positional note delete also says "your note" for someone else's note~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (Maple data-safety batch): Same change as #705: the positional path names the author too.
 `platform/agents/conversation/record_notes.py:350` — "delete note 2" on a list containing another author's note (an Owner may delete it) asks "Delete your note on …?", the same wrong wording as #705 through the positional path. (review 2026-09-27 #88)
 
 **Suggested fix:** Name the author in the confirmation whenever it isn't the requester (same change as #705).

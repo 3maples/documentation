@@ -1298,11 +1298,13 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `add a note to Bob Lee` → *"What should the note say?"* → the text | files the reply, even if it reads like a command | ✅ rule |
 | `show me the notes for 12 Oak St` / `what notes are on Bob Lee?` / `any notes on E0042?` / `show me his notes` | lists them newest first, with author and date | ✅ rule |
 | `delete my note on Bob Lee` / `delete note 2` (after a list) / `delete my last note on Ana Reyes` → *"Delete your note …? This can't be undone."* → `yes` / `no` | deletes it, or keeps it; your own notes, or any as an Owner | ✅ rule *(it was redirected to the app)* |
+| `delete the note on Ana Reyes` / `delete note 1` as an Owner, on someone else's note → *"Delete Jordan Lee's note on Ana Reyes: …?"* → `yes` | *"I've deleted Jordan Lee's note on …"* — the author is named, never "your note"; `delete my note on …` offers only your own | ✅ rule *(2026-10-01, #705 / #758 — an Owner was offered an employee's note as "your note")* |
+| `show me his contact info` / `delete that one` (a contact in focus) | the contact in focus — a pronoun is never looked up as a name | ✅ rule *(2026-10-01, #703 — "his" matched "Chris", which then took the focus)* |
 | `link John Doe to 123 Main St` / `link 123 Main St to John Doe` / `connect Carla Diaz with the Elm House property` / `add Carla Diaz to 12 Oak St` / `Carla Diaz lives at 12 Oak St` | links them (either order); "already linked" when they are | ✅ rule *(the guide's own phrasing was unknown on the rules tier)* |
 | `link Zed Quill to 12 Oak St` (no such contact) | "I couldn't find a contact or a property called Zed Quill." | ✅ rule |
 | `remove Ana Reyes from 12 Oak St` / `unlink …` | done in the app — §9.8 | 🛑 redirect |
 
-**Open gaps:** #703 (a pronoun contact looked up by name), #705 and #758 (an Owner offered someone else's note as "your note"), #741, #742 ("Please note: …" filed as a note), #745, #746 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690.
+**Open gaps:** #741, #742 ("Please note: …" filed as a note), #745, #746 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690; 2026-10-01: #703, #705, #758.
 
 ---
 
@@ -1650,6 +1652,8 @@ Token conventions: `{task}` = a task title (e.g. `fix the fence gate`); `{status
 | `delete the {task} task` → *"…are you sure?"* → `yes` | `delete_task` → Task Agent (manager-only, confirm first) | ✅ rule *(2026-09-27 — the "yes" now deletes; #692)* |
 | `create a task to call Bob tomorrow and assign it to me` / `add a task to trim the hedge due Friday and assign it to Jordan` | `create_task` → Task Agent with due date / assignee | ✅ rule *(2026-09-27 — a create's tail sets fields: `assign it to` me / an email / a teammate's name, `mark it` / `status:` a status, a date phrase (`tomorrow`, `due Friday`, `by next week`, `on Oct 3`) as the due date. Instructions come out of the note; the date stays in it. Before, the trailing "assign it to …" routed the whole message to an edit of another task.)* |
 | `create a task to fix the side gate at the Elm House property` / `add a task to rake the leaves at 12 Oak St` | `create_task` → Task Agent, linked to the property | ✅ rule *(2026-09-27 — "at the X property" or an "at …" tail that names one property; the words stay in the note)* |
+| `create a task to pick up mulch for Jordan` / `… order gloves for the crew` | `create_task`, linked to no property — a bare "for …" links only an address (`for 12 Oak St`) or "the … property" | ✅ rule *(2026-10-01, #712 — it linked "14 Jordan Rd")* |
+| `due today?` / `is it due Friday?` / `push the fence task to Friday?` (a task in focus) | not a due-date change — a question never writes; `could you push it to Friday?` still moves it | ✅ rule *(2026-10-01, #710 — it set the date)* |
 | `create a task to call the supplier and assign it to Zed` (no such teammate) | `create_task` — the task is made, assigned to you, and the reply says Zed wasn't found | ✅ rule *(2026-09-27 — a clause Maple can't apply is reported, never dropped)* |
 
 ## 7.2 Casual phrasings
@@ -1879,7 +1883,7 @@ Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-sup
 
 Task details (2026-09-27) also show the linked property, the estimate it was converted into, and how many photos and videos it has.
 
-**Open gaps:** #710 ("due today?" writes), #740 ("what is/are …" after a task list), #767 ("perfect," / "quick," / "one more thing," before a command), #774 ("I need you to …"), #712, #717, #718, #761; older #442, #447 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27; #711, #713, #751 and #752 on 2026-09-29; #470 and #762 on 2026-09-30.
+**Open gaps:** #740 ("what is/are …" after a task list), #767 ("perfect," / "quick," / "one more thing," before a command), #774 ("I need you to …"), #717, #718, #761; older #442, #447 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27; #711, #713, #751 and #752 on 2026-09-29; #470 and #762 on 2026-09-30; #710 and #712 on 2026-10-01.
 
 ---
 
@@ -2349,6 +2353,8 @@ Turns about the conversation itself are answered after the question gate has had
 | `thanks` / `ok thanks` / `great` / `perfect` / `that's all` | "You're welcome — anything else I can help with?" | ✅ rule |
 | `cancel` / `never mind` / `stop` | "There's nothing to cancel right now — …" | ✅ rule |
 | a stray `yes` / `no` / `go ahead` | "I'm not waiting on an answer right now — …" | ✅ rule |
+| `No, set the markup to 25%` / `keep it at 20% markup` / `don't forget to call Bob Lee tomorrow` / `wait, add a work item called Fence` (nothing asked) | the request runs — only a plain no is a stray no | ✅ rule *(2026-10-01, #706 — they were answered "I'm not waiting on an answer")* |
+| `no, don't delete it` / `don't` / `no wait` / `keep it` / `leave it` / `don't delete Ana Reyes` (nothing asked) | "I'm not waiting on an answer right now — …" — a decline that asks for nothing stays a stray no | ✅ rule *(2026-10-01, #706 review — "no, don't delete it" and "don't delete Ana Reyes" offered the delete; a negated delete is a no whatever it names)* |
 | `repeat that` / `say that again` | Maple's last reply again | ✅ rule |
 | `start over` / `reset` / `clear the chat` | points to the clear button; drops anything Maple was waiting on | ✅ rule |
 
