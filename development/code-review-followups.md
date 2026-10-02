@@ -2280,7 +2280,10 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Move the size branch inside the existing try, or wrap it in the same failure reply.
 
-### 702. [MEDIUM] A category id typed into the message skips the company check, and the details lookup reads it unscoped
+### 702. ~~[MEDIUM] A category id typed into the message skips the company check, and the details lookup reads it unscoped~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** per the user's rule (CLAUDE.md "Tenant scope of referenced ids"): Maple no longer accepts an id typed into the message — a category or unit is always resolved by name within the company, so an id-shaped value is an unknown name. `POST`/`PUT /materials` refuse (404) a category or size unit that isn't the material's company's (`dependencies.assert_company_refs`), and `_with_catalog_names` reads names only within the material's company.
+
 `platform/agents/material/service.py:1949` — The update-path resolver resolves only category values that aren't 24-hex; a hex id passes straight to `UpdateMaterialRequest`, and routers/materials.py:516-548 doesn't check the category's company. `_with_catalog_names` (807/812) then loads it with an unscoped `MaterialCategory.get` / `MaterialUnit.get` and prints the name. This exposes another tenant's category name to anyone holding its ObjectId. (review 2026-09-27 #28)
 
 **Suggested fix:** Resolve hex ids with `find_one(id == oid, company == company_oid)`, here and in `_resolve_create_category_unit_ids`. Scope both lookups in `_with_catalog_names` to `material_doc["company"]`.
