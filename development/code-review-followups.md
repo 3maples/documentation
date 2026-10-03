@@ -1951,7 +1951,10 @@ turned on the first time generation feels slow. If the side-by-side shows the
 research path is worse, that is a reason to improve the prompt context, not to
 bring back copying.
 
-### 569. [LOW] `or target.company` fallback can file a Maple note under another tenant
+### 569. ~~[LOW] `or target.company` fallback can file a Maple note under another tenant~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** Wider than the entry: `crud_handlers.py` had three `Estimate.find_one(Estimate.estimate_id == code)` fallbacks with no company — `_load_estimate_for_update`, `_load_estimate_for_read` and `_handle_update_estimate_status_transition` — so a missing or malformed company read, edited or changed the status of whichever company's estimate had the code. Each now replies `NO_COMPANY_FOR_ESTIMATE` ("I need a company before I can pull up an estimate.", shared with the #37 guard) and never queries; `_file_estimate_note` never falls back to `target.company`. `tests/test_estimate_company_scope.py` fails if any estimate query runs with no company. `test_estimates_work_item_add_with_unusable_company_id_*` no longer expects the add to land: it is refused, and still doesn't raise.
+
 `platform/agents/estimate/note_handlers.py:164` — When `company_id` is empty or malformed, the loader falls back to an unscoped `Estimate.find_one(estimate_id == code)` and the note is filed under `target.company`, which could be any tenant's estimate with that code. The orchestrator always supplies a company today, so this is defense in depth.
 
 **Suggested fix:** If `_coerce_company_oid(company_id)` is None, return the failure envelope; never fall back to `target.company`.
@@ -2639,27 +2642,42 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Add `READ_IDS` entries for the field questions with accept/reject tests in `tests/test_command_grammar.py` (the rows in `tests/test_estimate_focus_questions.py` port one-to-one), have `estimate_question` read the matched entry instead of its own patterns, and check the routing snapshot diff.
 
-### 783. [LOW] An estimate's title is not a metric subject, so "what's the total for Smith?" looks for a customer
+### 783. ~~[LOW] An estimate's title is not a metric subject, so "what's the total for Smith?" looks for a customer~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** When no customer, property or division matches, an exact estimate title in the company is said back with its code, total and status — "I couldn't find a customer, property or division called Smith, but E0042 'Smith' is an estimate: $1,234.00 including tax (Won)." (`metric_answers._estimate_titled`; Deleted estimates are left out of the query). Titles aren't unique: with two or more, Maple names none — "…but 2 estimates are titled Smith." (user, 2026-10-03). Only for a money figure — total, average, biggest, smallest. Corpus: `metrics-total-for-an-estimate-title`, `…-past-a-deleted-one`, `metrics-total-for-a-shared-estimate-title`.
+
 `platform/agents/estimate/metric_subject.py` — `resolve_subject` looks a name up among contacts, properties and divisions only. "What's the total for Smith?" (in the routing snapshot) now routes to `analytics_metric`; with an estimate titled "Smith" and no contact or property of that name it answers "I couldn't find a customer, property or division called Smith." Before, it went to help or a material lookup, so this is not a regression, but the user meant the estimate. (Maple metrics plan Phase 1 task 11, 2026-09-30)
 
 **Suggested fix:** When no customer, property or division matches, try an exact estimate title (the `(ESTIMATE_AGENT_LABEL, "estimate")` name source) and answer as the single-estimate focus question does ("The total on E0042 'Smith' is …"), or ask "Did you mean the estimate 'Smith'?".
 
-### 784. [LOW] "Won" means the sold set in a money question but the Won status in a count or a list
+### 784. ~~[LOW] "Won" means the sold set in a money question but the Won status in a count or a list~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** User decision 2026-10-03: a bare "won" / "win" is the sold set (Won + Scheduled + Completed) in counts and lists too; only "status won" said outright ("with status won", "won status", "in Won status", "status is won", "currently won") is the Won status. One pattern, `agents/estimate/text_helpers.WON_STATUS_SAID_RE`, read by `list_query` (a `"won"` status set, filtered like "sold") and `metric_query` (now off the whole question: "total value of estimates with status won" counted every estimate, and "won status" was taken as a name). Count and list replies say "(Won, Scheduled, Completed)". CLAUDE.md's metrics section records the rule; tests in `test_estimate_list_query.py`, `test_estimate_list_answers.py`, `test_estimate_agent.py`, `test_metric_query.py` and the corpus.
+
 `platform/agents/estimate/metric_query.py` vs `platform/agents/estimate/list_query.py` — decision 8 (2026-09-30) made "won" in money and win-rate questions Won + Scheduled + Completed; counts and lists kept "won estimates" as the literal status (§1.1: "a named status still wins"). So "how much did I win?" can cover more estimates than "how many won estimates do I have?". Every reply names the statuses it counted, so the difference is visible, but it is a difference. (Maple metrics plan, decision 8)
 
 **Suggested fix:** A user decision, not a code one: either align counts and lists with decision 8 (a behaviour change to §1.1 rows and `tests/test_estimate_list_answers.py`), or keep the split and say "won (Won status)" in count replies. Phase 3's win-rate change is the natural moment.
 
-### 785. [MEDIUM] The "X (customer)" / "X (property)" options break three of the four metric question shapes, so choosing one doesn't answer
+### 785. ~~[MEDIUM] The "X (customer)" / "X (property)" options break three of the four metric question shapes, so choosing one doesn't answer~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** As suggested: the options stay as shown, `SubjectAmbiguous.kinds` maps each to its kind, `ask_to_rewrite(option_kinds=…)` stores them, and the answer — the option's text, its number, or "the customer" / "the property" — is written back as the bare name while the router sets the one-turn `forced_metric_subject_kind` (`record_names.kind_in_answer` / `forced_kind_key`; transient in `finalize_result`). `resolve_subject` reads it first. Corpus: `metrics-shared-name-customer-picked` (owner shape) and `metrics-shared-name-property-picked-by-number` (the "X's" shape).
+
 `platform/agents/estimate/metric_subject.py:189` — When a customer and a property share a name, the option picked is written back into the question as "Birch Hollow (customer)". The `m_owner` / `m_owner2` / `m_of` grammar slots allow only `[\w&'.-]`, so "how much has Birch Hollow (customer) spent with us?" and "what's Birch Hollow (customer)'s average job size?" no longer match any entry (verified: None), and go to the spec tier or the dashboard. Only the "for/from/at X" tail shape works. A typed "Birch Hollow" rewrites to the same question and asks again. (Second code review of the metrics work, 2026-09-30.)
 
 **Suggested fix:** Don't write the kind into the text. Keep the options as shown, but store `{option: kind}` on the rewrite record. On the answer, write back the bare name and set a one-shot `forced_metric_kind` (transient, like `forced_<domain>_id`) that `resolve_subject` reads first. Map a bare "customer" / "the property" reply to its option. Test with the owner shape and the `m_of` shape.
 
-### 786. [LOW] A city or province name matches every property in it as a metric subject
+### 786. ~~[LOW] A city or province name matches every property in it as a metric subject~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `_names` (name, street) feeds the whole-word rung; `_address_forms` ("street, city", full address) the exact rung only. "Toronto", "Guelph" and "ON" are SubjectNotFound; "12 Oak St, Toronto" still names its property.
+
 `platform/agents/estimate/metric_subject.py:154` — The second round's #7 added "street, city" and the full address to `_names`, and `_names` feeds both the exact rung and the whole-word rung (`_has_words`). So "how much have I made from Guelph?" (or "… from ON") keeps every property in Guelph: an unbounded "Which one did you mean: …?" menu, or, with one property there, an answer labelled with that property's name rather than the city. Verified: `_has_words("14 elm st, guelph", "guelph")` is True. Low because the previous commit (HEAD) gave the same menu through the finder's substring match; the earlier round's fix had briefly made it "couldn't find". (Third code review of the metrics work, 2026-09-30.)
 
 **Suggested fix:** Use the address forms in the exact rung only: split `_names` into the words (name, street) and `_address_forms(doc)` ("street, city", full address), and check `exact` against both but `_has_words` against the words only. Add `resolve("Toronto")` → SubjectNotFound to tests/test_metric_subject.py (the seeded world has Toronto properties).
 
-### 787. [LOW] The "can't narrow" reply says "a total" for an average or a biggest-estimate question
+### 787. ~~[LOW] The "can't narrow" reply says "a total" for an average or a biggest-estimate question~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `Unread.asked` names what was asked, read from the matched slots as `_read` dispatches (`_figure_metric`, `_ratio_metric`, `shape_of`): "an average", "the biggest estimate", "a win rate", "a ranking" …, and the reply's second sentence says "I can narrow it by …". Tests in `test_metric_query.py`.
+
 `platform/agents/estimate/metric_answers.py:122` — `_cannot_narrow` always says "I can't narrow a total by …", so "what's Bob Lee's average job size since March?" is told about a total. Wording only, no wrong figure. (Third code review of the metrics work, 2026-09-30.)
 
 **Suggested fix:** Pass the metric the grammar matched (read it from the slots as `read_metric_query` does, or have `unread_scope` return it too) and say "an average" / "the biggest estimate" / "a total" accordingly. Add one test for an average.
@@ -2672,7 +2690,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Check `_NEW_UNIT_RE.match(new_target)` first and return None early; bound the gaps (`.{0,80}?`) so the search is linear. Add a timing test on a 4,000-character previous message.
 
-### 789. [LOW] "What about Bob Lee?" after a company-wide metric question goes to help
+### 789. ~~[LOW] "What about Bob Lee?" after a company-wide metric question goes to help~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** For an `analytics_metric` read with no label, "for <name>" is added to the previous question — only when `read_metric_query` then reads the name as its subject, and never for a ranking by customer or property. Corpus: `metrics-win-rate-then-a-customer`; unit rows in `test_conversation_followup.py`.
+
 `platform/agents/conversation/followup.py:120` — `rewrite_elliptical` swaps the name the previous read used (`labels`, from the reply's `filter_by.name`). A company-wide metric question ("what's my win rate?", "what's our revenue this year?", "what's my gross margin?") names no one, so there is nothing to swap and "what about Bob Lee?" falls to the guide. After a question that names someone it works. True of every metric shape since Phase 1; found writing the Phase 3 corpus conversation (2026-10-01). Phrasing reference §1.12 ⚠️ row.
 
 **Suggested fix:** For an `analytics_metric` read with no label, append ` for <name>` to the previous message when the new target is a name (not a period) — but only when the previous message has no status subject ("on lost estimates") the appended name would be read into. Tests: win rate, a total and a ranking, each company-wide then "what about Bob Lee?".
@@ -2723,7 +2744,7 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 ### 807. [LOW] A filler word after "template" hides the template in focus
 `platform/agents/template/service.py:213` — The #704 gate uses the focus only when `_extract_name_hint` finds no name, and the hint's fallback regex takes whatever follows the noun: "delete this template please" → "please", "show me that template now" → "now", so Maple replies "I couldn't find a template matching 'please'". Before #704 the focus won for both. (review 2026-10-03, wrong-answers batch 2 #1)
 
-**Decision 2026-10-03 (user):** Maple does not need to handle template deletion — it can be treated as an unsupported request — so the delete half is not worth a fix, and the finding drops from HIGH to LOW. **Still open:** the get half — "show me that template now" — reaches the same gate.
+**Decision 2026-10-03 (user):** Maple does not need to handle template deletion — it can be treated as an unsupported request — so the delete half is not worth a fix, and the finding drops from HIGH to LOW. A follow-up decision the same day: **no explicit refusal** for template deletion either — it keeps working as it does (confirm, then delete). **Still open:** the get half — "show me that template now" — reaches the same gate.
 
 **Suggested fix:** For the get half: treat a hint made only of filler words (`please|now|again|too|then|for me|thanks|thank you`) as no name in `_extract_name_hint`, and add "show me that template now" (focused template expected) beside `test_it_alone_is_still_the_template_in_focus`. Separately, if template deletion is to be refused as unsupported, that is a change to `delete_template`'s routing and copy, not to this gate.
 

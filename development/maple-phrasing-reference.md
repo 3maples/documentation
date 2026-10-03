@@ -418,15 +418,18 @@ a note to a material or role. **Refused by the planner:** labor burden
 | `list estimates for Bob Lee` / `show estimates for Elm House` | `list_estimates` for that customer (contacts → their properties) or property; a name that is neither is answered ("I couldn't find a customer or a property called …") | ✅ rule *(2026-09-27, #687 — the name was dropped and every estimate listed)* |
 | `show me estimates from last month` | `list_estimates` over the past 30 days (a rolling window, like "from last week") | ✅ rule *(2026-09-27, #687 — "last" was read as "the latest one" and returned a single row)* |
 | after a list: `just the drafts` / `which ones are on hold?` / `only the ones over $1000` / `only the ones from last month` / `only for Bob Lee` | the same list, narrowed | ✅ rule *(2026-09-27 — refinements chain; §10.8)* |
+| after a list: `only the won ones` / `which of those are won?` | the same list, narrowed to the sold set — Won, Scheduled, Completed — and the reply names them | ✅ rule *(2026-10-03, #784 — narrowed to the Won status alone)* |
 | after a list: `sort them by total` / `sort them by date` | the same list, highest value / newest first | ✅ rule *(2026-09-27)* |
 | after a list: `what's the total of those?` / `add them up` / `how many is that?` | the combined value / the count of that list | ✅ rule *(2026-09-27)* |
 | `what's the total value of my maintenance estimates?` / `total value of my open estimates` (more than 20 of them) | the division's work items only; every matching estimate | ✅ rule *(2026-09-30, metrics task 9 — it summed each estimate's whole total, and only the first page of 20. Summed by `services/maple_metrics.py`)* |
-| `how many estimates have been sold?` / `how many sold estimates do I have` / `how many estimates did I sell?` / `how many did I sell?` / `what's the total value of my sold estimates?` | `list_estimates` over **Won + Scheduled + Completed** — "sold" is no status of its own: everything a customer bought, however far it has since moved | ✅ rule *(2026-09-28 — "sold" was no filter, so it counted every estimate. `_SOLD_ESTIMATE_QUERY_PATTERN` needs the estimate noun, so "what unit is River Rock sold by?" is untouched; a named status still wins — "won estimates" is Won only)* |
+| `how many estimates have been sold?` / `how many sold estimates do I have` / `how many estimates did I sell?` / `how many did I sell?` / `what's the total value of my sold estimates?` | `list_estimates` over **Won + Scheduled + Completed** — "sold" is no status of its own: everything a customer bought, however far it has since moved | ✅ rule *(2026-09-28 — "sold" was no filter, so it counted every estimate. `_SOLD_ESTIMATE_QUERY_PATTERN` needs the estimate noun, so "what unit is River Rock sold by?" is untouched; a named status still wins. **2026-10-03, #784 (user):** "won" alone is this set too — Won + Scheduled + Completed, as in a money question — and the reply says so; only "status won" said outright ("with status won", "won status", "in won status") is the Won status)* |
 | `how many did I sell?` / `how many have been sold` / `how many were sold` / `how many did we sell this month?` — with nothing before it | `list_estimates` → sold count | ✅ rule *(2026-09-29 — was help: "how many" is a count, never a help question. A `list_estimates` grammar entry built on `SOLD_VERB`, shared with the agent's sold filter)* |
 | after an estimate count or list: `how many have been sold?` / `how many are won?` / `how many are on hold?` | a count by that status that keeps the customer, property, period or amount the last read was narrowed to — after "list my estimates for Bob Lee": *"You have 2 sold estimates for Bob Lee."* | ✅ rule *(2026-09-29 — the first version counted company-wide after a customer's list. `followup.py::_count_by_status`; when the last read had a status AND a scope ("how many estimates did I win this month?") the rule steps aside, since which words to swap is a guess. "how many of those are won?" narrows the list instead and is not this rule)* |
 | `how many estimates for Bob Lee?` / `how many won estimates for Bob Lee?` / `how many sold estimates for Bob Lee this year?` / `how many estimates for Bob Lee in draft status?` / `how many estimates for Bob Lee that are won?` / `… in review?` / `… on hold?` / `… over $1000?` / `show me draft estimates for Bob Lee` | `list_estimates` for that customer (or property), with the status and period | ✅ rule *(2026-09-29 — the customer was dropped from every count and every status list, so each counted the whole company. The `list_estimates` entry takes a status before "estimates" and a name after "for"; a trailing period, amount or status — "this year", "over $1000", "with status X", "in draft status", "that are won", in any order — is read off the name, and a status read off it is the one applied: `agents/estimate/list_query.py::read_list_query` reads name, status and status set in one pass. `tests/test_estimate_list_answers.py` checks what was actually counted against a seeded database)* |
 | any estimate count, list, empty list or total | the reply names everything it was narrowed by — *"You have 2 sold estimates for Bob Lee in the last year."*, *"Here are your won estimates for Bob Lee:"*, *"You don't have any sold estimates in the last month."*, *"The combined value of your 2 sold estimates in the last month is $1,500.00."* | ✅ rule *(2026-09-29 — a scoped count read as company-wide, and "show me won estimates for Bob Lee" was headed "Estimates for Bob Lee:". An unfiltered reply reads as before)* |
 | `how many estimates for Min Won?` / `how many draft estimates for Min Won?` / `show me estimates for Min Won` / `how many estimates for Min Won this year?` / `… for Min Won in review?` — a surname (or property name) that ends in a status word | that customer's estimates; a status said outside the name still applies | ✅ rule *(2026-09-30, #779 — "Won" was read off the name as a status and "Min" substring-matched other contacts. The whole name is looked up exactly first; the status is read off it only when the whole name is no one's. Review 2026-09-30 #3: also with a period or status after it, and when the orchestrator's contact rule hands over the whole name)* |
+| `how many won estimates do I have?` / `show me won estimates for Bob Lee` / `how many are won?` | Won + Scheduled + Completed — *"You have 2 won estimates for Bob Lee (Won, Scheduled, Completed)."* | ✅ rule *(2026-10-03, #784 — "won" was the Won status in a count or list but the sold set in a money question, so "how much did I win?" covered more estimates than "how many won estimates?". User decision: bare "won"/"win" is the sold set everywhere)* |
+| `how many estimates with status won do I have?` / `how many estimates for Bob Lee with status won?` / `show me my won status estimates` | the Won status only — *"You have 1 won estimate for Bob Lee."* | ✅ rule *(2026-10-03, #784 — "status won" said outright; `text_helpers.WON_STATUS_SAID_RE`, shared with metric questions)* |
 | `how many won estimates for Bob Lee in review?` / `how many draft estimates for Bob Lee that are sold?` | *"That asks for two statuses at once — review or won. Which one did you mean? Ask again with just one …"* | ✅ rule *(2026-09-30, #780 — the first status read was counted and the other dropped. Not a resumable question: re-ask with one status)* |
 | `what's the total value of sold estimates for Bob Lee?` / `total value of estimates for Bob Lee` | the customer's total — *"Sold value for Bob Lee, all time: $2,000.00 across 2 estimates (Won, Scheduled, Completed), including tax."* | ✅ rule *(2026-09-30 — a metric question, §1.12. It totalled every customer)* |
 
@@ -994,7 +997,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** #783, #784, #785, #786, #787 (metrics, §1.12); older #22, #23, #279, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
+**Open gaps:** older #22, #23, #279, #354, #406, #437, #439, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436; #569, #783, #784, #785, #786, #787 on 2026-10-03.
 
 ## 1.12 Metrics — totals, averages, the biggest, rankings, by month, comparisons, win rate, margin and markup *(2026-09-30)*
 
@@ -1009,8 +1012,11 @@ never by the LLM, and every reply names what it counted.
 
 - **Won and sold are the same set** — Won + Scheduled + Completed (decision
   8): a job the customer said yes to, whatever came after. "Made", "spent",
-  "revenue" and "sales" mean it too. *In Won status* / *currently won* is the
-  literal status.
+  "revenue" and "sales" mean it too, and so does "won" in a count or a list
+  (#784). "Status won" said outright — *with status won*, *won status*, *in
+  Won status*, *status is won*, *currently won* — is the literal status,
+  wherever it sits in the question (it was read only at the end: "total of
+  estimates with status won" counted every estimate).
 - **Money is tax-inclusive** (the estimates' `grand_total`, as the dashboard);
   *before tax*, *pre-tax* or *excluding tax* sums each work item's
   `sub_total ÷ (1 + tax%)`. The reply says which.
@@ -1031,9 +1037,10 @@ never by the LLM, and every reply names what it counted.
   several asks which; one that matches nothing says so. Two records with one
   name — two customers called Dana Wu — are counted together; a customer and
   a property with one name are offered as *"Birch Hollow (customer)"* /
-  *"Birch Hollow (property)"* (picking one works for "for Birch Hollow", not
-  yet for "how much has Birch Hollow spent" — #785). A full address ("12 Oak
-  St, Toronto") names its property; "in total" / "overall" after a name is all
+  *"Birch Hollow (property)"*; the one picked — by its text, its number or
+  "the customer" — answers every question shape (#785). A full address ("12
+  Oak St, Toronto") names its property, but a city or province alone names
+  none (#786); "in total" / "overall" after a name is all
   of it, not part of the name.
 - **A scope the choices can't hold is never guessed**: *excluding Elm House*,
   *since January*, *in 2025* are not read as a name — the rules step aside and
@@ -1083,9 +1090,12 @@ never by the LLM, and every reply names what it counted.
 | `how much have I sold to Ana?` (two Anas) | *"Which one did you mean: Ana Lopez or Ana Reyes?"* | ✅ rule |
 | `how much has he spent?` / `how much has she spent?` (a customer in focus) | that customer's sold total | ✅ rule *(review 2026-09-30 #8 — "he" searched every name containing "he")* |
 | `how much have I sold to Dana Wu?` (two customers called Dana Wu) | both, each property once | ✅ rule *(review 2026-09-30 #9 — "Which one did you mean: Dana Wu?" asked again after every answer)* |
-| `what's our revenue excluding Elm House` / `how much have I made since January` / `… in 2025` | the LLM tier's; without it, *"I can't narrow a total by "since January" yet. I can total by customer, property or division; …"* | ⚠️ gap *(review 2026-09-30 #1 — the first answered FOR Elm House; "since January" and "in 2025" were looked up as names. Second review #2: the fallback was the company-wide dashboard figure)* |
+| `what's our revenue excluding Elm House` / `how much have I made since January` / `… in 2025` | the LLM tier's; without it, *"I can't narrow a total by "since January" yet. I can narrow it by customer, property or division; …"* — "an average" / "the biggest estimate" / "a win rate" for those questions (#787, 2026-10-03) | ⚠️ gap *(review 2026-09-30 #1 — the first answered FOR Elm House; "since January" and "in 2025" were looked up as names. Second review #2: the fallback was the company-wide dashboard figure)* |
 | `what's the lifetime won amount for Between the Pines?` / `how much have I sold to Elm House in total?` / `… from 12 Oak St, Toronto?` | that property's total | ✅ rule *(second review 2026-09-30 #3, #4, #7)* |
-| `how much has Birch Hollow spent with us?` → *"Which one did you mean: Birch Hollow (customer) or Birch Hollow (property)?"* → `1` | — | ⚠️ gap *(#785 — the option's "(customer)" is written into a question shape that can't hold it)* |
+| `how much has Birch Hollow spent with us?` → *"Which one did you mean: Birch Hollow (customer) or Birch Hollow (property)?"* → `Birch Hollow (customer)` / `1` / `the customer` | that one's figure — *"Sold value for Birch Hollow, all time: $800.00 …"* | ✅ rule *(2026-10-03, #785 — the option's "(customer)" was written into the question, which then matched no shape. The name goes back bare and the kind rides on the turn: `record_names.kind_in_answer`, `forced_metric_subject_kind`)* |
+| `how much have I made from Guelph?` / `… from ON` | *"I couldn't find a customer, property or division called Guelph."* | ✅ rule *(2026-10-03, #786 — every property in the city matched, an unbounded "which one?")* |
+| `what's the total for Smith?` (an estimate titled Smith, no customer or property of that name) | *"I couldn't find a customer, property or division called Smith, but E0042 'Smith' is an estimate: $1,234.00 including tax (Won)."* | ✅ rule *(2026-10-03, #783 — said only that no customer was called Smith)* |
+| `what's the total for Smith?` (two estimates titled Smith) | *"I couldn't find a customer, property or division called Smith, but 2 estimates are titled Smith."* — a Deleted one is never counted or named | ✅ rule *(2026-10-03, #783 review — named whichever came back first)* |
 | `how much have I sold to Zed Zedson?` | *"I couldn't find a customer, property or division called Zed Zedson."* | ✅ rule |
 | `how much have I sold to Carla Diaz?` (no property) | *"Carla Diaz has no sold estimates (Won, Scheduled, Completed)."* | ✅ rule |
 | `what's my biggest estimate?` → `what's its status?` / `open it` | the estimate named is the one in focus, and the one row a pick reads | ✅ rule *(task 12)* |
@@ -1113,7 +1123,7 @@ never by the LLM, and every reply names what it counted.
 | `what's my average markup?` / `what's my average markup this year?` / `what's the average markup for Elm House?` / `what's Bob Lee's average markup?` | *"Average markup on sold work, all time: 29.4% — $500.00 of markup on $1,700.00 of subtotal, across 4 estimates (Won, Scheduled, Completed), weighted by each work item's subtotal."* | ✅ rule *(Phase 3 — they were help; weighted by cost, decision 17)* |
 | `what's my gross margin last year?` (no sold work) / every work item has an unpriced activity | *"There's no sold work last year to measure a gross margin on."* / *"There's no gross margin to give on sold work: every work item in it has an activity with no cost rate (3 work items)."* | ✅ rule *(Phase 3 — not 0%)* |
 | `what's my gross margin this year?` → `and last year?` / `what's the gross margin for Bob Lee?` → `what about Ana Reyes?` | the same question for the new period or customer | ✅ rule *(Phase 3)* |
-| `what's my win rate?` / `what's our revenue this year?` / `what's my gross margin?` → `what about Bob Lee?` — a company-wide metric question, then a name | help — the follow-up swaps the name the question used, and it used none; ask "what's the win rate for Bob Lee?" | ⚠️ gap *(#789, 2026-10-01 — every metric shape since Phase 1; after a question that names someone, "what about …?" works)* |
+| `what's my win rate?` / `what's our revenue this year?` / `what's my gross margin?` → `what about Bob Lee?` — a company-wide metric question, then a name | the same question for Bob Lee — *"The win rate for Bob Lee, all time, is 67% …"* | ✅ rule *(2026-10-03, #789 — went to help: the question named no one to swap. "for Bob Lee" is added when the metric grammar reads it as the subject; never to a ranking by customer or property)* |
 | `which customer has the best margin?` / `what's my gross margin by month?` / `markup by division` / `how does my margin this year compare to last year?` | said back — *"I can't rank by gross margin yet. Ask for one at a time — "what's the gross margin for Bob Lee?""* | ⚠️ gap *(decision 18)* |
 | `what's my markup?` (bare) | help — it may mean the default markup setting; ask "what's my average markup?" | ⚠️ gap *(Phase 3 — deliberately not read as the average)* |
 | `what's work item 2's margin?` / `what's the patio work item's gross margin?` / `what's this estimate's gross margin?` / `what's E0042's gross margin?` / `what's this estimate's win rate?` | not a metric — the work item's figure (§1.5.7), or the one estimate's | ✅ rule *(Phase 3 review #1, #3, 2026-10-01 — the possessive was read as a customer: "I couldn't find … called work item 2")* |
@@ -1140,9 +1150,8 @@ routing / answers), `tests/test_metric_ratios.py` (win rate, margin,
 markup), `tests/test_metric_win_rate.py`, `tests/test_metric_margin.py`, `tests/test_maple_metrics.py`,
 `tests/test_metric_subject.py`, `tests/test_metric_periods.py`,
 `tests/test_metric_spec.py`; multi-turn: the `METRICS` conversations in
-`tests/maple_conversations/corpus.py`. Open: #783 (an estimate title is not a
-subject), #784 ("won" in a count is the Won status), #789 ("what about Bob
-Lee?" after a company-wide question).
+`tests/maple_conversations/corpus.py`. #783, #784, #785, #786, #787 and #789
+resolved 2026-10-03.
 
 
 # 2. Properties
@@ -1953,7 +1962,7 @@ any metric (§1.12).
 | `how many hours of Elm House are in my estimates?` — a unit asked of a place | *"I couldn't find a material, role, customer, property or division called Elm House."* — a unit is never a place's total | ✅ rule *(Phase 4 review round 2 #2 — it gave Elm House's dollar total)* |
 | `how much Ana work did we win?` (two customers called Ana) → `Ana Reyes` | *"Which one did you mean: Ana Lopez or Ana Reyes?"*; the name in reply runs the question for her | ✅ rule *(Phase 4 review round 2 #3 — it said "couldn't find")* |
 | `how much have I quoted using Black Mulch?` — the lines' dollars | not read: a guide answer | ⚠️ gap *(decision 19, 2026-10-01 — out of scope)* |
-| `how much Black Mulch is in my estimates?` → `what about Topsoil?` | help — the follow-up swaps a customer or place, not the material | ⚠️ gap *(like #789)* |
+| `how much Black Mulch is in my estimates?` → `what about Topsoil?` | help — the follow-up swaps a customer or place, not the material | ⚠️ gap *(the material is not a subject; #789's fix adds a customer, not a material)* |
 | `how much mulch is in this estimate?` / `which estimates use Black Mulch?` / `how much does Black Mulch cost?` / `how much mulch do I need for 200 sq ft?` | the open estimate, the list, the catalog price, the Calculator — not a line sum | ✅ rule |
 
 ---
