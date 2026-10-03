@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **806**. Never
+- **Entries are numbered and permanent.** Next free number: **810**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -586,6 +586,11 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 `platform/routers/agent_helpers/named_answers.py:36` — `_material_names` reads `find({"company": company}, {"name": 1})` with no sort, then `to_list(length=_NAME_CAP)` with a cap of 5000. For a company with more than 5000 materials, the names past the cap are dropped without any log, and which ones are dropped is whatever order Mongo returns. A dropped name that opens with a command verb ("Clear Stone") then reads as a new request again. It also reads up to 5000 rows on every turn where "Which material do you mean?" is open. LOW because no company is near 5000 materials, and a missed name falls back to the checks Maple used before names were looked up. (review 2026-09-28 seventh round #1)
 
 **Suggested fix:** Look up only the reply instead of loading the catalog, as [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md) §3.2 proposes: have the router pass `name_in_reply(message)` and run one `find_one({"company": company, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}})`, answering when it hits. Deferred (2026-09-28) to phase 0 of that plan (renumbered 2026-09-29), which replaces this loader; the minimum change in the meantime is a warning when the cap is reached.
+
+### 808. [LOW] A template lookup miss loads every template twice
+`platform/agents/template/service.py:184` — Both handlers run `_find_templates_by_name(company_id, name_hint) or _find_templates_by_name(company_id, _before_aside(name_hint))`. `_find_templates_by_name` loads the company's whole template collection (a pre-existing full scan), so every miss reloads it — including when the hint has no ", " and the second query is identical to the first. LOW: a template list is small, and a miss already ends in "I couldn't find a template". (review 2026-10-03, wrong-answers batch 2 round 2 #1)
+
+**Suggested fix:** Call the fallback only when it differs: `short = _before_aside(name_hint); matches = await find(name_hint) or (await find(short) if short != name_hint else [])`, or load the list once and filter twice.
 
 ## Silently swallowed errors
 
@@ -1627,7 +1632,10 @@ Both prompts gained another rule (reverse + now labor-time). Still clear, but th
 
 ## Platform — Maple agents
 
-### 49. [MEDIUM] `_ADDRESS_PATTERN` can false-match "N <word>+ way/court"
+### 49. ~~[MEDIUM] `_ADDRESS_PATTERN` can false-match "N <word>+ way/court"~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** A unit right after the number (seconds … years, times, miles, km, metres, feet, yards, percent) is an amount, never a street number, so "60 minutes one way", "3 days back way" and "20 miles each way" no longer read as an address. Every suffix is kept, so "123 Cedar Way" and "who lives at 12 Elm Court" still do — chosen over dropping way/court/ct or requiring the whole residual, both of which lose real addresses. Tests: `test_orchestrator_intents.py::test_a_quantity_is_no_street_address` / `test_a_street_address_still_reads`.
+
 **File**: [agents/orchestrator/service.py:65](../../platform/agents/orchestrator/service.py)
 **Severity**: MEDIUM
 
@@ -1680,7 +1688,10 @@ which is non-trivial and would expand the scope of the current PR beyond the
 spec the user signed off on. Track until product asks for the consistent UX
 across all three resources or a customer reports the dual-flow inconsistency.
 
-### 329. [MEDIUM] "Please don't" is consumed as a property value by the one-turn shortcut
+### 329. ~~[MEDIUM] "Please don't" is consumed as a property value by the one-turn shortcut~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `agents/conversation/replies.py::declines_offer` reads a no to an offer: a polite lead ("please", "ok") is dropped, then a plain no, a bare decline ("don't", "nah, leave it") or a not-now ("not right now", "not yet", "later") declines. Only a closed set of words may follow, so "please add bob@example.com" is still a value. Used by `optional_follow_up.py` (the live path, estimates included) and the legacy `pending_estimate_follow_up.py`. "I'll do it from the portal" stays a ⚠️ gap in §10.4. Tests in `test_agent_helpers_optional_follow_up.py`, `test_agent_helpers_pending_estimate_follow_up.py` and `test_maple_estimate_field_edits.py`.
+
 `optional_follow_up.py` — `please` is in `_AFFIRMATION_PREFIX` and `don't` is
 not in the exact-match `_NEGATIVE_VALUES`, so a "Please don't" reply at the
 confirm stage delegates a property lookup for the literal value "don't" (fails
@@ -2291,7 +2302,10 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Look the size up on `target.sizes` with `_normalize_size_text` (case-insensitive). If it's missing, reply "X doesn't come in … — it comes in …", as the read op does.
 
-### 701. [MEDIUM] The size-command branch skips `process()`'s error handling
+### 701. ~~[MEDIUM] The size-command branch skips `process()`'s error handling~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** The size branch runs inside the same failure reply as every other request — one `_request_failed` helper serves both. `tests/test_material_agent.py::test_a_failed_size_command_says_so`.
+
 `platform/agents/material/service.py:3079` — `return await self._handle_size_command(...)` sits before the `try/except` around `_dispatch_intent_to_handler` (3054-3086). A DB error, an `HTTPException(404)` when the material is deleted between resolve and write, or `NoActingUser` escapes, and routers/agents.py:1666-1670 turns it into a 500 instead of "I could not complete the material request." MEDIUM: failure paths only. (review 2026-09-27 #27)
 
 **Suggested fix:** Move the size branch inside the existing try, or wrap it in the same failure reply.
@@ -2311,7 +2325,10 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Keep the fallback, but discard an extracted name that is only a pronoun or "one" before setting `parsed["full_name"]`. Leave the "notes" stopword in contact/utils.py alone (CLAUDE.md Notes item 2).
 
-### 704. [MEDIUM] "it/this/that" anywhere in a message picks the focused template over one the user named
+### 704. ~~[MEDIUM] "it/this/that" anywhere in a message picks the focused template over one the user named~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** The template in focus is used only when `_extract_name_hint` finds no name, and the hint drops an aside after ", " ("Old Patio, it's a duplicate" → Old Patio). The staleness check the entry mentions is not added: a delete always asks first and names the template in its confirmation. Tests: `test_maple_template_crud.py::test_a_named_template_beats_the_one_in_focus` / `test_it_alone_is_still_the_template_in_focus`.
+
 `platform/agents/template/service.py:205` — `_POINTS_AT_FOCUS_RE` is an unanchored search that runs before `_extract_name_hint`. "delete template Old Patio, it's a duplicate" asks to delete the focused "Patio", so a quick "yes" deletes the wrong one. This breaks "a name in the message beats the anchor", and `active_template_id` has no staleness check. (review 2026-09-27 #31)
 
 **Suggested fix:** Use the anchor only when `_extract_name_hint` finds no name, and anchor the regex to the whole reference, e.g. `^\s*(?:delete|remove|show(?:\s+me)?|get|open)\s+(?:it|this(?:\s+one)?|that(?:\s+one)?)\s*[.!?]?\s*$`.
@@ -2447,12 +2464,18 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Allow up to two words between the keyword and the noun (`\b{kw}\s+(?:\w+\s+){0,2}(?:estimates|quotes)\b`) → `_RECENT_ESTIMATES_LIMIT`. Add these cases to test_estimate_list_sort_words.py.
 
-### 725. [MEDIUM] An estimate code before "work item" is taken as the work item's name
+### 725. ~~[MEDIUM] An estimate code before "work item" is taken as the work item's name~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** In the before-noun branch, words up to and including an E-code are dropped, so "the markup on E0042 work item Patio" falls through to Patio after the noun. Rows in `test_maple_work_item_context.py::test_work_item_hint_extraction`.
+
 `platform/agents/estimate/work_item_field_handlers.py:72` — The #668 reorder reads the words before the noun first, and E-codes aren't stop words. "what's the markup on E0042 work item Patio?" now gives hint "E0042" (was "Patio"), so the handler looks for a work item named E0042. Read-only. (review 2026-09-27 #54)
 
 **Suggested fix:** In the before-noun branch, treat `[Ee]-?\d{4,7}` as a stop and fall through to the words after the noun. Add the case to the #668 tests.
 
-### 726. [MEDIUM] `pronoun_domain` reads the dictated note body
+### 726. ~~[MEDIUM] `pronoun_domain` reads the dictated note body~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `pronoun_domain(strip_assigned_value(strip_dictated_payload(message)), …)`, as suggested. `test_question_registry.py::test_a_pronoun_in_a_dictated_note_names_nothing`. A domain WORD in the note body is a separate path and still routes — logged as #806.
+
 `platform/agents/orchestrator/service.py:3521` — `_resolve_intent_with_history` strips the dictated payload for routing but passes the raw message to `pronoun_domain`. With a task in focus and an older contact anchor, "add a note: she wants the gate locked" routes to `update_contact` ("…wants the gate locked" routes to `update_task`). "there is a dog" pulls a note to a property the same way. (review 2026-09-27 #55)
 
 **Suggested fix:** `pronoun_domain(strip_assigned_value(strip_dictated_payload(message)), context or {})`.
@@ -2691,6 +2714,18 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/agents/task/list_filters.py:81` — `_PROPERTY_RE` refuses a place whose first word is `me|myself|today|tomorrow|this|next|the` (IGNORECASE), so "tasks at Next Door Landscaping" or "tasks at This Old House" finds no place and lists every task. Predates the "wrong answers that look right" batch; noticed while probing it. LOW: a place named that way is rare, and "tasks for the Next Door Landscaping property" can't reach it either. (review 2026-10-02 round 3, unnumbered)
 
 **Suggested fix:** Refuse "this"/"next" only when a date word follows — `(?!(?:me|myself|today|tomorrow|the)\b|(?:this|next)\s(?:week|month|year)\b)` — so "for next week" stays a window and "at Next Door Landscaping" is a place. Add both as rows in test_property.
+
+### 806. [MEDIUM] A domain word in a dictated note routes the note
+`platform/agents/orchestrator/service.py` — With a task in focus, "add a note: a dog in the yard" goes to `update_property`: "yard" is a property domain hint (`agents/orchestrator/intents.py`), and an earlier rule path reads hints from the whole message, dictated payload included. `_resolve_intent_with_history` already classifies on the command head (`strip_dictated_payload`), but it returns early only when the HEAD has a domain word — the path that claims "yard" runs before it. Found fixing #726 (the pronoun half of the same problem). MEDIUM: the note lands on the wrong record, though it is a note, not an overwrite.
+
+**Suggested fix:** Find the rule path that reads DOMAIN_HINTS from the full message for a note request and give it `strip_dictated_payload(message)`, as `_resolve_intent_with_history` does. Add "add a note: a dog in the yard" (task in focus) → `update_task` to `test_question_registry.py::test_a_pronoun_in_a_dictated_note_names_nothing`'s neighbour.
+
+### 807. [LOW] A filler word after "template" hides the template in focus
+`platform/agents/template/service.py:213` — The #704 gate uses the focus only when `_extract_name_hint` finds no name, and the hint's fallback regex takes whatever follows the noun: "delete this template please" → "please", "show me that template now" → "now", so Maple replies "I couldn't find a template matching 'please'". Before #704 the focus won for both. (review 2026-10-03, wrong-answers batch 2 #1)
+
+**Decision 2026-10-03 (user):** Maple does not need to handle template deletion — it can be treated as an unsupported request — so the delete half is not worth a fix, and the finding drops from HIGH to LOW. **Still open:** the get half — "show me that template now" — reaches the same gate.
+
+**Suggested fix:** For the get half: treat a hint made only of filler words (`please|now|again|too|then|for me|thanks|thank you`) as no name in `_extract_name_hint`, and add "show me that template now" (focused template expected) beside `test_it_alone_is_still_the_template_in_focus`. Separately, if template deletion is to be refused as unsupported, that is a change to `delete_template`'s routing and copy, not to this gate.
 
 ## Platform — API, models and data
 
@@ -5685,3 +5720,7 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 
 **Suggested fix:** Remove the parameter from all three.
 
+### 809. [LOW] `_before_aside` split a comment from the regex it describes
+`platform/agents/template/service.py:26` — The new function sits between `# "it", "this", "that one" — a reference to the template in focus.` and `_POINTS_AT_FOCUS_RE`, so the comment now heads `_before_aside`. LOW: a misplaced comment, no behaviour. (review 2026-10-03, wrong-answers batch 2 round 2 #2)
+
+**Suggested fix:** Move `_before_aside` below `_POINTS_AT_FOCUS_RE` (or above the comment), so the comment sits directly on the regex again.

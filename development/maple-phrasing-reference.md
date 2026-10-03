@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-02
+**Last updated:** 2026-10-03
 
 ### Recent changes
 
@@ -741,6 +741,7 @@ estimate page doesn't edit it either.
 | `change the labor burden on the Foundation scope to 18%` | `update_estimate` → Estimate Agent | 🛑 refused |
 | `what's the profit margin on {WI}?` / `what's the gross margin on {WI}?` | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24 — computed from the lines; explains a missing activity cost basis)* |
 | `what's the markup on {WI}?` / overhead / tax | `update_estimate` → Estimate Agent | ✅ rule *(2026-09-24)* |
+| `what's the markup on E0042 work item Patio?` | the Patio work item on E0042 | ✅ rule *(2026-10-03, #725 — the code before "work item" was read as the work item's name)* |
 | `what's the subtotal of {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `how much is {WI}?` | `update_estimate` → Estimate Agent | 🤖 LLM |
 | `what's the total for {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
@@ -993,7 +994,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** #783, #784, #785, #786, #787, #788 (metrics, §1.12); older #22, #23, #279, #329, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
+**Open gaps:** #783, #784, #785, #786, #787 (metrics, §1.12); older #22, #23, #279, #354, #406, #437, #439, #569, #614, #615, #616, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436.
 
 ## 1.12 Metrics — totals, averages, the biggest, rankings, by month, comparisons, win rate, margin and markup *(2026-09-30)*
 
@@ -1223,14 +1224,14 @@ Comma-less unformatted addresses (`1036 Fort Salonga Rd Northport NY`) are inten
 |---|---|---|
 | `remove {contact} from {property}` | nothing is deleted; Maple says the link is removed in the app (§9.8, #679) | 🛑 redirect |
 | a property whose name looks like a person's (`show me Elm House`) | the property, when that is its exact name and no contact's | ✅ rule *(2026-09-27 — it answered "No contact found with name 'Elm House'")* |
-| `N <words> way` / `court` / `ct` phrasings (`60 minutes one way`) | `_ADDRESS_PATTERN` false-matches them as a property lookup (#49) | ⚠️ gap |
+| `60 minutes one way` / `3 days back way` / `20 miles each way` | not a property — a number then a unit is an amount, never a street number | ✅ rule *(2026-10-03, #49 — `_ADDRESS_PATTERN` read them as an address. Only before "way", "court" or "ct": `123 Cedar Way`, `who lives at 12 Elm Court` and streets named after a unit (`2500 4 Mile Rd`, `10 Mile Rd`) still read as addresses)* |
 | `12 Oak Street` in reply to *"Multiple properties matched. Please specify the exact property name, address, or owner."* | the question keeps no record, so the reply is read from scratch and the original request is lost | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
 
 Cross-resource phrasings (e.g. `who lives at {property}?`) are tracked under §8.
 
 **Notes, links and follow-ups** for properties and contacts are in §3.9.
 
-**Open gaps:** older #49, #101, #322 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #697.
+**Open gaps:** older #101, #322 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #697; #49 on 2026-10-03.
 
 ---
 
@@ -1297,6 +1298,7 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | Phrasing | Behavior | Status |
 |---|---|---|
 | `add a note to him: call after 5` (contact in focus) / `add a note to Bob Lee saying …` / `jot down a note for 12 Oak St: …` | files the note, authored by you | ✅ rule *(it asked "which fields?" on the rules tier)* |
+| `add a note: she wants the gate locked` / `add a note: there is a dog` (a task in focus, an older contact or property anchor) | the note goes to the task in focus | ✅ rule *(2026-10-03, #726 — a pronoun inside the dictated note picked the contact or property. A domain word in the note body still can: `add a note: a dog in the yard` goes to the property, #806)* |
 | `add a note to Bob Lee` → *"What should the note say?"* → the text | files the reply, even if it reads like a command | ✅ rule |
 | `show me the notes for 12 Oak St` / `what notes are on Bob Lee?` / `any notes on E0042?` / `show me his notes` | lists them newest first, with author and date | ✅ rule |
 | `delete my note on Bob Lee` / `delete note 2` (after a list) / `delete my last note on Ana Reyes` → *"Delete your note …? This can't be undone."* → `yes` / `no` | deletes it, or keeps it; your own notes, or any as an Owner | ✅ rule *(it was redirected to the app)* |
@@ -1450,7 +1452,7 @@ reply says how many.
 | `what's the price of Topsoil?` / `how much does mulch cost?` / `how many materials do I have?` / `list my material categories` | one material's price, the count, the categories — not a catalog figure | ✅ rule |
 | `what's the average price of my mulch?` / `most expensive material in Bulk Materials` — a category or material narrowing | not read | ⚠️ gap *(Phase 4 — company-wide figures only)* |
 
-**Open gaps:** #701, #760 (space-grouped costs), #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697; #700 on 2026-10-02.
+**Open gaps:** #760 (space-grouped costs), #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697; #700 on 2026-10-02; #701 on 2026-10-03 (a failed size command says so instead of a server error).
 
 ---
 
@@ -1630,7 +1632,7 @@ Additional cross-resource phrasings (e.g. `which templates include {material}?`)
 |---|---|---|
 | `{template}` in reply to *"Which template would you like to see?"* / *"Which template should I delete?"* | the question keeps no record, so the reply is read from scratch; a name that opens with a command verb (`Remove Sod`) may be taken as a command | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
 
-**Open gaps:** #704 ("it" picks the focused template over a named one) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681, #695; `find templates named X` (§6.5).
+**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681, #695; #704 on 2026-10-03 (`delete template Old Patio, it's a duplicate` is Old Patio, not the template in focus — the focus is used only when no template is named, and an aside after a comma is dropped only when the whole name matches no template, so `show template Patio, Large` is still that template); `find templates named X` (§6.5).
 
 ---
 
@@ -2249,7 +2251,8 @@ Maple: I've linked estimate E0042 to Bob Residential for you.   ← one turn (20
 | **bare property answer** — `{property}` / `{address}` / `link it to {address}` (no yes/no word) | the answer *is* the value while the slot is open → link | ✅ rule *(2026-06-06 — verified: a non-affirmative, non-negative, non-pivot reply at the confirm stage is treated as the collect-value answer)* |
 | `Yes` (no property named) | re-ask: "Which property should I link estimate '{EST}' to?" | ✅ rule *(2026-06-06)* |
 | `No` / `not now` / `no thanks` / `maybe later` | acknowledge, clear the slot, leave unlinked | ✅ rule *(2026-06-06 — these are in the `_NEGATIVE_VALUES` lexicon)* |
-| `not right now` / `I'll do it from the portal` / `nah, leave it` | acknowledge, clear the slot, leave unlinked | ⚠️ gap *(NOT in the exact-match `_NEGATIVE_VALUES` lexicon (`routers/agent_helpers/text_helpers.py`) — currently treated as a property-name answer; the link lookup fails and re-prompts. Fix: extend the lexicon or add a soft-negative prefix check.)* |
+| `not right now` / `nah, leave it` / `Please don't` / `don't` / `not yet` | acknowledge, clear the slot, leave unlinked | ✅ rule *(2026-10-03, #329 — read as a property name, and the lookup re-prompted; "please" was a yes with the value "don't". `replies.declines_offer`, in the generic optional follow-up and the legacy estimate one)* |
+| `I'll do it from the portal` | acknowledge, clear the slot, leave unlinked | ⚠️ gap *(still read as a property-name answer — the link lookup fails and re-prompts)* |
 | **pivot** — next message is clearly a fresh request (a new CRUD command or question) | drop the slot silently, route normally | ✅ rule *(pre-existing escape hatch in `handle_pending_optional_follow_up`; guard now documented inline. **2026-07-28** — the escape hatch ran at the confirm stage only; it now covers the collect-value stage too, because that stage can keep the slot open across turns. The follow-up field's own domain is exempt, so `the Downtown property` stays a value.)* |
 | **unresolved answer** — the named property doesn't match anything (typo, ambiguous, or a property that doesn't exist) | re-ask and keep the slot open so the next reply is still read as the property | ✅ rule *(**2026-07-28** — previously the slot was popped before delegating and never restored, so the retry fell through to intent classification and was answered as a brand-new create request ("Sure, I'll help you create an estimate!"). `_rearm_on_unresolved` restores the record whenever the delegated agent returns `needs_clarification`.)* |
 | `{name} - {street}` composite (e.g. `Primavera - 153 Asharoken Ave`) | resolve against the Property catalog | ✅ rule *(**2026-07-28** — `_resolve_property_address` gained a reverse-containment fallback tier, so a label combining both fields matches even though neither field contains the whole string.)* |
@@ -2258,7 +2261,7 @@ Maple: I've linked estimate E0042 to Bob Residential for you.   ← one turn (20
 | **word-ordinal reply** — `the first one` / `second` / `2nd` / `the last one` / `the 2` | select that candidate from the list just shown | ✅ rule *(**2026-07-30** — reported: Maple offered "(1) Bob Residential; (2) Tang's Resident" and "The first one." was resolved as a property *name*, answering "I couldn't find a property matching 'The first one.'". The matcher was digits-only. Now `agents/text_utils.py::match_ordinal_reference` — `first`–`tenth`, `1st`–`10th`, `last`, and a digit with an optional leading determiner — shared with the Task confirmation flow so two numbered menus can't accept different words. Anchored at both ends, so a property named `First Street` still reaches the correction path.)* |
 | **unresolvable reply while a candidate list is on screen** | re-show the numbered list | ✅ rule *(**2026-07-30** — with candidates armed there is no pinned property, so this branch rendered the confirm prompt's placeholder label: "I believe you are looking for 'that property'".)* |
 
-**Remaining ⚠️ in this section (§10.4):** soft-negative phrasings not in the exact-match lexicon (`not right now`, `I'll do it from the portal`, `nah, leave it`) are treated as a property-name answer — extend `_NEGATIVE_VALUES` or add a soft-negative prefix check in `routers/agent_helpers/text_helpers.py`. **Note (2026-07-28):** now that an unresolved answer keeps the slot open, these soft negatives re-prompt instead of falling through — the same wrong outcome, but the user is no longer silently dropped out of the flow, and a pivot ("show me my estimates") still releases it. Tests: `tests/test_maple_estimate_field_edits.py::TestEstimateOptionalFollowUp` + `::TestEstimateFollowUpConfirmStage` (incl. the legacy-defers ordering test), `::TestFollowUpSurvivesUnresolvedValue`, and `tests/test_agent_helpers_delegate_create_estimate.py`.
+**Remaining ⚠️ in this section (§10.4):** `I'll do it from the portal` is still treated as a property-name answer; the other soft negatives are declines since 2026-10-03 (#329). **Note (2026-07-28):** now that an unresolved answer keeps the slot open, these soft negatives re-prompt instead of falling through — the same wrong outcome, but the user is no longer silently dropped out of the flow, and a pivot ("show me my estimates") still releases it. Tests: `tests/test_maple_estimate_field_edits.py::TestEstimateOptionalFollowUp` + `::TestEstimateFollowUpConfirmStage` (incl. the legacy-defers ordering test), `::TestFollowUpSurvivesUnresolvedValue`, and `tests/test_agent_helpers_delegate_create_estimate.py`.
 
 ---
 
