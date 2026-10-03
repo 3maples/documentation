@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **805**. Never
+- **Entries are numbered and permanent.** Next free number: **806**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2330,12 +2330,18 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 **Suggested fix:** Use the closed lists (`is_negative_text(bare) or bare in _DECLINE_HEADS`) instead of `is_decline_text`, and add the "no, …" counterpart to the existing "yes, delete contact Bob" test.
 
-### 707. [MEDIUM] `_BARE_GET_RE` runs before the 80-character guard
+### 707. ~~[MEDIUM] `_BARE_GET_RE` runs before the 80-character guard~~ — RESOLVED 2026-10-02
+
+**Resolved 2026-10-02:** `rewrite_bare_property_name` checks the company and the 80-character cap before matching. Measured 1.36 s on "show me a" + 2,000 spaces + "x" before the fix. `tests/test_record_lists.py::test_a_long_message_never_reaches_the_bare_name_pattern` bounds it at 0.1 s.
+
 `platform/agents/conversation/record_lists.py:155` — `_BARE_GET_RE.match(text)` runs before `len(text) > 80` (:156). Its `\s*[?.!]?\s*$` tail after a 60-char group backtracks quadratically: about 0.48 s on a crafted 2,000-char message, on every turn that isn't answering a question. (review 2026-09-27 #34)
 
 **Suggested fix:** Check the length before matching.
 
-### 708. [MEDIUM] `rewrite_focus_question` has no length cap
+### 708. ~~[MEDIUM] `rewrite_focus_question` has no length cap~~ — RESOLVED 2026-10-02
+
+**Resolved 2026-10-02:** Returns None past 80 characters before matching, as the neighbouring rewrites do (0.16 s before). `tests/test_catalog_names.py::test_a_long_message_is_no_focus_question` bounds it at 0.1 s.
+
 `platform/agents/conversation/catalog_names.py:264` — `_FOCUS_QUESTION_RE` takes about 0.16 s on "the a" + 1995 spaces + "b", and runs on every turn that isn't answering a question. (review 2026-09-27 #35)
 
 **Suggested fix:** Return None when `len(message) > 80` before matching, as the neighbouring rewrites do.
@@ -2635,7 +2641,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Pass the metric the grammar matched (read it from the slots as `read_metric_query` does, or have `unread_scope` return it too) and say "an average" / "the biggest estimate" / "a total" accordingly. Add one test for an average.
 
-### 788. [LOW] The comparison pattern slows sharply on long messages, and runs on every "what about X?"
+### 788. ~~[LOW] The comparison pattern slows sharply on long messages, and runs on every "what about X?"~~ — RESOLVED 2026-10-02
+
+**Resolved 2026-10-02:** `_compared_over` returns before searching when the new target isn't a unit, and `_COMPARISON_RE`'s gaps are bounded (`.{0,80}?`). A 4,000-character near-miss ("this month vs " repeated) took 0.44 s; now 1.6 ms, and 2.9 ms at 8,000. `tests/test_conversation_followup.py::test_a_long_comparison_stays_linear` bounds it at 0.1 s and pins a comparison with words between its parts still swapping.
+
 `platform/agents/conversation/followup.py:83` — `_compared_over` searches `previous` with `_COMPARISON_RE` (two lazy `.*?` gaps and a backreference) before checking whether the new target is a unit at all, so every elliptical follow-up pays for it. Super-linear: 2,000 characters take 0.056 s, 4,000 take 0.44 s (verified), 8,000 about 3.3 s. Messages are capped at 2,000 characters, so today's worst case is ~60 ms on the event loop; a stored rewrite or translation can be longer. Low because the cap bounds it now; the same class of bug as review 2026-09-27 #13. (Second code review of Maple metrics Phase 2, 2026-09-30.)
 
 **Suggested fix:** Check `_NEW_UNIT_RE.match(new_target)` first and return None early; bound the gaps (`.{0,80}?`) so the search is linear. Add a timing test on a 4,000-character previous message.
@@ -4906,6 +4915,11 @@ total row count rather than blank-row count.
 `platform/tests/test_maple_work_item_context.py:438` — `test_a_new_command_naming_a_code_does_not_answer_which_estimate` (all three parametrizations) fails with `RuntimeError: … got Future attached to a different loop` inside `EstimateAgent.process()`. It fails at `0bfe2fc` (before the 2026-10-01 tenant work) and every commit since, run alone or in a batch, so it predates that work; it was missed because the related-test runs didn't include this file.
 
 **Suggested fix:** Find what the `wired` fixture's `_say` drives through `asyncio.run` that reaches a Motor client bound to the TestClient's loop (likely a real DB call the stubs don't cover), and stub it or run the turn on the client's portal.
+
+### 805. [LOW] Two of the three guards are pinned only by a 0.1 s wall clock
+`platform/tests/test_record_lists.py:1` — `test_a_long_message_never_reaches_the_bare_name_pattern` and `test_catalog_names.py::test_a_long_message_is_no_focus_question` assert `elapsed < 0.1`. What #707 and #708 fixed is an ORDER: the length check runs before the pattern. That is directly testable, but the tests check it through timing instead. The fixed path is microseconds, so they pass by a wide margin today. But the neighbouring test (`test_a_long_what_about_stays_linear`) deliberately uses 1.0 s because "a wall-clock bound must not flake on a GC pause", and these two are the only 0.1 s bounds in the conversation suites. LOW: no flake observed; it's suite hygiene. (review 2026-10-02, guards batch #1)
+
+**Suggested fix:** Assert the order rather than the clock: `monkeypatch.setattr(record_lists, "_BARE_GET_RE", _Exploding())` (and `catalog_names._FOCUS_QUESTION_RE`), where `_Exploding.match` raises, then call each rewrite with the 2,000-character message and assert None. Keep the #788 test (`test_conversation_followup.py::test_a_long_comparison_stays_linear`) on the clock (bounded search; 1.6 ms against 0.1 s) and add the same exploding stand-in for its "Bob Lee" path, which should never search at all.
 
 ## Codebase hygiene (batchable)
 
