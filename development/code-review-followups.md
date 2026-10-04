@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **810**. Never
+- **Entries are numbered and permanent.** Next free number: **811**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -1832,11 +1832,17 @@ of recomputing it.
 `\bhow\s+long\b` routes any "how long … <spatial unit>" query to the Calculator. Mitigated by the measurement-unit requirement, CRUD-override precedence, and the no-unit negative test — but non-labor phrasings like "how long is a 10 ft board" now reach open-math too.
 **Suggested fix:** Accept — open-math handles such strays gracefully (trivial answer). Monitor; tighten only if a real misroute surfaces.
 
-### 406. [LOW] platform/routers/agent_helpers/estimate_gathering.py:238 — gathering-path response never mentions the auto-linked property
+### 406. ~~[LOW] platform/routers/agent_helpers/estimate_gathering.py:238 — gathering-path response never mentions the auto-linked property~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `_finalize_gathering` now says the link, in the one-shot path's words: "Created estimate 'E0042' and linked it to property 'Primavera Residence'." Both paths build the line with `estimate_gathering.created_estimate_line`. Test: `test_estimate_gathering.py::TestFinalizeGatheringStashedProperty`.
+
 The one-shot path confirms "…and linked it to property '{label}'", but `_finalize_gathering` applies the stashed property silently (the stash's `label` field is unused) — inconsistent UX, no confirmation of the link.
 **Suggested fix:** Append "and linked it to property '{label}'" to the finalize response when the stash was applied.
 
-### 437. [LOW] platform/agents/estimate/crud_handlers.py — fuzzy disclosure dropped on sorted and aggregate list responses
+### 437. ~~[LOW] platform/agents/estimate/crud_handlers.py — fuzzy disclosure dropped on sorted and aggregate list responses~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** The sorted lead-ins name everything the list was narrowed by, as the plain list does: "Your latest estimate for 'Primavera':", "Your top 3 draft estimates for Bob Lee by value:". The aggregate total already did, through `described`. Test: `test_maple_estimate_field_edits.py::TestFuzzyListFilterDisclosure::test_a_sorted_fuzzy_read_names_the_match`.
+
 `_handle_list_estimates` names the fuzzily-matched property via
 `property_constraint_label`, but the `sort_field == "grand_total"` /
 `sort_field == "created_at"` branches and the `total_value` aggregate return all
@@ -1890,6 +1896,9 @@ place — the old one has to be dropped), so it should ship deliberately with a
 migration step rather than bundled into unrelated work.
 
 ### 447. [LOW] platform/agents/task/text_helpers.py:117 — "add to the tasks: X" with no active task appends to an unrelated task
+
+**Kept 2026-10-03 (user):** append stays the behavior — asked again and confirmed; no change.
+
 The plural now routes to a notes append. With no `active_task_id`, the resolver's
 step-7 recency fallback picks the most-recently-updated task in the company, so a
 user who meant "add an item to my task list" annotates whatever they last
@@ -1966,7 +1975,10 @@ bring back copying.
 
 **Suggested fix:** Return just `Optional[str]` and drop the set/add verb patterns from this path (update `TestNoteCueBroadening`), or correct the docstring.
 
-### 614. [LOW] `run_confirmed_edits` acts on the stashed code, not the verified target
+### 614. ~~[LOW] `run_confirmed_edits` acts on the stashed code, not the verified target~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `fuzzy_confirmation` passes the code of the estimate it loaded company-scoped by id (`target.estimate_id`) in place of the stashed one, so the re-run acts on the verified target. Test: `test_agent_helpers_fuzzy_confirmation.py::test_confirmed_edit_batch_reruns_the_stashed_commands`.
+
 `platform/agents/estimate/edit_executor.py:274` — `fuzzy_confirmation.py:92` loads the target by `pending["estimate_id"]` (company-scoped), but the re-run looks up `pending["estimate_code"]`, and nothing checks the two agree. Pending state is server-owned, so this is defense in depth.
 
 **Suggested fix:** Pass `target.estimate_id` from fuzzy_confirmation into `run_confirmed_edits`, or reject when it differs from the stashed code.
@@ -2546,7 +2558,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Name the author in the confirmation whenever it isn't the requester (same change as #705).
 
-### 760. [LOW] Space grouping merges two numbers into one cost
+### 760. ~~[LOW] Space grouping merges two numbers into one cost~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** A space-grouped number followed by a size unit (lb, kg, yd, ft, bag …) keeps only the groups before that last space: "$20 100lb bag" and "$20 100 lb bag" are 20, "1,200 500 lbs" is 1200, "$2 000 a pallet" is still 2000. A bare "45 100" is still 45100; nothing says which number is the cost. Tests: `test_create_questions.py::test_bare_answer`.
+
 `platform/agents/conversation/create_questions.py:48` — `(?:[, ]\d{3})` reads a space followed by three digits as a thousands separator. "$20 100lb bag" gives 20100 and "45 100" gives 45100, and the material is created at that cost without a question. Before the 2026-09-27 fix it read 20. LOW because it needs an unusual reply to the cost question. (review 2026-09-27, second round #7)
 
 **Suggested fix:** Require a word boundary after the grouped form (`…){1,2}\b`), or accept only a comma, NBSP or thin space as a group separator. Add "$20 100lb bag" to test_create_questions.py.
@@ -3097,7 +3112,10 @@ geocode and note it in the comment.
 
 **Suggested fix:** Decided 2026-09-23: option (b), a delayed sweep, was chosen as the real fix but deferred because it needs a scheduled job. Mark candidate paths on version delete instead of deleting them, and have a sweep delete ones still unreferenced by any version after ~15 minutes.
 
-### 631. [MEDIUM] The estimates PUT still recomputes with the old formula
+### 631. ~~[MEDIUM] The estimates PUT still recomputes with the old formula~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03 (user: one formula):** The PUT prices each work item with `work_item_breakdown`, the server port of the portal's math, so the stored total is the one the estimate page and Maple show: 5 × 2.5 × $3.99 at 15% markup and 13% tax is $64.85, not $64.81. Legacy `labours` lines no longer price a work item (the portal never sends them); the two API tests that priced one now use an activity. A stored labor burden still prices, as before. Review rounds of that batch: AI generation, Maple's add-work-items path and the manual (`skip_generation`) create price the same way once an item has material or activity lines (`job_item_builders._price_as_the_page`) — an item with neither keeps its own figure — and a sized template stores its scaled lines' price, not its total times the factor. Tests: `test_estimate_api.py::test_update_estimate_prices_work_items_as_the_portal_does`, `test_build_job_items_from_parsed_prices_lines_as_the_portal_does`, `test_manual_create_prices_work_items_as_the_portal_does`, `test_template_create_routing.py::…test_a_sized_template_stores_the_price_of_its_scaled_lines`.
+
 `platform/routers/estimates.py:1296` — The PUT rounds once, half-even; Maple now rounds each line, half-up. Verified: 5 lines of 2.5 × $3.99 with 15% markup and 13% tax → PUT $64.81, Maple $64.85. A portal save restates a total Maple stored to the cent, and the assumption rescale's exact `line_derived` check (< 0.01) now flags portal-saved items as manual overrides.
 
 **Suggested fix:** Have the PUT use `work_item_breakdown` (the portal sends burden 0), or loosen `line_derived` to accept either formula. Needs your call because it changes the HTTP API's stored totals; I'd pick the former for one formula everywhere. **Awaiting Simon's decision** (changes the totals the HTTP API stores).
@@ -5745,3 +5763,8 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `platform/agents/template/service.py:26` — The new function sits between `# "it", "this", "that one" — a reference to the template in focus.` and `_POINTS_AT_FOCUS_RE`, so the comment now heads `_before_aside`. LOW: a misplaced comment, no behaviour. (review 2026-10-03, wrong-answers batch 2 round 2 #2)
 
 **Suggested fix:** Move `_before_aside` below `_POINTS_AT_FOCUS_RE` (or above the comment), so the comment sits directly on the regex again.
+
+### 810. [LOW] The router imports an agent module's private `_recalculate_sub_total`
+`platform/routers/agent_helpers/template_estimate.py:26` — The sized-template fix (#631 review) imports `agents.estimate.work_item_field_handlers._recalculate_sub_total`, a leading-underscore helper, into `routers/agent_helpers`. That is the cross-module private import #575 and #750 flag elsewhere. It ties the router to one agent mixin's internals, for a one-line wrapper around `work_item_breakdown(unburdened(item)).total`, which already lives in the routers' own `routers/estimate_helpers/calculations.py`. LOW: no behavioral effect. (review 2026-10-03, wrong-answers batch 4 round 3 #1)
+
+**Suggested fix:** In `template_estimate.py`, import `unburdened` and `work_item_breakdown` from `routers.estimate_helpers.calculations` and write `job_item.sub_total = work_item_breakdown(unburdened(job_item)).total`. Drop the `_recalculate_sub_total` import. The test needs no change.
