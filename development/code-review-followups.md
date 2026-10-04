@@ -1651,7 +1651,10 @@ action-phrase prefix via `_bare_entity_residual`. Catalog-backed
 lookup (per the plan's deferred Phase 2a-proper) would retire the
 concern entirely.
 
-### 279. [MEDIUM] Maple-chat estimate-creation refusal still uses the legacy direct add-card link
+### 279. ~~[MEDIUM] Maple-chat estimate-creation refusal still uses the legacy direct add-card link~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** User decision: a yes/no. Every Maple create starts in `delegate_create_estimate`, which now asks before claiming a slot when the next estimate would bill overage — the portal's rule (`services/estimate_quota.estimate_bills_overage`: capped, at or over the plan's included estimates, a card on file, a plan with an overage price) and the user's `show_overage_notification`. It says what the estimate pages' dialog says, word for word — "…Additional charges will apply at $3/additional estimate. Create it anyway?" (user 2026-10-03: the price is $3; `overage_confirmation.OVERAGE_NOTICE`, change both). Only Free has estimate overage; Base and Pro are unlimited, so Base's config went from 100 included / $2 overage to 1,000,000 / $0, like Pro, in `plan_config.py` and the portal's `billing-plans.ts` together. The Stripe price `est_overage_base` keeps its old tiers until `scripts/seed_stripe_products.py` is re-run with its drift update; Base isn't selectable at launch, so nothing is billed by it meanwhile. "Yes" re-runs the create once with `overage_acknowledged` (per-turn); "no" creates nothing (`routers/agent_helpers/overage_confirmation.py`, a router yes/no flow in `open_question`). A failed check never blocks the create — the quota gate still runs. Without a card the add-card refusal is unchanged. Tests: `test_maple_overage_confirmation.py`; corpus `estimate-create-over-quota-asks-then-yes` / `-then-no`.
+
 
 `ESTIMATE_LIMIT_REFUSAL_MESSAGE` in `platform/agents/text_utils.py:237-240` still embeds
 `ADD_CARD_LINK` (`/settings?tab=billing&openAddCard=1`) when the orchestrator's
@@ -1866,7 +1869,10 @@ a flow that can re-ask indefinitely.
 **Suggested fix:** exempt only a domain match with no action verb; tighten as
 part of the state-machine consolidation above.
 
-### 442. [LOW] agents/task/resolver.py:94 — `-updated_at` recency sort has no tiebreaker
+### 442. ~~[LOW] agents/task/resolver.py:94 — `-updated_at` recency sort has no tiebreaker~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** The resolver sorts `-updated_at, -_id`, so a tie goes to the newer task, and the `(company, updated_at)` index gained `_id` so the sort stays index-served. Test: `test_task_resolver.py::test_last_task_breaks_a_recency_tie_by_newest_id` (both tasks forced to one timestamp). **Per environment, after the deploy:** `python scripts/drop_redundant_task_index.py --apply` drops the old `company_1_updated_at_-1`, now a redundant prefix (`init_beanie` never drops indexes); it refuses until the new index exists, and re-running is a no-op.
+
 `_fetch_candidates` sorts on `.sort("-updated_at")` alone. BSON dates are
 millisecond-precision and `Task.update_timestamp` is a
 `@before_event([Replace, Insert])` hook that re-stamps `updated_at` to *now* on
@@ -1999,21 +2005,30 @@ bring back copying.
 
 **Suggested fix:** Gate step 3 on `not names_title`, or return the not-found clarification.
 
-### 617. [LOW] `intent` and `existing_estimate_id` aren't treated as per-turn keys
+### 617. ~~[LOW] `intent` and `existing_estimate_id` aren't treated as per-turn keys~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `intent` and `existing_estimate_id` are in `finalize_result.TRANSIENT_KEYS`. Test: `test_agent_helpers_finalize_result.py::test_finalize_strips_the_update_dispatch_keys`.
+
 `platform/routers/agent_helpers/finalize_result.py:47` — `run_update_estimate` puts them in `dispatch_context`, and the CRUD passthrough returns that context, so they get saved and a later generation reads them (service.py:984). Company-checked; impact unconfirmed.
 
 **Suggested fix:** Add both to `TRANSIENT_KEYS`.
 
 **Update 2026-09-27:** the reader is `agents/estimate/service.py:991` (`existing_estimate_id` for `intent == "update_estimate"`), and `TRANSIENT_KEYS` is now `routers/agent_helpers/finalize_result.py:57`.
 
-### 645. [LOW] The planner rejects references to a work item added in the same plan
+### 645. ~~[LOW] The planner rejects references to a work item added in the same plan~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `invalid_targets` counts a work item an earlier `add_work_item` in the plan adds: "it" (`use_active`) and its exact description name it, as the executor resolves them. A position still numbers the estimate as loaded (the executor does), so "work item 3" after an add on a two-item estimate is rejected. Tests: `test_maple_edit_planner.py::test_a_plan_can_target_the_work_item_it_adds`, `test_a_just_added_item_has_no_new_position`, `test_a_plan_still_cannot_target_an_item_before_adding_it`.
+
 `platform/agents/estimate/edit_planner.py:120` — `invalid_targets` rejects any target that isn't in the snapshot unless it is `use_active` with an anchor, so "add a Fence work item and put 10 mulch on it" can't be planned when nothing is anchored.
 
 **Suggested fix:** Allow `use_active` or a description hint naming an `add_work_item` earlier in the plan (the executor already resolves these). Add a test.
 
 *(Review 2026-09-24 fourth pass #32.)*
 
-### 659. [LOW] Setting a work item back to its original total doesn't reset the adjustment the way the portal does
+### 659. ~~[LOW] Setting a work item back to its original total doesn't reset the adjustment the way the portal does~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `_edit_set_work_item_total` treats a total equal (to the cent) to the one at `original_profit_margin` as a reset, as the portal's `handleAdjustSet` does: the original markup exactly, `original_profit_margin` cleared, and "I've set the total … back to $440.00 (markup back to 10%)." Test: `test_estimate_edit_executor.py::test_setting_the_original_total_again_resets_the_adjustment`.
+
 `platform/agents/estimate/edit_executor.py:824` — The portal's `handleAdjustSet` (WorkItemInlineContent.tsx:233-250) treats a total equal to the baseline as a reset: it restores the baseline markup and clears `original_profit_margin`. Maple stores the back-calculated markup, float residue included, and keeps `original_profit_margin`, so "set work item 1 back to $440" leaves the Adjust pill showing and the markup slightly off.
 
 **Suggested fix:** If `round(amount*100) == round(baseline_total*100)` (the baseline being the total at `original_profit_margin`), set `profit_margin = original_profit_margin` and `original_profit_margin = None`. Add a test.
@@ -2520,7 +2535,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Require the verb, as `_NOTE_VERB` does in command_grammar.
 
-### 743. [LOW] `NOTE_DELETE_REDIRECT` still says notes can't be deleted from chat
+### 743. ~~[LOW] `NOTE_DELETE_REDIRECT` still says notes can't be deleted from chat~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `NOTE_DELETE_REDIRECT` now names the forms the note handler reads — "Say \"delete my note on <name>\" — or \"show me the notes for <name>\", then \"delete note 2\"" — and still says nothing was deleted; editing stays in the app. Test: `test_delete_scope_redirect.py::test_the_note_redirect_points_at_the_form_that_deletes`.
+
 `platform/agents/conversation/delete_confirmation.py:54` — record_notes now deletes notes ("delete my note on Bob Lee"), but a phrasing it doesn't parse ("delete Bob Lee's note") reaches the agent's delete and gets "I can't delete or edit notes from chat yet". (review 2026-09-27 #73)
 
 **Suggested fix:** Point the copy at the working form: "Say 'delete my note on <name>' and I'll find it."
@@ -2566,7 +2584,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Require a word boundary after the grouped form (`…){1,2}\b`), or accept only a comma, NBSP or thin space as a group separator. Add "$20 100lb bag" to test_create_questions.py.
 
-### 761. [LOW] The overdue midnight keeps `fold` and disagrees with the other midnight helpers
+### 761. ~~[LOW] The overdue midnight keeps `fold` and disagrees with the other midnight helpers~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `agents/local_time.midnight(now)` builds the day's start fresh (fold 0), and both the overdue cutoff and the due windows (`list_filters`) use it. On Havana's 2026-11-01 it is 04:00 UTC, not the second midnight an hour later. Tests: `test_local_time.py::test_midnight_is_the_first_one_on_a_day_whose_midnight_repeats`, `test_the_overdue_cutoff_is_the_shared_midnight`.
+
 `platform/agents/task/service.py:458` — `user_now(ctx).replace(hour=0, …)` keeps `fold=1` when now falls in a repeated hour. On a day whose midnight repeats (America/Havana 2026-11-01), `today` becomes the second midnight, one hour late, and the overdue query then includes tasks due today. `_midnight` (list_filters.py:102) and `parse_due_phrase` build `datetime(y, m, d, tzinfo=zone)` (fold 0), which matches the portal. (review 2026-09-27, second round #9)
 
 **Suggested fix:** Build `today` with the same constructor, e.g. reuse `list_filters._midnight(user_now(working_context))`.

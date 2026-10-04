@@ -389,7 +389,7 @@ estimate".
 **Refused by rule:** bulk delete and equipment (orchestrator, on the command
 part only — never on a note body, a new name or a reply to Maple's question);
 a note to a material or role. **Refused by the planner:** labor burden
-(`labor_burden`) and a stated material cost (`material_cost`).
+(`labor_burden`) and a stated material cost (`material_cost`). A plan may name the work item it adds by "it" or its exact description — "add a Fence work item and set its tax to 13%" (2026-10-03, #645); a position still numbers the estimate as it was loaded.
 
 ## 1.1 Count & status queries
 
@@ -491,6 +491,7 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `new commercial quote` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `create an estimate to plant six hydrangea at the {property} residence` — property auto-linked at creation; "six" stays a plant quantity, never an area | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — property link + area grounding guard; the generation itself remains 🤖 LLM)* |
 | `estimate for sod at {street address}` — address resolved against the Property catalog and linked | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — unique match required; ambiguous/unknown falls back to the ask-to-link follow-up)* |
+| any create when the company has used its plan's included estimates and has a card on file (and the user hasn't turned the overage notice off) → *"You're creating an estimate beyond the allotted number in your plan. Additional charges will apply at $3/additional estimate. Create it anyway?"* — the estimate pages' dialog, word for word → `yes` / `no` | `yes` goes on with the create (one-shot, gathered or from a template); `no` creates nothing | ✅ rule *(2026-10-03, #279 — Maple created it and billed the overage without a word, where the estimate pages show an acknowledgment dialog. Without a card the create is still refused with the add-card link.)* |
 
 Handled by `agents/estimate/conversation_guide.py` + `agents/estimate/assumption_defaults.py`.
 
@@ -782,6 +783,7 @@ Sets a work item's total to an absolute dollar amount by **back-calculating its 
 | `bump {WI} up to $1800` | `update_estimate` → Estimate Agent | ✅ rule |
 | `reduce {WI} to $1200` | `update_estimate` → Estimate Agent | ✅ rule |
 | `set a flat rate of $750 on {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `set the total for {WI} to $440` after an adjustment, $440 being its total at the original markup | the adjustment is reset, as the portal's Adjust dialog does: that markup exactly, and no Adjust pill — *"I've set the total on … back to $440.00 (markup back to 10%)."* | ✅ rule *(2026-10-03, #659 — the back-calculated markup, float residue included, and the adjustment kept)* |
 
 ## 1.6 Linking
 
@@ -998,7 +1000,7 @@ rejected; it cannot name another estimate (it says `different_estimate`);
 reads get the capability message; removals still ask for confirmation.
 Disabled by `MAPLE_EDIT_PLANNER_ENABLED=false` (the test suite's default).
 
-**Open gaps:** older #23, #279, #354, #617, #645, #659 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436; #22, #439, #615, #616 on 2026-09-29; #569, #783, #784, #785, #786, #787, #406, #437, #614, #631 on 2026-10-03.
+**Open gaps:** older #23, #354 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #663, #664, #665, #666, #668, #670, #671, #673, #677, #682, #683, #684, #685, #686, #687, #689, #691, #696, #697, #334, #436; #22, #439, #615, #616 on 2026-09-29; #569, #783, #784, #785, #786, #787, #406, #437, #614, #631, #279, #617, #645, #659 on 2026-10-03.
 
 ## 1.12 Metrics — totals, averages, the biggest, rankings, by month, comparisons, win rate, margin and markup *(2026-09-30)*
 
@@ -1312,13 +1314,14 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `add a note to Bob Lee` → *"What should the note say?"* → the text | files the reply, even if it reads like a command | ✅ rule |
 | `show me the notes for 12 Oak St` / `what notes are on Bob Lee?` / `any notes on E0042?` / `show me his notes` | lists them newest first, with author and date | ✅ rule |
 | `delete my note on Bob Lee` / `delete note 2` (after a list) / `delete my last note on Ana Reyes` → *"Delete your note …? This can't be undone."* → `yes` / `no` | deletes it, or keeps it; your own notes, or any as an Owner | ✅ rule *(it was redirected to the app)* |
+| a note delete the note handler can't parse (`delete Bob Lee's note`) | *"I couldn't tell which note you meant, so I haven't deleted anything. Say "delete my note on <name>" — or "show me the notes for <name>", then "delete note 2" — and I'll find it."* | ✅ rule *(2026-10-03, #743 — said notes couldn't be deleted from chat)* |
 | `delete the note on Ana Reyes` / `delete note 1` as an Owner, on someone else's note → *"Delete Jordan Lee's note on Ana Reyes: …?"* → `yes` | *"I've deleted Jordan Lee's note on …"* — the author is named, never "your note"; `delete my note on …` offers only your own | ✅ rule *(2026-10-01, #705 / #758 — an Owner was offered an employee's note as "your note")* |
 | `show me his contact info` / `delete that one` (a contact in focus) | the contact in focus — a pronoun is never looked up as a name | ✅ rule *(2026-10-01, #703 — "his" matched "Chris", which then took the focus)* |
 | `link John Doe to 123 Main St` / `link 123 Main St to John Doe` / `connect Carla Diaz with the Elm House property` / `add Carla Diaz to 12 Oak St` / `Carla Diaz lives at 12 Oak St` | links them (either order); "already linked" when they are | ✅ rule *(the guide's own phrasing was unknown on the rules tier)* |
 | `link Zed Quill to 12 Oak St` (no such contact) | "I couldn't find a contact or a property called Zed Quill." | ✅ rule |
 | `remove Ana Reyes from 12 Oak St` / `unlink …` | done in the app — §9.8 | 🛑 redirect |
 
-**Open gaps:** #741, #742 ("Please note: …" filed as a note), #745, #746 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690; 2026-10-01: #703, #705, #758.
+**Open gaps:** #741, #742 ("Please note: …" filed as a note), #745, #746 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690; 2026-10-01: #703, #705, #758; #743 on 2026-10-03.
 
 ---
 
@@ -1464,7 +1467,7 @@ reply says how many.
 | `what's the price of Topsoil?` / `how much does mulch cost?` / `how many materials do I have?` / `list my material categories` | one material's price, the count, the categories — not a catalog figure | ✅ rule |
 | `what's the average price of my mulch?` / `most expensive material in Bulk Materials` — a category or material narrowing | not read | ⚠️ gap *(Phase 4 — company-wide figures only)* |
 
-**Open gaps:** #760 (space-grouped costs), #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697; #700 on 2026-10-02; #701 on 2026-10-03 (a failed size command says so instead of a server error).
+**Open gaps:** #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697; #700 on 2026-10-02; #701 on 2026-10-03 (a failed size command says so instead of a server error); #760 on 2026-10-03.
 
 ---
 
