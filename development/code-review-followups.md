@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **812**. Never
+- **Entries are numbered and permanent.** Next free number: **815**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -301,7 +301,9 @@ on write (override `__init__` / validator so any create or update lowercases
 the field). (c) Replace the regex with `User.find_one(User.email == email)`.
 Don't do (c) before (a) — a stray capitalized row would silently fail auth.
 
-### 26. [MEDIUM] `find_contacts_by_name` fetches whole company, filters in Python
+### 26. ~~[MEDIUM] `find_contacts_by_name` fetches whole company, filters in Python~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** the substring match runs in Mongo (`agents/contact/utils.full_name_contains`: `$regexMatch` on the trimmed "first last", escaped, case-insensitive), and only a miss reads the company's contact names (`_contact_names`, ids and names only) for the fuzzy fallback, loading in full just the ones it picks. The contact and property agents no longer pass `_list_contacts_via_api` (which loaded every contact); `list_contacts_fn` stays as an injection point. `cross_resource.find_contacts_by_full_name` uses the same filter. Tests: `tests/test_contact_name_lookup.py`.
 **File**: `agents/contact/utils.py:158-170`
 **Severity**: MEDIUM
 
@@ -417,7 +419,9 @@ Estimate.aggregate([
 Defer until perf measurements demand it; current shape is correct
 and clear. Worth coupling with a fixture-based perf test.
 
-### 328. [MEDIUM] `_resolve_estimate_by_title` full-collection scan now on three more paths
+### 328. ~~[MEDIUM] `_resolve_estimate_by_title` full-collection scan now on three more paths~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** with #669 — `_match_estimates_by_title` calls `title_reference.find_named_estimates`, which matches on titles alone and loads only the matches. No cap was added: a capped list matched the wrong estimate as an exact target (round 32 #2).
 The (pre-existing) resolver does `Estimate.find(company == oid).to_list()` and
 substring-matches titles in Python. The new `_resolve_estimate_code_or_title`
 wires it into notes/description/link updates, so every code-less update turn
@@ -552,7 +556,9 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 
 **Suggested fix:** Pass the loaded `target` into the executor as an optional parameter.
 
-### 669. [MEDIUM] Maple's named-estimate lookup loads every estimate document in full
+### 669. ~~[MEDIUM] Maple's named-estimate lookup loads every estimate document in full~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** one shared helper, `agents/estimate/title_reference.find_named_estimates`, reads every estimate's `title` and `property` (archived included, no cap), runs the title ladder and customer fallback (`resolve_named_estimates`) over that projection, then loads the matched estimates in full. The router's resolver, the get-estimate delegate and the Estimate agent all use it; the delegate also stops loading the newest 100 when a title is named (only the loose match after it reads them). Tests: `tests/test_estimate_title_lookup.py`. The customer fallback still calls `find_properties_by_name_or_address`, which loads every property — #812.
 
 **Update 2026-09-29:** name-answers phase 1 added no caller: a title given in answer to "Which estimate?" is looked up exactly and indexed (`title_reference.find_estimates_titled`, index `company_title`). The ladder for titles named inside a request still loads everything; the projection fix is unchanged.
 `platform/routers/agent_helpers/estimate_resolver.py:188` (and `delegate_get_estimate.py:~219`, `agents/estimate/crud_handlers.py` `_match_estimates_by_title`) — to match "the Patio estimate" by title, each path loads every estimate the company has, whole documents with their job items, then filters in Python. Round 32 #2 widened the router's two paths from the newest 100 to the full set, so they agree with the agent's resolver (a capped list matched the wrong estimate as an exact target); the cost grows with the company's estimate count, per named message.
@@ -561,7 +567,9 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 
 *(Review 2026-09-26 round 32 #2, cost of the fix.)*
 
-### 709. [MEDIUM] Each turn loads the whole catalog, up to twice, plus every contact and property
+### 709. ~~[MEDIUM] Each turn loads the whole catalog, up to twice, plus every contact and property~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `catalog_names._lookup_name_kinds` asks, for one name, five indexed company-scoped queries run together — material, role, template and property by exact name (`name_lookup.same_name`: anchored, escaped, any case and spacing) and one contact query for the full or first name — instead of loading up to 5,000 of each kind plus every contact and property. A name is looked up once per message (`_KINDS_SEEN`, set by `_rewrite`). Tests: `tests/test_catalog_names.py` (the #709 section).
 `platform/agents/conversation/catalog_names.py:96` — `_catalog` reads every material, role and template in the company (up to 5,000 each) to compare names in Python. `_record_kind` (:138) and `_kind_of` (:157) each call it, and each also runs the whole-collection contact and property finders. `_GET_RE` / `_QUESTION_RE` match most short messages, so most turns run 3–6 catalog scans before routing. Related to tracked #26 (`find_contacts_by_name` fetches the whole company), but this is a new caller multiplying it. (review 2026-09-27 #36)
 
 **Suggested fix:** Look names up with an indexed, anchored, escaped, case-insensitive query per model with `limit(2)`, and resolve the kind once per message.
@@ -591,6 +599,11 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 `platform/agents/template/service.py:184` — Both handlers run `_find_templates_by_name(company_id, name_hint) or _find_templates_by_name(company_id, _before_aside(name_hint))`. `_find_templates_by_name` loads the company's whole template collection (a pre-existing full scan), so every miss reloads it — including when the hint has no ", " and the second query is identical to the first. LOW: a template list is small, and a miss already ends in "I couldn't find a template". (review 2026-10-03, wrong-answers batch 2 round 2 #1)
 
 **Suggested fix:** Call the fallback only when it differs: `short = _before_aside(name_hint); matches = await find(name_hint) or (await find(short) if short != name_hint else [])`, or load the list once and filter twice.
+
+### 812. [MEDIUM] `find_properties_by_name_or_address` loads every property to match a name
+`platform/agents/cross_resource.py:34` — The finder loads all the company's properties and matches in Python: the query inside the name, street or full address, or a stored name or street inside the query. It serves the estimate customer fallback (`title_reference.resolve_named_estimates`, after a title matches nothing) and the property agent's twin (`PropertyAgent._find_properties_by_name_or_address`). Left out of the slow-lookups batch (#709, #669, #328, #26) because the reverse containment ("Elm House" inside "the elm house job") has no indexed form, and Mongo's `$toLower` lowercases ASCII only, so moving it to `$expr` could miss accented names the Python match finds. (logged 2026-10-04)
+
+**Suggested fix:** Run the forward containment in Mongo (`$regexMatch` on name, street and the composed address, escaped, case-insensitive) and keep the reverse check, or drop it if no phrasing needs it — the customer fallback already re-checks whole words in `_names_whole`. Then project only the fields matched, and share one finder between `cross_resource` and the property agent.
 
 ## Silently swallowed errors
 
@@ -2798,6 +2811,11 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 **Decision 2026-10-03 (user):** Maple does not need to handle template deletion — it can be treated as an unsupported request — so the delete half is not worth a fix, and the finding drops from HIGH to LOW. A follow-up decision the same day: **no explicit refusal** for template deletion either — it keeps working as it does (confirm, then delete). **Still open:** the get half — "show me that template now" — reaches the same gate.
 
 **Suggested fix:** For the get half: treat a hint made only of filler words (`please|now|again|too|then|for me|thanks|thank you`) as no name in `_extract_name_hint`, and add "show me that template now" (focused template expected) beside `test_it_alone_is_still_the_template_in_focus`. Separately, if template deletion is to be refused as unsupported, that is a change to `delete_template`'s routing and copy, not to this gate.
+
+### 813. [LOW] The contact query's 20-row cap can hide a full-name match behind first-name matches
+`platform/agents/conversation/catalog_names.py:137` — `person()` runs one `$or` for both readings — a contact whose first name is the name, and one whose full name is — and reads at most 20 rows (`to_list(length=20)`). With more than 20 contacts sharing a first name, a contact whose full name is that same word (first name "Bob", no last name) can fall past row 20, so "contact" is missed. `_kind_of` then lets a material named "Bob" rewrite as the material, where the old code (every contact loaded) returned None. LOW: it needs 21+ contacts with one first name, one of them with no last name, and a catalog item of exactly that name. (review 2026-10-04, slow-lookups batch #1)
+
+**Suggested fix:** Ask the two questions separately, each as `find_one(..., {"_id": 1})`: one with the full-name alternatives (the first/last splits and the single-field forms with the other field blank), one with `{"first_name": same_name(name)}`. Two indexed queries in the same `asyncio.gather`, no cap, exact semantics; and the Python full/first re-check goes away.
 
 ## Platform — API, models and data
 
@@ -5848,3 +5866,9 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `platform/routers/agent_helpers/template_estimate.py:26` — The sized-template fix (#631 review) imports `agents.estimate.work_item_field_handlers._recalculate_sub_total`, a leading-underscore helper, into `routers/agent_helpers`. That is the cross-module private import #575 and #750 flag elsewhere. It ties the router to one agent mixin's internals, for a one-line wrapper around `work_item_breakdown(unburdened(item)).total`, which already lives in the routers' own `routers/estimate_helpers/calculations.py`. LOW: no behavioral effect. (review 2026-10-03, wrong-answers batch 4 round 3 #1)
 
 **Suggested fix:** In `template_estimate.py`, import `unburdened` and `work_item_breakdown` from `routers.estimate_helpers.calculations` and write `job_item.sub_total = work_item_breakdown(unburdened(job_item)).total`. Drop the `_recalculate_sub_total` import. The test needs no change.
+
+### 814. [LOW] `title_reference.py` ends with a blank line
+`platform/agents/estimate/title_reference.py:536` — `find_named_estimates` was appended with an extra trailing newline, so the file ends "\n\n". pycodestyle's W391; the project's ruff rules don't include W, so no gate catches it. Style only. (review 2026-10-04, slow-lookups batch #2)
+
+**Suggested fix:** Remove the final empty line so the file ends with a single newline after `return [by_id[i] for i in ids if i in by_id]`.
+
