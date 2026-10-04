@@ -4159,7 +4159,10 @@ The Maple panel never shows that Maple is waiting for an answer, and offers no C
 
 **Suggested fix:** Treat the local turn as already restored only when it is the tail of `restored` (check `restored[restored.length - 2]` is that user line); otherwise append. Add a test with a repeated earlier message.
 
-### 733. [MEDIUM] A successful quiet reload never clears an earlier load error
+### 733. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `DashboardPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/DashboardPage.test.tsx` — "a successful reload after a failed first load leaves the error screen". The shared quiet-load helper this entry suggested was not extracted: the five loaders differ (one is an effect keyed on a reload token), and the fix is one line each.
+
 `portal/src/pages/DashboardPage.tsx:84` — Same defect as #728 in the dashboard list loader (81-108); the page stays on the error state (235). (review 2026-09-27 #63)
 
 **Suggested fix:** Clear the error after a successful load regardless of `quiet`. Consider one shared quiet-load helper, since the pattern is now pasted six times.
@@ -4381,22 +4384,34 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 
 **Resolved 2026-09-27** (portal `19257da`): Contacts, Properties, Materials, People and Settings → Templates reload quietly after a Maple write — no `isLoading` swap, so the page, open dialogs and sheets, filters and scroll stay, and a failed refresh keeps what is shown; the first load still shows the spinner. `agentMutationEvents.ts` maps `create_estimate_from_template`, `delete_template` (new `portal:templates:changed`), `link_contact` (both Properties and Contacts) and Maple's `add_note`/`delete_note` (new `portal:notes:changed`, which the notes panel on that record listens for); `dispatchAgentMutation` fires every matching event. The dashboard reloads its lists and cards on an estimate change and its Upcoming Tasks card on a task change; the property activity panel also listens for estimate and task changes. Pinned by the quiet-refresh tests in `tests/{Contacts,Materials,People}PageDiffSave.test.tsx`, `PropertiesPageMobileSheet.test.tsx` and `TemplatesTabMapleRefresh.test.tsx`, plus `agentMutationEvents.test.ts`, `DashboardPage.test.tsx`, `UpcomingTasksCard.test.tsx`, `NotesPanel.test.tsx` and `PropertyActivityPanel.test.tsx`.
 
-### 728. [MEDIUM] A successful quiet reload never clears an earlier load error
+### 728. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `ContactsPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/ContactsPageDiffSave.test.tsx` — "a successful reload after a failed first load leaves the error screen".
+
 `portal/src/pages/ContactsPage.tsx:251` — `setError("")` now runs only when `!quiet`. If the first load failed, the page shows `<ErrorState>` (671). A later Maple write triggers a quiet reload that succeeds, but the error stays and the page stays on the error screen. Before this diff, a Maple write reset the error and the page recovered. (review 2026-09-27 #58)
 
 **Suggested fix:** Call `setError("")` after the successful `set*` calls in `try`, as TasksPage.tsx:151 does.
 
-### 729. [MEDIUM] A successful quiet reload never clears an earlier load error
+### 729. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `MaterialsPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/MaterialsPageDiffSave.test.tsx` — "a successful reload after a failed first load leaves the error screen".
+
 `portal/src/pages/MaterialsPage.tsx:121` — Same defect as #728 in the materials loader (120-134); the page stays on `<ErrorState>` (551) after a successful Maple-triggered reload. (review 2026-09-27 #59)
 
 **Suggested fix:** Clear the error after a successful load regardless of `quiet`.
 
-### 730. [MEDIUM] A successful quiet reload never clears an earlier load error
+### 730. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `PeoplePage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/PeoplePageDiffSave.test.tsx` — "a successful reload after a failed first load leaves the error screen".
+
 `portal/src/pages/PeoplePage.tsx:101` — Same defect as #728 in the roles loader (100-114); the page stays on `<ErrorState>` (335). (review 2026-09-27 #60)
 
 **Suggested fix:** Clear the error after a successful load regardless of `quiet`.
 
-### 731. [MEDIUM] A successful quiet reload never clears an earlier load error
+### 731. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `PropertiesPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/PropertiesPageMobileSheet.test.tsx` — "a successful reload after a failed first load leaves the error screen".
+
 `portal/src/pages/PropertiesPage.tsx:125` — Same defect as #728 in the properties loader (122-156); the page stays on `<ErrorState>` (394). (review 2026-09-27 #61)
 
 **Suggested fix:** Clear the error after a successful load regardless of `quiet`.
