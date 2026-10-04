@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **815**. Never
+- **Entries are numbered and permanent.** Next free number: **817**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -304,6 +304,7 @@ Don't do (c) before (a) — a stray capitalized row would silently fail auth.
 ### 26. ~~[MEDIUM] `find_contacts_by_name` fetches whole company, filters in Python~~ — RESOLVED 2026-10-04
 
 **Resolved 2026-10-04:** the substring match runs in Mongo (`agents/contact/utils.full_name_contains`: `$regexMatch` on the trimmed "first last", escaped, case-insensitive), and only a miss reads the company's contact names (`_contact_names`, ids and names only) for the fuzzy fallback, loading in full just the ones it picks. The contact and property agents no longer pass `_list_contacts_via_api` (which loaded every contact); `list_contacts_fn` stays as an injection point. `cross_resource.find_contacts_by_full_name` uses the same filter. Tests: `tests/test_contact_name_lookup.py`.
+
 **File**: `agents/contact/utils.py:158-170`
 **Severity**: MEDIUM
 
@@ -422,6 +423,7 @@ and clear. Worth coupling with a fixture-based perf test.
 ### 328. ~~[MEDIUM] `_resolve_estimate_by_title` full-collection scan now on three more paths~~ — RESOLVED 2026-10-04
 
 **Resolved 2026-10-04:** with #669 — `_match_estimates_by_title` calls `title_reference.find_named_estimates`, which matches on titles alone and loads only the matches. No cap was added: a capped list matched the wrong estimate as an exact target (round 32 #2).
+
 The (pre-existing) resolver does `Estimate.find(company == oid).to_list()` and
 substring-matches titles in Python. The new `_resolve_estimate_code_or_title`
 wires it into notes/description/link updates, so every code-less update turn
@@ -513,7 +515,10 @@ order is preserved. Same shape for `MaterialUnit`. If attaching a
 collation is awkward via Beanie, leave the Python sort — clarity beats
 a half-done DB push-down.
 
-### 159. [LOW] `agents/cross_resource.py` filters in-Python on full collections
+### 159. ~~[LOW] `agents/cross_resource.py` filters in-Python on full collections~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `find_materials_by_name` and `find_labours_by_name` match in Mongo (`_name_contains`: escaped, case-insensitive substring — Mongo folds accented letters); contacts moved with #26 and properties with #812. Tests: `tests/test_catalog_name_lookup.py`.
+
 **File**: [platform/agents/cross_resource.py](../../platform/agents/cross_resource.py)
 **Severity**: LOW (scaling)
 
@@ -540,7 +545,10 @@ grows.
 `Settings.indexes` when/if per-feature dashboards materialize; harmless to add
 now.
 
-### 448. [LOW] platform/agents/template/service.py:161 — full-collection load to resolve one id
+### 448. ~~[LOW] platform/agents/template/service.py:161 — full-collection load to resolve one id~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** a positional pick loads its one template (`TemplateAgent._template_by_id`: `_id` and `company` in one query) instead of the whole collection. The Property / Contact / Material / Labour `_resolve_target_*` id branches the entry mentions were not changed.
+
 `_template_from_listed_position` calls `_list_templates_db` and scans the result
 for the picked id; `Template.get(...)` plus a company check is one round trip
 instead of a full-collection load. It only runs when a positional reference
@@ -551,7 +559,10 @@ pattern, so this is consistency-vs-efficiency rather than a defect.
 for the `_resolve_target_*` id branches in Property / Contact / Material /
 Labour, which scan a full `_list_*_via_api` result for the same reason.
 
-### 618. [LOW] The estimate is loaded twice per planned edit
+### 618. ~~[LOW] The estimate is loaded twice per planned edit~~ — CLOSED 2026-10-04 — not a defect
+
+**Closed 2026-10-04:** the second load is the freshness guard across the planner's LLM call (up to `PLANNER_TIMEOUT_SECONDS`, 12 s). The executor's write replaces `job_items` wholesale through `versioned_set`, which has no version precondition, so applying the plan to the copy loaded before planning would overwrite a portal edit made meanwhile; reloading applies it, pinned by job item id, to the current list. An extra indexed query is the cheaper risk. A comment at the call site (`edit_planner.py`) says so.
+
 `platform/agents/estimate/edit_planner.py:248` — `_plan_and_apply_edits` loads it, then `_run_edit_commands` loads it again: an extra query, and a snapshot that may be out of date.
 
 **Suggested fix:** Pass the loaded `target` into the executor as an optional parameter.
@@ -570,6 +581,7 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 ### 709. ~~[MEDIUM] Each turn loads the whole catalog, up to twice, plus every contact and property~~ — RESOLVED 2026-10-04
 
 **Resolved 2026-10-04:** `catalog_names._lookup_name_kinds` asks, for one name, five indexed company-scoped queries run together — material, role, template and property by exact name (`name_lookup.same_name`: anchored, escaped, any case and spacing) and one contact query for the full or first name — instead of loading up to 5,000 of each kind plus every contact and property. A name is looked up once per message (`_KINDS_SEEN`, set by `_rewrite`). Tests: `tests/test_catalog_names.py` (the #709 section).
+
 `platform/agents/conversation/catalog_names.py:96` — `_catalog` reads every material, role and template in the company (up to 5,000 each) to compare names in Python. `_record_kind` (:138) and `_kind_of` (:157) each call it, and each also runs the whole-collection contact and property finders. `_GET_RE` / `_QUESTION_RE` match most short messages, so most turns run 3–6 catalog scans before routing. Related to tracked #26 (`find_contacts_by_name` fetches the whole company), but this is a new caller multiplying it. (review 2026-09-27 #36)
 
 **Suggested fix:** Look names up with an indexed, anchored, escaped, case-insensitive query per model with `limit(2)`, and resolve the kind once per message.
@@ -582,7 +594,10 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 
 **Suggested fix:** Add `IndexModel([("company", ASCENDING)])` to `User.Settings.indexes`.
 
-### 716. [MEDIUM] `due_date` is filtered and sorted with no index, and the docstring says otherwise
+### 716. ~~[MEDIUM] `due_date` is filtered and sorted with no index, and the docstring says otherwise~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `Task.Settings.indexes` has `(company, due_date, updated_at desc, _id)` — the due-date lists' filter and their whole sort (`+due_date, -updated_at, +_id`), so the sort and its limit stay index-served and `_list_conditions`' "all fields indexed" is true. Beanie builds it on boot; nothing to drop. Tests: `tests/test_task_due_index.py` (the index exists; the overdue query's winning plan uses it with no SORT stage).
+
 `platform/models/task.py:74` — The new `extra` conditions filter on `due_date` and sort by `+due_date` (agents/task/base.py:216-217, :259), but no index covers `(company, due_date)`, while `_list_conditions` says "All fields used here are indexed". MEDIUM rather than HIGH: the company-prefixed indexes keep the scan to one tenant. (review 2026-09-27 #43)
 
 **Suggested fix:** Add `IndexModel([("company", 1), ("due_date", 1)])`, or correct the docstring.
@@ -595,15 +610,26 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 
 **Suggested fix:** Look up only the reply instead of loading the catalog, as [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md) §3.2 proposes: have the router pass `name_in_reply(message)` and run one `find_one({"company": company, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}})`, answering when it hits. Deferred (2026-09-28) to phase 0 of that plan (renumbered 2026-09-29), which replaces this loader; the minimum change in the meantime is a warning when the cap is reached.
 
-### 808. [LOW] A template lookup miss loads every template twice
+### 808. ~~[LOW] A template lookup miss loads every template twice~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `_find_templates_by_name` matches in Mongo (case-insensitive, escaped substring) instead of loading every template, and `_templates_named` tries the name before an aside only when it differs. Tests: `tests/test_template_lookups.py`.
+
 `platform/agents/template/service.py:184` — Both handlers run `_find_templates_by_name(company_id, name_hint) or _find_templates_by_name(company_id, _before_aside(name_hint))`. `_find_templates_by_name` loads the company's whole template collection (a pre-existing full scan), so every miss reloads it — including when the hint has no ", " and the second query is identical to the first. LOW: a template list is small, and a miss already ends in "I couldn't find a template". (review 2026-10-03, wrong-answers batch 2 round 2 #1)
 
 **Suggested fix:** Call the fallback only when it differs: `short = _before_aside(name_hint); matches = await find(name_hint) or (await find(short) if short != name_hint else [])`, or load the list once and filter twice.
 
-### 812. [MEDIUM] `find_properties_by_name_or_address` loads every property to match a name
+### 812. ~~[MEDIUM] `find_properties_by_name_or_address` loads every property to match a name~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** the finder reads only the address fields of the company's properties, matches in Python exactly as before, and loads the matches in full — the #669 pattern. The match stays in Python on purpose: the reverse direction (a stored name inside the query, user option a) has no indexed form, and Mongo's `$toLower` would not fold "Île" / "École" the way `str.lower` does. It still reads every property's address row, but no longer every document. `PropertyAgent._find_properties_by_name_or_address` (its twin, over `_list_properties_via_api`) is unchanged. Tests: `tests/test_property_name_lookup.py`.
+
 `platform/agents/cross_resource.py:34` — The finder loads all the company's properties and matches in Python: the query inside the name, street or full address, or a stored name or street inside the query. It serves the estimate customer fallback (`title_reference.resolve_named_estimates`, after a title matches nothing) and the property agent's twin (`PropertyAgent._find_properties_by_name_or_address`). Left out of the slow-lookups batch (#709, #669, #328, #26) because the reverse containment ("Elm House" inside "the elm house job") has no indexed form, and Mongo's `$toLower` lowercases ASCII only, so moving it to `$expr` could miss accented names the Python match finds. (logged 2026-10-04)
 
 **Suggested fix:** Run the forward containment in Mongo (`$regexMatch` on name, street and the composed address, escaped, case-insensitive) and keep the reverse check, or drop it if no phrasing needs it — the customer fallback already re-checks whole words in `_names_whole`. Then project only the fields matched, and share one finder between `cross_resource` and the property agent.
+
+### 815. [LOW] The contact, property, material and role agents load their whole collection to resolve one id
+`platform/agents/contact/service.py:826` — `ContactAgent` (agents/contact/service.py:826), `PropertyAgent` (agents/property/service.py:910), `MaterialAgent` (agents/material/service.py:773) and `LabourAgent` (agents/labour/service.py:452) each resolve a record id by loading the company's whole collection through `_list_*_via_api` and comparing ids in Python. The id is usually the active anchor, so every "update it" / "change its phone" reaches one. Split out of #448, whose template half was fixed 2026-10-04 (`TemplateAgent._template_by_id`); resolving #448 had left this half untracked. LOW: correct, and the loop is company-scoped. (review 2026-10-04, slow-queries batch #1)
+
+**Suggested fix:** Replace each loop with `Model.find_one({"_id": oid, "company": company_oid})` behind a small `_<kind>_by_id` helper, as `TemplateAgent._template_by_id` does; the agent tests that stub `_list_*_via_api` for id resolution move to stubbing the helper.
 
 ## Silently swallowed errors
 
@@ -1124,6 +1150,11 @@ both tables' headers.
 `platform/agents/task/list_filters.py:175` — The "wrong answers that look right" batch (#717/#718/#724) added `_SMALL_COUNTS` (list_filters.py:175, one…ten) and `_COUNT_WORDS` (estimate/crud_helpers.py:188, one…ten) beside the existing `_SMALL_NUMBERS` (task/text_helpers.py:992, a/an/one…three). Three maps for one idea drift apart: "in four days" works in a task list but not in a task edit, and the next person to add "eleven" adds it to one of three. LOW: no wrong answer today — each map covers what its parser accepts. (review 2026-10-02 round 3 #1)
 
 **Suggested fix:** Put one `SMALL_NUMBER_WORDS = {"one": 1, … "ten": 10}` in `agents/text_utils.py`, and have all three import it (text_helpers keeps its "a"/"an" → 1 as `{**SMALL_NUMBER_WORDS, "a": 1, "an": 1}` and widens `_IN_N_RE` to the shared words). Rerun test_task_list_filters.py, test_estimate_list_sort_words.py and the due-date tests in test_maple_task_operations.py.
+
+### 816. [LOW] `PropertyAgent._find_properties_by_name_or_address` is a second copy of the property finder, still loading every property
+`platform/agents/property/service.py:534` — The agent's twin of `cross_resource.find_properties_by_name_or_address` loads every property document through `_list_properties_via_api` to match a name or address, and serves the property agent's own get/update/delete lookups (:926, :2435). #812 (resolved 2026-10-04) changed only the shared finder — a projected read with the matches reloaded — so the two copies of the predicate can now drift, and the agent's copy keeps the full load. LOW: pre-existing and correct. Related: #815 (the same agents' id lookups). (review 2026-10-04, slow-queries batch #2)
+
+**Suggested fix:** Make the agent's method delegate to `cross_resource.find_properties_by_name_or_address` (same predicate, projected read, matches reloaded), moving its tests from stubbing `_list_properties_via_api` to stubbing the shared finder. Could be done together with #815.
 
 ## Accessibility
 
