@@ -4004,6 +4004,8 @@ test that breaks on every MDXEditor upgrade.
 ## Portal — layout, navigation and Maple panel
 
 ### 118. [MEDIUM] Hand-rolled `import.meta` cast in widget API client
+
+**Deferred 2026-10-04 (user):** left for a website session — the repo had no `node_modules`, and the user chose not to install them in this batch.
 **File**: [website/widget/api.ts:25-27](../../website/widget/api.ts)
 **Severity**: MEDIUM (DX)
 
@@ -4015,7 +4017,10 @@ Fix: add a one-line `website/widget/vite-env.d.ts` containing
 `/// <reference types="vite/client" />`. Drop the cast and read
 `import.meta.env.VITE_PUBLIC_API_URL` directly.
 
-### 123. [MEDIUM] `formatOrchestratorReply` mutates input parameter
+### 123. ~~[MEDIUM] `formatOrchestratorReply` mutates input parameter~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `formatOrchestratorReply` is pure. A new `isOutOfScopeReply(result)` decides the out-of-scope path; the formatter uses it for the copy and `useMapleAgent` for the chip set, and `_outOfScope` is gone from both result types. (A pure predicate rather than the `{ text, outOfScope }` return the entry suggested: same contract, no churn at every call site.) Tests: `tests/orchestratorReply.test.ts` (and the input is never written to), `tests/useMapleAgent.test.tsx` › out-of-scope replies.
+
 **File**: [portal/src/lib/orchestratorReply.ts:54](../../portal/src/lib/orchestratorReply.ts)
 **Severity**: MEDIUM (mutation)
 
@@ -4184,7 +4189,10 @@ The Maple panel never shows that Maple is waiting for an answer, and offers no C
 
 **Resolved 2026-09-27** (platform `9f657b4`, portal `97c87f4`): the reply and `GET /agents/conversation` carry `open_question` (`{"kind": …}` from the question gate); the composer shows "Waiting for your answer · Cancel" while one is open, restored on reload, and Cancel sends "cancel". A yes/no question's chips are Yes/No, and no clarification gets agent action chips. A message sent before the restored history lands is kept after it (a turn already in the restored lines isn't shown twice). The dead `_aiConversationId` state and `createConversationId` are gone, and `/agents/orchestrate` no longer echoes the conversation state to the browser (`response_model_exclude={"context"}`; in-process callers still see it). Pinned by `tests/test_agent_helpers_finalize_result.py`, `tests/test_conversation_api.py`, and the portal's `useMapleAgent.test.tsx` and `AiPanel.test.tsx`.
 
-### 727. [MEDIUM] `mergeRestored` can wipe the restored transcript when the pending message repeats an earlier one
+### 727. ~~[MEDIUM] `mergeRestored` can wipe the restored transcript when the pending message repeats an earlier one~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `mergeRestored` treats the local turn as already restored only when its question is at the end of the restored transcript — the last line, or the one before the reply — never an earlier line with the same words. A "yes" typed while the restore loaded no longer wipes the question it answers. Tests: `tests/useMapleAgent.test.tsx` › mergeRestored (a repeated earlier message; a finished turn; a question-only turn).
+
 `portal/src/components/Layout/useMapleAgent.ts:356` — `restored.findIndex(m => m.role === "user" && m.text === firstLocalUser.text)` finds the first earlier occurrence anywhere in history, and :357 drops every restored line from there on. Reload mid-question and type "yes" (already earlier in history): the panel shows only `[yes, Thinking…]`, and the question being answered is gone. MEDIUM rather than HIGH: display only — the server keeps the history and a reload restores it. (review 2026-09-27 #57)
 
 **Suggested fix:** Treat the local turn as already restored only when it is the tail of `restored` (check `restored[restored.length - 2]` is that user line); otherwise append. Add a test with a repeated earlier message.
@@ -4197,12 +4205,18 @@ The Maple panel never shows that Maple is waiting for an answer, and offers no C
 
 **Suggested fix:** Clear the error after a successful load regardless of `quiet`. Consider one shared quiet-load helper, since the pattern is now pasted six times.
 
-### 734. [MEDIUM] The question-strip Cancel button takes focus off the composer
+### 734. ~~[MEDIUM] The question-strip Cancel button takes focus off the composer~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** The question strip's Cancel has `onMouseDown={keepComposerFocus}`, like the composer's other controls. Test: `tests/AiPanel.test.tsx` › "pressing Cancel keeps focus in the composer".
+
 `portal/src/components/Layout/AiPanel.tsx:435` — The button has no `onMouseDown={keepComposerFocus}`, against the file's own rule (336-347). On a phone, blur brings the tab bar back (PortalLayout 426), lifting the composer about 64px between press and click, so the tap misses. The strip appears right after a reply, when the textarea has just been refocused. (review 2026-09-27 #64)
 
 **Suggested fix:** Add `onMouseDown={keepComposerFocus}`, as the other composer controls do.
 
-### 735. [MEDIUM] Cancel doesn't stop a pending voice auto-send
+### 735. ~~[MEDIUM] Cancel doesn't stop a pending voice auto-send~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** Cancel calls `cancelAutoSend()` before `onCancelQuestion`, so a counting-down voice transcript no longer sends itself after the cancel turn. Test: `tests/AiPanelVoice.test.tsx` › "cancelling the open question aborts the auto-send".
+
 `portal/src/components/Layout/AiPanel.tsx:437` — `onClick={() => onCancelQuestion?.()}` bypasses `cancelAutoSend()`. If a voice transcript is counting down ("Sending in 3…"), it can still fire after the "cancel" turn — the double-send `submitDirectMessageCancellingAutoSend` (187-190) exists to prevent. (review 2026-09-27 #65)
 
 **Suggested fix:** `onClick={() => { cancelAutoSend(); onCancelQuestion?.(); }}`.
