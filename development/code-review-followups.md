@@ -2319,7 +2319,10 @@ Features Maple doesn't handle in chat fall into whichever rule matches: "add a d
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
-### 699. [MEDIUM] The display-text save for non-English turns can erase another turn's chat lines
+### 699. ~~[MEDIUM] The display-text save for non-English turns can erase another turn's chat lines~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** Both halves. The merge now matches chat lines on role and text, and carries a `display_text` this turn put on lines both copies hold onto the newer copy (`conversation_store._merge_history`), so the display-text save no longer looks like a rewritten history and the other turn's lines survive. And `_save_display_text` runs only once the turn's own save went through (`routers/agents._TURN_SAVED`); before that the snapshot is the pre-turn one. Tests: `test_conversation_store.py::test_display_text_added_to_this_turns_lines_survives_a_merge`, `test_the_display_text_save_is_skipped_when_the_turns_save_failed`, `…marks_this_turns_lines_once_the_turn_saved`.
+
 `platform/routers/agents.py:705` — `_save_display_text` saves again, conditional on the version just written. If another turn saved during the outbound translation call, `merge_turn` looks for `base[-1]` in ours, which now has an extra `display_text` key, finds no match, treats the history as rewritten and keeps only ours. The other turn's lines are dropped: the #689 loss again, for non-English conversations. Also, if the first save failed, the pre-turn snapshot's lines are stamped with this turn's text. MEDIUM: needs a non-English user with two overlapping turns. (review 2026-09-27 #25)
 
 **Suggested fix:** In `_new_lines`, match history lines on (role, text) only and carry `display_text` onto `latest`'s matching lines. Better, translate before the turn's single save. Skip `_save_display_text` when the first save returned "".
@@ -2510,12 +2513,18 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** `pronoun_domain(strip_assigned_value(strip_dictated_payload(message)), context or {})`.
 
-### 737. [LOW] A turn's chat lines are lost on merge when its last line repeats the previous last line
+### 737. ~~[LOW] A turn's chat lines are lost on merge when its last line repeats the previous last line~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** The merge lines this turn's history up against what it loaded by position (`_offset`): the loaded lines, less any the 40-line cap dropped, must open it, and everything after them is this turn's. It no longer searches for the last loaded line from the end, so a repeated "thanks" → "You're welcome!" keeps its lines. Test: `test_conversation_store.py::test_a_turn_whose_last_line_repeats_the_previous_one_keeps_its_lines`.
+
 `platform/routers/agent_helpers/conversation_store.py:82` — `_new_lines` matches `base[-1]` by value, scanning from the end, and lines carry no timestamp. If this turn's last line equals the previous last line ("thanks" → "You're welcome!" twice), it matches at the end, returns [], and a concurrent merge drops this turn's lines. (review 2026-09-27 #67)
 
 **Suggested fix:** Match the whole base tail (last 2 lines) at its known offset, or take `ours[len(base):]` after aligning for the 40-line cap.
 
-### 738. [LOW] A turn that overlaps Clear brings the cleared conversation back
+### 738. ~~[LOW] A turn that overlaps Clear brings the cleared conversation back~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** When the conversation was deleted mid-turn, the save inserts `merge_turn(snapshot, ours, {})` — only the keys this turn changed and the lines it added — never the copy it loaded. Test: `test_conversation_store.py::test_a_turn_that_overlaps_clear_saves_only_its_own_changes`.
+
 `platform/routers/agent_helpers/conversation_store.py:151` — When the document vanished mid-turn, the loop re-inserts the whole `ours`: pre-clear history, anchors and questions. Same as the old code; reachable only from a second tab or the TTL. (review 2026-09-27 #68)
 
 **Suggested fix:** Insert `merge_turn(base.snapshot, ours, {})`, which keeps only this turn's changed keys and new lines.
