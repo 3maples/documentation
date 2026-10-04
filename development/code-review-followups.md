@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **811**. Never
+- **Entries are numbered and permanent.** Next free number: **812**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -3938,7 +3938,10 @@ test that breaks on every MDXEditor upgrade.
 
 **Suggested fix:** Clear the error in unstage and in the kept-image remove handler.
 
-### 635. [MEDIUM] A notes refresh wipes a note the user just created
+### 635. ~~[MEDIUM] A notes refresh wipes a note the user just created~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `useNotes` tracks the fetch in flight; a local create, delete, edit or attachment change while one is pending starts a fresh fetch that supersedes it (`supersedeInFlight`), so the older answer can't undo the change and the feed still picks up what Maple filed. The fresh fetch keeps the kind of the one it supersedes, so a superseded parent-switch load still clears on failure (review round 1), and it always runs the newest `load` (`loadRef`): a change that finishes after a record switch fetches the record on screen, never the one it was clicked on (review round 2). Tests: `tests/useNotes.test.tsx` › local changes during a refresh (create; delete), "a superseded parent-switch load still clears on failure", and "a note change that finishes after a parent switch never reloads the old parent".
+
 `portal/src/hooks/useNotes.ts:84` — When Maple files a note, `refreshKey` bumps and a fetch starts. If the user creates their own note before it lands, `createNote` prepends it and then the older fetch replaces the list without it. A probe went from ['created'] to []; in the partial-upload retry path `notes.find(pendingId)` then finds nothing.
 
 **Suggested fix:** After any local change to the list (create, delete, replace), start a fresh `load` (or bump the sequence), so the stale response is superseded. Add a test.
@@ -3980,14 +3983,20 @@ test that breaks on every MDXEditor upgrade.
 
 *(Review 2026-09-25 fifth pass #20.)*
 
-### 654. [MEDIUM] Notes filed by a mixed batch or the planner don't refresh the open feeds
+### 654. ~~[MEDIUM] Notes filed by a mixed batch or the planner don't refresh the open feeds~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** Platform: `_file_batch_notes` sets `notes_filed` on the result whenever a batch files a note (work item or estimate), and only then (`test_estimate_edit_executor.py::test_a_batch_that_files_a_note_says_so_for_the_portal`, `…without_a_filed_note…`). Portal: `dispatchAgentMutation` carries it onto the estimates event, and the estimate page refreshes its notes feeds and badges on it, even while a reload waits (`tests/agentMutationEvents.test.ts`, `tests/NewEstimateWithActivityPage.mapleWrites.test.tsx` › a batch that filed a note refetches the notes feed).
+
 `portal/src/pages/NewEstimateWithActivityPage.tsx:568` — Only the rule note path reports `operation: "add_work_item_note"` (platform work_item_edit_handlers.py:189). Batches through `_run_edit_commands` report `"operation": "update_estimate"` with the note only in `applied`: the planner (edit_planner.py:260), the replay after a confirmation (edit_executor.py:383), mixed batches ("set markup 20% and note 'gate code' on item 2"), and estimate notes filed in a batch. `notesRefreshKey` never bumps, so the feeds stay stale. With the dialog open the reload is also blocked, so the badges don't update.
 
 **Suggested fix:** Platform: set `result["notes_filed"] = True` in `_run_edit_commands` when `batch.notes` is non-empty. Portal: carry it through `dispatchAgentMutation` and bump the key when `NOTE_OPERATIONS.has(op) || detail.notes_filed`. Add tests on both sides.
 
 *(Review 2026-09-25 fifth pass #23.)*
 
-### 655. [MEDIUM] A failed refresh empties the feed and loses a note edit in progress
+### 655. ~~[MEDIUM] A failed refresh empties the feed and loses a note edit in progress~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `load` takes a `refresh` flag (the refresh key and the manual reload set it). A failed refresh keeps the list and shows the error; only a failed load after a parent switch clears it, as before. A card being edited stays mounted and the badge keeps its count. Tests: `tests/useNotes.test.tsx` › refresh failure (refresh key; manual reload); the parent-switch clearing test is unchanged.
+
 `portal/src/hooks/useNotes.ts:103` — The `catch` clears notes on every failure. That was meant for a parent switch, but it now also runs on a Maple-triggered refetch of the same parent. Verified: `['n1']` → `[]` with the error "offline". Each `NoteCard` holds its edit composer in local state (NoteCard.tsx:61), so a card being edited unmounts and the typed text is lost. `onCountChange(0)` also resets the badge.
 
 **Suggested fix:** Pass a `refresh` flag to `load` and only `setNotes([])` when the parent changed. On a refresh failure keep the list and set `error` (or a light "couldn't refresh" message). Add a test.
@@ -4000,6 +4009,12 @@ test that breaks on every MDXEditor upgrade.
 **Suggested fix:** When `fromMaple` is true, call only `estimatesApi.get`.
 
 *(Review 2026-09-25 fifth pass #30.)*
+
+
+### 811. [LOW] A note created on one record can be prepended to the next record's list
+`portal/src/hooks/useNotes.ts:189` — `createNote` awaits `notesApi.create`, then always prepends the created note. Switch from property A to B while the create is saving: if B's load has already landed, A's new note is added to the top of B's list, and nothing replaces it until B is next fetched (a Maple refresh, a reload or a revisit). If B's load is still in flight, `supersedeInFlight` fetches B and the stray note is replaced. LOW: it predates the notes-feed batch (#635/#654/#655), it's display only and same-company, and it needs a switch during the create's round trip. (review 2026-10-04, notes-feed batch round 3 #1)
+
+**Suggested fix (decided 2026-10-04, user):** fix the cause, not this one race. The hook survives a record switch (the detail panes are reconciled in place), so every async step can land on the wrong record; three review rounds in a row found narrower versions of that. Key the notes panel by its parent — `<NotesPanel key={`${parentType}:${parentId}:${workItemId ?? ""}`} …/>` wherever it renders — so a switch mounts a fresh hook and the old one's late responses are dropped by its own unmounted guard. That closes this finding and the whole class, and lets the defensive code (the parent-switch clearing in `load`, `loadRef`) be simplified afterwards. Cost: an open note draft is discarded on a switch. Test: create on A with `create` pending, switch to B, resolve → B's list unchanged. (The narrower alternative — compare the parent in `createNote` before prepending — was considered and not chosen.)
 
 ## Portal — layout, navigation and Maple panel
 
