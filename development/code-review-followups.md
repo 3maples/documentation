@@ -2781,12 +2781,18 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Refuse "this"/"next" only when a date word follows — `(?!(?:me|myself|today|tomorrow|the)\b|(?:this|next)\s(?:week|month|year)\b)` — so "for next week" stays a window and "at Next Door Landscaping" is a place. Add both as rows in test_property.
 
-### 806. [MEDIUM] A domain word in a dictated note routes the note
+### 806. ~~[MEDIUM] A domain word in a dictated note routes the note~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** two rules read the note body. The action/domain last resort (`_classify_via_action_domain`) re-read the whole message when the head named no record ("yard" → property), and the estimate-field rule in `_classify_specific_phrasings` looked for "estimate" anywhere ("the estimate needs review" → estimate). Both now skip the body for a note request when an estimate, property, contact or task is in focus (`_NOTE_ANCHOR_DOMAINS`); with nothing in focus, or a material or role (no notes), the body still decides, so the routing snapshot is unchanged. Tests: `test_question_registry.py`, `test_maple_bare_note_routing.py`.
+
 `platform/agents/orchestrator/service.py` — With a task in focus, "add a note: a dog in the yard" goes to `update_property`: "yard" is a property domain hint (`agents/orchestrator/intents.py`), and an earlier rule path reads hints from the whole message, dictated payload included. `_resolve_intent_with_history` already classifies on the command head (`strip_dictated_payload`), but it returns early only when the HEAD has a domain word — the path that claims "yard" runs before it. Found fixing #726 (the pronoun half of the same problem). MEDIUM: the note lands on the wrong record, though it is a note, not an overwrite.
 
 **Suggested fix:** Find the rule path that reads DOMAIN_HINTS from the full message for a note request and give it `strip_dictated_payload(message)`, as `_resolve_intent_with_history` does. Add "add a note: a dog in the yard" (task in focus) → `update_task` to `test_question_registry.py::test_a_pronoun_in_a_dictated_note_names_nothing`'s neighbour.
 
-### 807. [LOW] A filler word after "template" hides the template in focus
+### 807. ~~[LOW] A filler word after "template" hides the template in focus~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `TemplateAgent._extract_name_hint` trims trailing courtesy and timing words (please, now, again, thanks, for me …), so a hint of nothing else is no name and the focus applies — the get half. The shared helper fixes "delete this template please" too; deletion still confirms first, as decided.
+
 `platform/agents/template/service.py:213` — The #704 gate uses the focus only when `_extract_name_hint` finds no name, and the hint's fallback regex takes whatever follows the noun: "delete this template please" → "please", "show me that template now" → "now", so Maple replies "I couldn't find a template matching 'please'". Before #704 the focus won for both. (review 2026-10-03, wrong-answers batch 2 #1)
 
 **Decision 2026-10-03 (user):** Maple does not need to handle template deletion — it can be treated as an unsupported request — so the delete half is not worth a fix, and the finding drops from HIGH to LOW. A follow-up decision the same day: **no explicit refusal** for template deletion either — it keeps working as it does (confirm, then delete). **Still open:** the get half — "show me that template now" — reaches the same gate.

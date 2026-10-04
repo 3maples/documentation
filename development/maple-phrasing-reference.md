@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-03
+**Last updated:** 2026-10-04
 
 ### Recent changes
 
@@ -1310,7 +1310,8 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | Phrasing | Behavior | Status |
 |---|---|---|
 | `add a note to him: call after 5` (contact in focus) / `add a note to Bob Lee saying …` / `jot down a note for 12 Oak St: …` | files the note, authored by you | ✅ rule *(it asked "which fields?" on the rules tier)* |
-| `add a note: she wants the gate locked` / `add a note: there is a dog` (a task in focus, an older contact or property anchor) | the note goes to the task in focus | ✅ rule *(2026-10-03, #726 — a pronoun inside the dictated note picked the contact or property. A domain word in the note body still can: `add a note: a dog in the yard` goes to the property, #806)* |
+| `add a note: she wants the gate locked` / `add a note: there is a dog` (a task in focus, an older contact or property anchor) | the note goes to the task in focus | ✅ rule *(2026-10-03, #726 — a pronoun inside the dictated note picked the contact or property)* |
+| `add a note: a dog in the yard` / `add a note: the estimate needs review` / `add a note: check the property line` (an estimate, property, contact or task in focus) | the note goes to the record in focus — a domain word in the body names nothing | ✅ rule *(2026-10-04, #806 — "yard" sent it to a property, "estimate" to the estimate. With nothing in focus, or a material or role in focus (they take no notes), the body is still the only signal: `add a note: the estimate needs review` goes to the estimate)* |
 | `add a note to Bob Lee` → *"What should the note say?"* → the text | files the reply, even if it reads like a command | ✅ rule |
 | `show me the notes for 12 Oak St` / `what notes are on Bob Lee?` / `any notes on E0042?` / `show me his notes` | lists them newest first, with author and date | ✅ rule |
 | `delete my note on Bob Lee` / `delete note 2` (after a list) / `delete my last note on Ana Reyes` → *"Delete your note …? This can't be undone."* → `yes` / `no` | deletes it, or keeps it; your own notes, or any as an Owner | ✅ rule *(it was redirected to the app)* |
@@ -1647,7 +1648,7 @@ Additional cross-resource phrasings (e.g. `which templates include {material}?`)
 |---|---|---|
 | `{template}` in reply to *"Which template would you like to see?"* / *"Which template should I delete?"* | the question keeps no record, so the reply is read from scratch; a name that opens with a command verb (`Remove Sod`) may be taken as a command | ⚠️ gap *(deferred 2026-09-29 — [name-answers plan](plans/2026-09-28-maple-name-answers-plan.md) §7)* |
 
-**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681, #695; #704 on 2026-10-03 (`delete template Old Patio, it's a duplicate` is Old Patio, not the template in focus — the focus is used only when no template is named, and an aside after a comma is dropped only when the whole name matches no template, so `show template Patio, Large` is still that template); `find templates named X` (§6.5).
+**Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #675, #677, #681, #695; #704 on 2026-10-03 (`delete template Old Patio, it's a duplicate` is Old Patio, not the template in focus — the focus is used only when no template is named, and an aside after a comma is dropped only when the whole name matches no template, so `show template Patio, Large` is still that template); `find templates named X` (§6.5). #807 on 2026-10-04: a courtesy or timing word after the noun is no name — `show me that template now` / `… please` / `… again` is the template in focus, and `show template Old Patio please` is Old Patio.
 
 ---
 
