@@ -2573,17 +2573,26 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Insert `merge_turn(base.snapshot, ours, {})`, which keeps only this turn's changed keys and new lines.
 
-### 740. [LOW] After a task list, any "what is/are …" question becomes a task filter
+### 740. ~~[LOW] After a task list, any "what is/are …" question becomes a task filter~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** a task-list refinement must read as a task filter: `followup._reads_as_a_task_filter` runs the task list parser (`parse_task_list_ask`) over it — a status, assignee, due window or place — and a place alone must be said with "at" / "for" / "in", as an estimate refinement's is. "what is the rate for Foreman?" after a task list is left to route on its own. Tests: `test_conversation_followup.py`.
+
 `platform/agents/conversation/followup.py:104` — `_REFINE_RE` accepts `(which|what) … (is|are) <anything>`, and `_refined_tasks` adds any `q`. After "list my tasks", "what is the rate for Foreman?" becomes "list my tasks, only the rate for Foreman", and the rewrite stays `list_tasks` so it repeats. Read-only. (review 2026-09-27 #70)
 
 **Suggested fix:** Give tasks the closed vocabulary `_refined_estimates` uses (statuses, overdue, due-when, assignee).
 
-### 741. [LOW] "and her email is …" is swallowed by the "what about X?" rewrite
+### 741. ~~[LOW] "and her email is …" is swallowed by the "what about X?" rewrite~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `_looks_like_a_target` refuses a target that states a value (`=`, " is ", " are ", "should be"), so "and her email is …" falls through to `rewrite_field_statement` and updates Ana. Tests: `test_conversation_followup.py`.
+
 `platform/agents/conversation/followup.py:53` — `_looks_like_a_target` accepts "her email is ana@new.example.com", and `rewrite_elliptical` runs before `rewrite_field_statement`, so after "show me contact Ana Reyes" the update becomes the garbled read "show me contact her email is …". (review 2026-09-27 #71)
 
 **Suggested fix:** Reject targets containing " is ", "=" or "should be", or try `rewrite_field_statement` first.
 
-### 742. [LOW] "Please note: …" is filed as a note
+### 742. ~~[LOW] "Please note: …" is filed as a note~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** a verbless note must start the message (`note: …`, the tested shorthand); after a lead word ("please", "ok" …) a verb is required, so "Please note: I want the markup at 20%" is the idiom, not a note. The suggested fix (always require the verb) would have dropped the shorthand. Tests: `test_record_notes.py`.
+
 `platform/agents/conversation/record_notes.py:50` — The targetless note rule makes the verb optional (`(?:<verb> …)?note\s*[:-]`), so "Please note: I want to change the markup to 20%" files a note on the record in focus and the request isn't carried out. The written entry (§10.7) is "add a note: …", and the estimate grammar requires a verb. (review 2026-09-27 #72)
 
 **Suggested fix:** Require the verb, as `_NOTE_VERB` does in command_grammar.
@@ -2655,14 +2664,20 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Anchor these patterns with `_COMMAND_LEAD`, as the other edits are — that adds no negation logic (a negation is just not a lead), and the anchor sits before the verb, so a note body is untouched. Add the phrasings above to `_NEGATED_EDITS` in tests/test_task_verbs.py (asserting `detect_update_op` / `detect_notes_update` return None), plus a note whose body contains "don't" that still appends. Confirm the approach with the user first.
 
-### 763. [LOW] "what sizes does it come in?" is claimed for materials whatever is in focus
+### 763. ~~[LOW] "what sizes does it come in?" is claimed for materials whatever is in focus~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** the suggested copy: with no material in focus and another record (task, contact, estimate …) in focus, the material question reads *"Only materials have sizes — which material do you mean?"* — the same pending question, so its reply still finishes the request; no fall-through. Tests: `test_material_agent.py`.
+
 `platform/agents/orchestrator/service.py:2669` — `parse_size_command` yields a pronoun "sizes"/"read" command (material "") and the orchestrator always routes it to get_material, so with a task, contact or estimate in focus Maple asks "Which material do you mean?" and opens a material question that catches the next message. (review 2026-09-28 third round #2)
 
 **Tried and backed out (2026-09-28):** letting it fall through when another domain is in focus is worse — on the rules tier, with a task in focus, "what sizes does it come in?" fell to the task creator ("What should the task be called?") and the next turn, "mark it as done", created a task named "mark it as done". Asking which material is the safer answer.
 
 **Suggested fix:** Only with a real destination for the other domain: answer a pronoun sizes question about a task / contact / estimate with "Only materials have sizes — which material do you mean?" (still the material question), or leave as is. The fall-through must not reach create_task.
 
-### 764. [LOW] The size-command pronoun set misses they / these / those and "it please"
+### 764. ~~[LOW] The size-command pronoun set misses they / these / those and "it please"~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** the pronoun set takes they / these / those, and a trailing "please" is stripped (after the 200-character cap) before parsing, so "… from it please" is the material in focus and "… from Black Mulch please" names Black Mulch. Tests: `test_material_size_commands.py`.
+
 `platform/agents/material/size_commands.py:89` — "what sizes do they come in?", "remove size 1 yd from those" and "… from it please" parse as names ('they', 'those', 'it please') and answer "No material found matching 'They'" — the same name-lookup path as review 2026-09-27 #18. (review 2026-09-28 third round #3)
 
 **Suggested fix:** `^(?:(?:this|that|the)\s+)?(?:it|this|that|they|them|these|those|one|material)$`, and strip a trailing "please" before the check; add the cases to `test_a_pronoun_is_the_material_in_focus`.
@@ -2688,7 +2703,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Add `now|ok(?:ay)?|please` to the leading alternatives of `_SIZE_REPLY_WRAPPER_RE` (or strip with `replies._without_polite_leads`); add "now Topsoil" to a unit test.
 
-### 774. [LOW] "I need you to mark it done" no longer counts as a command
+### 774. ~~[LOW] "I need you to mark it done" no longer counts as a command~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** the shared `COMMAND_LEAD` (agents/text_utils.py) accepts "I need you to" — it requires "you", so plain "I need to …" stays excluded (user decision 2026-09-28). The routing snapshot is unchanged. Tests: `test_task_verbs.py`.
+
 `platform/agents/task/text_helpers.py:114` — with a task in focus it shows the task's details and writes nothing; HEAD's unanchored `\bmark` matched it. "I need to archive the fence gate task" replies "What would you like to update on the task?" (no write, confusing). "I need to …" was deliberately dropped from the lead (user decision 2026-09-28: it notes work still to do). (review 2026-09-28 fourth round #3)
 
 **Suggested fix:** Accept `i\s+need\s+you\s+to` — it requires "you", so plain "I need to" stays excluded — and add "I need you to mark it done" to `test_a_polite_edit_still_counts`.
@@ -2820,7 +2838,10 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** One definition for both: move `names_a_database_id` to `agents/text_utils.py` with `re.compile(r"\b[0-9a-f]{24}\b", re.IGNORECASE)`, and use it from the task resolver, `estimate_resolver` and `delegate_get_estimate`; add a capitals case to `test_an_estimate_id_in_the_message_names_no_estimate`.
 
-### 804. [LOW] A task-list place starting with "Next" or "This" is never read
+### 804. ~~[LOW] A task-list place starting with "Next" or "This" is never read~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `_PROPERTY_RE` refuses "this" / "next" only before week / month / year, so "tasks at Next Door Landscaping" and "tasks at This Old House" read the place and "tasks for next week" stays a window. Tests: `test_task_list_filters.py`.
+
 `platform/agents/task/list_filters.py:81` — `_PROPERTY_RE` refuses a place whose first word is `me|myself|today|tomorrow|this|next|the` (IGNORECASE), so "tasks at Next Door Landscaping" or "tasks at This Old House" finds no place and lists every task. Predates the "wrong answers that look right" batch; noticed while probing it. LOW: a place named that way is rare, and "tasks for the Next Door Landscaping property" can't reach it either. (review 2026-10-02 round 3, unnumbered)
 
 **Suggested fix:** Refuse "this"/"next" only when a date word follows — `(?!(?:me|myself|today|tomorrow|the)\b|(?:this|next)\s(?:week|month|year)\b)` — so "for next week" stays a window and "at Next Door Landscaping" is a place. Add both as rows in test_property.

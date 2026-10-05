@@ -1286,6 +1286,7 @@ Routed, but found no one until 2026-09-27 — see §2.3.
 | `change the phone of {contact} to 555-1111` | ✅ rule |
 | `change Ana's phone to …` with two Anas → *"More than one contact matches that: 1. Ana Reyes 2. Ana Lopez"* → `Ana Lopez` / `2` / `the second one` | ✅ rule *(2026-09-27 — it said "Multiple contacts matched" and the reply dead-ended)* |
 | right after a contact is created or shown: `his phone is 519-555-1234` / `her email is …` / `add his email …` / a bare email or phone number | ✅ rule *(2026-09-27, §10.8 — these were unknown, or started a second contact)* |
+| … with "and" first: `and her email is ana@new.example.com` / `and the phone should be 519-555-1234` | the same update — never "what about X?" | ✅ rule *(2026-10-04, #741 — the follow-up rewrite took it as a new target and showed "contact her email is …"; a target that states a value — " is ", " are ", "should be", "=" — is none)* |
 | `update the phone on {contact} to 555-1111` | ✅ rule |
 | `set {contact}'s phone to 555-1111` | ✅ rule |
 | `add a note to {contact}: "..."` / `set the notes on {contact} to "..."` | ✅ rule *(2026-09-17 — `notes` is no longer a `Contact` field; the phrasing creates a real `Note`, authored by the acting user, instead of writing a scalar. Also handled inline on create.)* |
@@ -1313,6 +1314,8 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `add a note: she wants the gate locked` / `add a note: there is a dog` (a task in focus, an older contact or property anchor) | the note goes to the task in focus | ✅ rule *(2026-10-03, #726 — a pronoun inside the dictated note picked the contact or property)* |
 | `add a note: a dog in the yard` / `add a note: the estimate needs review` / `add a note: check the property line` (an estimate, property, contact or task in focus) | the note goes to the record in focus — a domain word in the body names nothing | ✅ rule *(2026-10-04, #806 — "yard" sent it to a property, "estimate" to the estimate. With nothing in focus, or a material or role in focus (they take no notes), the body is still the only signal: `add a note: the estimate needs review` goes to the estimate)* |
 | `add a note to Bob Lee` → *"What should the note say?"* → the text | files the reply, even if it reads like a command | ✅ rule |
+| `note: call after 5` / `Note - bring the trailer` (the shorthand, said first) | files the note on the record in focus | ✅ rule |
+| `Please note: I want to change the markup to 20%` / `please note - the price changed` | not a note — "please note" is "be aware"; the request is read as a request (on the rules tier Maple asks what to do) | ✅ rule *(2026-10-04, #742 — it was filed as a note and the request wasn't carried out. A lead word before a verbless "note" makes it the idiom; with a verb, `please add a note: …` is still a note)* |
 | `show me the notes for 12 Oak St` / `what notes are on Bob Lee?` / `any notes on E0042?` / `show me his notes` | lists them newest first, with author and date | ✅ rule |
 | `delete my note on Bob Lee` / `delete note 2` (after a list) / `delete my last note on Ana Reyes` → *"Delete your note …? This can't be undone."* → `yes` / `no` | deletes it, or keeps it; your own notes, or any as an Owner | ✅ rule *(it was redirected to the app)* |
 | a note delete the note handler can't parse (`delete Bob Lee's note`) | *"I couldn't tell which note you meant, so I haven't deleted anything. Say "delete my note on <name>" — or "show me the notes for <name>", then "delete note 2" — and I'll find it."* | ✅ rule *(2026-10-03, #743 — said notes couldn't be deleted from chat)* |
@@ -1322,7 +1325,7 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `link Zed Quill to 12 Oak St` (no such contact) | "I couldn't find a contact or a property called Zed Quill." | ✅ rule |
 | `remove Ana Reyes from 12 Oak St` / `unlink …` | done in the app — §9.8 | 🛑 redirect |
 
-**Open gaps:** #741, #742 ("Please note: …" filed as a note), #745, #746 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690; 2026-10-01: #703, #705, #758; #743 on 2026-10-03.
+**Open gaps:** #745, #746 (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #679, #682, #683, #687, #690; 2026-10-01: #703, #705, #758; #743 on 2026-10-03; #741 and #742 on 2026-10-04.
 
 ---
 
@@ -1393,6 +1396,8 @@ A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft b
 | `change its price to 5` on a material with several sizes → *"which size?"* → `2 cu ft` | the change, on that size | ✅ rule *(2026-09-27 — the answer didn't resume the edit)* |
 | `remove size 1 yd from it` with nothing in focus → *"Which material do you mean?"* → `Show Stone` / `no, Black Mulch please` | the change, on that material — a reply that is one of the company's materials answers however it reads | ✅ rule *(2026-09-28)* |
 | … → `No. 57 Stone` / `The Good Stuff` — a name that opens with words a reply is cleaned of, beside materials the cut name also matches | the change, on the material named exactly | ✅ rule *(2026-09-29, #775 — "Multiple materials matched", and nothing changed)* |
+| `what sizes do they come in?` / `remove size 1 yd from those` / `… from these` / `… from it please` | the material in focus (asked about first once stale) | ✅ rule *(2026-10-04, #764 — they / these / those and a trailing "please" were read as a material's name: "No material found matching 'They'")* |
+| `what sizes does it come in?` with a task, contact or estimate in focus | *"Only materials have sizes — which material do you mean?"* — the same material question, and its reply finishes the request | ✅ rule *(2026-10-04, #763 — it asked "Which material do you mean?" with no reason. Falling through instead reached the task creator, so the question stays)* |
 
 **Invariants:**
 - **Last-size delete refusal** — cannot remove the only remaining size on a material. Copy: *"I can't remove the last size from this material — it needs at least one size. Add another size first, or delete the material entirely if that's what you mean."*
@@ -1468,7 +1473,7 @@ reply says how many.
 | `what's the price of Topsoil?` / `how much does mulch cost?` / `how many materials do I have?` / `list my material categories` | one material's price, the count, the categories — not a catalog figure | ✅ rule |
 | `what's the average price of my mulch?` / `most expensive material in Bulk Materials` — a category or material narrowing | not read | ⚠️ gap *(Phase 4 — company-wide figures only)* |
 
-**Open gaps:** #763 ("what sizes does it come in?" asks which material whatever is in focus), #764 (they / those / "it please"), #768 (a lead word before a size command), #775 (a name starting "No." / "The" / "Please" can dead-end) (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697; #700 on 2026-10-02; #701 on 2026-10-03 (a failed size command says so instead of a server error); #760 on 2026-10-03.
+**Open gaps:** #768 (a lead word before a size command) (see [code-review-followups.md](code-review-followups.md)). #775 was resolved 2026-09-29; #763 and #764 on 2026-10-04. Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697; #700 on 2026-10-02; #701 on 2026-10-03 (a failed size command says so instead of a server error); #760 on 2026-10-03.
 
 ---
 
@@ -1723,6 +1728,7 @@ own filters match (`list_filters.task_group_of`). **Open tasks** unless
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
 | `what tasks do we have at {property}?` / `tasks for the {property} property` | `list_tasks` filtered by property | ✅ rule *(2026-09-27; a property that doesn't match is answered — "I couldn't find a property called …")* |
+| `tasks at Next Door Landscaping` / `tasks at This Old House` | `list_tasks` at that place — "this" / "next" make a due window only before week / month / year (`tasks for next week`) | ✅ rule *(2026-10-04, #804 — a place starting "Next" or "This" was never read, and every task was listed)* |
 | `tasks assigned to {email}` / `tasks assigned to me` / `tasks assigned to Jordan` / `Jordan's tasks` | `list_tasks` filtered by assignee | ✅ rule *(2026-09-27 — the email is read whole (it stopped at the first ".", #687); a teammate by first, last or full name; an unknown name is answered, never dropped)* |
 | `tasks assigned to Jordan due today` / `tasks assigned to Jordan Crew at 12 Oak St` / `tasks assigned to Jordan marked done` | `list_tasks` filtered by the assignee and the other filter | ✅ rule *(2026-10-02, #717 — the surname is a capitalised word that opens no other filter; "assigned to Jordan due today" was a teammate called "Jordan due")* |
 | `tasks for Jordan` | property first, then teammate | ✅ rule *(2026-09-27)* |
@@ -1764,6 +1770,7 @@ The `the {task} task` keyword forms are ✅ rule; bare-title forms (`change the 
 | `set task {T0001} description\|notes\|due date\|title to {value}` / `change T0001's due date to Friday` / `set task {T0001} property\|address to Elm House` | `update_task` → Task Agent | ✅ rule *(2026-09-28 — target before the field (`_TARGET_FIRST_LEAD`); previously asked "What would you like to update on the task?", and the due-date form read its value as "date to …". Description here overwrites, like `set the description of …`)* |
 | `remove the property from the task` / `unlink it from the property` | `update_task` (property cleared) → Task Agent | ✅ rule *(2026-09-27 — unlinking a task is Maple's; unlinking a contact from a property is still done in the app, §9)* |
 | `hey maple, rename the fence task to Gate` / `could you change the due date of it to Friday` / `I'd like to update the description: bring the ladder` | `update_task` → Task Agent | ✅ rule *(a lead before the verb — fillers, a polite ask, "I'd like to" — is still a command)* |
+| `I need you to mark it done` / `I need you to archive the fence task` | the edit — "I need you to" asks Maple | ✅ rule *(2026-10-04, #774 — it showed the task and wrote nothing. Plain `I need to finish it` still notes work to do and is no command, user decision 2026-09-28; the lead is the shared `COMMAND_LEAD`)* |
 | `don't rename the fence task to Gate` / `I won't change the due date of the fence task to Friday` / `we shouldn't update the description of it to foo` / `don't add a description to it: call Bob` | nothing changes — the verb mid-sentence is not a command | ✅ rule *(2026-09-30, #762 — they wrote. Rename, field and add-description shapes are anchored with `_COMMAND_LEAD` like every other task edit; no negation rule)* |
 
 ## 7.6.1 Notes on an existing task (append by default)
@@ -1911,7 +1918,7 @@ Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-sup
 
 Task details (2026-09-27) also show the linked property, the estimate it was converted into, and how many photos and videos it has.
 
-**Open gaps:** #740 ("what is/are …" after a task list), #767 ("perfect," / "quick," / "one more thing," before a command), #774 ("I need you to …"), #761; older #442, #447 (see [code-review-followups.md](code-review-followups.md)). #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27; #711, #713, #751 and #752 on 2026-09-29; #470 and #762 on 2026-09-30; #710 and #712 on 2026-10-01; #717 and #718 on 2026-10-02.
+**Open gaps:** #767 ("perfect," / "quick," / "one more thing," before a command); older #447 (see [code-review-followups.md](code-review-followups.md)). #442 and #761 were resolved 2026-10-03; #740, #774 and #804 on 2026-10-04. #672, #675, #676, #683, #687, #689 and #692 were resolved 2026-09-27; #711, #713, #751 and #752 on 2026-09-29; #470 and #762 on 2026-09-30; #710 and #712 on 2026-10-01; #717 and #718 on 2026-10-02.
 
 ---
 
@@ -2367,7 +2374,11 @@ Maple remembers the last **read** — its message and the records it was about �
 estimate or task list, `just the drafts`, `which ones are on hold?`, `only the
 ones over $1000`, `sort them by total`, `what's the total of those?`, `just the
 overdue ones`, `how many is that?` replay that list with the refinement added
-— so refinements chain (§1.1, §7.5).
+— so refinements chain (§1.1, §7.5). A task-list refinement must read as a
+task filter — a status, an assignee, a due window, or a place said with
+"at" / "for" / "in" (`which ones are done?`, `just mine`, `just the ones at
+Elm House`); `what is the rate for Foreman?` after a task list is its own
+question (#740, 2026-10-04).
 
 ## 10.9 "Show more" *(2026-09-27)*
 
