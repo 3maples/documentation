@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **817**. Never
+- **Entries are numbered and permanent.** Next free number: **819**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -111,7 +111,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 
 | Lines | File | Note |
 |------:|------|------|
-| 3,797 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push) |
+| 3,797 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push); 4,022 on 2026-10-05 (+5 that day: `_create_estimate_from_template(audit=)`) |
 | 3,577 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net); +70 by 2026-09-27 — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py`; +155 on 2026-09-27 (multi-turn push: cross-record joins, dashboard, named creates) |
 | 3,210 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | +366 on 2026-09-27 (multi-turn push: size commands, one-question creates); +123 in the 2026-09-27/28 review fixes (3,087 at `main` then) — the material in focus, size-label refusals, "which material?". `_handle_size_command` is 105 lines — split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` (review 2026-09-27 #29) |
 | 2,637 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug; +70 on 2026-09-27 |
@@ -132,7 +132,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,177 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
 | 1,163 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | +48 over the 2026-09-24 review passes; +15 by 2026-09-27 |
 | 1,195 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases; +65 on 2026-09-28 for the target-first field shapes and `restated_field_value`. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46) |
-| 1,072 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27 |
+| 1,072 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27; 1,102 on 2026-10-05 (+14 for the save failure's outage/bug split, #619) |
 | 944 | [platform/agents/task/service.py](../../platform/agents/task/service.py) | **crossed the line 2026-09-27** (was 688). **Next step:** a `TaskListBase` layer in `agents/task/listing.py` holding `_handle_list_tasks`, `_due_note`, `_resolve_list_ask` and `_FINISHED_STATUS_NAMES`; move `_handle_task_due_change` into operations.py; split `_handle_update_subop` into a detector table plus a named-target helper — about 600 lines left (review 2026-09-27 #47) |
 | 903 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
 | 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
@@ -215,7 +215,7 @@ seams that already exist as separate classes.
 | 176 | `_handle_update_estimate_work_item_update_field` — agents/estimate/work_item_handlers.py:851 |
 | 396 | `EstimateAgent.process` — agents/estimate/service.py:821 (+13 on 2026-09-24, +14 on 2026-09-25 for the bulk-delete/equipment guard; move the CRUD short-circuit block into `_process_crud_intent(...)`, review #71) |
 | 182 | `delegate_get_estimate` — routers/agent_helpers/delegate_get_estimate.py:168 (+35 on 2026-09-24; one helper per rung plus `_render_estimate_summary`, review #62) |
-| 143 | `_run_edit_commands` — agents/estimate/edit_executor.py:209 (new 2026-09-24, +18 in the third review pass for the dry-run confirmation and the transient/bug error split, +7 in the fourth for the pin snapshot; extract `_persist_batch`, `_success_envelope` and the exception branches, review #57) |
+| 157 | `_run_edit_commands` — agents/estimate/edit_executor.py:257 (new 2026-09-24, +18 in the third review pass for the dry-run confirmation and the transient/bug error split, +7 in the fourth for the pin snapshot, +12 on 2026-10-05 splitting the save failure the same way, #619; extract `_persist_batch`, `_success_envelope` and the exception branches, review #57) |
 | 114 | `run_update_estimate` — routers/agent_helpers/estimate_update.py:163 (+44 on 2026-09-24; extract `_dispatch_to_planner` and `_build_dispatch_context`, review #63) |
 | 123 | `_dispatch_confirmed_intent` — routers/agent_helpers/fuzzy_confirmation.py:65 (+25 on 2026-09-24, +30 on 2026-09-25 for the delete permission check and audit — move that branch into `_confirm_delete(...)`; a `sub_op` → handler dict, review #64) |
 | 484 | `_handle_list_estimates` — agents/estimate/crud_handlers.py:1180 (first measured 2026-09-29; 489 at that day's HEAD, 484 after the sold-estimates work. Reads the question, resolves the address/property/contact/material-line constraints, builds the filter, queries, and builds four replies. **Next step:** move the reply building — count / total / empty / list, all from one `described` — into a `_list_reply(...)` helper, and the filter building into `_list_filters(list_query, …)`; the question is already read by `agents/estimate/list_query.py`) |
@@ -268,6 +268,7 @@ seams that already exist as separate classes.
 | — | seven functions in `platform/agents/task/` (see archive for the list) |
 | — | two handlers in `agents/estimate/assumption_handlers.py:257,415` |
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
+| 125 | `_finalize_template_estimate` — routers/agent_helpers/template_estimate.py:102 (first measured 2026-10-05, +16 that day logging the failure, splitting the outage/bug reply and removing an estimate inserted before the failure, #318; extract the create/scale/save block into `_instantiate(processor, company_oid, template, factor, context_payload)`, leaving the gate, audit and envelope here — review 2026-10-05 #4) |
 
 #### Watch
 
@@ -637,7 +638,10 @@ Paths that discard the real failure. #64 is the anchor; #430 is the standing
 bandit `B110` baseline (11 bare `except Exception: pass` blocks — a count above
 11 means a change added one).
 
-### 20. [MEDIUM] Narrow `except Exception` around `PydanticObjectId(company_id)` cast in `_resolve_latest_estimate`
+### 20. ~~[MEDIUM] Narrow `except Exception` around `PydanticObjectId(company_id)` cast in `_resolve_latest_estimate`~~ — RESOLVED 2026-10-05
+
+**Resolved 2026-10-05:** the cast in `agents/estimate/crud_helpers.py::_resolve_latest_estimate` (moved there from `service.py`) catches `(InvalidId, TypeError)` only, so a malformed id still fails closed and anything else surfaces. The logged broad except around the query stays. Pinned by `test_resolve_latest_estimate_lets_an_unexpected_error_through`.
+
 **File**: `agents/estimate/service.py` — the first of two `except Exception`
 clauses in `_resolve_latest_estimate` (around line 3266 post-fix).
 **Severity**: MEDIUM (hygiene, matches entry #0 of the original batch)
@@ -727,7 +731,10 @@ Fix: replace each `catch {}` with
 
 **Fix:** Track an `analyticsError` state and render a small inline note ("Couldn't load analytics — retry") when set.
 
-### 318. [MEDIUM] Broad `except Exception` in template instantiation swallows the real failure
+### 318. ~~[MEDIUM] Broad `except Exception` in template instantiation swallows the real failure~~ — RESOLVED 2026-10-05
+
+**Resolved 2026-10-05:** the create/scale/save block logs `Template estimate instantiation failed for company <id>: <type>` before releasing the slot: a `TRANSIENT_WRITE_ERRORS` hiccup (`services/sparse_update.py`, shared with the edit executor) at WARNING with "try again", anything else at ERROR with "Something went wrong on my side … You can create it on the Estimates page", since a retry would fail the same way. An estimate already inserted when the failure struck is deleted first (`_discard_unfinished`), so the reply's "couldn't create" is true and the released slot leaves no unbilled empty draft per attempt (review 2026-10-05 round 3). The router passes `_create_estimate_from_template(audit=False)` and keeps its own create audit, written only after a successful save, so a template estimate is audited as created once and a failed attempt leaves no audit trace (rounds 4–5). The design that makes the cleanup necessary is #818. The type only, no traceback: Sentry captures frame locals, and this frame holds the user's token claims and message (see #817). Pinned by `test_a_failed_instantiation_is_logged_and_frees_the_slot`.
+
 **Where:** `platform/routers/agent_helpers/template_estimate.py:156`
 
 **Issue:** The create/scale/save block catches bare `Exception`, releases the quota slot, and returns a generic "try again" with no logging. A genuine bug (scaling math, model validation) is invisible in logs and indistinguishable from a transient DB blip.
@@ -810,7 +817,10 @@ and add `logger.debug(...)` (or `logger.exception(...)` where a failure is not
 routine) before falling through. Best done as one focused sweep, since the
 pattern is near-identical across the six files.
 
-### 619. [LOW] A failed estimate-edit persist logs nothing about the cause
+### 619. ~~[LOW] A failed estimate-edit persist logs nothing about the cause~~ — RESOLVED 2026-10-05
+
+**Resolved 2026-10-05:** the failed save logs the exception type (no message, no traceback — they hold line values): a `_TRANSIENT_ERRORS` hiccup at WARNING and offered as a retry, anything else at ERROR where Sentry sees it and answered with the batch's bug reply (`_EDIT_BUG_REPLY`, "make this change on the estimate page") — a retry would fail the same way. Pinned by `test_a_failed_save_logs_why`.
+
 `platform/agents/estimate/edit_executor.py:219` — `logger.warning(..., code)` makes version conflicts and outages indistinguishable.
 
 **Suggested fix:** Log `type(exc).__name__` (still no exc_info, to keep note bodies out of logs).
@@ -823,12 +833,18 @@ pattern is near-identical across the six files.
 
 **Suggested fix:** Remove the try/except, or log `type(err).__name__` at warning level and re-raise.
 
-### 747. [LOW] `except Exception: return None` hides errors without logging
+### 747. ~~[LOW] `except Exception: return None` hides errors without logging~~ — RESOLVED 2026-10-05
+
+**Resolved 2026-10-05:** `rewrite_catalog_reference` logs `Catalog name rewrite failed (<type>)` at WARNING before leaving the message as it was. Pinned by `test_a_failed_rewrite_is_logged_and_leaves_the_message`.
+
 `platform/agents/conversation/catalog_names.py:171` — A programming error in the rewrite is silently dropped, and the message routes as if no rewrite applied. (review 2026-09-27 #77)
 
 **Suggested fix:** Log `type(err).__name__` at warning level before returning None, as viewed_record.py does.
 
-### 748. [LOW] `except Exception: return None` hides errors without logging
+### 748. ~~[LOW] `except Exception: return None` hides errors without logging~~ — RESOLVED 2026-10-05
+
+**Resolved 2026-10-05:** `rewrite_bare_property_name` logs `Bare property name lookup failed (<type>)` at WARNING. Pinned by `test_a_failed_lookup_is_logged_and_leaves_the_message`.
+
 `platform/agents/conversation/record_lists.py:180` — Same pattern as #747 in the city/role list filter. (review 2026-09-27 #78)
 
 **Suggested fix:** Log `type(err).__name__` at warning level before returning None.
@@ -2869,6 +2885,11 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Ask the two questions separately, each as `find_one(..., {"_id": 1})`: one with the full-name alternatives (the first/last splits and the single-field forms with the other field blank), one with `{"first_name": same_name(name)}`. Two indexed queries in the same `asyncio.gather`, no cap, exact semantics; and the Python full/first re-check goes away.
 
+### 818. [LOW] The template router saves the estimate before its work item exists, so every later failure needs cleanup
+`platform/agents/estimate/crud_handlers.py:768` — `_create_estimate_from_template` inserts an empty Draft, and the callers then build, scale and price the template's work item and save it with a second write. Any failure between the two writes leaves an empty estimate behind. The template router (`routers/agent_helpers/template_estimate.py::_finalize_template_estimate`) now copes: it deletes the estimate (`_discard_unfinished`), releases the quota slot, and skips the processor's audit (`audit=False`) so the record and the reply agree. That took four review rounds of #318 to get right (2026-10-05), and Maple's own template path (`crud_handlers.py:925`) has the same insert-then-fill shape without that cleanup. LOW: the router path is correct today; the agent path's exposure is the same rare failure window.
+
+**Suggested fix:** Build and price the work item first, then insert the estimate once with its job items and total, and audit that single insert. A failure before the insert leaves nothing, which removes `_discard_unfinished`, the second write and the `audit` flag. It touches both callers, so do it as its own change with the template routing and estimate agent tests.
+
 ## Platform — API, models and data
 
 **Resolved 2026-09-27** (platform `2c2e5d0`): `agents/conversation/out_of_chat.py` answers company default percentages, team/invitations, billing/plan/credits, Load Standard, CSV import, units, divisions, unlink, duplicate, the estimate document and photos with the place in the app where each is done (user-guide wording), as a policy refusal read on the command head only. Pinned by `tests/test_out_of_chat_redirects.py` (including false-positive guards: work-item markup, "the duplicate contact", "the invoice task", note bodies) and corpus rows `boundary-*`. Snapshot: "duplicate it" and "set the company's default markup for work items to 20%" now redirect.
@@ -3708,6 +3729,11 @@ row count first — this may be years away.
 **Suggested fix:** Persist `conversation_lang`; in a non-English conversation, translate short replies too (design §5.6). Normalize trailing punctuation in the yes/no checks (the registry's normalized yes/no, §5.1).
 
 *(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
+
+### 817. [MEDIUM] Sentry ships frame locals — token claims and chat messages — with every `logger.exception`
+`platform/main.py:59` — `sentry_sdk.init` leaves `include_local_variables` at its default (True; SDK 2.70), and `send_default_pii=False` does not strip frame variables. The default scrubber denylists exact keys such as `token`, not `decoded_token`, `message` or `context_payload`. So each of the ~29 `logger.exception` calls on Maple paths (`routers/agents.py:1828` among them) can send the user's Firebase claims (uid, email), their chat message and conversation state to Sentry. The estimate edit executor and the template instantiation (#318) log the exception type only for this reason, but that costs the stack. Found reviewing #318 (review 2026-10-05 #1).
+
+**Suggested fix:** Needs your decision. Either set `include_local_variables=False` in `sentry_sdk.init`, which keeps every stack and drops locals everywhere (my pick: one line, covers all sites, and the type-only logs could go back to full tracebacks); or keep locals and add an `EventScrubber` denylist for `decoded_token`, `message`, `context_payload`, `chat_history` and the user/email names — narrower, but every new local name is a new leak.
 
 ## Portal — estimate builder
 
