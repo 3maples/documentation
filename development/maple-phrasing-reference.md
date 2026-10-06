@@ -422,6 +422,7 @@ a note to a material or role. **Refused by the planner:** labor burden
 | after a list: `just the draft and sent ones` / `only the draft or review ones` / `which of those are draft, review or sent?` | the same list (and its customer), narrowed to every status in the list | ✅ rule *(2026-10-05 — wasn't a refinement at all: the reader knew one status. `followup.py` rewrites it to "… that are draft and sent", read by the list reader)* |
 | after a list: `sort them by total` / `sort them by date` | the same list, highest value / newest first | ✅ rule *(2026-09-27)* |
 | after a list: `what's the total of those?` / `add them up` / `how many is that?` | the combined value / the count of that list | ✅ rule *(2026-09-27)* |
+| `what's the total value of my draft estimates over $1000 before tax?` / after a list: `does that include tax?` | the list's total before tax — *"The combined value of your 2 draft estimates over $1,000 is $1,500.00, before tax."*; every list total says which (*"…, including tax."*) | ✅ rule *(2026-10-05 — a list's total was tax-inclusive whatever was asked, and said nothing about tax. `… of my sold estimates before tax` stays the list's too: the metric dates a period differently, so tax said must not change which estimates count — review 2026-10-05 #1)* |
 | `what's the total value of my maintenance estimates?` / `total value of my open estimates` (more than 20 of them) | the division's work items only; every matching estimate | ✅ rule *(2026-09-30, metrics task 9 — it summed each estimate's whole total, and only the first page of 20. Summed by `services/maple_metrics.py`)* |
 | `how many estimates have been sold?` / `how many sold estimates do I have` / `how many estimates did I sell?` / `how many did I sell?` / `what's the total value of my sold estimates?` | `list_estimates` over **Won + Scheduled + Completed** — "sold" is no status of its own: everything a customer bought, however far it has since moved | ✅ rule *(2026-09-28 — "sold" was no filter, so it counted every estimate. `_SOLD_ESTIMATE_QUERY_PATTERN` needs the estimate noun, so "what unit is River Rock sold by?" is untouched; a named status still wins. **2026-10-03, #784 (user):** "won" alone is this set too — Won + Scheduled + Completed, as in a money question — and the reply says so; only "status won" said outright ("with status won", "won status", "in won status") is the Won status)* |
 | `how many did I sell?` / `how many have been sold` / `how many were sold` / `how many did we sell this month?` — with nothing before it | `list_estimates` → sold count | ✅ rule *(2026-09-29 — was help: "how many" is a count, never a help question. A `list_estimates` grammar entry built on `SOLD_VERB`, shared with the agent's sold filter)* |
@@ -452,14 +453,15 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | Phrasing | Answer | Status |
 |---|---|---|
 | `what's the status of {EST}?` / `is it sent?` | "E0001 'Oak St patio' is Draft." | ✅ rule |
-| `what's the total on it?` / `how much is {EST}?` | "The total on E0001 … is $1,250.00." | ✅ rule |
+| `what's the total on it?` / `how much is {EST}?` | "The total on E0001 … is $1,250.00, including tax." | ✅ rule *(2026-10-05 — the reply now says it includes tax)* |
+| with an estimate open: `what is the total value not including tax?` / `what's the total before tax?` / `how much is it before tax?` / `what's its total pre-tax?` | each work item's total ÷ (1 + its tax %), as every "before tax" figure — *"The total on E0001 … is $1,000.00 before tax ($1,130.00 including tax)."* | ✅ rule *(2026-10-05, user screenshot — it went to help: "I can't see the estimate figures from here". With nothing open, the same question is every estimate's total, §1.12)* |
 | `who's the customer?` / `who is it for?` | the contacts on its property: "… is for Ana Reyes at 12 Oak St." | ✅ rule |
 | `what's the address?` / `where is it?` | its property, or how to link one | ✅ rule |
 | `what's the markup on this estimate?` / `what's the gross margin on it?` | per work item | ✅ rule |
 | `when was it created?` / `when was {EST} last updated?` / `what's the code for this estimate?` | the date / the code | ✅ rule |
 | `show me estimate {EST}` | the details now include "Property: 12 Oak St — Ana Reyes" | ✅ rule *(2026-09-27)* |
 | with an estimate open: `what is markup?` / `what's the difference between markup and gross margin?` / `how much does mulch cost?` / `what's the address for bob lee?` / `what's my average markup?` | not a question about that estimate — goes on to help, the catalog, the contact, or (the last, since 2026-10-01) the company's average markup, §1.12 | ✅ rule *(2026-09-30, #719 — each got the open estimate's figure. With no reference, only "it"/"this" or the plainest "what's the <field>?" is about the open estimate)* |
-| with an estimate open: `how much is the total?` / `what's the status right now?` / `what's the total including tax?` / `what's the customer's name?` / `how much is it altogether?` | answered from the open estimate | ✅ rule *(review 2026-09-30 #5 — the #719 narrowing had sent them to help. `what's the total before tax?` is not: the answer is the tax-inclusive total; `what's the total altogether?`, with no "it", is not about one estimate. `how much is the mulch?` / `how much is the foreman?` is a price, not the estimate's total — second review #1. `how much is E0042 in total?` is E0042's total — second review #8)* |
+| with an estimate open: `how much is the total?` / `what's the status right now?` / `what's the total including tax?` / `what's the customer's name?` / `how much is it altogether?` | answered from the open estimate | ✅ rule *(review 2026-09-30 #5 — the #719 narrowing had sent them to help. `what's the total before tax?` is too since 2026-10-05, the row above; `what's the total altogether?`, with no "it", is not about one estimate. `how much is the mulch?` / `how much is the foreman?` is a price, not the estimate's total — second review #1. `how much is E0042 in total?` is E0042's total — second review #8)* |
 | `which estimate has the highest total?` / `what's the lowest total on an estimate?` | the estimates sorted by total, not "Which estimate would you like to view?" | ✅ rule *(2026-09-30, #720 — a ranking, average or comparison word is never about one estimate)* |
 
 **Title-based lookup** *(May expansion)*: when no estimate code is found in the query, `_resolve_estimate_by_title` extracts a title from quoted text (`"Untitled Estimate"`) or `title/called/named X` phrasings and searches by substring match. Single match → returns the estimate. Multiple matches → lists them and asks the user to pick by code.
@@ -876,7 +878,7 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `what's my pipeline value in the last 30 days?` | `analytics_estimates` → Estimate Agent (custom window) | ✅ rule |
 | `what's the backlog value?` | `analytics_estimates` → Estimate Agent | ✅ rule |
 | `what's my completed value?` / `how much was completed?` | `analytics_estimates` → Estimate Agent (estimates marked Completed in the last 30 days) | ✅ rule *(2026-09-30 — counts when an estimate was *marked* Completed (`status_changed_at`), with the dashboard's card: it counted Completed estimates *updated* in the window, so editing an old job put it back. Earlier: 2026-06-20 — replaced the retired "won value" headline; see change log)* |
-| `what's the value of my estimates?` / `how much are my estimates worth?` | `analytics_estimates` → Estimate Agent (total value, all-time) | ✅ rule *(2026-07-08 — `_analytics_total_value`: `sum(grand_total)` excluding Archived/Generating/Failed (Lost stays in — a lost bid is still an estimate); plural-only pattern so "value of estimate {EST}" stays §1.2. 2026-07-09 — yields to amount filters: "estimates worth **over $10k**" stays a `list_estimates` amount-threshold query.)* |
+| `what's the value of my estimates?` / `how much are my estimates worth?` / `what's the total value of my estimates this year before tax?` | `analytics_metric` — §1.12's figure over every real estimate (Lost included, as before), with calendar periods, before tax when asked, and the reply naming both | ✅ rule *(2026-10-05, user screenshot — the dashboard's total ignored "before tax", gave the tax-inclusive figure, and read "this year" as the last 365 days: "Your estimates are worth $230,775.84 in the last year". `total value of my estimates this year before tax` without the question word is too (review #4); only a tail the metric reader can't hold — `… of the estimates I've done over the last 60 days` — stays the dashboard's below. Before: 2026-07-08 — `_analytics_total_value`: `sum(grand_total)` excluding Archived/Generating/Failed (Lost stays in — a lost bid is still an estimate); plural-only pattern so "value of estimate {EST}" stays §1.2. 2026-07-09 — yields to amount filters: "estimates worth **over $10k**" stays a `list_estimates` amount-threshold query.)* |
 | `what's the value of the estimates I've done over the last 60 days?` | `analytics_estimates` → Estimate Agent (total value, custom window) | ✅ rule *(2026-07-08 — window bounds `updated_at`; response states the window)* |
 | `give me a summary of my estimates from the last 60 days` | `analytics_estimates` → Estimate Agent (windowed Pipeline/Backlog/Completed) | 🤖 LLM *(2026-07-08 — `_analytics_windowed_summary`: all three buckets recomputed inside the user's window; previously the window was parsed and silently discarded, so every window returned identical numbers)* |
 | `what's the breakdown of estimates by statuses this month?` | `analytics_estimates` → Estimate Agent | ✅ rule |
@@ -888,6 +890,7 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `draft vs approved estimates` | `analytics_estimates` → Estimate Agent (generic pair) | ✅ rule *(2026-06-02 — explicit "X vs Y" / "compare X and Y"; no win-rate framing for non-WON/LOST pairs)* |
 | `compare won and lost estimates` / `is my win rate any good?` — a win-loss phrasing no metric entry lists | `analytics_estimates` → the same win rate as §1.12 (sold against Lost), over the dashboard's window | ✅ rule *(2026-10-01 — it was the Won-only count)* |
 | `what's my pipeline?` / `how's my pipeline looking?` / `what's in my backlog?` / `how much have I completed this month?` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-27, design §7.5 — they went to the user guide)* |
+| `what's my pipeline before tax?` / `what's the backlog value not including tax?` / `give me a summary before tax` / `show me my dashboard before tax` / `how's business before tax?` / `pipeline before tax` | the card's figure before tax; every card, total and summary says which — *"Your pipeline is worth **$X** in the last 90 days, before tax."* A summary before tax counts each card over its own window from the engine. A breakdown by status or division stays tax-inclusive and says so | ✅ rule *(2026-10-05 — "before tax" was ignored and no figure said whether it included tax; the anchored summary, dashboard and bare-card forms took no tax phrase at all — review #2. Their results now come back whole, so "does that include tax?" / "what about before tax?" work after them too)* |
 | `show me my dashboard` / `give me a summary` / `how's business?` | `analytics_estimates` → Estimate Agent (Pipeline / Backlog / Completed) | ✅ rule *(2026-09-27 — they were unknown or help. A summary of one estimate — "give me a summary of E0042" — is not this.)* |
 | `how many estimates are in each status?` / `pipeline by status` / `estimates by status` / `estimate value by division` | `analytics_estimates` → Estimate Agent (breakdown) | ✅ rule *(2026-09-27 — "in each status" counted all estimates; "by division" was unknown)* |
 | `what is my pipeline worth` / `how big is my backlog?` / `hey maple, what's in the pipeline?` / `can I see my pipeline?` / `pipeline` / `backlog?` / `whats my pipeline` / `which estimates are in my backlog?` / `is my pipeline growing?` / `i'd like to see my backlog` | `analytics_estimates` → Estimate Agent | ✅ rule *(2026-09-30, #721 — a pipeline/backlog question opens with a question or show word after at most a lead, or is the bare noun. Review 2026-09-30 #4: "whats", "which", "is/are my/our" and "I'd like to see" open one too — "whats my pipeline" went to the Material agent. "is the pipeline trench on the estimate?" / "are the pipeline fittings included?" are not metrics — second review #6)* |
@@ -1035,8 +1038,21 @@ never by the LLM, and every reply names what it counted.
   customer: *"I couldn't find a customer, property or division called Draft,
   Review, and Sent."*
 - **Money is tax-inclusive** (the estimates' `grand_total`, as the dashboard);
-  *before tax*, *pre-tax* or *excluding tax* sums each work item's
-  `sub_total ÷ (1 + tax%)`. The reply says which.
+  *before tax*, *pre-tax*, *excluding*, *not including*, *without*, *ex*,
+  *less*, *minus* or *net of tax*, *tax excluded* sums each work item's
+  `sub_total ÷ (1 + tax%)`; *including*, *with*, *incl.*, *plus tax*, *tax
+  included* is the default said outright. The reply says which. One reading
+  for every reader — metrics, the dashboard's cards, a list's total, one
+  estimate's total — in `agents/estimate/tax_words.py` (2026-10-05). *After
+  tax* is neither, and is said back. A total with tax said and nothing named
+  (*what is the total value not including tax?*) is every estimate's — user
+  decision 2026-10-05 — unless an estimate is open, when it is that one's.
+- **The last figure's tax** (2026-10-05): *does that include tax?* / *is that
+  before tax?* re-runs the last money read with tax the other way, after
+  *"That included tax. Here it is before tax:"*; *what about before tax?* /
+  *and with tax?* re-runs it the way asked
+  (`agents/conversation/tax_followup.py`). After a count, a margin or nothing,
+  Maple says how tax works instead.
 - **Periods are calendar periods on the user's clock**: *this month* is since
   the 1st where they are; *last quarter* is the previous one; *in the last 90
   days* starts at that day's midnight. With *won* / *sold* a period reads when
@@ -1146,6 +1162,10 @@ never by the LLM, and every reply names what it counted.
 | `what's my markup?` (bare) | help — it may mean the default markup setting; ask "what's my average markup?" | ⚠️ gap *(Phase 3 — deliberately not read as the average)* |
 | `what's work item 2's margin?` / `what's the patio work item's gross margin?` / `what's this estimate's gross margin?` / `what's E0042's gross margin?` / `what's this estimate's win rate?` | not a metric — the work item's figure (§1.5.7), or the one estimate's | ✅ rule *(Phase 3 review #1, #3, 2026-10-01 — the possessive was read as a customer: "I couldn't find … called work item 2")* |
 | `what's my win rate on bids?` / `what's my gross margin on all estimates?` / `what's my average markup on my jobs?` / `how much have I sold on all my estimates?` | the whole company's figure | ✅ rule *(Phase 3 review #2 — "bids", "all", "my" were looked up as names; the last since Phase 1)* |
+| `What's the total value of my estimates this year before tax?` → `does that include tax?` → `what about before tax?` | *"Total value this year: $1,500.00 across 4 estimates, before tax."* → *"That was before tax. Here it is including tax:\nTotal value this year: $3,745.00 across 4 estimates, including tax."* → the first figure again | ✅ rule *(2026-10-05, user screenshot — the first was the dashboard's tax-inclusive total over the last 365 days; the second was "I'm not able to help with that"; the third swapped "before tax" in as a name)* |
+| `what is the total value not including tax?` / `what's the total before tax?` / `what's the total value including tax?` (nothing open) | every estimate's total — *"Total value, all time: $1,500.00 across 4 estimates, before tax."* | ✅ rule *(2026-10-05, user decision — it was help: "I can't see the estimate figures from here")* |
+| `how much did we sell this year minus tax?` / `what's our revenue this year not including tax?` / `how much are my open estimates worth?` | that figure before tax / the open estimates' total | ✅ rule *(2026-10-05 — "not including tax" read "including tax" out of it as with tax)* |
+| `does that include tax?` after a count or a gross margin | *"That answer has no tax in it. Totals I give include tax unless you ask for them before tax …"* | ✅ rule *(2026-10-05)* |
 | `what's the gross margin with tax?` / `what's our revenue with tax?` | the company's margin (always pre-tax) / its tax-inclusive total | ✅ rule *(Phase 3 review #4 — "tax" was looked up as a name. `… after tax` is said back, not read as either: it usually means with the tax taken off — review round 2 #1)* |
 | `win rate by value` / `what share of my quoted dollars did I win?` | not read — a dollar-weighted win rate | ⚠️ gap *(decision 14 — the win rate counts estimates)* |
 | `who are my best customers?` → `just the won ones` | *"I'm not sure how to help with that…"* | ⚠️ gap *(decision 13, 2026-09-30 — a status refinement after a metric answer is not supported yet; ask again with the status: "who are my top customers by won value?")* |
@@ -1154,9 +1174,8 @@ never by the LLM, and every reply names what it counted.
 **Not metrics** — each keeps its own answer: `how much is E0042?` and `what's
 the total on it?` (one estimate, §1.2); `what's the total of those?` (the list
 just shown, §1.1); `what is the total value of the open estimates` and
-`estimates over $10k` (the list's total and filter, §1.1); `what's the value
-of my estimates?`, `what's my pipeline?`, `how much have I completed this
-month?`, `what's my completed value?`, `won vs lost status` and `draft vs
+`estimates over $10k` (the list's total and filter, §1.1); `what's my
+pipeline?`, `how much have I completed this month?`, `what's my completed value?`, `won vs lost status` and `draft vs
 approved` (the dashboard, §1.9); `how is my win rate calculated?` (help);
 `what's the gross margin?` / `… on it` / `… on work item 2` / `… on E0042` (one
 estimate or work item, §1.2 / §1.5.7); `what's my material markup?` (a
@@ -1167,7 +1186,7 @@ I need …` (the Calculator, §10.3); `what's the average wage for Foreman?`
 routing / answers), `tests/test_metric_ratios.py` (win rate, margin,
 markup), `tests/test_metric_win_rate.py`, `tests/test_metric_margin.py`, `tests/test_maple_metrics.py`,
 `tests/test_metric_subject.py`, `tests/test_metric_periods.py`,
-`tests/test_metric_spec.py`; multi-turn: the `METRICS` conversations in
+`tests/test_metric_spec.py`, `tests/test_tax_words.py`, `tests/test_tax_followup.py`; multi-turn: the `METRICS` conversations in
 `tests/maple_conversations/corpus.py`. #783, #784, #785, #786, #787 and #789
 resolved 2026-10-03.
 
