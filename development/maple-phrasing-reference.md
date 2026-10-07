@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-06
+**Last updated:** 2026-10-07
 
 ### Recent changes
 
@@ -696,6 +696,7 @@ The rename handler already covers description updates. These phrasings extend th
 | `how many materials are in {WI}?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `what materials does {WI} have?` | `update_estimate` → Estimate Agent | ✅ rule |
 | `list the materials in {WI}` | `update_estimate` → Estimate Agent | ✅ rule |
+| `list the materials in {WI}` → `change the second one to 3 bags` | — | ⚠️ gap *(2026-10-07 — a work item's material and activity lists don't record their rows (`work_item_field_handlers.py`), so "the second one" has no row to pick; the planner's resolver asks which line rather than reading an older list)* |
 
 **Disambiguation note:** `what materials does {EST} use?` (§1.1) queries all materials across all work items via the cross-resource drilldown. The phrasings above scope to a *single* work item within the estimate.
 

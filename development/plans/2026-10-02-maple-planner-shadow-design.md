@@ -222,6 +222,59 @@ range limits as in `edit_commands.py`. Grouped by what they touch:
 | Help | `help` (a question for the user guide) |
 | Conversation | `answer` (a choice, a value, yes, no, or the fields a create or gathering flow asked for), `cancel`, `show_more`, `repeat`, `acknowledge`, `social` (a question about Maple itself — `maple_persona`), `redo_last` (the last read again with one change: another subject, another period, or tax the other way — today's `followup.py` and `tax_followup.py`), `refine_last` (narrow the list just shown: "just the drafts") |
 
+### 4.2.1 As built (step 4, 2026-10-07)
+
+Decisions the code forced, in `platform/agents/planner/schema.py`:
+
+- **Each op is today's intent name** where one exists (`update_contact`,
+  `list_tasks` …; `INTENT_OF_OP` maps the rest — `set_status` → `update_estimate`,
+  `metric` → `analytics_metric`, notes and conversation turns to their feature).
+  The shadow comparison (§8) reads it, and a test fails if a supported intent
+  has no op.
+- **Task edits are one `update_task`** with typed fields (due date, clear due,
+  status, assignee, unassign, property, clear property, notes append/replace,
+  archived) — how the Task agent already works — not six ops.
+- **Inventory corrections:** tasks have no priority; templates are only listed,
+  read and deleted; a role's Rate is derived, so `labour_rate` is a refusal
+  reason and `LabourFields` has `wage` only; contact roles and labour units are
+  enums, task statuses and divisions are the company's names.
+- **`edit_estimate` does not carry `EditCommand` unchanged.** Today's
+  `WorkItemRef` has `job_item_id`, which would let the model pass an id. The
+  planner's edit commands subclass today's — every bound and validator kept —
+  with a symbolic `WorkItemPick` (position, name, focus, listed) and, for a
+  line edit, a `line` that may be a listed row. `to_edit_command` turns one
+  back into today's `EditCommand` once the resolver has the work item.
+- **The tool is sent prebuilt** (`plan_tool()`): langchain's conversion inlines
+  every `$ref` and made the schema ~34k tokens. Kept as `$defs`, titles
+  stripped, it is ~13k tokens — cached at a tenth after the first call. A test
+  caps it (56,000 characters) so it grows only on purpose.
+
+Step 5 (`snapshot.py`) needed the state to carry time as well as turns (D19):
+anchors now stamp `active_<domain>_set_at` (`focus.stamp_anchor`), lists
+`recorded_at`, and every turn `last_turn_at` (`finalize_orchestrate_result`) —
+bookkeeping, not message reading, so D14 doesn't hold it back. The viewed
+estimate signal carries an id, never a code; the snapshot names it through the
+estimate anchor the signal sets.
+
+**Step 6a, measured 2026-10-07** (gpt-6-luna, three live calls):
+
+| Call | Latency | Input | Cache | Plan |
+|---|---|---|---|---|
+| "update the phone number for Bob Jones to 555-123-4567" | 2.8 s | 25,815 | wrote 25,466 | valid, as §4.1 |
+| "add a contact Mark Liu, 555-0142, and link him to 14 Birch Rd" | 5.2 s | 25,820 | read 25,466 | valid: create + link via `step` |
+| "change her email to ana@reyes.ca" (Ana in focus) | 2.8 s | 25,809 | read 25,466 | valid: `focus`, domain contact |
+
+- **Caching works as designed:** everything up to the breakpoint (prompt + tool
+  schema) is written once and read after; only ~350 tokens per turn are
+  uncached. langchain-openai 1.6.6 carries `prompt_cache_options` and the
+  content-block breakpoint natively — no raw-client fallback (#820 is moot).
+- **The cached prefix is ~25,500 tokens, not ~15,000:** OpenAI counts the tool
+  schema at about twice the characters-÷-4 estimate. Per turn on Luna: ~$0.0003
+  (cached read + ~350 fresh + ~70 out); the first write ~$0.0032.
+- **Latency is 2.8–5.2 s with the prefix cached** — fine for shadow (it runs
+  after the reply); a question for switchover, where it is the user's wait. The
+  parity run (step 11) records it per call; trimming the schema is the lever.
+
 ### 4.3 References are symbolic, never ids
 
 Every target is a `RecordRef`:
@@ -536,6 +589,38 @@ In shadow nothing runs; at switchover the same code gates the executor.
 confirm, the whole plan asks once, with a summary. Otherwise run in order and
 stop at the first failure, saying what was done. (Shadow logs the decision.)
 
+### 6.1 As built (step 7, 2026-10-07)
+
+`agents/planner/resolve.py` and `agents/planner/policy.py`, read-only.
+
+- **Names** go through the existing company-scoped finders:
+  `record_names.find_records_named` (contacts, properties, materials, roles,
+  tasks — exact, then word-start), `find_estimate_by_code` /
+  `find_named_estimates` for estimates, readable-code lookups for `T0042` /
+  `E0042`, and an exact-then-word-start name match for templates.
+- **Focus, page and listed rows** load by `{"_id", "company"}` — an anchor or
+  a row pointing at another company's record resolves to *none*. Work items
+  resolve on the resolved estimate by position, name, focus (only an anchor on
+  that estimate) or a listed work-item row scoped to it. A listed line gives
+  the line's name, which today's `EditCommand` takes as its query. It counts
+  only a list of that work item's lines (`material_line` / `activity_line`,
+  scoped to its `JobItem.id`). Today's line lists record no rows, so a listed
+  line asks rather than reading an older list (review 2026-10-07 #1; ⚠️ gap in
+  the phrasing reference).
+- **Stale** (§5.2, D19): a focus not fresh by turn (`focus.anchor_is_fresh`,
+  the viewed page counts as fresh) or set more than 24 hours ago; a list shown,
+  or a work item put in focus, before the previous turn or more than 24 hours
+  ago.
+- **The policy reuses today's rules, never copies them:** `may_delete_estimate`,
+  `services/notes.may_delete_note` (a note's author or an Owner; Maple's note
+  delete and the HTTP route read the same rule), the Owner/Admin rule for catalog deletes, `EDITABLE_ESTIMATE_STATUSES` with
+  `CONTENT_OPS` (notes exempt), `estimate_bills_overage` with
+  `check_quota_exceeded`, `settings.tasks_enabled` with `is_task_limit_reached`.
+  An answer is *would ask* when no question is open or it was asked more than
+  an hour ago (D19).
+- **A plan's decision is its strictest action's** — refuse, ask, confirm, run —
+  so a plan with one doubtful action asks once, before anything runs.
+
 ## 7. Shadow recording
 
 ### 7.1 Where it hooks in
@@ -606,6 +691,56 @@ credits" a lookup instead of a time-window guess.
 Indexed on `(company, user, at)` and `(conversation_id, at)`. A TTL index
 expires documents 45 days after insert — housekeeping, so the collection
 doesn't outlive its review.
+
+### 7.4 As built (step 8, 2026-10-07)
+
+- `services/maple_shadow.py`: `take_snapshot` (a deep copy of `merged_context`,
+  taken right after `apply_viewed_record_signal`; it drops the history's last
+  user entry when it is this turn's message, so the planner sees the message
+  once, in its own fence) and `record_turn` (the background task).
+- The question gate's reading goes onto the capture after `decide_turn`:
+  `decision` is `answer` / `cancel` / `new_message`, or `none` when nothing was
+  open, and `question_open` says which.
+- `_finalize_result` schedules `record_turn` right after `_track_unanswered`,
+  with the English payload and the turn's latency. The current pipeline's
+  `maple_unanswered` row carries `shadow_turn` too: the capture's id is made at
+  snapshot time and becomes the `maple_shadow_turns` document's `_id`.
+- Attribution: `services/llm/context.tenantless_llm_context(feature, turn_id)`
+  wraps the plan and the check and resets on exit, so the tasks after it keep
+  the request's attribution. The planner's calls are `maple.shadow.plan`, with
+  no company and no user.
+- Tokens per side come from the turn's `llm_usage_events` (indexed on
+  `turn_id`), split on that feature. Each side records `prompt`, `cached`,
+  `cache_write`, `completion`, `credits` and `calls`.
+- The bound is 30 s, not 20 s: the planner call keeps its own 20 s, and the
+  resolver's reads get 10 s more. It runs after the reply, so the user never
+  waits for it.
+- The planner's outcome (§9.3) is `planner_outcome`:
+  - Unsupported gives its reason. `out_of_chat` carries the capability, and
+    `other` is `not_understood`.
+  - An action that would be refused is `ActionCheck.refused_for`, which is
+    `not_permitted` or `limit`. The policy now sets it with each refusal.
+  - A reference that matches nothing is `not_found`.
+  - A failed call is `error`.
+  - A clarify plan or a "which one?" is not a miss.
+  A miss is written to `maple_unanswered` with `pipeline="planner"`.
+- `current.wrote` is a heuristic: an intent or operation that starts with a
+  write verb, and no question was saved. `current.anchors` lists the
+  `active_<domain>_id`s that moved this turn. Step 9's comparison reads the
+  delegations themselves. `comparison` stays empty until step 9.
+- Flag: `MAPLE_SHADOW_ENABLED` (config, default false; forced false in
+  `tests/conftest.py`). **For the window it also has to be set on the Render
+  dashboard.**
+- Tests: `tests/test_maple_shadow.py` (19).
+  - The snapshot, including the viewed record.
+  - The planner's outcomes.
+  - Tenant-less attribution with the turn id kept. A real `record_llm_usage`
+    under it bumps no counter and posts no meter.
+  - Both sides' tokens.
+  - The planner's miss row.
+  - A failure never raises.
+  - The reply is identical with shadow on (except the turn's clock).
+  - Shadow saves no conversation.
 
 ## 8. Comparing with the current pipeline
 

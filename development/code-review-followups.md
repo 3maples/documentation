@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **821**. Never
+- **Entries are numbered and permanent.** Next free number: **822**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2902,6 +2902,13 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 `platform/agents/estimate/crud_handlers.py:768` — `_create_estimate_from_template` inserts an empty Draft, and the callers then build, scale and price the template's work item and save it with a second write. Any failure between the two writes leaves an empty estimate behind. The template router (`routers/agent_helpers/template_estimate.py::_finalize_template_estimate`) now copes: it deletes the estimate (`_discard_unfinished`), releases the quota slot, and skips the processor's audit (`audit=False`) so the record and the reply agree. That took four review rounds of #318 to get right (2026-10-05), and Maple's own template path (`crud_handlers.py:925`) has the same insert-then-fill shape without that cleanup. LOW: the router path is correct today; the agent path's exposure is the same rare failure window.
 
 **Suggested fix:** Build and price the work item first, then insert the estimate once with its job items and total, and audit that single insert. A failure before the insert leaves nothing, which removes `_discard_unfinished`, the second write and the `audit` flag. It touches both callers, so do it as its own change with the template routing and estimate agent tests.
+
+### 821. [MEDIUM] Shadow planner calls take global LLM slots with no cap of their own — WON'T FIX for the window
+`platform/services/maple_shadow.py:246` — The planner runs under a tenant-less context, so `services/llm/concurrency.llm_slot` gives it no per-company semaphore. It takes only a global slot (`OPENAI_MAX_CONCURRENCY`, 24). With shadow on for every company, each Maple turn adds a 3–20 s call that competes for the same 24 slots as users' live calls. Under a burst, users' estimate generations and Maple turns would queue behind shadow calls. That breaks the "never affects the user" guarantee (design 2026-10-02 §7.2) for latency, though not for errors. MEDIUM rather than HIGH: at today's traffic the queue is unlikely to form. (review 2026-10-07 #3)
+
+**Decision (Simon, 2026-10-07):** not an issue — shadow runs only for the limited two-week review window, then is turned off. Revisit only if shadow is kept on longer, or if the window shows LLM queueing.
+
+**Suggested fix (if revisited):** give shadow its own bound: a module-level `asyncio.Semaphore` (default 4) in `maple_shadow`, tried without waiting in `_plan_and_check`. When it's taken, skip planning and record `planner.error = "shadow_busy"` instead of queueing.
 
 ## Platform — API, models and data
 
