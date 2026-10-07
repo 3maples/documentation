@@ -810,11 +810,12 @@ planner may see the record the current pipeline just made.
     since the current side doesn't record which it took.
   - Otherwise items are matched in any order (an empty domain matches any).
     A leftover on either side, or a different record where both name one, is
-    `differ`. When one side couldn't and the other would, the first reason
+    `differ`. Records are compared by id but named in the reason, by the
+    current pipeline's anchor name and the planner's resolved label. When one side couldn't and the other would, the first reason
     says so.
   - An intent the adapter doesn't know, or a record the current pipeline
     didn't show, is `unsure`.
-- Tests: `tests/test_maple_compare.py` (31) covers agree, differ and unsure,
+- Tests: `tests/test_maple_compare.py` (32) covers agree, differ and unsure,
   compound messages, couldn't against would, the open-question reading, notes
   and links. `tests/test_maple_shadow.py` checks the stored comparison.
 
@@ -1006,6 +1007,43 @@ tokens). The header's totals show how a conversation's cost grows with its
 length — the current pipeline's credits per turn rise as its 20-entry history
 fills, the planner's stay flat (§5). `index.md` lists every conversation with
 its counts and tokens, differing conversations first.
+
+### 10.3 As built (step 10, 2026-10-07)
+
+- `scripts/export_shadow_sessions.py --since <date> [--until <date>] --out <dir>`
+  is read-only. It reads `maple_shadow_turns` in the window, groups them by
+  `conversation_id` (or by user, for a turn without one), and writes one file
+  per conversation plus `index.md`.
+- **The header:** the company, the user, the conversation prefix and the
+  dates. Below it, the counts:
+  - agree, differ and unsure;
+  - how many turns each side couldn't do;
+  - each side's tokens with the cached share;
+  - the current pipeline's credits, and the planner's credits "if billed",
+    since the planner bills no one.
+  
+  A conversation whose first recorded turn isn't turn 1 says it began before
+  the window.
+- **The turns:** a `## <date>` heading each day.
+  - An agreeing turn is collapsed: the message, then one line a side with its
+    tokens.
+  - Any other turn is shown in full:
+    - a heading with the verdict, and which side couldn't;
+    - the message, and its English when that differs — each quoted line by
+      line. A value spanning several lines in a planner action is printed on
+      one line with `⏎` marking the breaks.
+    - the state the planner saw;
+    - the current pipeline: agent, intent, latency, calls, tokens and
+      credits; how it read an open question; what it touched; any question
+      it asked; its outcome; its reply;
+    - the planner: each action with its values, its references and its
+      verdict — or its refusal, question or failure;
+    - the comparison's reasons, and the skew note;
+    - a verdict to tick and a note line.
+- `index.md` puts the most differing conversations first, then the most
+  unsure, then the earliest. It gives each conversation's counts, the current
+  pipeline's credits and the planner's tokens, plus totals for the window.
+- Tests: `tests/test_export_shadow_sessions.py` (17).
 
 ## 11. The window and the review
 
