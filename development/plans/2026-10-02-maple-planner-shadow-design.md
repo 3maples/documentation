@@ -725,7 +725,8 @@ doesn't outlive its review.
   - A clarify plan or a "which one?" is not a miss.
   A miss is written to `maple_unanswered` with `pipeline="planner"`.
 - `current.wrote` is a heuristic: an intent or operation that starts with a
-  write verb, and no question was saved. `current.anchors` lists the
+  write verb, no question was saved, and the turn wasn't cancelled. A declined
+  delete comes back as `delete_<x>` with `cancelled`, and wrote nothing. `current.anchors` lists the
   `active_<domain>_id`s that moved this turn. Step 9's comparison reads the
   delegations themselves. `comparison` stays empty until step 9.
 - Flag: `MAPLE_SHADOW_ENABLED` (config, default false; forced false in
@@ -764,6 +765,58 @@ planner as a new request" is a `differ` of its own.
 Known skew: the planner's resolver reads the database *after* the current
 pipeline wrote. When `current.wrote` is true the log says so, because the
 planner may see the record the current pipeline just made.
+
+### 8.1 As built (step 9, 2026-10-07)
+
+- `services/maple_compare.compare(current, planner)` is a pure function of the
+  two stored records. `record_turn` stores its result as `comparison`:
+  `verdict`, `why`, both sides' items as `[domain, kind, detail]`, and `skew`
+  (the current pipeline wrote). Because it reads only what's stored, a
+  window's turns can be compared again after the comparison changes. It never
+  raises; a failure is `unsure`.
+- **The current side.** An outcome (§9.2) is `couldnt` with its reason. A
+  saved question is `ask`, a cancel is `chat`. Otherwise each op becomes one
+  item: the turn's own op, or each delegation of a multi-intent turn.
+  - The kind comes from the operation, else the intent, by name prefix.
+  - The domain comes from the agent, else the intent.
+  - The record acted on is the anchor the turn moved, else the one still in
+    focus after it. So an edit to the contact already in focus still names
+    its contact. Each turn now stores `anchors_after` and `cancelled` for this.
+- **The planner side.** A failed call — or a plan whose check failed
+  (`check_error`), which is stored with its plan — is `couldnt` with `error`,
+  and is also the planner's `error` outcome in `maple_unanswered`; unsupported
+  is `couldnt` with its reason; clarify is `ask`. Otherwise, per action:
+  - A reference that matched nothing is `couldnt not_found`, and a refused
+    action is `couldnt` with its `refused_for`.
+  - *would ask* and *would confirm* are both `ask` — a delete asks first on
+    both sides.
+  - A plan that asks or refuses runs nothing else, so its other actions don't
+    count.
+  - A note takes its parent's domain, as today's note replies do; a link and
+    a note delete match any domain, as today's link answers as a property
+    update.
+  - Stored references are now structured: `describe`, `status`, `domain`,
+    `label`, `record_id`, `stale`.
+- **The verdict.**
+  - With a question open, a different reading of the message (answer, cancel,
+    new message) is `differ` — unless the planner failed, which read nothing,
+    or both declined. The gate cancels on "never mind" before it reads the
+    question's kind, while the planner answers a yes/no with `yes=false`, so
+    a cancel and a no (or an answer that ended cancelled and a planner
+    `cancel`) count as one decline and `agree`.
+    When both take it as the answer, a yes/no is compared with what the
+    current pipeline did: a no against a write, or a yes against a cancel, is
+    `differ`. A pick or a value is `agree`, saying the choice isn't compared,
+    since the current side doesn't record which it took.
+  - Otherwise items are matched in any order (an empty domain matches any).
+    A leftover on either side, or a different record where both name one, is
+    `differ`. When one side couldn't and the other would, the first reason
+    says so.
+  - An intent the adapter doesn't know, or a record the current pipeline
+    didn't show, is `unsure`.
+- Tests: `tests/test_maple_compare.py` (31) covers agree, differ and unsure,
+  compound messages, couldn't against would, the open-question reading, notes
+  and links. `tests/test_maple_shadow.py` checks the stored comparison.
 
 ## 9. Tracking what Maple couldn't do
 
