@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **819**. Never
+- **Entries are numbered and permanent.** Next free number: **821**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -118,7 +118,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 2,561 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
 | 2,498 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | +123 on 2026-09-27 |
 | 2,282 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam |
-| 1,987 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. was `orchestrate_agent_endpoint` at 607 lines; +221 on 2026-09-27 (open question, conversation store, page signals); the endpoint body is now `_orchestrate_turn` (#689), 729 lines (functions table) |
+| 2,227 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. was `orchestrate_agent_endpoint` at 607 lines; +221 on 2026-09-27 (open question, conversation store, page signals); the endpoint body is now `_orchestrate_turn` (#689), 729 lines (functions table); re-measured 2,227 on 2026-10-07 (+63 that day, from 2,164: the turn id and the unanswered tracker's hooks on the finalize closure, the early exits and the 500 path — review 2026-10-07 #4, deferred) |
 | 1,720 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24, +156 by 2026-09-27. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73); +89 on 2026-09-27 |
 | 1,644 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
 | 1,586 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | +42 on 2026-09-27 |
@@ -188,6 +188,11 @@ fixtures — but these are past the point of scanning.
 | 823 | platform/tests/test_estimate_gathering.py |
 | 822 | platform/tests/conftest.py |
 | 818 | platform/tests/test_agents_api.py |
+| 808 | platform/tests/test_llm_usage_tracking.py |
+
+`test_llm_usage_tracking.py` (added 2026-10-07, review #4, deferred) crossed 800 with the
+prompt-caching and credits tests; its seam is `TestCachedTokenPricing` + `TestCredits` →
+`tests/test_llm_credits.py`.
 
 `test_maple_task_operations.py` has the only pre-planned split:
 `test_maple_task_notes.py` / `_ops.py` / `_text_helpers.py` / `_perf.py`, on
@@ -197,7 +202,7 @@ seams that already exist as separate classes.
 
 | Lines | Function |
 |------:|----------|
-| 729 | `_orchestrate_turn` — routers/agents.py:942 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) |
+| 822 | `_orchestrate_turn` — routers/agents.py:1057 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) Re-measured 822 on 2026-10-07; +28 that day (794 → 822) for the unanswered tracker's `_track_unanswered` closure and the crash-record hand-off. |
 | 381 | `update_estimate` — routers/estimates.py:959 (grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation, +5 on 2026-10-01 for the tenant checks; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
 | 124 | `create_estimate` — routers/estimates.py:299 (first measured 2026-10-01: 118 before, +6 for the property and line checks before the slot claim. Extract `_assert_create_refs(company_obj_id, payload)` — tenant batch 1 review #2) |
 | 99 | `duplicate_estimate` — routers/estimates.py:790 (first measured 2026-10-01: 93 before, +6 to drop another company's property from the copy; extract the clone into `_clone_estimate(source, user_email)`) |
@@ -634,6 +639,11 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 `platform/agents/contact/service.py:826` — `ContactAgent` (agents/contact/service.py:826), `PropertyAgent` (agents/property/service.py:910), `MaterialAgent` (agents/material/service.py:773) and `LabourAgent` (agents/labour/service.py:452) each resolve a record id by loading the company's whole collection through `_list_*_via_api` and comparing ids in Python. The id is usually the active anchor, so every "update it" / "change its phone" reaches one. Split out of #448, whose template half was fixed 2026-10-04 (`TemplateAgent._template_by_id`); resolving #448 had left this half untracked. LOW: correct, and the loop is company-scoped. (review 2026-10-04, slow-queries batch #1)
 
 **Suggested fix:** Replace each loop with `Model.find_one({"_id": oid, "company": company_oid})` behind a small `_<kind>_by_id` helper, as `TemplateAgent._template_by_id` does; the agent tests that stub `_list_*_via_api` for id resolution move to stubbing the helper.
+
+### 819. [LOW] `export_unanswered.py` loads the whole period into memory
+`platform/scripts/export_unanswered.py:112` — `collect()` reads every `MapleUnanswered` row between `--since` and `--until` with `.to_list()`. With the 180-day TTL and an early `--since`, that is every unanswered turn for six months held in memory at once. LOW: a manual review script; two weeks of traffic is small. (review 2026-10-07 #9)
+
+**Suggested fix:** Accept it for now; if the collection grows, render per reason with an aggregation (`$group` by reason/detail for the counts) and iterate the rows with an async cursor instead of `.to_list()`.
 
 ## Silently swallowed errors
 
@@ -5953,3 +5963,7 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 
 **Suggested fix:** Remove the final empty line so the file ends with a single newline after `return [by_id[i] for i in ids if i in by_id]`.
 
+### 820. [LOW] The planner design's §5.1 still treats langchain's cache support as unknown
+`documentation/development/plans/2026-10-02-maple-planner-shadow-design.md:445` — "Getting it onto the wire" says it is not known whether langchain-openai 1.6.6 keeps a content-block breakpoint, and plans a raw `AsyncOpenAI` fallback (step 6a). Step 0 established it does: `ChatOpenAI` has a `prompt_cache_options` field and `_format_message_content` keeps `prompt_cache_breakpoint`, pinned by `platform/tests/test_llm_prompt_cache.py`. The plan describes a fallback that will never be needed. (review 2026-10-07 #8)
+
+**Suggested fix:** Replace the two "Getting it onto the wire" bullets with: "langchain-openai 1.6.6 supports both natively (`ChatOpenAI.prompt_cache_options`; `prompt_cache_breakpoint` on a text block), pinned by `tests/test_llm_prompt_cache.py`", and reduce step 6a to the live `cached_tokens > 0` check.

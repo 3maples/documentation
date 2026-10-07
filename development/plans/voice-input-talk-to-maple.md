@@ -27,6 +27,8 @@ Dual-gated rollout, off by default on both sides:
 ## Architecture
 
 **Hybrid STT:**
+> **2026-10-07:** the model is now `gpt-transcribe` (OpenAI's recommended model for recorded speech, with language detection; $0.0045/min). The rest of this plan is unchanged.
+
 - **Authoritative path:** `MediaRecorder` records audio (`audio/webm;codecs=opus` on Chrome, `audio/mp4` on Safari) → `POST /agents/transcribe` → OpenAI `gpt-4o-mini-transcribe` (best word-error rate in noise, cheap ~$0.003/min) → `{text, language, duration_seconds}`.
 - **Feedback path:** `webkitSpeechRecognition` interim results shown live while speaking — display only, never sent, all its errors swallowed (iOS-flaky by design). Fallback: `AnalyserNode` level meter.
 
