@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **822**. Never
+- **Entries are numbered and permanent.** Next free number: **823**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -221,7 +221,8 @@ seams that already exist as separate classes.
 | 64 | `get_optional_follow_up_spec` — routers/agent_helpers/optional_follow_up.py:216 (pre-existing; it is a single allowlist dict literal, so the length is data, not logic) |
 | 176 | `_handle_update_estimate_work_item_update_field` — agents/estimate/work_item_handlers.py:851 |
 | 396 | `EstimateAgent.process` — agents/estimate/service.py:821 (+13 on 2026-09-24, +14 on 2026-09-25 for the bulk-delete/equipment guard; move the CRUD short-circuit block into `_process_crud_intent(...)`, review #71) |
-| 182 | `delegate_get_estimate` — routers/agent_helpers/delegate_get_estimate.py:168 (+35 on 2026-09-24; one helper per rung plus `_render_estimate_summary`, review #62) |
+| 126 | `delegate_get_estimate` — routers/agent_helpers/delegate_get_estimate.py:252 (+35 on 2026-09-24; one helper per rung plus `_render_estimate_summary`, review #62; was 182 — its reply tail moved to `estimate_details_reply` 2026-10-08) |
+| 94 | `estimate_details_reply` — routers/agent_helpers/delegate_get_estimate.py:380 (new 2026-10-08, switchover phase 2b: the tail of `delegate_get_estimate`, moved whole as the reply the planner's executor shares; split into `_field_answer_envelope(...)` (the `if field:` branch) and `_details_text(est_payload, property_label, customers)` — review 2026-10-08 (2b) #4, deferred) |
 | 157 | `_run_edit_commands` — agents/estimate/edit_executor.py:257 (new 2026-09-24, +18 in the third review pass for the dry-run confirmation and the transient/bug error split, +7 in the fourth for the pin snapshot, +12 on 2026-10-05 splitting the save failure the same way, #619; extract `_persist_batch`, `_success_envelope` and the exception branches, review #57) |
 | 114 | `run_update_estimate` — routers/agent_helpers/estimate_update.py:163 (+44 on 2026-09-24; extract `_dispatch_to_planner` and `_build_dispatch_context`, review #63) |
 | 123 | `_dispatch_confirmed_intent` — routers/agent_helpers/fuzzy_confirmation.py:65 (+25 on 2026-09-24, +30 on 2026-09-25 for the delete permission check and audit — move that branch into `_confirm_delete(...)`; a `sub_op` → handler dict, review #64) |
@@ -229,7 +230,8 @@ seams that already exist as separate classes.
 | 91 | `_resolve_estimate_code_or_title` — agents/estimate/crud_handlers.py:1948 (+21 on 2026-09-24; move the forced-code, open-work-item and offer steps into helpers, review #69) |
 | 87 | `finalize_orchestrate_result` — routers/agent_helpers/finalize_result.py:173 |
 | 68 | `_handle_analytics_query` — agents/estimate/crud_handlers.py:1843 (first measured 2026-10-06; +2 that day for tax, the breakdown's note kept in `_analytics_breakdown`). **Next step:** a table of matched card → handler in place of the if/elif chain |
-| 85 | `_handle_query_work_item_field` — agents/estimate/work_item_field_handlers.py:889 (+24 on 2026-09-24; extract `_describe_work_item_field`, review #65) |
+| 54 | `work_item_field_reply` — agents/estimate/work_item_field_handlers.py:633 (was `_handle_query_work_item_field`, 85 lines, +24 on 2026-09-24; its tail moved here 2026-10-08 as the reply the planner's executor shares, the handler now ~40. Extract `_describe_work_item_field` — the per-field `if/elif` returning `resp` — review #65; review 2026-10-08 (2b) #5, deferred) |
+| 62 | `answer` — agents/estimate/focus_questions.py:136 (47 → 62 on 2026-10-08, switchover phase 2b: title, description and division answers for the planner. Move those three into `_answer_text_field(field, estimate, label, items)`, called before the work-item branches; no reply change — review 2026-10-08 (2b) #6, deferred) |
 | 80 | `_classify_via_action_domain` — agents/orchestrator/service.py:2682 (+16 on 2026-09-24; extract `_apply_note_add_target`, review #66) |
 | 66 | `build_edit_snapshot` — agents/estimate/edit_planner.py:66 (new 2026-09-24; extract `_snapshot_work_item`, `_active_entry`, `_chat_slice`, review #58) |
 | 62 | `find_estimate_from_context_or_message` — routers/agent_helpers/estimate_resolver.py:144 (+12 on 2026-09-24; extract `_from_named_or_listed`, review #70) |
@@ -2914,6 +2916,11 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 **Decision (Simon, 2026-10-07):** not an issue — shadow runs only for the limited two-week review window, then is turned off. Revisit only if shadow is kept on longer, or if the window shows LLM queueing.
 
 **Suggested fix (if revisited):** give shadow its own bound: a module-level `asyncio.Semaphore` (default 4) in `maple_shadow`, tried without waiting in `_plan_and_check`. When it's taken, skip planning and record `planner.error = "shadow_busy"` instead of queueing.
+
+### 822. [LOW] The planner's estimate list core reaches the Estimate agent's private helpers through a duck-typed argument
+`platform/agents/estimate/list_core.py:137` — `list_estimates_reply(..., helpers: Any)` calls `helpers._estimate_summary_payload` and `helpers._format_estimate_list_entry`. Neither uses agent state (they read the estimate and call `object_link`), so passing the agent in only to reach two private methods is the coupling switchover phase 2a's review removed from the executor. LOW: same package, works, but the signature hides what it needs. (review 2026-10-08 (2b) #7)
+
+**Suggested fix:** Make them module functions in `agents/estimate/crud_helpers.py` (`estimate_summary(estimate)`, `estimate_list_entry(summary)`), keep the mixin methods as one-line wrappers for today's callers, and drop the `helpers` parameter and the executor's `_estimate_agent` lookup for the list.
 
 ## Platform — API, models and data
 

@@ -279,6 +279,63 @@ language reading is its own change, four weeks after the last switch.
   against today's parser), `test_planner_turn.py` (the copy on fallback). A live check over eight
   reads against Simon's Dev company gave today's replies.
 
+### 7.3 As built: phase 2b — reading estimates (2026-10-08)
+
+- **One estimate** (`get_estimate`): `delegate_get_estimate.estimate_details_reply`
+  holds today's full reply and field answers; the router calls it after
+  resolving from the text, the executor with the resolved estimate (loaded
+  within the company). Fields map onto `focus_questions.answer`
+  (`gross_margin` → margin; `work_items` → the full details, which record the
+  work-item rows). Title, description and divisions are new answers there —
+  today's reader never asks for them, so today is unchanged. `notes` falls
+  back (`field:get_estimate.notes`) until `list_notes` (2c).
+- **Work items** (`list_work_items`, `get_work_item`, `work_item_field`,
+  `list_work_item_lines`): today's handlers split into
+  `work_items_reply`, `work_item_details_reply`, `work_item_field_reply` and
+  `work_item_lines_reply`, each called after today's text matching. The
+  executor finds the work item by the resolver's `JobItem.id` — never a
+  position — and a work item the estimate no longer has is a `LookupError`
+  (fallback). Each puts the work item in focus. `lines: "all"` is both lists.
+- **The estimate list is the planner's own core** (user decision 2026-10-08):
+  today's `_handle_list_estimates` reads every filter from the text in one
+  611-line handler and is left alone. `agents/estimate/list_core.py`
+  (`EstimateListAsk`; `list_estimates_reply`, `count_estimates_reply`,
+  `total_estimates_reply`) reads through the metric engine's filter
+  (`maple_metrics.estimate_match`), so a list, its count and its total read
+  the same estimates as every figure and the dashboard, and words its replies
+  as today's do (each names everything it was narrowed by). Where today is
+  wrong, the planner is right:
+  - a property, customer, material or role said in any words narrows a count
+    ("how many estimates have I done at Bob Residential?" was 56, the
+    company's);
+  - no status said is every real estimate (`DEFAULT_STATUSES`) — today counts
+    archived, generating and deleted ones too (Sim Co: 55 against today's 56);
+  - a period dates estimates as the engine does (`date_field_for`: sold ones
+    by `sold_at`), where today's list always reads `created_at`;
+  - sorts today lacks: oldest, lowest total; a title filter.
+  - the reply names exactly the statuses it counted: "open draft and lost
+    estimates (Draft)", "open sold estimates (Won)"; "open" over statuses none
+    of which is open counts no estimate — a filter, never the Deleted status a
+    delete leaves for a moment (user, review 2026-10-08 (2b) #1–#2); a customer
+    and a property are both named ("for Ana Reyes at 'Elm House'", #3).
+- **A customer named by a property's name** ("at Bob Residential", planned as
+  a customer): when no contact matches but one property does, the policy
+  resolves it as the property (`policy._resolve_all`), and the list counts
+  that property's estimates.
+- **Live check on Sim Co** (read-only): "show me my 3 oldest estimates", "how
+  many estimates do I have?" and "list my won estimates" ran on the planner.
+  "how many estimates have I done at Bob Residential?" and "what's the total
+  value of my draft estimates?" were planned as `metric` and fell back — 2c.
+  Seen in one run: "list my won estimates" planned `statuses: ["Won"]`
+  rather than `sold` (#784: a bare "won" is the sold set) — the prompt already
+  says so; a parity-run item, not an executor rule.
+- **Tests:** `test_planner_execute_estimates.py` (27: details and fields
+  against today's own replies, work items against today's handlers),
+  `test_planner_execute_estimate_list.py` (22), a policy test for the
+  customer-as-property reading. A stale assertion in
+  `test_agent_helpers_delegate_get_estimate.py` (it predates `recorded_at`,
+  27ecc77) was fixed in passing.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
