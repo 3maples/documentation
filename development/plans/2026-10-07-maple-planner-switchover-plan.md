@@ -336,6 +336,69 @@ language reading is its own change, four weeks after the last switch.
   `test_agent_helpers_delegate_get_estimate.py` (it predates `recorded_at`,
   27ecc77) was fixed in passing.
 
+### 7.4 As built: phase 2c — figures and notes (2026-10-08)
+
+- **`metric`**: `metric_answers.answer_metric_ask(agent, ask, …)` is today's
+  answer from the ask on (subject resolved within the company, fetch, word);
+  `answer_metric` reads the text and calls it. `agents/planner/metric_ask.py`
+  maps the plan to today's `MetricAsk` through `metric_spec.ask_from_spec`
+  (the plan's status, period and shape choices are the spec's), so both LLM
+  tiers keep one set of rules, and adds what the spec can't say: a status
+  list, `work`, `recurring`, `by_status` rows, `line_total`. A division said
+  as `work` with no customer or property is the subject, as today. Pinned by
+  ask equality: each plan maps to the very ask today's grammar reads from the
+  words (18 phrasings). A plan no ask describes falls back
+  (`filter:metric.shape`).
+- **`dashboard`**: `EstimateAgent.dashboard_reply(card, …)` over today's card
+  functions; the breakdown became `dashboard_breakdown(by, period, …)`, which
+  today's text router calls. A card's period is the **calendar** one
+  ("pipeline this month" is the month, as every figure reads it — today's text
+  reader rolls back 30 days). A breakdown over a week, any card over "the
+  last N days" (a card has no day count), and "all time" on pipeline or
+  completed have no answer today and fall back at the gate
+  (`filter:dashboard.period`; review 2026-10-08 (2c) #2).
+- **`catalog_figure`**: `catalog_figures.catalog_figure_reply(CatalogAsk, …)`,
+  which today's pre-handler calls after reading the words.
+- **`task_count`**: today's `list_tasks_reply` with the group set, open tasks
+  unless a status, a due window or "archived" is said (decision 22). "All
+  tasks by person" can't be told from the plan yet; it counts open ones.
+- **`list_notes`**: `record_notes.note_parent(domain, doc)` and
+  `notes_reply(parent, …)`, shared with today's reader, for a contact,
+  property or estimate. A work item's or a task's notes fall back
+  (`ref:parent.<domain>`): tasks have none, and a work item's have no chat
+  reader yet.
+- **A record's linked records** ("how many properties does John Smith
+  have?" — today: "You have 6 properties", every property): the 2a fields
+  left over are covered. A contact's `properties` and a property list
+  `related` to a contact are `PropertyAgent.properties_of_contact_reply` (one
+  query on the contact's id, new index `company_contacts`; "John Smith has 3
+  properties:"; a name filter beside it still narrows, review (2c) #5). A
+  property's `contacts` / `owner` are `ContactAgent.contacts_of_property_reply`,
+  in the property's own order (#4). Its `estimates` are the 2b list
+  core, and a contact's or property's `notes` are `notes_reply`. A property list
+  related to an estimate, material or role still falls back.
+- **A `count` written inside a list's filter** is the list's count
+  (`schema._Listing`): in the live check the planner wrote
+  `filter: {owner, count}` for that question three times in five, which
+  failed validation and fell back to today's wrong answer. Anything else
+  stray in a filter is still refused. Four runs after both fixes: 3 every time.
+- **Contact or property, either way**: the 2b rule now covers a notes
+  parent too — a name planned as one kind that matches none of it but one
+  record of the other resolves as that record (`policy._EITHER_KIND`), as
+  today's note reader tries contacts, then properties.
+- **Live check on Sim Co** (read-only): "how many estimates have I done at
+  Bob Residential?" ran on the planner — "You have 7 estimates for Bob
+  Residential, worth $35,790.52, including tax." (today: "You have 56
+  estimates"). A total figure planned with `measure: count` leads with the
+  count (user 2026-10-08; `MetricAsk.measure` on a figure, which today's
+  reader never sets). Also on the planner: the total of draft estimates, top 3
+  customers, this year's win rate, the pipeline, the backlog this year, the
+  priciest material, open tasks by person, and Bob Residential's notes.
+- **Tests:** `test_planner_execute_figures.py` (81: task counts, catalog
+  figures, notes and dashboard cards against today's replies; the metric
+  ask-equality table and end-to-end figures), a policy test for the either-
+  kind parent.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering

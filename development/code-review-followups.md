@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **823**. Never
+- **Entries are numbered and permanent.** Next free number: **832**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -140,6 +140,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 860 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
 | 860 | [platform/services/maple_metrics.py](../../platform/services/maple_metrics.py) | the metrics engine, first measured 2026-10-06; +7 that day (`pre_tax_total`). **Next step:** the Phase 3 ratios (`run_win_rate`, `run_margin` and their helpers) into `maple_ratios.py` |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
+| 811 | [platform/agents/planner/execute.py](../../platform/agents/planner/execute.py) | new 2026-10-08, switchover phase 2c: the coverage gate, the run loop and every op's handler. **Next step:** keep `COVERED`, `uncovered` and `execute` here; move the estimate, work-item and estimate-list handlers into `agents/planner/execute_estimates.py` and task_count, catalog_figure, notes, dashboard and metric into `agents/planner/execute_figures.py` before phases 3–6 add more — no behaviour change (review 2026-10-08 (2c) #1, deferred; MEDIUM by the line-limit rule) |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
 lifecycle into `routers/invitations.py` (~400 lines, a clean seam, leaves
@@ -230,6 +231,7 @@ seams that already exist as separate classes.
 | 91 | `_resolve_estimate_code_or_title` — agents/estimate/crud_handlers.py:1948 (+21 on 2026-09-24; move the forced-code, open-work-item and offer steps into helpers, review #69) |
 | 87 | `finalize_orchestrate_result` — routers/agent_helpers/finalize_result.py:173 |
 | 68 | `_handle_analytics_query` — agents/estimate/crud_handlers.py:1843 (first measured 2026-10-06; +2 that day for tax, the breakdown's note kept in `_analytics_breakdown`). **Next step:** a table of matched card → handler in place of the if/elif chain |
+| 56 | `dashboard_breakdown` — agents/estimate/crud_handlers.py:2144 (new 2026-10-08, switchover phase 2c: `_analytics_breakdown`'s body moved whole as the reply the planner shares; extract `_division_lines(analytics, label)` and `_status_lines(analytics, label)` — review 2026-10-08 (2c) #3, deferred) |
 | 54 | `work_item_field_reply` — agents/estimate/work_item_field_handlers.py:633 (was `_handle_query_work_item_field`, 85 lines, +24 on 2026-09-24; its tail moved here 2026-10-08 as the reply the planner's executor shares, the handler now ~40. Extract `_describe_work_item_field` — the per-field `if/elif` returning `resp` — review #65; review 2026-10-08 (2b) #5, deferred) |
 | 62 | `answer` — agents/estimate/focus_questions.py:136 (47 → 62 on 2026-10-08, switchover phase 2b: title, description and division answers for the planner. Move those three into `_answer_text_field(field, estimate, label, items)`, called before the work-item branches; no reply change — review 2026-10-08 (2b) #6, deferred) |
 | 80 | `_classify_via_action_domain` — agents/orchestrator/service.py:2682 (+16 on 2026-09-24; extract `_apply_note_add_target`, review #66) |
@@ -5202,6 +5204,51 @@ total row count rather than blank-row count.
 `platform/tests/test_record_lists.py:1` — `test_a_long_message_never_reaches_the_bare_name_pattern` and `test_catalog_names.py::test_a_long_message_is_no_focus_question` assert `elapsed < 0.1`. What #707 and #708 fixed is an ORDER: the length check runs before the pattern. That is directly testable, but the tests check it through timing instead. The fixed path is microseconds, so they pass by a wide margin today. But the neighbouring test (`test_a_long_what_about_stays_linear`) deliberately uses 1.0 s because "a wall-clock bound must not flake on a GC pause", and these two are the only 0.1 s bounds in the conversation suites. LOW: no flake observed; it's suite hygiene. (review 2026-10-02, guards batch #1)
 
 **Suggested fix:** Assert the order rather than the clock: `monkeypatch.setattr(record_lists, "_BARE_GET_RE", _Exploding())` (and `catalog_names._FOCUS_QUESTION_RE`), where `_Exploding.match` raises, then call each rewrite with the 2,000-character message and assert None. Keep the #788 test (`test_conversation_followup.py::test_a_long_comparison_stays_linear`) on the clock (bounded search; 1.6 ms against 0.1 s) and add the same exploding stand-in for its "Bob Lee" path, which should never search at all.
+
+### 823. [MEDIUM] The catalog figure's database-down reply is untested
+`platform/agents/conversation/catalog_figures.py:298` — (Edge case — an infrastructure failure.) `catalog_figure_reply` catches a failed query and replies `_DB_DOWN` under a list intent with an empty result, so no 500 reaches the user. No test makes the query fail, so a regression that re-raises or uses the wrong intent would pass. (review 2026-10-08 (2c) branch audit #2, deferred)
+
+**Suggested fix:** Monkeypatch `catalog_figures.material_price_extreme` to raise, run `{op: "catalog_figure", kind: "priciest_material"}` through the executor, and assert `response == _DB_DOWN`, `intent == "list_materials"`, `result == {"operation": "list_materials", "read_only": True, "figure": "highest", "field": "price"}`.
+
+### 824. [MEDIUM] The metric's database-down reply is untested
+`platform/agents/estimate/metric_answers.py:334` — (Edge case — an infrastructure failure.) `answer_metric_ask` catches a failed resolve or fetch and replies `_DB_DOWN` as a question ("Would you like to try again?"). Only the string's outcome classification is tested (test_maple_outcomes.py:84), not the path. (review 2026-10-08 (2c) branch audit #3, deferred)
+
+**Suggested fix:** Monkeypatch `metric_answers.run_metric` to raise, run `{op: "metric", status: "sold"}` through the executor, and assert `response == _DB_DOWN`, `needs_clarification is True`, `clarifying_question == "Would you like to try again?"`.
+
+### 825. [MEDIUM] A status breakdown with no data is untested
+`platform/agents/estimate/crud_handlers.py:2188` — (Edge case — analytics with no entries at all, a data shape #4/#5 don't reach.) When `compute_analytics` returns no status entries, the reply is "No status data available for this period." No test reaches it. (review 2026-10-08 (2c) branch audit #6, deferred)
+
+**Suggested fix:** Monkeypatch `routers.estimates.compute_analytics` to return an object with empty `by_status` and `by_division`, run `{card: "by_status"}`, and assert the reply. Pair with #5, so each arm has its own case.
+
+### 826. [MEDIUM] A `count: false` inside a filter beside `count: true` is untested
+`platform/agents/planner/schema.py:67` — (Edge case — an unusual combination of inputs.) `_count_in_filter` keeps the action's own `count` when the filter's is false (`bool(data.get("count")) or bool(counted)`). Only `filter.count: true` is tested, so a change that lets the filter's false override the action's true would pass. (review 2026-10-08 (2c) branch audit #10, deferred)
+
+**Suggested fix:** Add a schema test: `{"op": "list_properties", "count": True, "filter": {"owner": "x", "count": False}}` validates to `count is True` and a filter without `count`.
+
+### 827. [MEDIUM] `_metric`'s no-ask guard is untested
+`platform/agents/planner/execute.py:681` — (Edge case — a defensive guard no caller reaches.) `_metric` raises `ValueError` when `metric_ask` returns None — unreachable through `execute` because the gate stops such a plan, but it is the executor's guard if `_metric` is ever reached another way. No test. (review 2026-10-08 (2c) branch audit #12, deferred)
+
+**Suggested fix:** Call `execute._metric(schema.Metric(shape="ranking"), context={}, message_en="m", get_processor=lambda _l: None)` under `pytest.raises(ValueError)`.
+
+### 828. [MEDIUM] A notes parent property with no name is untested
+`platform/agents/conversation/record_notes.py:115` — (Edge case — optional data missing.) `note_parent("property", doc)` names a property by its street when it has no name (`Property.name` is optional, default ""). The reply's label and the focus name both use it. Every test property has a name. (review 2026-10-08 (2c) branch audit #13, deferred)
+
+**Suggested fix:** In the notes test, add a property with `name=""` and a note, run `list_notes` on it, and assert the reply names its street ("Here are the notes on [3 Oak Ave]…").
+
+### 829. [MEDIUM] A notes parent estimate with no code is untested
+`platform/agents/conversation/record_notes.py:119` — (Edge case — optional data missing.) `note_parent("estimate", doc)` labels the estimate by its title when `estimate_id` is blank. No test has an estimate without a code. (review 2026-10-08 (2c) branch audit #14, deferred)
+
+**Suggested fix:** Call `note_parent("estimate", SimpleNamespace(id=PydanticObjectId(), estimate_id="", title="Birch Patio"))` and assert `"Birch Patio" in parent.label` and `parent.name == ""`.
+
+### 830. [MEDIUM] A property's contacts named by its street, or "That property", is untested
+`platform/agents/contact/service.py:2039` — (Edge case — optional data missing.) `contacts_of_property_reply` labels the property by name, else street, else "That property". Only the name arm is tested. (review 2026-10-08 (2c) branch audit #15, deferred)
+
+**Suggested fix:** Add stored properties with `name=""` (assert "3 Oak Ave has 1 contact:") and with `name=""` and `street=""` — `street` is required but an empty string passes — (assert "That property has no contacts linked to it yet.").
+
+### 831. [MEDIUM] A contact's property row named by its street, or "Unnamed Property", is untested
+`platform/agents/property/service.py:2553` — (Edge case — optional data missing.) `properties_of_contact_reply` labels each row by name, else street, else "Unnamed Property". Only named properties are tested, so a nameless property's row label is unpinned. (review 2026-10-08 (2c) branch audit #16, deferred)
+
+**Suggested fix:** Link Ana to a property with `name=""` (assert its row shows the street) and to one with `name=""` and `street=""` — `street` is required but an empty string passes validation — (assert its row shows "Unnamed Property").
 
 ## Codebase hygiene (batchable)
 
