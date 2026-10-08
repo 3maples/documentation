@@ -1,10 +1,10 @@
 # Maple planner, shadow comparison and unanswered tracking: design
 
 **Date:** 2026-10-02 · **Revised:** 2026-10-07 (Maple changes of 2026-10-02 → 10-06; decisions D6–D19; the unanswered tracker, §9; prompt caching, §5.1; parity with today's phrasings, §4.5 and Appendix A; gap review, §15)
-**Status:** Approved 2026-10-07 (D1–D19). Build starts at step 0.
+**Status:** Approved 2026-10-07 (D1–D19). Steps 0–11 built 2026-10-07. **Revised the same day (D20): the comparison runs in Dev only; switchover in Dev, then production** — the switchover plan is [`2026-10-07-maple-planner-switchover-plan.md`](2026-10-07-maple-planner-switchover-plan.md).
 **Builds on:** [`2026-09-25-maple-routing-convergence-design.md`](2026-09-25-maple-routing-convergence-design.md),
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
-**Decided with Simon:** 2026-10-02 (D1–D5) and 2026-10-06 (D6–D17) and 2026-10-07 (D18–D19), in the architecture-review session
+**Decided with Simon:** 2026-10-02 (D1–D5) and 2026-10-06 (D6–D17) and 2026-10-07 (D18–D20), in the architecture-review session
 
 ## 1. Why this exists
 
@@ -56,23 +56,24 @@ could not answer (§9).
 |---|---|---|---|
 | D1 | How to compare | **Shadow comparison only**: the current pipeline answers every turn; the planner runs beside it, dry-run, and both are logged | A/B split of users (needs traffic we don't have, and exposes users to the unproven path) |
 | D2 | What is logged | **Every session, one md file per session**, for review | Automated scoring, an LLM judge |
-| D3 | How long | **Two weeks** with shadow on, then review | Open-ended |
+| D3 | How long | ~~**Two weeks** with shadow on, then review~~ — superseded by D20: until the planner is clearly better in Dev | Open-ended |
 | D4 | How it's judged | **Manual review** of the session files by Simon; no conversation replay | Replaying the corpus conversations end to end |
 | D5 | Switchover | **Company by company**, behind a per-company setting, and only if the review finds the planner much better; otherwise the current pipeline stays and the planner keeps improving | Big-bang cutover |
 | D6 | What shadow builds | **The real planner, resolver and policy**; only the executor is missing (was P3) | A throwaway prototype |
 | D7 | Privacy | **No privacy constraints on the logs**: full emails, verbatim messages; exports go wherever Simon chooses | First names only, refusing in-repo output paths |
-| D8 | Which companies | **All companies**, including 3Maples' own and demo companies | Customers only |
+| D8 | Which companies | ~~**All companies**, including 3Maples' own and demo companies~~ — superseded by D20: Dev's companies only, narrowed by `MAPLE_SHADOW_COMPANIES` when wanted | Customers only |
 | D9 | Unanswered turns | **Recorded, with the message and the reason** (§9); each is reviewed as a valid response or a gap | Not tracked |
 | D10 | What a session is (was P1) | **One whole conversation**: from a user's first message until they press Clear (which deletes the conversation) or it expires after 30 idle days — never split by time, so the file shows everything the conversation carried. Each turn's file entry shows its tokens, cached tokens and credits (§10.2). The 30-day expiry is Mongo's TTL on `ConversationContext.updated_at`: it deletes the whole document — history, anchors, open questions — so the panel comes back empty. Kept as is: the planner's cost doesn't grow with history (§5), so nothing argues for clearing sooner, and a user back after a month is better served by a clean panel than by month-old context | Splitting after 30 minutes idle; a shorter expiry |
 | D11 | The per-company switch (was P5) | **A `Company` field, optional: missing means the current pipeline**, so no migration and no default write (§12) | An env list of company ids |
 | D12 | The unanswered tracker after the window (was P6) | **Stays on**, as a standing product signal (§9.5) | On for the window only |
 | D13 | Prompt caching | **Cache only the fixed part of the prompt** — one explicit breakpoint after the static block, nothing per-turn before it (§5.1); every LLM call's cached and cache-write tokens are recorded, so caching is visible across Maple | The default mode, which caches the whole prompt and pays the write premium on the part that never repeats |
-| D14 | Today's Maple during the window (was P2) | **Don't change how today's Maple reads messages during the two weeks**: no new phrasings, regex or rule entries — they wait, or go into the planner. Fixes that stop data loss or a wrong write are still fine, and all other work carries on (features outside Maple's language reading, portal work, the unanswered tracker, prompt-caching changes). Otherwise the first week compares the planner with one version of Maple and the second week with another | Keep changing both during the window |
+| D14 | Today's Maple during the window (was P2) | *Revised by D20: today's Maple is being replaced, so phrasing work goes to the planner from now on, window or not.* **Don't change how today's Maple reads messages during the two weeks**: no new phrasings, regex or rule entries — they wait, or go into the planner. Fixes that stop data loss or a wrong write are still fine, and all other work carries on (features outside Maple's language reading, portal work, the unanswered tracker, prompt-caching changes). Otherwise the first week compares the planner with one version of Maple and the second week with another | Keep changing both during the window |
 | D15 | Before the window (was P4) | **A check before turning shadow on**: run the planner once, locally, over sentences whose right answers are already written down, and read the misses. Widened by D18 | Turn shadow on without the check |
 | D16 | Questions Maple asks | **A clarifying question is not an unanswered turn.** Maple asking which record, what value, or yes/no is mid-request, not a failure (§9.1) | Counting every turn that didn't act |
 | D17 | Credits for cached tokens | **A cached token costs the customer less**: credits count it at the cached rate, and the Stripe meter reports the same number (§5.1) | Counting every prompt token alike |
 | D18 | The parity run (was P7) | **Every corpus that pins today's behaviour, and the phrasing reference itself** (§4.5, step 11): the 1,216-phrase routing corpus in each state, the 206 CRUD-coverage phrasings, the 256 acceptance conversations replayed with the planner live, and every ✅ reference row — about 2,700 calls, under $5. No ✅ phrasing may come back `unsupported` or `not_understood`; every difference is read. Kept as the planner's regression suite, run before every prompt, schema or model change | The 125 `expected.json` rows only |
 | D19 | Staleness by time (was P8) | **An anchor or remembered list older than 24 hours is stale** however few turns ago it was set, so a write through "it" asks first; **an open question older than 1 hour is dropped** — a question lives one turn, or one hour. The snapshot shows each age in turns and in time (§6). For today's Maple the same rule is a separate follow-up | Turns only, as today |
+| D20 | Where the comparison runs (2026-10-07) | **Dev only, then switch over in Dev, then production.** Shadow runs in Dev on Simon's own traffic; the parity suite is the measure, and every phrasing worth keeping becomes a reference row. When the planner works clearly better than today's Maple in Dev, the switchover (§12) is built and used in Dev first; production follows company by company. Phrasing refinements go into the planner only — today's Maple gets fixes for data loss, wrong writes and production bugs. Supersedes D3, D8, §11's window and step 12 | The two-week production window (D3, D8) |
 
 ## 3. The new pipeline
 
@@ -116,8 +117,9 @@ corpora.
 **Replaced at switchover, not before:** the router pre-handlers'
 language-reading (including `tax_followup`'s and `followup`'s detectors),
 `decide_turn`'s heuristics, the orchestrator ladder and classifier, each
-agent's own classify/extract calls, `command_grammar.py`, `metric_spec.py`,
-and the translation sandwich's inbound call.
+agent's own classify/extract calls, `command_grammar.py`, and `metric_spec.py`. *The translation sandwich stays, both ways (Simon,
+2026-10-07): the planner reads any language, but its stray-reply check, the
+history and the reports are English, and the replies are English templates.*
 
 ## 4. The plan
 
@@ -557,7 +559,7 @@ chain is its own.
   fortieth message of a long conversation as on the third; a session's length
   (D10) changes what the log file shows, never what the planner is sent.
   (Today's classifier sends 20 entries.)
-- **Prompt review:** `/agent-prompt-review` before the window starts.
+- **Prompt review:** `/agent-prompt-review` before the switchover (§12).
 
 ### 5.1 Prompt caching
 
@@ -862,9 +864,17 @@ doesn't outlive its review.
   `active_<domain>_id`s that moved this turn. Step 9's comparison reads the
   delegations themselves. `comparison` stays empty until step 9.
 - Flag: `MAPLE_SHADOW_ENABLED` (config, default false; forced false in
-  `tests/conftest.py`). **For the window it also has to be set on the Render
-  dashboard.**
-- Tests: `tests/test_maple_shadow.py` (19).
+  `tests/conftest.py`). Set in `platform/.env.local` for the Dev comparison
+  (D20) — never on Render.
+- **Which companies** (2026-10-07, Simon): `MAPLE_SHADOW_COMPANIES`, a
+  comma-separated list of company ids, narrows the flag to those companies —
+  for a trial on one company before the whole window. Empty is every company,
+  so D8 is unchanged. Ids, not names: names repeat and change, and the turn
+  already carries the id. An entry that isn't a 24-hex id is logged (at
+  startup, when the flag is on) and skipped; a list with no valid id records
+  no one, never everyone. `maple_shadow.records_company` is the one check,
+  in `take_snapshot`.
+- Tests: `tests/test_maple_shadow.py` (24).
   - The snapshot, including the viewed record.
   - The planner's outcomes.
   - Tenant-less attribution with the turn id kept. A real `record_llm_usage`
@@ -906,8 +916,10 @@ planner may see the record the current pipeline just made.
   (the current pipeline wrote). Because it reads only what's stored, a
   window's turns can be compared again after the comparison changes. It never
   raises; a failure is `unsure`.
-- **The current side.** An outcome (§9.2) is `couldnt` with its reason. A
-  saved question is `ask`, a cancel is `chat`. Otherwise each op becomes one
+- **The current side.** An outcome (§9.2) is `couldnt` with its reason; so
+  is an `off_topic` turn with none (recorded before the tracker classified
+  the off-topic reply, 2026-10-07), as `not_understood`. A saved question is
+  `ask`, a cancel is `chat`. Otherwise each op becomes one
   item: the turn's own op, or each delegation of a multi-intent turn.
   - The kind comes from the operation, else the intent, by name prefix.
   - The domain comes from the agent, else the intent.
@@ -945,9 +957,15 @@ planner may see the record the current pipeline just made.
     `differ`. Records are compared by id but named in the reason, by the
     current pipeline's anchor name and the planner's resolved label. When one side couldn't and the other would, the first reason
     says so.
+  - **Two couldn'ts agree**, whatever reason or record each names — neither
+    side did anything, and the reply's wording is the unanswered report's
+    concern, not the comparison's (first Dev export, 2026-10-07: "how's the
+    weather tomorrow?" was `guide_no_answer` against `not_understood`, and
+    read as a difference). The `why` keeps both reasons, and the session file
+    prints it under the collapsed turn.
   - An intent the adapter doesn't know, or a record the current pipeline
     didn't show, is `unsure`.
-- Tests: `tests/test_maple_compare.py` (32) covers agree, differ and unsure,
+- Tests: `tests/test_maple_compare.py` (39) covers agree, differ and unsure,
   compound messages, couldn't against would, the open-question reading, notes
   and links. `tests/test_maple_shadow.py` checks the stored comparison.
 
@@ -997,8 +1015,11 @@ finished response in `_finalize_result`, in this order:
    intent `needs_payment_method` / `hard_cap_reached` /
    `translation_unavailable`; `result.refused` (catalog delete); 
    `template_not_found`; `update_estimate_unsupported_modify`; `success is
-   False`; intent `unknown` with no `open_question`; an `analytics_metric`
-   result with no value.
+   False`; intent `unknown` with no `open_question`; intent `off_topic`
+   (`not_understood off_topic`, 2026-10-07 — its reply had been an inline
+   string, so neither rule saw it; it is now
+   `orchestrator.OFF_TOPIC_REFUSAL_MESSAGE`); an `analytics_metric` result
+   with no value.
 2. **The reply against the existing constants, imported by name** —
    `BULK_DELETE_REFUSAL_MESSAGE`, `EQUIPMENT_REFUSAL_MESSAGE`,
    `BURDEN_REFUSAL`, `MATERIAL_COST_REFUSAL`, `ESTIMATE_LIMIT_REFUSAL_MESSAGE`,
@@ -1156,9 +1177,15 @@ its counts and tokens, differing conversations first.
   
   A conversation whose first recorded turn isn't turn 1 says it began before
   the window.
+- **Dates are the user's days** (2026-10-07): each turn stores the
+  browser's zone (`MapleShadowTurn.timezone`, from `client_context`), and
+  the file name, the header's dates and each `## <date>` heading use it —
+  else the zone the state's `Today:` line names, else UTC. `--since` and
+  `--until` stay UTC days. Without this, an evening turn on the US west
+  coast was filed under tomorrow.
 - **The turns:** a `## <date>` heading each day.
   - An agreeing turn is collapsed: the message, then one line a side with its
-    tokens.
+    tokens, and any note the comparison left (two couldn'ts' reasons).
   - Any other turn is shown in full:
     - a heading with the verdict, and which side couldn't;
     - the message, and its English when that differs — each quoted line by
@@ -1175,9 +1202,37 @@ its counts and tokens, differing conversations first.
 - `index.md` puts the most differing conversations first, then the most
   unsure, then the earliest. It gives each conversation's counts, the current
   pipeline's credits and the planner's tokens, plus totals for the window.
-- Tests: `tests/test_export_shadow_sessions.py` (17).
+- Tests: `tests/test_export_shadow_sessions.py` (22), including the script
+  imported cold — it imports `routers` first, past the agents ↔ routers
+  cycle the suite never sees.
 
 ## 11. The window and the review
+
+**Revised 2026-10-07 (D20): the comparison runs in Dev, not production.** The
+two-week production window below the line was the original plan and is kept
+for the record; nothing of it runs.
+
+- **Where:** Dev only — `MAPLE_SHADOW_ENABLED=true` in `platform/.env.local`,
+  narrowed with `MAPLE_SHADOW_COMPANIES` when wanted. The flag is never set on
+  Render. Production runs today's Maple, unchanged, until the switchover.
+- **The traffic is Simon's own.** The comparison only shows what someone
+  tried, so the measure is the parity suite (step 11): every phrasing tried by
+  hand that matters becomes a phrasing-reference row (or a corpus row), and
+  from then on every run checks it.
+- **The loop:** use Maple in Dev → export (`scripts/export_shadow_sessions.py`)
+  → read the differences and the unanswered turns → fix the planner (prompt,
+  schema, policy, resolver) → parity run → again. Gaps go to the planner only
+  (D14 as revised by D20); today's Maple gets fixes for data loss, a wrong
+  write, or a bug customers hit in production.
+- **Blockers regardless:** any planner turn that *would run* a write on the
+  wrong record, a delete without asking, or an overage create without asking.
+- **Decision (Simon):** when the planner works clearly better than today's
+  Maple in Dev, build the switchover (§12, its own plan) and switch in Dev
+  first. Production follows only after that, company by company.
+
+---
+
+*Original plan (superseded by D20):*
 
 - **Before:** D15's pre-flight; deploy with `MAPLE_SHADOW_ENABLED=true`
   (promotion by Simon with `/release platform`). After day one, check
@@ -1199,6 +1254,8 @@ its counts and tokens, differing conversations first.
 
 ## 12. Switchover (only if the review says so)
 
+**Planned in [`2026-10-07-maple-planner-switchover-plan.md`](2026-10-07-maple-planner-switchover-plan.md)** (D20: Dev first, then production). The outline below is what that plan builds on.
+
 1. **Executor** (`agents/planner/execute.py`): each action calls today's
    handler for it — the domain agents' handler tables, `edit_executor` for
    `edit_estimate`, `delegate_create_estimate` (with its overage question) for
@@ -1215,8 +1272,9 @@ its counts and tokens, differing conversations first.
    `finalize_orchestrate_result`. A conversation's open question is answered by
    the pipeline that asked it — the switch takes effect at a turn with no open
    question.
-3. **Rollout:** 3Maples' own company → two or three customers → everyone. Shadow
-   can stay on for the companies not yet switched.
+3. **Rollout (D20):** Simon's company in Dev → every Dev company → release →
+   3Maples' own company in production → two or three customers → everyone.
+   Shadow stays on in Dev for the companies not yet switched.
 4. **Rollback:** setting the field back to `current` takes effect next turn.
 5. **Retirement:** four weeks after the last company switches, with no rollback
    used, the current pipeline's language-reading code is deleted: the router
@@ -1248,8 +1306,8 @@ planner and can ship first — it is useful on its own.
 | 10 | `scripts/export_shadow_sessions.py` | one file per conversation, never split by time; day headings; a conversation begun before the window; tokens and credits per turn and in total; file format |
 | 11 | **Parity run** (D18): the planner, live, over every corpus that pins today's behaviour, scored against the answer each already records: (a) the 1,216-phrase routing corpus in each of its states, against `snapshot_routing.json` (domain and kind); (b) the 206 CRUD-coverage phrasings, against their expected intent; (c) the 256 acceptance conversations, run through the endpoint with shadow on and the planner live, against the seeded test world — 539 turns in every conversation state, through the exact §8 comparison, a dry run of the window itself; (d) **every ✅ row of the phrasing reference**, read by `scripts/phrasing_reference_rows.py` (§4.5 point 3), against the row's intent and agent, with unreadable rows listed as not checked. About 2,700 worker-model calls; under $5 | **The bar:** no ✅ phrasing (reference) or `expected` row (corpus) comes back from the planner as `unsupported` or `not_understood`, and every `differ` is read and either fixed or explained in the report. Blockers (§11) apply here too. The run is kept as the planner's live-tier regression suite (`llm_e2e`, like `test_maple_routing_live.py`), run before every prompt, schema or model change from here on — not only at retirement |
 | 11a | Existing calls onto the cache helper (§5.1), largest fixed prompts first, by the per-feature numbers from step 0 | each moved call's request is explicit-mode; its feature's cached share rises in `llm_usage_events` |
-| 12 | Deploy, two-week window, review (§11) | — |
-| 13+ | Switchover (§12), only after Simon's decision | its own plan |
+| 12 | ~~Deploy, two-week window, review~~ — D20: the Dev loop (§11), until the planner is clearly better | the parity suite, run after every planner change |
+| 13+ | Switchover (§12), only after Simon's decision — Dev first, then production | [`2026-10-07-maple-planner-switchover-plan.md`](2026-10-07-maple-planner-switchover-plan.md) |
 
 ## 14. Risks
 
@@ -1258,7 +1316,8 @@ planner and can ship first — it is useful on its own.
 | Shadow spend is higher than expected | One worker call per turn, its static part cached; spend visible on day one under `maple.shadow.plan`; the flag turns it off |
 | Caching silently doesn't happen (a field dropped on the wire, a per-turn value in the static block, a prompt under 1,024 tokens) | Step 6a's live check; the static-block tests; day one's cached share in `llm_usage_events` |
 | Shadow slows the server | Runs after the response; 20 s timeout; Maple's LLM concurrency limiter still applies |
-| Two weeks gives too few interesting turns | The index puts differing sessions first; if traffic is thin, extend the window rather than judge on a handful |
+| Dev traffic is only what Simon tries (D20) | The parity suite is the measure; each phrasing worth keeping becomes a reference row, so later runs check it |
+| Production's phrasings were never shadowed before the switch (D20) | The parity suite pins every phrasing today's Maple handles; production rolls out with 3Maples' own company first; rollback is one field. Optionally, shadow 3Maples' own production company (`MAPLE_SHADOW_COMPANIES`) for a few days before switching it |
 | The comparison flags too much as `unsure` | Reviewer reads `unsure` like `differ`; tighten the adapter after the first export, not during the window |
 | The unanswered classifier misses a reason (a reply worded outside the constants) | It under-reports, never invents; the constants test fails on a rename; the shadow comparison still surfaces the turn when the planner would have acted |
 | The current pipeline keeps changing (as it did 10-02 → 10-06) | D14's freeze; the doc's §3 and §4.2 are re-checked against the code before step 4 starts |
@@ -1299,7 +1358,7 @@ retirement change (§12.5).
 - Don't write session files or reports on the server.
 - Don't add outcome markers across the current pipeline's handlers — classify
   in `maple_outcomes.py`; the planner carries them natively.
-- Don't fix the current pipeline's phrasing during the window (D14).
+- Don't add phrasings to the current pipeline (D14, revised by D20) — they go to the planner.
 - Don't switch a company over without Simon's decision from the review.
 
 ## Appendix A. Parity map — today's catalog → the plan
