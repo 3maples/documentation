@@ -277,6 +277,7 @@ seams that already exist as separate classes.
 | — | two handlers in `agents/estimate/assumption_handlers.py:257,415` |
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
 | 125 | `_finalize_template_estimate` — routers/agent_helpers/template_estimate.py:102 (first measured 2026-10-05, +16 that day logging the failure, splitting the outage/bug reply and removing an estimate inserted before the failure, #318; extract the create/scale/save block into `_instantiate(processor, company_oid, template, factor, context_payload)`, leaving the gate, audit and envelope here — review 2026-10-05 #4) |
+| 51 | `_compare` — services/maple_compare.py:240 (first measured 2026-10-07, review of the planner parity run #1, deferred: the decline check, the both-answered branch and the item matching in one body. Extract the matching loop — from `unsure: List[str] = []` to the leftover-items loop — into `_match(current, current_items, planner_items) -> Tuple[List[str], List[str]]` returning `(why, unsure)`; `_compare` keeps the readings and the verdict. No behaviour change; tests/test_maple_compare.py must pass unchanged.) |
 
 #### Watch
 

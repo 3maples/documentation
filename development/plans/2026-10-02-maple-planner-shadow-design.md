@@ -351,6 +351,138 @@ by construction: the verbless and possessive forms the rules handle with
 address and person-name heuristics (§2.8, §3.7, §4.7, §5.7), and anything
 in another language.
 
+### 4.5.1 As built: the parity run (step 11, 2026-10-07)
+
+**The harness.**
+- `tests/test_planner_parity_live.py` is opt-in: `-m llm_e2e` with
+  `OPENAI_API_KEY`. Its knobs are `PARITY_SOURCES`, `PARITY_LIMIT` and
+  `PARITY_CONCURRENCY`.
+- Helpers live in `tests/planner_parity/`: cases, scoring, the runner, the
+  report, and the explained rows.
+- `scripts/phrasing_reference_rows.py` reads the reference.
+- Reports go to `tests/reports/planner_parity.md` and
+  `planner_parity_conversations.md`, with `.json` copies for diffing two runs.
+
+**Four corpora, with no database (only the plan is scored):**
+- *routing*: every phrasing of the routing corpus in each of its four anchor
+  states, against `snapshot_routing.json`. Rows the rules left `unknown`
+  aren't scored.
+- *expected*: the routing rows of `expected.json`.
+- *crud*: the 206-row coverage matrix, refusals included.
+- *reference*: every ✅/🛑 row the reader can check.
+  - 1,035 rows are checked, 67 of them refusals; 267 are listed as not checked,
+    each with its reason (several steps, a state it can't build, an ellipsis,
+    an identifier, an unknown placeholder).
+  - A row that says "it" runs with its section's record in focus.
+
+**Scoring** uses the window's own comparison (`services/maple_compare`). On top
+of it:
+- *blocker*: a supported phrasing the planner refuses — the bar. Counted only
+  on expected, crud and reference: the routing corpus records where the rules
+  routed, not what the agent then did ("set the labor burden …" routes to the
+  Estimate Agent, which refuses).
+- *ran*: a supported row with no recorded intent (or the rules tier's help
+  fallback); it only has to not refuse.
+- *refusal_ok* / *refusal_missed*.
+- *intent match*: the stricter `INTENT_OF_OP` equality.
+
+**The acceptance conversations** run through the real endpoint against the
+seeded world, with shadow on, the current pipeline at the rules tier and the
+planner live. The turn's background tasks run, so each turn is scored by its
+stored `comparison`: a dry run of the window.
+
+**Results.** First run, then final run, same code paths. Each run was about
+5,000 corpus calls (29 minutes at 8 at a time) plus 581 conversation turns.
+Five rounds came to roughly 20,000 calls, about $6 at step 6a's measured
+cost.
+
+| Corpus | Cases | Agree | Differ | Blockers | Refusals missed | Errors |
+|---|---|---|---|---|---|---|
+| routing (first → final) | 3,549 | 2,010 → 2,149 | 1,268 → 803 | (34) → 0 | — | 237 → 54 |
+| expected | 107 | 65 → 78 | 32 → 28 | 1 → 0 | — | 8 → 0 |
+| crud | 206 | 155 → 165 | 27 → 23 | 0 → 0 | 0 | 6 → 0 |
+| reference | 1,223 → 1,035 | 356 → 382 | 155 → 73 | 6 → 0 | 31 → 3 (explained) | 55 → 3 |
+| conversations (turns) | 581 | 487 → 551 (95%) | 94 → 30 | — | — | — |
+
+**The bar is met:** no blocker, and the three remaining flags are explained
+(`tests/planner_parity/explained.py`):
+- renaming an activity: the reference refuses it, but the shared edit command
+  can do it, so a decision is needed;
+- two template edits named without saying "template": the policy finds no
+  estimate by that name and asks, so nothing runs.
+
+**What the runs changed.**
+- Prompt:
+  - estimate edits go only inside `edit_estimate`;
+  - never ask which record (point with focus, or name it);
+  - refusal scope:
+    - only *setting* labor burden is refused;
+    - a role's cost is its wage;
+    - moving a material to a category is an update;
+    - a task's property is cleared, not unlinked;
+    - equipment only when said;
+    - templates and partial bulk deletes are refused;
+  - an activity's rate on an estimate is settable;
+  - a bare name, address or code shows the record;
+  - empty creates and updates;
+  - a bare yes with nothing open answers nothing;
+  - replies to a text question, a menu (by code) or a "which one?";
+  - start over;
+  - personal questions are `social`.
+- Schema:
+  - creates and updates may name nothing yet;
+  - `archived=false` is a value;
+  - "every work item" (`by: all`) for markup, overhead, tax, gross margin and
+    division, never for a removal;
+  - the `recurring` refusal — set_recurring removed, decision 2026-10-07;
+  - `start_over`;
+  - `refine_last` sort and count;
+  - role figures take rate and wage;
+  - `put_back` moves the model's common misplacements to where they belong
+    and never invents a value.
+- Policy:
+  - today's status gates: transitions, the missing-items send gate, and the
+    role rule — now one function,
+    `services/estimate_status.status_change_role_refusal`, used by the
+    Estimate Agent too;
+  - a create's needed fields (a material's cost, a role's wage);
+  - an empty update asks what to change;
+  - which size, which teammate, an unknown task status;
+  - a figure's subject, by `metric_subject.resolve_subject`;
+  - a bare yes, ok or no with nothing open never writes.
+- Resolver:
+  - estimate list rows recorded by E-code;
+  - a name copied with "the" and its kind word.
+- Comparison:
+  - "couldn't find" and "asked which" are one outcome;
+  - a create that then offers a follow-up wrote.
+- Current pipeline: the overage "no" and the note-delete "no" mark themselves
+  `cancelled`.
+- Planner call: one retry on a dropped connection.
+
+**What remains, read.**
+- The routing corpus's 803 differences are mostly the planner asking for a
+  record the message doesn't name, where the rules routed to an agent that
+  asks the same, plus the corpus's deliberate fragments ("due date",
+  "check grade"). In a real turn both sides ask, and the window's comparison
+  scores that as agreement.
+- In the scored sources the differences are mostly labelling:
+  - work-item reads that today files under `update_estimate`;
+  - answers reached by another route ("which contact is E0042 for?" as an
+    estimate field);
+  - a few real ones, such as "which properties use Black Mulch?", which the
+    planner answers with estimates.
+- The 30 conversation differences are edge readings:
+  - "show more" with nothing listed;
+  - a stale list;
+  - "Show Stone" answering "which material?";
+  - unknown teammates in a filter.
+  
+  Each is in the conversation report.
+
+**From here** the suite is the planner's live regression suite. Run it before
+every prompt, schema or model change and diff the `.json` against the last run.
+
 ### 4.6 A multi-turn drill-down, turn by turn
 
 The plan is per turn; what carries a conversation is the server-owned state
