@@ -438,6 +438,54 @@ language reading is its own change, four weeks after the last switch.
   properties, materials, roles, templates, estimates and tasks paged end to end, a limit, today's list unchanged), two
   turn tests and an estimate-list conversation through the real check.
 
+### 7.6 As built: phase 4a — catalog creates and updates (2026-10-08)
+
+- **Today's handlers write** (the plan's design: the planner reads the
+  request, today's code does the work). Each agent has a public
+  `create_*_reply` / `update_*_reply` that hands the plan's fields to today's
+  private handler, as the material size commands already did:
+  `ContactAgent`, `PropertyAgent`, `MaterialAgent` (`_handle_create_material`
+  / `_handle_update_material`), `LabourAgent` (its dispatcher, the role named
+  by id). Enrichment (address lookup, geocoding, the material markup, the
+  Rate from the wage), validation, the one-field-at-a-time questions — whose
+  answers are today's to take, through the open-question gate — the audit
+  log and the reply are all today's. The executor maps the plan's names
+  onto today's: a role's `wage` is `cost`; a material's `rename_size_to` /
+  `remove_size` are `size_op` / `new_size`; a size's unit is the company's
+  own by name, one it lacks said back with today's note and nothing written.
+- **A write never falls back** (`execute.WRITES`): once a write has begun,
+  a failure is answered — "Something went wrong partway through that, so I
+  stopped. Please check the record before trying again — part of the change
+  may already be saved." — never handed to today's pipeline, which could make
+  the write twice. A record that doesn't load within the company
+  (`execute.RecordNotLoaded`) is raised before any write, so with nothing
+  written before it the turn still falls back.
+- **Tenant scope** (CLAUDE.md): today's `_update_contact_via_api` and
+  `_update_property_via_api` loaded by a bare id and never checked the
+  company; both now refuse another company's record (safe today only because
+  today's resolver supplies the company's own ids).
+- Checked and not a defect: changing a role's unit ("make the Foreman daily")
+  writes, through the planner and today's update.
+- **Sizes** (review 2026-10-08 (4a)): adding a size the material already has
+  is said back ("Pavers already comes in 12x12 — I've left it as it is.") —
+  it overwrote that size's cost, on the planner and on today's add command
+  alike, and both now share `MaterialAgent._size_already_there`. A cost for
+  a size the material lacks still adds it, as today (user decision, option
+  B). A size renamed and removed at once is refused by the schema, so the
+  turn falls back. A failed write is the unanswered tracker's
+  `error/write_failed`.
+- **Live check on Sim Co** (planned and gated only — nothing written to Dev):
+  a contact, a contact's email, a property, a role's wage, a material and a
+  role all plan cleanly, pass the policy and would run.
+- **Tests:** `test_planner_execute_writes.py` (19: each create and update
+  through today's handler against the database, each missing-field question
+  with nothing written, sizes renamed, added and removed, an unknown unit,
+  another company's record, the two update cores' company checks, adding a
+  size it has, a cost for one it lacks), the write rule in
+  `test_planner_execute.py` (4), today's add command on a size it has
+  (`test_material_agent.py`), the schema's rename-and-remove refusal and the
+  outcome row.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
