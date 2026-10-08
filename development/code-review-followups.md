@@ -266,7 +266,7 @@ seams that already exist as separate classes.
 | ~54 | `formatOrchestratorReply` — portal/src/lib/orchestratorReply.ts:39 |
 | 53 | `_run` — scripts/backfill_task_readable_ids.py:70 |
 | 171 | `_handle_update_subop` — agents/task/service.py:605 (new 2026-09-27; a detector table plus a named-target helper — review 2026-09-27 #47) |
-| 104 | `_handle_list_tasks` — agents/task/service.py:282 (new 2026-09-27; moves with `TaskListBase`, #47) |
+| 129 | `list_tasks_reply` — agents/task/service.py:345 (was `_handle_list_tasks`, 104 lines; its body moved here 2026-10-08 as the reply the planner's executor shares, +25 for the signature and docstring; `_handle_list_tasks` is now 14 lines. Moves with `TaskListBase`, #47) |
 | 89 | `_resolve_list_ask` — agents/task/service.py:399 (new 2026-09-27; make its `teammate()` closure a method, #47) |
 | 105 | `_handle_size_command` — agents/material/service.py:1693 (new 2026-09-27; +30 on 2026-09-28 for the material in focus and its "which material?" question; split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` — review 2026-09-27 #29) |
 | 70 | `parse_task_list_ask` — agents/task/list_filters.py:139 (new 2026-09-27; one reader per filter phrase) |
@@ -278,6 +278,10 @@ seams that already exist as separate classes.
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
 | 125 | `_finalize_template_estimate` — routers/agent_helpers/template_estimate.py:102 (first measured 2026-10-05, +16 that day logging the failure, splitting the outage/bug reply and removing an estimate inserted before the failure, #318; extract the create/scale/save block into `_instantiate(processor, company_oid, template, factor, context_payload)`, leaving the gate, audit and envelope here — review 2026-10-05 #4) |
 | 51 | `_compare` — services/maple_compare.py:240 (first measured 2026-10-07, review of the planner parity run #1, deferred: the decline check, the both-answered branch and the item matching in one body. Extract the matching loop — from `unsure: List[str] = []` to the leftover-items loop — into `_match(current, current_items, planner_items) -> Tuple[List[str], List[str]]` returning `(why, unsure)`; `_compare` keeps the readings and the verdict. No behaviour change; tests/test_maple_compare.py must pass unchanged.) |
+| 62 | `list_contacts_reply` — agents/contact/service.py:2034 (new 2026-10-08, switchover phase 2a: the body of `_handle_list_contacts`, which shrank by as much, as the reply the planner's executor shares; split the row rendering into `_contact_list_items(serialized)` — review 2026-10-08 #10, deferred) |
+| 64 | `list_properties_reply` — agents/property/service.py:2458 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_property_list_items(serialized)` — review 2026-10-08 #11, deferred) |
+| 63 | `list_labours_reply` — agents/labour/service.py:1253 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_labour_list_items(serialized)` — review 2026-10-08 #12, deferred) |
+| 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
 
 #### Watch
 

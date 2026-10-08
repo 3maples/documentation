@@ -225,6 +225,60 @@ language reading is its own change, four weeks after the last switch.
   check over eight phase-1 messages against Dev gave today's replies, and
   "list my contacts" fell back.
 
+### 7.2 As built: phase 2a — reading records (2026-10-08)
+
+- **Shared replies (S2).** Each agent's details and list replies became a
+  method that takes values; today's handler reads the message and calls it,
+  the executor calls it with the plan's:
+  `ContactAgent.contact_details_reply` / `list_contacts_reply`,
+  `PropertyAgent.property_details_reply` / `list_properties_reply`,
+  `MaterialAgent.material_details_reply` / `list_materials_reply` (it matches
+  a category by name itself) / `list_material_categories_reply`,
+  `LabourAgent.labour_details_reply` / `list_labours_reply`,
+  `TemplateAgent.template_details_reply` / `list_templates_reply`,
+  `TaskAgent.task_details_reply` / `list_tasks_reply`. The executor calls
+  only these public methods (review 2026-10-08 #3–#7). Today's tests for
+  each agent, the CRUD coverage matrix, the routing snapshot and the 275
+  acceptance conversations pass unchanged.
+- **Covered:** `get_*` and `list_*` for contacts, properties, materials, roles,
+  tasks and templates, and `list_material_categories`. Records load by the
+  resolver's id **within the caller's company** (`execute._load`; anything
+  else is a `LookupError`, so a fallback).
+- **The turn's state is copied** for the executor (`run_planner_turn`): a
+  fallback part way through a plan hands today's pipeline the state the turn
+  started with, never the planner's half-written lists and anchors; a run's
+  result carries the copy, which finalize saves (review #1). A reference
+  that isn't one record (a `step`) falls back at the gate, `ref:<name>.<status>`
+  (review #2).
+- **Per-field coverage** (`execute._uncovered_read`): a list filter or a get
+  `field` the executor doesn't read yet falls back (`filter:<op>.<name>`,
+  `field:<op>.<field>`). Not yet: contacts by role, city or related record;
+  properties by city or related; materials or roles on an estimate; a
+  property's contacts / owner / estimates / notes, a contact's properties /
+  notes. A get's other fields answer with the full details, as today.
+- **A filtered property count is the planner's own answer** (user decision
+  2026-10-08, review round 2 #2): today drops the owner / name filter and
+  counts every property; the planner counts what it filtered and says so —
+  "You have 2 properties owned by Ana Reyes." (`format_count_response`'s
+  `qualifier`). Today's reply is unchanged: its handler still drops the
+  filters before calling `list_properties_reply`. Where today's Maple gives a
+  wrong answer, the planner gives the right one rather than copying it.
+- **Values, not text:** a material category is matched by name (one the
+  company doesn't have lists nothing); `price_below` / `price_above` both
+  apply; task filters map onto today's `TaskListAsk`, named due windows
+  through `list_filters.apply_due_window` (the same dates and words as
+  "due this week"), explicit dates on the user's clock, worded "due by Oct 16".
+  `due_before` is the last day included — "due by Friday" is Friday, "due
+  before Friday" Thursday — said in the schema and the prompt's "Reading the
+  words" (review round 2 #1; a live check of four phrasings gave those days).
+- **Focus for several actions:** finalize's entity anchoring is now
+  `finalize_result.anchor_entity`; the executor calls it for each action of a
+  multi-action plan (finalize moves only the estimate's), the last newest.
+- **Tests:** `test_planner_execute_reads.py` (30, each branch of the task
+  filter mapping included), `test_task_list_filters.py` (every `DueWindow`
+  against today's parser), `test_planner_turn.py` (the copy on fallback). A live check over eight
+  reads against Simon's Dev company gave today's replies.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
