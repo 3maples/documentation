@@ -4,7 +4,7 @@
 **Status:** Approved 2026-10-07 (D1–D19). Steps 0–11 built 2026-10-07. **Revised the same day (D20): the comparison runs in Dev only; switchover in Dev, then production** — the switchover plan is [`2026-10-07-maple-planner-switchover-plan.md`](2026-10-07-maple-planner-switchover-plan.md).
 **Builds on:** [`2026-09-25-maple-routing-convergence-design.md`](2026-09-25-maple-routing-convergence-design.md),
 [`2026-09-27-maple-multi-turn-everywhere-design.md`](2026-09-27-maple-multi-turn-everywhere-design.md)
-**Decided with Simon:** 2026-10-02 (D1–D5) and 2026-10-06 (D6–D17) and 2026-10-07 (D18–D20), in the architecture-review session
+**Decided with Simon:** 2026-10-02 (D1–D5) and 2026-10-06 (D6–D17) and 2026-10-07 (D18–D21), in the architecture-review session
 
 ## 1. Why this exists
 
@@ -74,6 +74,7 @@ could not answer (§9).
 | D18 | The parity run (was P7) | **Every corpus that pins today's behaviour, and the phrasing reference itself** (§4.5, step 11): the 1,216-phrase routing corpus in each state, the 206 CRUD-coverage phrasings, the 256 acceptance conversations replayed with the planner live, and every ✅ reference row — about 2,700 calls, under $5. No ✅ phrasing may come back `unsupported` or `not_understood`; every difference is read. Kept as the planner's regression suite, run before every prompt, schema or model change | The 125 `expected.json` rows only |
 | D19 | Staleness by time (was P8) | **An anchor or remembered list older than 24 hours is stale** however few turns ago it was set, so a write through "it" asks first; **an open question older than 1 hour is dropped** — a question lives one turn, or one hour. The snapshot shows each age in turns and in time (§6). For today's Maple the same rule is a separate follow-up | Turns only, as today |
 | D20 | Where the comparison runs (2026-10-07) | **Dev only, then switch over in Dev, then production.** Shadow runs in Dev on Simon's own traffic; the parity suite is the measure, and every phrasing worth keeping becomes a reference row. When the planner works clearly better than today's Maple in Dev, the switchover (§12) is built and used in Dev first; production follows company by company. Phrasing refinements go into the planner only — today's Maple gets fixes for data loss, wrong writes and production bugs. Supersedes D3, D8, §11's window and step 12 | The two-week production window (D3, D8) |
+| D21 | How a company runs on the planner (2026-10-07) | **The companies in `MAPLE_SHADOW_COMPANIES` run on the planner** while `MAPLE_SHADOW_ENABLED` is on; every other company runs today's pipeline, shadowed. No company field: the transition is Dev-only, and at the switchover the planner becomes every company's default and the list goes. Supersedes D5 (company by company) and D11 (the field) | A `Company.maple_pipeline` field and a per-company production rollout |
 
 ## 3. The new pipeline
 
@@ -866,14 +867,14 @@ doesn't outlive its review.
 - Flag: `MAPLE_SHADOW_ENABLED` (config, default false; forced false in
   `tests/conftest.py`). Set in `platform/.env.local` for the Dev comparison
   (D20) — never on Render.
-- **Which companies** (2026-10-07, Simon): `MAPLE_SHADOW_COMPANIES`, a
-  comma-separated list of company ids, narrows the flag to those companies —
-  for a trial on one company before the whole window. Empty is every company,
-  so D8 is unchanged. Ids, not names: names repeat and change, and the turn
+- **Which companies** (2026-10-07, Simon; revised the same day by D21):
+  `MAPLE_SHADOW_COMPANIES`, a comma-separated list of company ids, names the
+  companies that run **on the planner**; with the flag on, every other
+  company is shadowed. Ids, not names: names repeat and change, and the turn
   already carries the id. An entry that isn't a 24-hex id is logged (at
-  startup, when the flag is on) and skipped; a list with no valid id records
-  no one, never everyone. `maple_shadow.records_company` is the one check,
-  in `take_snapshot`.
+  startup, when the flag is on) and skipped. `maple_shadow.pipeline_for`
+  decides and `shadows` gates `take_snapshot`. (First built as a filter that
+  narrowed shadow to the companies listed.)
 - Tests: `tests/test_maple_shadow.py` (24).
   - The snapshot, including the viewed record.
   - The planner's outcomes.
@@ -1212,8 +1213,9 @@ its counts and tokens, differing conversations first.
 two-week production window below the line was the original plan and is kept
 for the record; nothing of it runs.
 
-- **Where:** Dev only — `MAPLE_SHADOW_ENABLED=true` in `platform/.env.local`,
-  narrowed with `MAPLE_SHADOW_COMPANIES` when wanted. The flag is never set on
+- **Where:** Dev only — `MAPLE_SHADOW_ENABLED=true` in `platform/.env.local`;
+  the companies in `MAPLE_SHADOW_COMPANIES` run on the planner, the rest are
+  shadowed (D21). The flag is never set on
   Render. Production runs today's Maple, unchanged, until the switchover.
 - **The traffic is Simon's own.** The comparison only shows what someone
   tried, so the measure is the parity suite (step 11): every phrasing tried by
@@ -1262,7 +1264,9 @@ for the record; nothing of it runs.
    `create_estimate`, `maple_metrics` for `metric`. Replies come from the
    existing templates (CLAUDE.md "Friendly first-person tone"), so every reply
    still names its target. Its own TDD plan, written then.
-2. **Per-company switch (D11):** `Company.maple_pipeline:
+2. **Per-company switch (D11):** *superseded by D21 — the companies in
+   `MAPLE_SHADOW_COMPANIES` run on the planner; no company field, and no
+   per-company production rollout.* `Company.maple_pipeline:
    Optional[Literal["current", "planner"]] = None`, set by
    `scripts/set_maple_pipeline.py`. **Missing or `None` means the current
    pipeline**, so no migration and no backfill: only a company someone switched
@@ -1272,8 +1276,8 @@ for the record; nothing of it runs.
    `finalize_orchestrate_result`. A conversation's open question is answered by
    the pipeline that asked it — the switch takes effect at a turn with no open
    question.
-3. **Rollout (D20):** Simon's company in Dev → every Dev company → release →
-   3Maples' own company in production → two or three customers → everyone.
+3. **Rollout (D20, D21):** Simon's company in Dev → every Dev company →
+   release with the planner as the default for every company.
    Shadow stays on in Dev for the companies not yet switched.
 4. **Rollback:** setting the field back to `current` takes effect next turn.
 5. **Retirement:** four weeks after the last company switches, with no rollback
@@ -1317,7 +1321,7 @@ planner and can ship first — it is useful on its own.
 | Caching silently doesn't happen (a field dropped on the wire, a per-turn value in the static block, a prompt under 1,024 tokens) | Step 6a's live check; the static-block tests; day one's cached share in `llm_usage_events` |
 | Shadow slows the server | Runs after the response; 20 s timeout; Maple's LLM concurrency limiter still applies |
 | Dev traffic is only what Simon tries (D20) | The parity suite is the measure; each phrasing worth keeping becomes a reference row, so later runs check it |
-| Production's phrasings were never shadowed before the switch (D20) | The parity suite pins every phrasing today's Maple handles; production rolls out with 3Maples' own company first; rollback is one field. Optionally, shadow 3Maples' own production company (`MAPLE_SHADOW_COMPANIES`) for a few days before switching it |
+| Production's phrasings were never shadowed before the switch (D20) | The parity suite pins every phrasing today's Maple handles, and the acceptance conversations run on the planner (switchover phase 7); production switches all at once (D21), so the switchover release keeps a way back — decided in its own change |
 | The comparison flags too much as `unsure` | Reviewer reads `unsure` like `differ`; tighten the adapter after the first export, not during the window |
 | The unanswered classifier misses a reason (a reply worded outside the constants) | It under-reports, never invents; the constants test fails on a rename; the shadow comparison still surfaces the turn when the planner would have acted |
 | The current pipeline keeps changing (as it did 10-02 → 10-06) | D14's freeze; the doc's §3 and §4.2 are re-checked against the code before step 4 starts |
