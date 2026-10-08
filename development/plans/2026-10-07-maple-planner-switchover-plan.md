@@ -399,6 +399,45 @@ language reading is its own change, four weeks after the last switch.
   ask-equality table and end-to-end figures), a policy test for the either-
   kind parent.
 
+### 7.5 As built: phase 3 — follow-ups on the plan (2026-10-08)
+
+- **The stored read** (`agents/planner/followups.py`): each read the executor
+  runs is stored as its action in `last_plan_read`, stamped with the turn; any
+  other action forgets it, so a follow-up never replays a write.
+- **A follow-up is the read it follows up, changed** (`followups.expand`, run
+  in `run_planner_turn` before the check): `redo_last` changes the subject,
+  period or tax of a figure, a card, an estimate list or one record;
+  `refine_last` narrows, sorts or counts the list just shown; `show_more` is
+  the list again from where it stopped. The expanded plan is checked and run
+  like any other — its references resolved again within the company, the
+  gate deciding. Only the read **just before** counts (today's "show more"
+  rule): if that turn was today's pipeline, or the read can't take the change
+  (`followup:<why>`), the turn falls back and today's answers from its own
+  memory (`last_request`, `list_page`).
+- **Every list pages on the planner** (user decision 2026-10-08):
+  `paging.format_and_record_page` shows ten rows (an estimate list twenty, as
+  today's; tasks and rankings already page), says "That's 1–10 of 34 — say
+  "show more" for the next 10." and remembers where it stopped; the last page
+  says "That's the last of them — 34 in all." The list replies take
+  `paged` / `offset`, which only the executor passes — today's lists still
+  stop at ten without a word. The offset of a "show more" goes on the
+  planner's copy of the state only, so a fallback never inherits it, and a
+  planner list's page is kept under its own key (`paging.PLANNER_PAGE_KEY`)
+  — today's "show more" after a failed planner turn would otherwise replay it
+  and show the first rows again (review 2026-10-08 (phase 3) #7); tasks and
+  rankings keep today's `list_page`, which both pipelines honour. An
+  explicit limit ("my top 3") is the whole answer.
+- **"Does that include tax?"** gives the figure the other way, as today does
+  (user decision; a prompt line: `before_tax` opposite the one just shown).
+- **Live check on Sim Co** (read-only): sold this year → "and last month?" →
+  "what about Bob Residential?"; open estimates → "just the drafts" → "how
+  many is that?" (39); the pipeline → "does that include tax?" ($475,843.21
+  before tax); 55 estimates paged 20, 20, 15 — all on the planner.
+- **Tests:** `test_planner_followups.py` (30, every follow-up and fallback),
+  `test_paging_pages.py` (3), `test_planner_show_more.py` (9: contacts,
+  properties, materials, roles, templates, estimates and tasks paged end to end, a limit, today's list unchanged), two
+  turn tests and an estimate-list conversation through the real check.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
