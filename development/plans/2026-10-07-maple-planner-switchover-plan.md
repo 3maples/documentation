@@ -646,6 +646,35 @@ kept, by work-item id — so the planner doesn't ask it again.
   two endpoint tests in `test_planner_pipeline_endpoint.py`, the gate's in
   `test_planner_execute.py`.
 
+### 7.11 As built: phase 5b — the catalog deletes (2026-10-09)
+
+- **Every catalog delete asks first** (`delete_contact`, `_property`,
+  `_material`, `_labour`, `_template`, `_task`), through 5a's confirmation, in
+  today's words: "I found contact 'Ana Reyes'. Please confirm before I delete
+  it." ("labor role", "the task" as today). A no is today's "Okay — I won't
+  delete Ana Reyes." — not a question. A delete reached through a stale record
+  asks once: its question names the record (today's rule).
+- **Yes** deletes through each agent's `delete_*_reply` (S2): today's yes
+  branch split out of each agent's `process` as `_finish_<kind>_delete` (the
+  delete, its cascade and audit, the record out of focus, its delete questions
+  gone, today's "I've deleted the … for you."), which today's branch now calls
+  too; a template's `_finish_template_delete`; a task's is today's
+  `_execute_confirmed_delete`. The rules are checked again on the yes
+  (`policy.recheck`): a user no longer an Owner or Admin gets `CHANGED_SINCE`.
+- **Today's to answer** (fallbacks): a delete planned beside other actions
+  (`confirm:delete_with_others` — a delete is confirmed on its own,
+  `settle_after_turn`), and a delete that reads as a note or an unlink request
+  ("remove Ana Reyes from Birch House", "delete the note on …":
+  `delete:scope`, today's `delete_scope_redirect`, #679). A Member's delete is
+  the policy's refusal, today's words.
+- A delete with no record resolved is never asked about
+  (`confirm:delete_unresolved`); one that fails once begun is answered
+  (`WRITE_FAILED`), never handed on.
+- **Tests:** `test_planner_deletes.py` (44: each kind's question, yes and no;
+  the record in focus cleared and another kept, for each moved
+  `_finish_<kind>_delete`; today's "selected …" name; stale; the fallbacks;
+  the role on the yes; a failed delete).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
