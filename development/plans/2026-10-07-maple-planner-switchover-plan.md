@@ -705,13 +705,41 @@ kind the planner deletes.
   today's answers it.
 - **Tests:** `test_planner_deletes_estimates_notes.py` (22); today's note and estimate questions pinned in `test_record_notes.py` and `test_agent_helpers_delegate_estimate_ops.py`.
 
+### 7.13 As built: phase 6a — an estimate from a description (2026-10-09)
+
+Phase 6 is split: **6a** a create from a description (and its property),
+**6b** templates (a create from one, and `apply_template`), **6c**
+`adjust_assumption`.
+
+- **`create_estimate`** (scope, and a property): today's create once the
+  request is read, split out of `delegate_create_estimate` as
+  `create_estimate_reply` (S2) — the sufficiency check (an unknown work type
+  is today's gathering question, whose next turn is today's), the assumptions
+  it states, the quota gate, generation, the audit, "Created estimate 'E0042'
+  and linked it to property 'Birch House'." Today's function reads the request
+  (the template's name, the property in the text) and then calls the same
+  core. A customer (no link on create, §8), a template or a template size
+  falls back (`field:create_estimate.<field>`) until 6b.
+- **Overage** (#279): the policy's confirm (`policy.OVERAGE_REASON`) is asked
+  by the planner's confirmation in today's words, "… Additional charges will
+  apply at $3/additional estimate. Create it anyway?", alone (with another
+  action or a stale record: `confirm:overage_with_others`). Yes runs the kept
+  create — the core never asks it, so no second question and no
+  `overage_acknowledged` to carry; no is today's `OVERAGE_DECLINED`.
+- **The quota gate moved** (no behaviour change): `_check_estimate_limit_or_refuse`
+  and its refusal now live in `routers/agent_helpers/estimate_limit.py`, so
+  the executor needn't import the router; the router imports them by their
+  old names.
+- **Tests:** `test_planner_create_estimate.py` (10; generation and the
+  sufficiency read stubbed, the company, property and estimate real).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
 it (a schema change, with a parity run):
 
 - `convert_task.delete_task` — no delete-after-convert anywhere.
-- `create_estimate.customer` — only a property is linked today.
+- `create_estimate.customer` — only a property is linked today (falls back, phase 6a).
 - `apply_template.size` — scaling exists only when creating from a template.
 - ~~`edit_estimate` on **every** work item~~ — done in phase 4c (§7.8): one
   command per work item.
