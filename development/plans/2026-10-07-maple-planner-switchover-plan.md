@@ -675,6 +675,36 @@ kept, by work-item id — so the planner doesn't ask it again.
   `_finish_<kind>_delete`; today's "selected …" name; stale; the fallbacks;
   the role on the yes; a failed delete).
 
+### 7.12 As built: phase 5c — an estimate's delete and a note's (2026-10-09)
+
+Phase 5 is done: a delete asks, a yes deletes and a no leaves it, for every
+kind the planner deletes.
+
+- **An estimate** (`delete_estimate`): today's question, its wording now
+  shared (`delegate_estimate_ops.estimate_delete_label` / `_question`): "Are
+  you sure you want to delete estimate 'Birch Patio (E0042)'? This cannot be
+  undone. …", or "Just to check: delete estimate …" when it came from a stale
+  focus. Yes is today's delete, split out of `fuzzy_confirmation` as
+  `delete_estimate_reply` (the creator-or-Owner rule again, the cascade, the
+  audit, "Estimate 'Birch Patio' has been deleted."). **A no** is "Okay — I
+  won't delete estimate 'Birch Patio (E0042)'." — today's generic "Cancelled.
+  Please let me know which estimate you'd like to work with." reads as a
+  question after a delete, so the planner says what it did (the right
+  answer over today's). Today's guard against "remove work item X from
+  estimate E0042" read as a delete is a keyword classifier's; the planner
+  plans that as an edit, and a delete always names the estimate it asks about.
+- **A note, by its id** (`delete_note`): "delete the second one" after a notes
+  list resolves the row of the list just shown (`resolve._note_list` reads
+  `record_notes.NOTE_LIST_KEY` — a notes list keeps its own rows), where
+  today's works by position. Today's question ("Delete your note on Ana Reyes:
+  “…”? This can't be undone." — the author's name when an Owner deletes
+  someone else's), today's no (`NOTE_KEPT`), and a yes through today's delete,
+  split out as `record_notes._finish_note_delete` (only its author or an
+  Owner). A work item's or a task's note is today's (`delete:note_parent`);
+  "delete my note on Ana Reyes" names no note the resolver can find, so
+  today's answers it.
+- **Tests:** `test_planner_deletes_estimates_notes.py` (22); today's note and estimate questions pinned in `test_record_notes.py` and `test_agent_helpers_delegate_estimate_ops.py`.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
@@ -688,7 +718,8 @@ it (a schema change, with a parity run):
 - ~~Several task fields in one update~~ — done in phase 4b (§7.7).
 - `get_<record>.field` — the agents always return full details (material size
   aside); `get_estimate.field` lacks division, title and description.
-- `list_notes` / `delete_note` on a work item or task, and a note by reference.
+- `list_notes` / `delete_note` on a work item or task, and a note by name. (A note by its row in the
+  list just shown is done, phase 5c.)
 - A listed material or activity line — no line list records rows, so
   `resolve_line` always asks.
 - `refine_last.sort` oldest / lowest total.
