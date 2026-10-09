@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **832**. Never
+- **Entries are numbered and permanent.** Next free number: **838**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -134,13 +134,14 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,195 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases; +65 on 2026-09-28 for the target-first field shapes and `restated_field_value`. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46) |
 | 1,072 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27; 1,102 on 2026-10-05 (+14 for the save failure's outage/bug split, #619) |
 | 1,060 | [platform/agents/estimate/command_grammar.py](../../platform/agents/estimate/command_grammar.py) | the written command list (design 2026-09-25), first measured 2026-10-06; +23 that day (tax: `_M_TAX`, the "of my estimates" and bare-total lookaheads, the "how much are my estimates worth" and headless total-value entries). **Next step:** move each family of entries (metric, line, ranking / by month / comparison, ratio) into `grammar_metrics.py` and keep `_CORE` here as their concatenation |
-| 944 | [platform/agents/task/service.py](../../platform/agents/task/service.py) | **crossed the line 2026-09-27** (was 688). **Next step:** a `TaskListBase` layer in `agents/task/listing.py` holding `_handle_list_tasks`, `_due_note`, `_resolve_list_ask` and `_FINISHED_STATUS_NAMES`; move `_handle_task_due_change` into operations.py; split `_handle_update_subop` into a detector table plus a named-target helper — about 600 lines left (review 2026-09-27 #47) |
+| 1,005 | [platform/agents/task/service.py](../../platform/agents/task/service.py) | **crossed the line 2026-09-27** (was 688); 1,048 by 2026-10-08, then −43 when `_handle_task_due_change` moved into operations.py (switchover phase 4b, done). **Next step:** a `TaskListBase` layer in `agents/task/listing.py` holding `_handle_list_tasks`, `_due_note`, `_resolve_list_ask` and `_FINISHED_STATUS_NAMES`; split `_handle_update_subop` into a detector table plus a named-target helper — about 600 lines left (review 2026-09-27 #47) |
+| 818 | [platform/agents/task/operations.py](../../platform/agents/task/operations.py) | **crossed the line 2026-10-08** (was 774): `_handle_task_due_change` moved in beside the other sub-handlers (switchover phase 4b). **Next step:** the convert flow (`_handle_convert_task`, `_perform_conversion`, `_convert_error_copy`, about 175 lines) into `agents/task/convert.py` as a `TaskConvertBase` layer (review 2026-10-08 (4b) #22, deferred) |
 | 903 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
 | 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
 | 860 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
 | 860 | [platform/services/maple_metrics.py](../../platform/services/maple_metrics.py) | the metrics engine, first measured 2026-10-06; +7 that day (`pre_tax_total`). **Next step:** the Phase 3 ratios (`run_win_rate`, `run_margin` and their helpers) into `maple_ratios.py` |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
-| 822 | [platform/agents/planner/execute.py](../../platform/agents/planner/execute.py) | new 2026-10-08, switchover phase 2c (811); +11 in phase 3 for paging and storing reads: the coverage gate, the run loop and every op's handler. **Next step:** keep `COVERED`, `uncovered` and `execute` here; move the estimate, work-item and estimate-list handlers into `agents/planner/execute_estimates.py` and task_count, catalog_figure, notes, dashboard and metric into `agents/planner/execute_figures.py` before phases 3–6 add more — no behaviour change (review 2026-10-08 (2c) #1, deferred; MEDIUM by the line-limit rule) |
+| 1,027 | [platform/agents/planner/execute.py](../../platform/agents/planner/execute.py) | new 2026-10-08, switchover phase 2c (811); +11 in phase 3 for paging and storing reads: the coverage gate, the run loop and every op's handler. **Next step:** keep `COVERED`, `uncovered` and `execute` here; move the estimate, work-item and estimate-list handlers into `agents/planner/execute_estimates.py` and task_count, catalog_figure, notes, dashboard and metric into `agents/planner/execute_figures.py` before phases 3–6 add more — no behaviour change (review 2026-10-08 (2c) #1, deferred; MEDIUM by the line-limit rule); 959 after phase 4a's catalog writes and 1,027 after 4b's task writes (the split is more pressing) |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
 lifecycle into `routers/invitations.py` (~400 lines, a clean seam, leaves
@@ -271,6 +272,7 @@ seams that already exist as separate classes.
 | 53 | `_run` — scripts/backfill_task_readable_ids.py:70 |
 | 171 | `_handle_update_subop` — agents/task/service.py:605 (new 2026-09-27; a detector table plus a named-target helper — review 2026-09-27 #47) |
 | 129 | `list_tasks_reply` — agents/task/service.py:345 (was `_handle_list_tasks`, 104 lines; its body moved here 2026-10-08 as the reply the planner's executor shares, +25 for the signature and docstring; `_handle_list_tasks` is now 14 lines. Moves with `TaskListBase`, #47) |
+| 67 | `_create_task_core` — agents/task/create.py:145 (new 2026-10-08: the body of `_handle_create_task`, about 110 lines, split into its reading and this core both pipelines call — switchover phase 4b. Split into the insert and a `_task_created_reply(task, resolved, unapplied, …)` for the lead and details — review 2026-10-08 (4b) #23, deferred) |
 | 89 | `_resolve_list_ask` — agents/task/service.py:399 (new 2026-09-27; make its `teammate()` closure a method, #47) |
 | 105 | `_handle_size_command` — agents/material/service.py:1693 (new 2026-09-27; +30 on 2026-09-28 for the material in focus and its "which material?" question; split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` — review 2026-09-27 #29) |
 | 70 | `parse_task_list_ask` — agents/task/list_filters.py:139 (new 2026-09-27; one reader per filter phrase) |
@@ -5249,6 +5251,36 @@ total row count rather than blank-row count.
 `platform/agents/property/service.py:2553` — (Edge case — optional data missing.) `properties_of_contact_reply` labels each row by name, else street, else "Unnamed Property". Only named properties are tested, so a nameless property's row label is unpinned. (review 2026-10-08 (2c) branch audit #16, deferred)
 
 **Suggested fix:** Link Ana to a property with `name=""` (assert its row shows the street) and to one with `name=""` and `street=""` — `street` is required but an empty string passes validation — (assert its row shows "Unnamed Property").
+
+### 832. [MEDIUM] Adding notes to a task that has none, among several changes, is untested
+`platform/agents/task/planned.py:95` — (Edge case: optional data missing.) `_planned_note`'s `else added` arm, notes added to an empty note among several changes, has no test. A wrong join would leave a stray blank first line, which becomes an empty title. (review 2026-10-08 (4b) #16, deferred)
+
+**Suggested fix:** With the blank task, test `{"notes_append": "Call Bob", "status": "Done"}`: `description == "Call Bob"` and `title == "Call Bob"`.
+
+### 833. [MEDIUM] A task status that doesn't resolve among several changes is untested
+`platform/agents/task/planned.py:107` — (Edge case: a guard the policy screens out.) The policy asks first about a status the company doesn't have (`_check_details`), so `_planned_change` returning None for one is reachable only if the policy and `_resolve_status_by_name` disagree. It is untested. (review 2026-10-08 (4b) #17, deferred)
+
+**Suggested fix:** Test `TaskAgent.update_task_reply(task, {"status": "Blocked", "assignee": "Jordan"}, …)` directly: it asks today's "I don't recognize 'Blocked' …" question, and nothing is written.
+
+### 834. [MEDIUM] A teammate that doesn't resolve among several task changes is untested
+`platform/agents/task/planned.py:110` — (Edge case: a guard the policy screens out.) The policy asks first about a teammate who isn't exactly one (`_check_details`), so `_planned_assignee` returning None for a name is unreachable through a real turn. It is untested. (review 2026-10-08 (4b) #18, deferred)
+
+**Suggested fix:** Call `update_task_reply` directly with `{"assignee": "Nobody", "status": "Done"}`: today's "Who should I assign the task to?" is asked, and nothing is written.
+
+### 835. [MEDIUM] "Me" with no known email among several task changes is untested
+`platform/agents/task/planned.py:129` — (Edge case: missing data.) With no `current_user_email`, `_planned_assignee` returns None and the change goes to `_handle_task_assign`, which says "I couldn't confirm your email…". There is no test. (review 2026-10-08 (4b) #19, deferred)
+
+**Suggested fix:** Use a context without `current_user_email` and `{"assignee": "me", "status": "Done"}`: that reply, with `success=False`, and nothing written (`_run(..., me=None)` in test_planner_execute_tasks.py already supports it).
+
+### 836. [MEDIUM] Archiving among several task changes is untested
+`platform/agents/task/planned.py:115` — (Edge case: an unusual combination.) `_planned_change`'s `archived` arm ("mark it done and archive it") has no test. (review 2026-10-08 (4b) #20, deferred)
+
+**Suggested fix:** Test `{"status": "Done", "archived": True}`: both are written in one update.
+
+### 837. [MEDIUM] The planner's unknown-task-field raise can't be reached
+`platform/agents/task/planned.py:122` — (Edge case: a defensive guard no caller reaches.) Every key comes from `TaskFields`, so `raise ValueError(f"no task field {name}")` can't run. It is untested. (review 2026-10-08 (4b) #21, deferred)
+
+**Suggested fix:** Keep it as the explicit guard and add a direct test: `_planned_change("colour", "red", …)` raises ValueError. Or fold `due_date` into the `cleared` table's style and drop the raise.
 
 ## Codebase hygiene (batchable)
 

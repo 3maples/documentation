@@ -486,6 +486,55 @@ language reading is its own change, four weeks after the last switch.
   (`test_material_agent.py`), the schema's rename-and-remove refusal and the
   outcome row.
 
+### 7.7 As built: phase 4b — task writes (2026-10-08)
+
+- **Create** (`create_task`): today's `_handle_create_task` is split into its
+  reading (the clauses, the title, the awaiting-title question) and
+  `_create_task_core`, which both pipelines call; the planner's entry is
+  `TaskAgent.create_task_reply`. So the note and its derived title, "I named
+  it from your notes", the teammate, status and property resolved as today
+  (one that can't be is told and the task still made), the notification, the
+  audit and the task limit are all today's. A due date is midnight of the
+  user's day (`execute._due_at`), as today's dates. Today's create has no
+  unassigned, archived or replaced-notes task, so those fields fall back
+  (`execute._WRITE_FIELDS`).
+- **Update** (`update_task`, `agents/task/planned.py`): one field runs today's
+  own sub-handler with the task resolved — status, assignee, unassign,
+  property, due date, archive, notes added or replaced — so its reply and any
+  question are today's. Several fields (§8's "one sub-op per message") are
+  resolved first and written once (`_finish_task_update`: one version, one
+  audit, today's "I've updated the task … Here are the updated details"). A
+  property that can't be found, or that several share, is asked with
+  `record_names.ask_to_rewrite(replan=True)`: the answer is written into the
+  request and, for a planner company, the router plans that whole request
+  again (`REPLAN_KEY`, user decision 2026-10-08 — today's one-change reading
+  would drop the rest). Any other field that can't be resolved goes to its
+  sub-handler, which asks. Nothing is written either way. The note fields fold into one note: set or replaced, added to,
+  then renamed (the title is its first line). A field with its clearing, or
+  two whole notes, is refused by the schema (`TaskFields`), so the turn falls
+  back. `_handle_task_due_change` moved to `operations.py` beside the other
+  sub-handlers.
+- **One record, one update** (Dev, 2026-10-08): "Mark T0001 as done and link
+  to Bob Residential" was planned as an update and a second update on "the
+  task of step 1"; the executor can't load a step reference, so the turn fell
+  back and today's pipeline read "done and link to Bob Residential" as a
+  status. `agents/planner/merge.py::merge_step_updates` folds such a second
+  update into the first before the check (same op, no field given two values,
+  the merged fields still valid; later step references renumbered), and the
+  prompt now says several changes to one record are one update. Owes the
+  parity run.
+- **Convert** (`convert_task`): today's flow with the task resolved — it asks
+  first (an estimate uses a billing slot) and today's pipeline takes the yes,
+  through the open-question gate. `delete_task` falls back (§8).
+- **Live check on Sim Co** (planned and gated only): a create with a due
+  date, "me" and a property; a status; status, assignee and due date at once;
+  a rename; a convert — all would run. "Add a note to T0002" plans as
+  `add_note` on the task (phase 4d: it becomes `notes_append`), and convert
+  with delete falls back.
+- **Tests:** `test_planner_execute_tasks.py` (44), the re-plan at the endpoint
+  (`test_planner_pipeline_endpoint.py`, both ways) and the flag
+  (`test_record_names.py`).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
@@ -495,7 +544,7 @@ it (a schema change, with a parity run):
 - `create_estimate.customer` — only a property is linked today.
 - `apply_template.size` — scaling exists only when creating from a template.
 - `edit_estimate` on **every** work item — `WorkItemRef` has no "all".
-- Several task fields in one update — today one sub-op per message.
+- ~~Several task fields in one update~~ — done in phase 4b (§7.7).
 - `get_<record>.field` — the agents always return full details (material size
   aside); `get_estimate.field` lacks division, title and description.
 - `list_notes` / `delete_note` on a work item or task, and a note by reference.
