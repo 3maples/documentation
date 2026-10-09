@@ -598,6 +598,54 @@ language reading is its own change, four weeks after the last switch.
   (as `_EITHER_KIND` does for a customer filter); owes a parity look.
 - **Tests:** `test_planner_execute_links_notes.py` (21).
 
+### 7.10 As built: phase 5a — the confirmation (2026-10-08)
+
+Phase 5 is split like phase 4: **5a** the confirmation itself, **5b** the
+catalog deletes, **5c** the estimate delete and a note's delete by id.
+**Removal stays today's** (Simon, 2026-10-08): "remove the patio from E0042"
+already asks first inside today's edit executor (the dry run names the items
+and the new total), and today's pipeline answers its yes from the commands it
+kept, by work-item id — so the planner doesn't ask it again.
+
+- **Asking** (`agents/planner/confirm.py`, `turn._ask`): the gate lets a
+  `confirm` decision through (`execute.uncovered`); the turn asks today's
+  question and keeps the plan and the records it resolved on a
+  `pending_intents` record tagged `"pipeline": "planner"`
+  (`op: planner_confirm`), which `open_questions` reads as a yes/no — so the
+  panel's "Waiting for your answer" and Yes/No chips work unchanged. 5a asks
+  one thing: a write through a record the user has moved on from (a stale
+  focus or list, D19), in today's words — "Just to check — do you mean Ana
+  Reyes?", "Just to check: apply this to E0042 'Spring Cleaning'? (yes/no)"
+  (any stale estimate, a link's side too), or a work item's. **A note doesn't
+  ask** (Simon, 2026-10-09): it overwrites nothing and its reply names the
+  record, as today (`focus.stale_anchor_confirmation`); a link still asks, since
+  an estimate's or a task's replaces its property. Two stale records in one plan, or a confirm 5a doesn't ask
+  yet, fall back (`confirm:several`, `confirm:<op>`).
+- **The next turn** (`turn._answer_kept`), before any planner call: **yes**
+  runs the kept plan on the kept records, the rules checked again
+  (`policy.recheck`: a role, the Draft/Review lock, an author found now still
+  stops it; the stale check doesn't ask twice). Anything that stops it — a
+  refusal, a record gone — is `confirm.CHANGED_SINCE`, never today's pipeline,
+  whose reading of "yes" isn't the plan. **No** is today's "Okay — which
+  contact did you mean?", not kept as a question: the name in reply is planned
+  again whole (S3) — today's replays the text. **A cancel** is today's
+  `LEFT_AS_IS`. **Anything else** drops the question (it lives one turn) and is
+  planned as a new request; the planner's copy loses it too. A question asked
+  under another company is dropped (#675). The reply is read by the gate's own
+  rule (`open_question.decide_question`), so a yes/no reads the same for both
+  pipelines; a kept plan this build can't read is answered `LOST_TRACK`
+  (`confirm:unreadable`).
+- **Off the planner** (§4): today's pipeline meeting a planner-tagged question
+  answers it with `confirm.LOST_TRACK` ("I've lost track of that question —
+  could you ask again?") — a company taken off the list between the question
+  and the answer. A question today's pipeline asked still falls back
+  (`open_question`).
+- `CHANGED_SINCE` and `LOST_TRACK` are classified for the unanswered tracker
+  (`error/changed_since`, `error/lost_track`).
+- **Tests:** `test_planner_confirm.py` (31, real records and the real policy),
+  two endpoint tests in `test_planner_pipeline_endpoint.py`, the gate's in
+  `test_planner_execute.py`.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
