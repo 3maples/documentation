@@ -568,6 +568,36 @@ language reading is its own change, four weeks after the last switch.
   since the check falls back, the missing agent, and the forced code cleared
   on a raise and never carried in a copied reply).
 
+### 7.9 As built: phase 4d — links and notes (2026-10-08)
+
+- **Links** (`link`, `agents/planner/execute_links.py`), each side loaded
+  within the company: a contact and a property through
+  `record_links.link_contact_reply` (today's write, split out of
+  `handle_link_request`: the property read again within the company — it was
+  a bare get — "already linked", the audit); an estimate and its property
+  through the Estimate agent's `link_property_reply` (today's load with its
+  edit lock, and `_apply_estimate_property`, split out of
+  `_handle_update_estimate_property_link`); a task and a property through the
+  Task agent's `link_property_reply` (today's handler, the property forced for
+  the one call). Any other pair falls back (`link:<a>-<b>`).
+- **Notes** (`add_note`): a contact's, property's or estimate's feed through
+  `record_notes.add_note_reply` (today's, signed by the user, "I've added a
+  note to …"); a task's notes through today's append ("add a note to T0002"
+  plans as `add_note`, and a task's notes are its description); a work item's
+  through today's `add_work_item_note` edit command, its estimate found within
+  the company.
+- **Tenant fix** (§2, CLAUDE.md): `_delete_contact_via_api` and
+  `_delete_property_via_api` took a bare id; both now take the caller's
+  company and read within it.
+- **Live check on Sim Co** (planned and gated only): a task's link, and notes
+  on a contact, a task, an estimate and a property, would run. "Link John
+  Smith to Bob Residential" is asked back (Sim Co has a contact and a property
+  of that name). **Follow-up:** "link E0059 to Bob Residential" planned the
+  property as a contact, so the pair is uncovered and today's pipeline links
+  it — the policy could try a link side as the other of contact and property
+  (as `_EITHER_KIND` does for a customer filter); owes a parity look.
+- **Tests:** `test_planner_execute_links_notes.py` (21).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
