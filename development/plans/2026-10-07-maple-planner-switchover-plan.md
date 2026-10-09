@@ -535,6 +535,39 @@ language reading is its own change, four weeks after the last switch.
   (`test_planner_pipeline_endpoint.py`, both ways) and the flag
   (`test_record_names.py`).
 
+### 7.8 As built: phase 4c — estimate writes (2026-10-08)
+
+- **Today's estimate code writes**, through the Estimate agent's value entry
+  points (`agents/estimate/planned.py`: `status_reply`, `edit_reply`,
+  `generate_work_item_reply`), called by `agents/planner/execute_estimates.py`
+  on the estimate the planner resolved within the company. The executor's
+  shared helpers (`RecordNotLoaded`, the company-scoped load, the agent
+  lookup) moved to `agents/planner/execute_base.py` so the per-area modules
+  don't import `execute.py`.
+- **Status** (`set_status`, `unarchive_estimate`):
+  `_handle_update_estimate_status_transition` with the estimate forced
+  (`FORCED_ESTIMATE_CODE_KEY`, for the one call, never saved), so today's
+  resolver neither re-reads the message nor guesses from a stale anchor.
+  The workflow's transitions, who may move it, the send gate, the audit and
+  "I've marked estimate E0001 as Sent." / "I've archived …" / "I've
+  unarchived … (now Review)." are today's.
+- **Edits** (`edit_estimate`): each planner command becomes today's
+  `EditCommand` (`to_edit_command`), its work item named by id, and the batch
+  runs through `_run_edit_commands`: all or nothing, the edit lock, the
+  removal question (today's pipeline takes its yes), one reply line per
+  command. "Every work item" is one command per work item (§8, done); the
+  gate lets an edit command's `all` through.
+- **New work** (`generate_work_item`): `_handle_generate_work_item` — the
+  lock checked before the paid generation, "I couldn't price … as a work
+  item" when nothing comes back, the new item in focus.
+- **Live check on Sim Co** (planned and gated only): mark as sent, the markup
+  on every work item, a rename, new work, removing a work item and an
+  unarchive all would run.
+- **Tests:** `test_planner_execute_estimate_writes.py` (22: each write through
+  today's code with its reply pinned, plus the review's — a work item gone
+  since the check falls back, the missing agent, and the forced code cleared
+  on a raise and never carried in a copied reply).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
@@ -543,7 +576,8 @@ it (a schema change, with a parity run):
 - `convert_task.delete_task` — no delete-after-convert anywhere.
 - `create_estimate.customer` — only a property is linked today.
 - `apply_template.size` — scaling exists only when creating from a template.
-- `edit_estimate` on **every** work item — `WorkItemRef` has no "all".
+- ~~`edit_estimate` on **every** work item~~ — done in phase 4c (§7.8): one
+  command per work item.
 - ~~Several task fields in one update~~ — done in phase 4b (§7.7).
 - `get_<record>.field` — the agents always return full details (material size
   aside); `get_estimate.field` lacks division, title and description.
