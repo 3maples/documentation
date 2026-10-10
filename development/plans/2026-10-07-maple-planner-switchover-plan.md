@@ -768,6 +768,40 @@ Phase 6 is split: **6a** a create from a description (and its property),
   apply pinned in `test_template_create_routing.py` and
   `test_maple_template_crud.py`.
 
+### 7.15 As built: phase 6c — assumption changes (2026-10-09)
+
+- **`adjust_assumption`** (estimate, change): today's handlers on the
+  estimate the planner resolved, forced for the one call
+  (`planned.adjust_assumption_reply`, as a status move is). Today's detector
+  reads the plan's `change` and picks the handler — split out of the update
+  dispatch as the agent's `_adjust_assumption` (S2): a size rescales the work
+  item ("I've updated the area from 500 sq ft to 800 sq ft and recalculated
+  estimate E0042 — new grand total: …"), units converted; a material swaps the
+  assumed line for the catalog's ("I've swapped the assumed "standard
+  pavers" for premium pavers on 1 material line …"). Every question and
+  refusal is today's (no assumption stored, several sizes, a size out of
+  range, a unit that can't convert).
+- **A change today's detector can't read falls back** before anything runs
+  (`field:adjust_assumption.change`): today's pipeline reads the user's own
+  message. The last parity run had at least five such changes ("800 square feet",
+  "assume premium pavers", "The area is 20x30"), so `change`'s description now
+  asks for the user's own words.
+- **"Which material?"** — a material not in the catalog, or several — is
+  `ask_to_rewrite(replan=True)` on the user's request, so the answer is
+  planned again whole (on the change's text when the request doesn't hold the
+  material's words, so the answer always lands); today's replays its own
+  message.
+- **The detector moved** (no behaviour change) to
+  `agents/estimate/assumption_detect.py`, re-exported by
+  `assumption_handlers.py` (now 740 lines), so the gate reads a change
+  without loading the handlers.
+- **Every op the planner plans now has a handler** except `answer` (an
+  answer to a question the planner didn't keep falls back) and the follow-ups
+  `followups.expand` rewrites. Owes the parity run.
+- **Tests:** `test_planner_adjust_assumption.py` (13); today's handlers pinned
+  in `test_estimate_assumption_adjustment.py` and
+  `test_assumption_adjustment_targeting.py`.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
