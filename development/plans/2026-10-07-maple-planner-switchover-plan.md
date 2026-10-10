@@ -933,6 +933,33 @@ Phase 6 is split: **6a** a create from a description (and its property),
   `test_planner_deletes_estimates_notes.py` (two fallbacks renamed
   `ask:other`).
 
+### 7.19 As built: phase 7b, part 2b — an update with nothing to change (2026-10-10)
+
+- **The field question, in today's words:** an update naming no field
+  (`update_contact`, `_property`, `_material`, `_labour`, `_task`) is asked
+  the asking agent's own question — "What contact fields should I update?",
+  "What property / material / labor role fields should I update?", the task
+  agent's "What would you like to update on the task? I can change the
+  description, due date, status, or assignee — or archive it." — not today's
+  "Please specify which fields to update." statement (§7.18's rule). A record
+  the plan can't point at is asked first (2a); what to change follows once it
+  is known. Two at once, or another reason beside it, is still today's.
+- **The answer is added to the request** ("update the Elm House property —
+  city") and planned again; the value question that follows ("What city?") is
+  the planner's own, kept the same way (7b part 1), and its answer completes
+  the update.
+- **Any of the company's names answers the planner's own question**
+  (`named_answers._is_any_name`, keyed `("Maple", PLANNER_ANSWER)`): the
+  question doesn't say which kind of name it wants, so a reply that is exactly
+  a task status, a contact, property, material, role, template, task title or
+  estimate title answers it however it reads ("New Request" to "What status
+  would you like?") — one indexed lookup per kind, only while that question
+  is open. `PLANNER_ANSWER` moved to `record_names`.
+- **Run:** the 13 conversations with an update that named no field — all pass
+  (the update-then-field-then-value flows mixed the planner's question with
+  today's field flow before), every turn on the planner.
+- **Tests:** `test_planner_asks.py` (49), `test_named_answers.py` (+3).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
