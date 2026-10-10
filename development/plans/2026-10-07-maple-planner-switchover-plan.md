@@ -1076,6 +1076,48 @@ Phase 6 is split: **6a** a create from a description (and its property),
   `test_planner_followups.py`, `test_planner_turn.py`. Parity run owed (a
   schema field).
 
+### 7.23 As built: phase 7c, part 2 — what the planner must not guess (2026-10-10)
+
+- **The company's task statuses in the planner's state** ("Task statuses: To
+  Do, In Progress, Done, Next Week"; `snapshot.TASK_STATUSES_KEY`), read once
+  per turn (`turn._with_task_statuses`; a failed read leaves them out, never
+  the turn), with a prompt line that a name on that list is the status:
+  "move it to Next Week" is the Next Week status, not a due date.
+- **Plan it, Maple asks:** the prompt points "it" with nothing in focus at the
+  focus ("remove size 1 yd from it" → "Which material do you mean?", today's)
+  and never clarifies to confirm what was said ("link Elm House to Carla
+  Diaz" is the link). A note with nothing said is `add_note` with no body,
+  an activity `add_activity` with no name (both now optional): the policy
+  asks today's "What should the note say?" / "What's the activity called? …"
+  (`policy.NOTE_TEXT`, `ACTIVITY_NAME`; words in `record_notes` and
+  `detail_questions`), the reply taken as the text or name however it reads
+  ("Remove Sod"); and the executor never runs either without one
+  (`field:add_note.body`, `field:edit_estimate.add_activity.name`) — a name
+  that only says what it is ("activity") is none. This is the "activity"
+  activity found in 7b, closed.
+- **No guess (`said.py`):** a material's size the message doesn't say (the
+  details just showed "Size: 2 cu ft") is left out, so the policy asks which
+  size — the second wrong write found in 7b, closed; and an estimate filter's
+  record by a name the message never names (a word of it counts: "Bob" names
+  Bob Lee) is today's turn — dropped, it would widen the answer.
+- **A planner question answered** goes into the request with the question
+  (`— asked "What status would you like?": New Request`): bare, "update task
+  T0003 — status — New Request" was planned as an answer with nothing asked.
+- **Run (full, 275):** 247 pass (224 at 7b part 2d); 514 of 564 turns on the
+  planner; 26 failures count (49). Fixed: the 13 rows where the planner asked
+  its own question, "Next Week", the note and activity questions, the size,
+  the metrics follow-ups. Of the 26: the five task titles (7e), the reads in
+  the wrong shape and "give me a summary" (7d), "delete my note on Ana Reyes"
+  (a note the plan can't point at until listed — 7d), and the sold counts
+  (7e's "worth $0.00" check). Found: the model sometimes puts a `domain` on a
+  work-item pick, which the schema forbids — an invalid plan, the turn today's.
+- **The acceptance report** keeps each call's checked actions with
+  `ACCEPTANCE_DEBUG=1` (`turn["checks"]`), to read a turn by.
+- **Tests:** `test_planner_said.py`, `test_planner_create_asks.py`,
+  `test_planner_execute.py`, `test_planner_snapshot.py`, `test_planner_turn.py`,
+  `test_planner_questions.py`, `test_planner_confirm.py`. Parity run owed (the
+  prompt and the schema changed).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
