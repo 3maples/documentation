@@ -1118,6 +1118,49 @@ Phase 6 is split: **6a** a create from a description (and its property),
   `test_planner_questions.py`, `test_planner_confirm.py`. Parity run owed (the
   prompt and the schema changed).
 
+### 7.24 As built: phase 7d, part 1 — reads in the shape asked (2026-10-10)
+
+- **The dashboard as a whole** ("show me my dashboard", "give me a summary")
+  is `dashboard {card: summary}`: today's "Here's a quick summary, including
+  tax:" with Pipeline, Backlog and Completed (`dashboard_reply` gains the
+  card; windowed and before tax as today's summary is; "all time" is today's).
+- **"How many" is a count:** `list_work_items` takes `count` ("Estimate E0001
+  has 2 work items.", today's `work_items_reply`); the prompt says a "how
+  many" is the list's count — "how many won and lost estimates?", "how many
+  estimates for Maintenance?" (the division's count) — never a list or a
+  figure.
+- **A material's sizes** (`get_material {field: sizes}`, which the executor
+  read as the details before): today's "Black Mulch comes in 2 sizes: 2 cu ft
+  at 4.40, 1 yd at 38.50." (`MaterialAgent.material_sizes_reply`, the one
+  sizes line both pipelines use).
+- **The materials or roles on an estimate** ("what materials does E0001
+  use?", "which roles are on E0001?") are `list_materials` / `list_labours
+  {filter: {related: the estimate}}` — today's per-estimate lists
+  (`materials_on_estimate_reply`, `roles_on_estimate_reply`), the estimate
+  read within the company and passed whole (`_estimate_materials_reply`,
+  `_estimate_labours_reply`, today's handlers after their lookup). Related
+  to anything else, or asked with a count or another filter ("how many
+  materials does E0001 use?", "is a Foreman on E0001?"), is still today's:
+  the estimate's whole list would answer wider than asked (review
+  2026-10-10 #1, #2).
+- **The summary over a period** ("give me a summary for this month") is the
+  calendar month, as every planner figure reads it, and says "this month";
+  today's reads it as the last 30 days ("in the last month").
+- **A follow-up only leans on the last read:** a question that says it all
+  is planned fresh — "what's the total value of my Maintenance estimates for
+  Bob Lee before tax?" came back a `redo_last` that kept the last figure's
+  "recurring" (a prompt line).
+- **Run (the 66 conversations with a figure, an estimate list, a follow-up,
+  an acknowledgement, the dashboard, sizes, lines or counts):** 57 pass (50).
+  Left for 7d part 2: the properties that use a material or role, a list
+  narrowed by price or "overdue", "delete my note on Ana Reyes". For 7e: the
+  sold counts that name their statuses, "estimates from last month", "you
+  don't have any estimates that use Topsoil", a list's total as a figure.
+- **Tests:** `test_planner_read_shapes.py` (new); `test_planner_execute_reads.py`
+  (a contact's materials still today's); `test_planner_execute_figures.py` (the
+  summary beside today's, over a month, and all time today's). Parity run owed (the prompt and the
+  schema changed).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
