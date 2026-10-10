@@ -990,6 +990,51 @@ Phase 6 is split: **6a** a create from a description (and its property),
 - **Tests:** `test_planner_create_asks.py` (new), `test_planner_asks.py` (two
   examples of "still today's" moved to an estimate's work).
 
+### 7.21 As built: phase 7b, part 2d — which size, which teammate, which status (2026-10-10)
+
+- **The planner asks, in today's words:** the policy keeps what it looked up
+  (`ActionCheck.options`: the material's sizes, the teammates a name matched,
+  the company's statuses), and the planner asks today's question with it —
+  "Black Mulch comes in 2 cu ft and 1 yd — which size should I change?",
+  "More than one teammate is called Jordan: … Which one?", "Who should I
+  assign the task to? …", "I don't recognize 'Parked' as one of your task
+  statuses. Your statuses are: … Which one should I use?". The words live once,
+  in `agents/conversation/detail_questions.py`, which today's agents now read
+  too.
+- **The answer replaces the name** the user wrote ("give it to Jordan" →
+  "give it to Jordan Park"), else is added after its field ("change its
+  price to 5 — size: 2 cu ft"); a number or a name picks from the menu, a
+  teammate going into the request by their email. Any of the company's names
+  answers, a teammate's among them (`_is_any_name`).
+- **A task create runs as today's:** a teammate or status it can't use is
+  today's create's to say — the task is written and the reply says what it
+  couldn't apply (the corpus pins it); a create missing its text asks for that
+  first.
+- **Still today's:** two details on one change, a detail beside another
+  reason (a stale focus).
+- **Found by the run, fixed: a request planned again read as an answer.** The
+  planner's history still ended with Maple's question and the reply, and
+  beside them the rewritten request ("give it to Jordan") was planned as an
+  `answer` with nothing asked — a fallback, and today's pipeline then wrote
+  the rewritten text literally (a task titled "— text: Create estimate for
+  Bob"). On a request planned again the planner's copy now drops both
+  (`snapshot.planner_context`). This was so for every answered planner
+  question since 7b part 1. The acceptance report now reads every planner call
+  in a turn (`acceptance.turn_record`), the last one answering.
+- **Run (full, 275):** 224 pass (222 in 7a); 488 of 541 turns on the planner
+  (416 of 536); 49 failures count (52). Of the 56 conversations with a
+  material or task update or a task create, 48 pass (49) and 112 of 116 turns
+  are the planner's (83 of 117); the one fewer is the size guessed below, and
+  "move it to Next Week" (7c's) flipped back. Run alone after the history
+  fix, the five that ask a detail and resume (which size, two Jordans, no Zed,
+  two unknown statuses) passed, every turn on the planner.
+- **Found, for 7c:** "change its price to 5" after a material's details
+  showed "Size: 2 cu ft" was planned with that size and changed it — a field
+  the user never gave, like the "activity" activity.
+- **Tests:** `test_planner_detail_asks.py` (new), `test_planner_turn.py`
+  (the history), `test_planner_acceptance_report.py` (every call),
+  `test_named_answers.py` (a teammate).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
