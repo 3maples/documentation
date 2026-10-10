@@ -891,6 +891,48 @@ Phase 6 is split: **6a** a create from a description (and its property),
   to today's pipeline (56 turns in the first run). **7b part 2**, reason by
   reason, a run after each.
 
+### 7.18 As built: phase 7b, part 2a — "which record?" in today's words (2026-10-09)
+
+- **Today's wording, as the rule is read:** today words one situation many
+  ways (six "which estimate" questions; "No contact found with name 'X'." in
+  the agent, "I couldn't find a contact called X." from the router; several
+  asks are statements — "Please specify which material name."). The planner
+  uses the corpus's wording where it pins one, else the asking agent's own
+  question, and "Which {noun} do you mean?" where today only says "Please
+  specify …" (`agents/planner/asks.py`).
+- **Covered:** one record the plan can't point at (`target`, `estimate`, a
+  link's sides, `property`, `template`, `parent`) — a name matching several
+  ("More than one contact matches that: …", today's estimate and task
+  menus), none ("I couldn't find a contact called Zed. Which contact did you
+  mean?", "I couldn't find an estimate with code E0099. …", an estimate
+  link's "I couldn't find a property matching "99 Pine St". …"), or "it"
+  with nothing in focus ("Which material do you mean?", "Which task did you
+  mean? Tell me its name or ID.", "Which estimate? Please share …"). The
+  turn asks before the gate (`turn._ask_back`); the question is a rewrite
+  question planned again — the name replaced by the answer when the user
+  wrote it, else the answer added. Still today's to ask (`ask:<why>`): any
+  other reason (an update with nothing to change, a create's missing field,
+  a size, a teammate or status — parts 2b–2d), two records at once, a
+  filter's or a metric subject's record — and any plan holding an action the
+  executor can't run yet (`execute.uncovered_actions`, checked first: the
+  answer would only be planned again to fall back).
+- **The answer:** "the second one" / "2" pick from the menu shown (its own
+  order, by name — two corpus rows that pin today's order are explained);
+  a word only one option has picks it ("the backyard one", the planner's
+  questions only); a task's title, an estimate's or a template's name answers
+  the planner's "which task / estimate / template?" however it reads (name
+  sources for `("Maple", "task" | "estimate" | "template")`); an estimate named by its code and title ("E0003
+  Backyard patio", as the menu offers it) resolves by its code.
+- **A request planned again counts its focus from the turn it was made**
+  (`resolve.PLANNED_AGAIN_KEY`, set by the router for that one turn): "assign
+  it" — "Who …?" — "Jordan" no longer finds the task in focus stale.
+- **Run:** the 56 conversations with a policy ask — 50 pass (most of the
+  rest are part 2b's: an update with nothing to change, where the planner's
+  question and today's field flow now mix); turns on the planner 66 of 142.
+- **Tests:** `test_planner_asks.py` (35), the resolver's code-and-title,
+  `test_planner_deletes_estimates_notes.py` (two fallbacks renamed
+  `ask:other`).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
