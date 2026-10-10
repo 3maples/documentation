@@ -1035,6 +1035,47 @@ Phase 6 is split: **6a** a create from a description (and its property),
   (the history), `test_planner_acceptance_report.py` (every call),
   `test_named_answers.py` (a teammate).
 
+### 7.22 As built: phase 7c, part 1 — the stray yes and the words said (2026-10-10)
+
+- **Decided (Simon, 2026-10-10):** a window carries its unit on the plan; a
+  window the message doesn't say is today's to read; the company's task
+  statuses go into the planner's state ("move it to Next Week"); and where the
+  planner asks its own question but today asks a specific one, the plan names
+  what's missing and the policy asks in today's words (part 2).
+- **A stray yes or no** with nothing asked is today's "I'm not waiting on an
+  answer right now — what would you like to do?" (`meta.meta_reply`), not
+  "You're welcome".
+- **The plan as the user said it** (`agents/planner/said.py`, applied before
+  a follow-up is expanded, so the stored read keeps it):
+  - the sold set named by the word said — "Won value" for "won", "Sold value"
+    for "sold";
+  - the Won status alone only when said outright ("in Won status", and a
+    breakdown's "won vs lost status"), as #784 — the model's `literal_won`
+    for "lifetime won amount" counted Won alone;
+  - a window in the unit said: "the last 6 months" is `days=6,
+    window_unit=month` (a new plan field, on a metric and an estimate
+    filter), read with today's rolling-window rule (`metric_query.said_window`)
+    — never "the last 183 days", in a first figure, its follow-up or a list.
+- **A window the message doesn't say** (`said.unsaid_period`) — the model
+  carried "the last 180 days" from the history into "draft vs sent vs won vs
+  lost for Maintenance" — hands the turn to today's pipeline, which reads the
+  message alone; a follow-up keeps its stored window.
+- **"won" in an estimate list** is the sold set unless the Won status is said
+  (`execute_estimates._estimate_list_ask`), and the reply names what it
+  counted: "won and lost estimates (Won, Scheduled, Completed, Lost)".
+- **"does that include tax?"** leads with today's words — "That was before
+  tax. Here it is including tax:" (`tax_followup.tax_lead_text`, shared;
+  `followups.tax_lead` / `with_tax_lead`) — only above the figure it promised.
+- **Run (the 60 conversations with a metric, an estimate list, a follow-up or
+  an acknowledgement):** 48 pass (42). Found, not this part's: the model
+  carries a customer from the history too ("how many won and lost
+  estimates?" counted Bob Lee's — 7c part 2, with the period's rule); a
+  refinement by price or "overdue" read as words (7d).
+- **Tests:** `test_planner_said.py` (new), `test_planner_execute.py`,
+  `test_planner_execute_figures.py`, `test_planner_execute_estimate_list.py`,
+  `test_planner_followups.py`, `test_planner_turn.py`. Parity run owed (a
+  schema field).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
