@@ -856,6 +856,41 @@ Phase 6 is split: **6a** a create from a description (and its property),
   answers (2, 4), 7d the read shapes (3), 7e the explained rows (5), a run
   after each; then Simon's judgement (§11 of the design).
 
+### 7.17 As built: phase 7b, part 1 — the planner's own questions (2026-10-09)
+
+- **A plan that is a question** ("Which material should I remove the 1 yd size
+  from?") is asked in the planner's words and kept as an open question
+  (`execute.ask_again`: a rewrite record, `record_names.ask_to_rewrite` with
+  nothing to replace and `replan`). The next reply is its answer unless it is
+  a cancel or a new request (the one question gate); the answer is added to
+  the request — "remove size 1 yd from it — Black Mulch" — and the router
+  plans it again whole (the `REPLAN_KEY` path).
+- **"Okay — which contact did you mean?"** after a no to the planner's "Just
+  to check" is kept the same way, on the kept request: "no" → "Bob Lee"
+  updates Bob Lee.
+- **A new request where the planner's question waited** is the planner's: the
+  gate drops the question and the router plans the request (it went to
+  today's pipeline before — so did the answer to any of the planner's name
+  questions that turned out to be a new request).
+- **A record named by the plan but not by the user is the focus** (found by
+  the acceptance run: a wrong write). "change her phone …" planned with the
+  focused contact's name instead of the focus resolved by name and was never
+  stale, so a write through a stale focus ran unasked. The policy now treats
+  a name the user didn't say that lands on the record in focus as the focus
+  (`resolve.named_from_focus`): a word of the name in the message is the
+  user's naming.
+- **Run:** the 35 conversations with a planner question or a stale focus — 15
+  pass (12 before); the stale-focus writes ask again. Found: "add an
+  activity to work item 2" added an activity named "activity" — a field the
+  user never gave (7c, first).
+- **Decided (Simon, 2026-10-09): the planner asks in today's words.** Where
+  the policy asks — no record in focus, a name matching none or several, an
+  update with nothing to change, a create missing its name or cost, which
+  size, a teammate or task status — the planner asks today's question
+  itself, keeps it and plans the answer again, instead of handing the turn
+  to today's pipeline (56 turns in the first run). **7b part 2**, reason by
+  reason, a run after each.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
