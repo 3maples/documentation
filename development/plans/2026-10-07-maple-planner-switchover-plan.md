@@ -960,6 +960,36 @@ Phase 6 is split: **6a** a create from a description (and its property),
   today's field flow before), every turn on the planner.
 - **Tests:** `test_planner_asks.py` (49), `test_named_answers.py` (+3).
 
+### 7.20 As built: phase 7b, part 2c — a create missing what it needs (2026-10-10)
+
+- **Today's handler asks, the planner keeps it:** a contact, property,
+  material or role create missing what it needs runs through today's create
+  handler (`asks.handler_asks`: one record create, its only reasons the
+  policy's create needs), which asks for the next missing field in today's
+  words and order — the material's category, unit, size and cost, the role's
+  wage and how it's paid, a contact's last name — and writes nothing. The
+  planner takes that question as its own (`asks.keep_create_question`, on the
+  turn's state from before the create ran, so today's own record of it is
+  dropped). So does a create the policy passes whose handler still asks (a
+  role with a wage and no unit).
+- **The answer, after the field it gives:** "create a new material called
+  River Rock — category: Stone" (`record_names.ANSWER_LABEL_KEY`), planned
+  again whole; the label is the field today's question asks for (a contact's
+  "name", a property's "address", a role's "wage").
+- **A task's text the planner asks itself:** "What should the task say?"
+  (`task.create.TASK_TEXT_QUESTION`) — the planner's task create names a task
+  from its notes and would write an empty one. Its answer is the text however
+  it reads (`PLANNER_TEXT`, a free-text value: "Create estimate for Bob", #470).
+- **Still today's:** an estimate's work (today's gathering flow), a create
+  need beside another reason (a teammate or task status — part 2d), two
+  creates at once.
+- **Run:** the 27 conversations with a record or task create — 22 pass, as
+  before; turns on the planner 50 of 53 (29 before). The five failures are the
+  7a ones: a task's title the corpus pins with its clauses ("Call Bob
+  tomorrow"), 7e's.
+- **Tests:** `test_planner_create_asks.py` (new), `test_planner_asks.py` (two
+  examples of "still today's" moved to an estimate's work).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
