@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-07
+**Last updated:** 2026-10-09
 
 ### Recent changes
 
@@ -1712,6 +1712,8 @@ When a **create-estimate** request names a template, `delegate_create_estimate` 
 | reply with an **incompatible** unit (area vs length) | Re-asks for the size in the baseline's unit. | ✅ rule |
 | `No` / `skip` to the size question | Instantiate at the baseline (1×) and proceed (no cancel). | ✅ rule |
 | `cancel` / `never mind` to the size question | Cancels the estimate request. | 🛑 cancel |
+| `create an estimate at {property} from the {template} template` | Today's: the property named isn't read (only the page's). The planner links it, and keeps it across the size question. | ⚠️ today; right on the LLM planner *(2026-10-09, switchover phase 6b)* |
+| `apply the {template} template to {EST} at 400 sq ft` | Today's: added at the baseline, the size unread. The planner scales it (a unit that can't convert adds nothing and says why). | ⚠️ today; right on the LLM planner *(2026-10-09, switchover phase 6b)* |
 
 **Scaling** (`agents/estimate/template_scaling.py`): multiplies material/labour/equipment quantities, activity effort, and the work-item `sub_total` by the factor; prices/rates unchanged. Linear across all line items — no per-item fixed-fee exemption. Pre-handler: `handle_pending_template_size` in `routers/agent_helpers/template_estimate.py`.
 

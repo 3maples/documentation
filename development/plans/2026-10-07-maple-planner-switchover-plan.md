@@ -719,7 +719,7 @@ Phase 6 is split: **6a** a create from a description (and its property),
   and linked it to property 'Birch House'." Today's function reads the request
   (the template's name, the property in the text) and then calls the same
   core. A customer (no link on create, §8), a template or a template size
-  falls back (`field:create_estimate.<field>`) until 6b.
+  falls back (`field:create_estimate.<field>`) until 6b (§7.14).
 - **Overage** (#279): the policy's confirm (`policy.OVERAGE_REASON`) is asked
   by the planner's confirmation in today's words, "… Additional charges will
   apply at $3/additional estimate. Create it anyway?", alone (with another
@@ -733,6 +733,41 @@ Phase 6 is split: **6a** a create from a description (and its property),
 - **Tests:** `test_planner_create_estimate.py` (10; generation and the
   sufficiency read stubbed, the company, property and estimate real).
 
+### 7.14 As built: phase 6b — templates (2026-10-09)
+
+- **A create from a template** (`create_estimate` with `template`): today's
+  template create once the request is read, split out of
+  `begin_template_estimate` as `template_estimate.template_estimate_reply`
+  (S2). Today's reads the template's name and the size from the message; the
+  planner passes the template it resolved, `template_size` and the new
+  `template_size_unit`. A template with no baseline is used as it is (a size
+  ignored, as today); one with a baseline is scaled, the size converted from
+  its unit (`template_scaling.template_factor`, no unit: the template's own).
+  No size, or one in a unit that can't convert, is today's question ("What's
+  the size of this job (in square feet)?"), whose next turn is today's.
+- **The property is linked**, which today's template create never read from
+  the message ("… from the 'Spring Cleanup' template and linked it to property
+  'Birch House'."). It rides on the size question
+  (`pending_template_size.property_id`), so the answer keeps it.
+- **Overage** asks first, as for a create from a description (§7.13).
+- **`apply_template`**: today's handler's tail, split out as the agent's
+  `_add_template_work_item`, reached through `planned.apply_template_reply` on
+  the estimate the planner resolved, under today's edit lock (a locked
+  estimate is the policy's refusal, answered by today's). **Scaled to the size
+  the plan read** (`size`, the new `size_unit`) — today's apply never read a
+  size and added the template at its baseline. With no size it is added as it
+  is; a size that can't convert writes nothing and says why
+  (`template_scaling.unit_mismatch_reply`, classified `template_unit` by the
+  unanswered tracker).
+- **Schema:** `template_size_unit` and `ApplyTemplate.size_unit`, a template's
+  four units; a size said in any other unit is left out (the field
+  descriptions say so), so Maple asks for it. A size with no template still
+  falls back (`field:create_estimate.template_size`), as does a customer. Owes
+  the parity run.
+- **Tests:** `test_planner_templates.py` (21); today's template create and
+  apply pinned in `test_template_create_routing.py` and
+  `test_maple_template_crud.py`.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
@@ -740,7 +775,7 @@ it (a schema change, with a parity run):
 
 - `convert_task.delete_task` — no delete-after-convert anywhere.
 - `create_estimate.customer` — only a property is linked today (falls back, phase 6a).
-- `apply_template.size` — scaling exists only when creating from a template.
+- ~~`apply_template.size`~~ — done in phase 6b (§7.14): the applied template is scaled.
 - ~~`edit_estimate` on **every** work item~~ — done in phase 4c (§7.8): one
   command per work item.
 - ~~Several task fields in one update~~ — done in phase 4b (§7.7).
