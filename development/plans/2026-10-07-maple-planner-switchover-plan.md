@@ -802,6 +802,60 @@ Phase 6 is split: **6a** a create from a description (and its property),
   in `test_estimate_assumption_adjustment.py` and
   `test_assumption_adjustment_targeting.py`.
 
+### 7.16 Phase 7a — the acceptance run and its first result (2026-10-09)
+
+- **The run:** `tests/test_planner_acceptance_live.py` (`-m llm_e2e`), every
+  acceptance conversation through the endpoint with its seeded company listed
+  in `MAPLE_SHADOW_COMPANIES` — production's switch — the planner live and
+  today's pipeline at the rules tier behind it. Scored on each reply's
+  fragments and `after` checks (`tests/planner_parity/acceptance.py`; a
+  different intent, agent or question flag is a note, never a failure). A
+  conversation stops at its first failing turn. It counts against the run
+  unless it is a gap of today's or explained
+  (`explained.EXPLAINED_CONVERSATIONS`). Report:
+  `tests/reports/planner_acceptance.md` / `.json`. About 540 worker-model
+  calls, 4 minutes, roughly $0.20.
+- **First run:** 226 of 275 conversations pass; 408 of 541 turns are the
+  planner's; one gap of today's closed. Turns handed back: an open question
+  of today's (57), `decision:ask` (56 — the planner's own questions and
+  name questions), `decision:refuse` (4), list filters not read yet (city,
+  role, related: 7), and five planner errors. The 49 failures:
+  1. **The planner's own questions don't carry to the next turn** (~15) — "Which
+     material should I remove the 1 yd size from?", "What note would you
+     like to add to Bob Lee?", "What would you like to update on task
+     T0003?", "which contact did you mean?" after a no. **Decided (Simon,
+     2026-10-09): keep the question and plan again** — the planner's question
+     is kept as an open question (as 5a's confirmations are), its answer is
+     written into the request, and the request is planned again whole; where
+     today has its own words for the question, the planner uses them.
+  2. **A bare yes or no with nothing asked** (4) is acknowledged ("You're
+     welcome") instead of today's "I'm not waiting for an answer".
+  3. **Reads in the wrong shape** (~11): the dashboard (pipeline only), "give
+     me a summary" and "who are my best customers?" asked back, an overdue
+     count grouped by assignee, "how many work items" listed, a material's
+     sizes as its details, "which properties use Black Mulch?" as
+     estimates, "what materials does E0001 use?" as work items, a
+     material's quantity across estimates as a count, "what's the total of
+     those?" after a list.
+  4. **Wrong answers** (~8): "won and lost" and "won amount" counting the Won
+     status alone (bare "won" is the sold set); "the last six months" said
+     back as 183 days; "does that include tax?" without "That was before
+     tax"; "move it to Next Week" setting a due date over the status of that
+     name; someone else's note listed instead of refused.
+  5. **The corpus pins today's words where the planner's answer is right or
+     equal** (~11) — a task's title without the due-date words ("Call Bob",
+     due tomorrow, where today's titles it "Call Bob tomorrow"), sold counts
+     naming their statuses, a metric's wording — explained, each with its
+     reason. Two to check first: "estimates from last month" finding none
+     (the engine's dating, sold ones by `sold_at`?) and a sold count "worth
+     $0.00".
+- **Decided (Simon, 2026-10-09): "my tasks" is the user's own** on the
+  planner ("show my overdue tasks" filters to the user); today's reads the
+  company's, so `task-overdue-filter` is explained.
+- **Next:** 7b the planner's questions (1), 7c the stray yes and the wrong
+  answers (2, 4), 7d the read shapes (3), 7e the explained rows (5), a run
+  after each; then Simon's judgement (§11 of the design).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
