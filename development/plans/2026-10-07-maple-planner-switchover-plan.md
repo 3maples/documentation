@@ -1286,10 +1286,19 @@ Phase 6 is split: **6a** a create from a description (and its property),
   action has no burden field. The prompt now says reading the burden or the
   unbillable rate is get_labour with no field (the role's wage and Rate);
   checked live, every role-field read and every burden setting across the
-  states, three times: all as expected. Left for a later prompt pass: "what
-  are the estimate divisions / units?" refused as out of chat (it's help),
-  and update_activity / add_work_item_note planned as actions (16 invalid
-  plans, each falling back to today's before anything runs).
+  states, three times: all as expected.
+- **Two prompt misses from the run, fixed:** "what are the estimate
+  divisions / units?" was refused as out of chat — asking which there are is
+  help, only adding, renaming or deleting one is out of chat (75 of 75 help
+  live; adding a division still refused). And a line or work-item note edit
+  was planned as an action (update_activity, add_work_item_note) or with the
+  line in the work item's place: the prompt now shows both commands whole
+  and says a command's target is always the work item, its line named in
+  activity_query / material_query. Live, the 530 cases on divisions, units,
+  activities, notes and rates three times: 77% as expected (67% in the
+  run), invalid plans 97 → 12. Still invalid: "add a note to the patio work
+  item please" (a work-item note with no text; today's asks for it after
+  the fallback).
 
 ## 8. Plan fields with no handler today
 
