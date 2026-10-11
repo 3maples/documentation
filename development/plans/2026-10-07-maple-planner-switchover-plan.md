@@ -1161,6 +1161,74 @@ Phase 6 is split: **6a** a create from a description (and its property),
   summary beside today's, over a month, and all time today's). Parity run owed (the prompt and the
   schema changed).
 
+### 7.25 As built: phase 7d, part 2 — narrowed lists and a note by its record (2026-10-10)
+
+- **The properties that use a material or need a role** ("which properties
+  use Black Mulch?", "show me jobs needing a Foreman") are `list_properties
+  {filter: {related: the material or role}}` — today's "Properties with an
+  estimate that uses Black Mulch:" (`PropertyAgent.properties_using_reply`;
+  the words in `_cross_response`, shared with today's list), the record read
+  within the company, the rows recorded. With a count or another filter it
+  is today's, as an estimate's lines are (7d part 1). The planner listed
+  estimates before.
+- **The contacts at a property as a list** ("and 9 Maple Ave?" after "who
+  lives at 12 Oak St?", planned as `list_contacts {filter: {related}}`) are
+  today's `contacts_of_property_reply`, as `get_property {field: contacts}`
+  is; with a name filter, or related to anything else, today's.
+- **An amount is a filter:** `EstimateFilter.total_above` / `total_below`
+  ("estimates over $1000", strictly, on the total with tax, as today's list
+  reads it; `list_core.EstimateListAsk.amount_over` / `amount_under` on the
+  engine's `MetricQuery`), said as today says it ("over $1,000",
+  `text_helpers.amount_words`, which today's `_scope_label` now uses).
+- **Refining the list just shown** (`refine_last`) takes `above` / `below`
+  ("only the ones over $1000": an estimate's total, a material's price),
+  `overdue` (tasks), `total` ("what's the total of those?" — that list's
+  total, where the model planned a company-wide metric, $2,050 for $1,250)
+  and `sold` ("how many have been sold?"). A refinement a list can't take is
+  today's (`followup:refine_last.<op>.<what>`). Before, "only the ones over
+  $1000" searched titles for "over $1000", and "just the overdue ones" failed
+  the schema.
+- **"delete my note on Ana Reyes"** is `delete_note {parent, mine}`: the
+  note is found as today's finds it (`record_notes.notes_to_delete`, shared:
+  the user's own, else — without "my" — one they may delete), by
+  `agents/planner/note_pick.py`, and asked about and deleted as a listed one
+  is (5c). None or several are today's to answer ("You don't have any notes
+  on Ana Reyes to delete.", its list of them). A parent with no kind said is
+  a contact's, then a property's, as today's note reader tries them
+  (`policy._UNSAID_KIND`; the model left the kind off). Before, the planner
+  asked "Which note on Ana Reyes would you like me to delete?".
+- **Said as the user said it** (`said.py`): a refinement to the sold set's
+  statuses with "sold" said is `sold` ("2 won, scheduled and completed
+  estimates (Won, Scheduled, Completed)" before); "my tasks" is the user's
+  own (Simon, 2026-10-09) — the model applied it some turns and not others.
+  `task-list-show-more` and `task-list-refined` are explained for it, as
+  `task-overdue-filter` is.
+- **"does that include tax?" is the figure the other way**, whatever
+  `before_tax` the model wrote (`followups.asked_about_tax`, as today's
+  `tax_followup` re-runs it): after "give me a summary" it planned the
+  summary again, including tax.
+- **The prompt:** one line for the properties, one for amounts and
+  refinements. Part 1's "a question that says it all is planned fresh, never
+  redo_last" made the model clarify a name ("Which property did you mean by
+  'St'?", "Which Smith do you mean?") and drop "won vs lost status"'s
+  statuses — bisected, line by line, each three runs. It is now "redo_last is
+  for a message that leans on the last read; a whole question is its own
+  action", and the clarify rule says Maple lists the matches and asks. A "Never
+  ask which note" line did the same and was dropped (the schema says it).
+- **Run (the whole corpus, 275 conversations):** 253 pass, 17 counting
+  against (7c: 247, 26). Every 7d part 2 row passes. Left for 7e: the sold
+  counts that name their statuses (three rows), "estimates from last month",
+  "you don't have any estimates that use Topsoil", a list's total answered as
+  a figure, the estimate details' missing "Title:" line, the five task titles,
+  "which material?" then a new edit, and a work item note's text ("drainage"
+  where today's keeps "about drainage").
+- **Tests:** `test_planner_read_shapes.py` (properties, contacts at a
+  property), `test_planner_execute_estimate_list.py` (amounts),
+  `test_planner_followups.py` (refinements, the tax question),
+  `test_planner_said.py` (sold, my tasks), `test_planner_deletes_estimates_notes.py`
+  (a note by its record), `test_planner_policy.py` (a parent with no kind),
+  `test_planner_turn.py` (the tax question on a turn). Parity run owed.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering

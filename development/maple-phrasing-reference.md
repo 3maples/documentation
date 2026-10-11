@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-09
+**Last updated:** 2026-10-10
 
 ### Recent changes
 
@@ -1807,10 +1807,10 @@ own filters match (`list_filters.task_group_of`). **Open tasks** unless
 | `tasks assigned to Jordan due today` / `tasks assigned to Jordan Crew at 12 Oak St` / `tasks assigned to Jordan marked done` | `list_tasks` filtered by the assignee and the other filter | ✅ rule *(2026-10-02, #717 — the surname is a capitalised word that opens no other filter; "assigned to Jordan due today" was a teammate called "Jordan due")* |
 | `tasks for Jordan` | property first, then teammate | ✅ rule *(2026-09-27)* |
 | `unassigned tasks` | `list_tasks` with no assignee | ✅ rule *(2026-09-27)* |
-| `list my tasks` | `list_tasks` (ALL tasks — "my" is not an assignee filter, matching every other resource; use "assigned to me" to filter) | ✅ rule |
+| `list my tasks` | `list_tasks` (ALL tasks — "my" is not an assignee filter, matching every other resource; use "assigned to me" to filter) | ✅ rule; on the LLM planner "my tasks" is the user's own (Simon, 2026-10-09; `agents/planner/said.py`, 2026-10-10 switchover phase 7d) |
 | `tasks in progress` / `show done tasks` / `list to do tasks` / `tasks with status {status}` | `list_tasks` filtered by status | ✅ rule *(2026-09-27; "to do" is a status only before "tasks" — "my to-dos" are all tasks)* |
 | `show open tasks` / `what's still to do?` | `list_tasks` leaving out finished tasks (a status named Done / Completed / Finished / Closed / Cancelled) | ✅ rule *(2026-09-27)* |
-| `show my overdue tasks` / `what's overdue?` | `list_tasks`, due before today and not finished, soonest first with each due date | ✅ rule *(2026-09-27)* |
+| `show my overdue tasks` / `what's overdue?` | `list_tasks`, due before today and not finished, soonest first with each due date | ✅ rule *(2026-09-27)*; on the LLM planner `show my overdue tasks` is the user's own (as above) |
 | `what's due today?` / `tasks due tomorrow` / `tasks due this week` / `tasks due next week` / `tasks due by Friday` / `tasks due on Oct 3` / `today's tasks` / `tasks for next week` | `list_tasks` with a `due_date` window, soonest first | ✅ rule *(2026-09-27 — no "task" word needed: only tasks have due dates. A week runs Monday to Sunday.)* |
 | `what's due?` / `anything due?` / `what's due next?` / `what's due now?` / `anything due already?` / `what's due for Jordan?` | the upcoming list below — for Jordan, property first, then teammate | ✅ rule *(2026-10-02, #718 — no date read meant no filter: every task, finished ones included, under "Here are your tasks", and "for Jordan" was dropped with the unread date)* |
 | `what's due for Jordan this week?` | due this week, for Jordan | ✅ rule *(2026-10-02 — "Jordan this week" was read as a place. A bare "this/next week/month" is a window only in a due question)* |
