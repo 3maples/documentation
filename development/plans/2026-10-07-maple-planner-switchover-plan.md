@@ -1278,8 +1278,18 @@ Phase 6 is split: **6a** a create from a description (and its property),
   `test_open_question.py` (the planner's which-record and detail
   questions), `test_planner_said.py` (a date as a status, a breakdown's
   rows), `test_planner_detail_asks.py` (a date-like status the company
-  lacks), `test_planner_acceptance_report.py` (explained ids). Parity run
-  owed.
+  lacks), `test_planner_acceptance_report.py` (explained ids).
+- **Parity run (2026-10-10, the first since 2026-10-07):** 4,022 of 4,897
+  agree, run or refuse as expected (3,910 before), 804 differ (927); the
+  conversations unchanged (551 agree, 30 differ). One blocker: "what's the
+  labor burden for the role Foreman?" was refused as setting it — the read
+  action has no burden field. The prompt now says reading the burden or the
+  unbillable rate is get_labour with no field (the role's wage and Rate);
+  checked live, every role-field read and every burden setting across the
+  states, three times: all as expected. Left for a later prompt pass: "what
+  are the estimate divisions / units?" refused as out of chat (it's help),
+  and update_activity / add_work_item_note planned as actions (16 invalid
+  plans, each falling back to today's before anything runs).
 
 ## 8. Plan fields with no handler today
 
