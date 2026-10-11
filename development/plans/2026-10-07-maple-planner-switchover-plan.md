@@ -121,9 +121,11 @@ branch; returns a result dict for `_finalize_result`, or `None` to fall back.
      record; a yes next turn executes the stash with `confirmed=True`, a no
      declines with today's words and `cancelled=True`.
    - `run` → execute (§6).
-7. **The unanswered tracker** records the planner's own outcome
-   (`maple_shadow.planner_outcome`, `pipeline="planner"`) instead of
-   classifying the reply.
+7. **The unanswered tracker** records the planner's turns only (D22): a turn
+   it ran on its plan's outcome (`maple_shadow.planner_outcome`), else on its
+   reply (`maple_outcomes.classify` — the planner runs today's handlers, and a
+   write can fail after the check); a fallback as `planner_gap` with its
+   reason. Today's pipeline isn't tracked.
 
 ## 6. The executor
 
@@ -216,7 +218,9 @@ language reading is its own change, four weeks after the last switch.
   `planner`; a fallback is compared like a shadow turn; one the planner
   wasn't asked about is `skipped`. A turn the planner ran records the
   planner's own outcome in `maple_unanswered` (pipeline `planner`) instead of
-  classifying the reply. The session export shows a ran turn on one line, a
+  classifying the reply. *(Revised 2026-10-11, D22: the reply is read too,
+  after the plan; a fallback is recorded as `planner_gap`; today's pipeline
+  isn't tracked.)* The session export shows a ran turn on one line, a
   fallback in full under `FELL BACK (<why>)`, and counts "planner ran / fell
   back" in each header and the index.
 - **Tests:** `test_planner_execute.py` (14), `test_planner_turn.py` (8),

@@ -75,6 +75,7 @@ could not answer (§9).
 | D19 | Staleness by time (was P8) | **An anchor or remembered list older than 24 hours is stale** however few turns ago it was set, so a write through "it" asks first; **an open question older than 1 hour is dropped** — a question lives one turn, or one hour. The snapshot shows each age in turns and in time (§6). For today's Maple the same rule is a separate follow-up | Turns only, as today |
 | D20 | Where the comparison runs (2026-10-07) | **Dev only, then switch over in Dev, then production.** Shadow runs in Dev on Simon's own traffic; the parity suite is the measure, and every phrasing worth keeping becomes a reference row. When the planner works clearly better than today's Maple in Dev, the switchover (§12) is built and used in Dev first; production follows company by company. Phrasing refinements go into the planner only — today's Maple gets fixes for data loss, wrong writes and production bugs. Supersedes D3, D8, §11's window and step 12 | The two-week production window (D3, D8) |
 | D21 | How a company runs on the planner (2026-10-07) | **The companies in `MAPLE_SHADOW_COMPANIES` run on the planner** while `MAPLE_SHADOW_ENABLED` is on; every other company runs today's pipeline, shadowed. No company field: the transition is Dev-only, and at the switchover the planner becomes every company's default and the list goes. Supersedes D5 (company by company) and D11 (the field) | A `Company.maple_pipeline` field and a per-company production rollout |
+| D22 | What the tracker records (2026-10-11) | **Only the planner's turns.** A turn a planner company's planner answered is read on its plan, then on the reply the user saw (a write that failed partway, a refusal from today's handler it ran); the endpoint's own exits (credit refusals, `translation_unavailable`, a 500) count for a planner company. A turn the planner hands to today's pipeline is a `planner_gap`, its detail the fallback reason — what the planner must cover before the switchover. Today's pipeline's own replies record nothing — a company on it, its reply after a planner gap — and the shadow's would-have-failed stays in `maple_shadow_turns` (`planner.outcome`). Today's pipeline goes at the switchover, so its misses aren't worth reviewing. Revises §9.2 and §9.3 | Tracking both pipelines until the switchover |
 
 ## 3. The new pipeline
 
@@ -1059,6 +1060,12 @@ shadow these sit beside the current pipeline's outcome, so the review sees
 "current couldn't, planner would" (and the reverse) on the same turn. After
 switchover the tracker reads the planner's outcome only, and §9.2's
 string-matching is deleted with the pipeline it reads.
+
+*Revised by D22 (2026-10-11): the tracker already records the planner's turns
+only — on its plan, then on the reply the user saw, because the planner runs
+today's handlers and a write can fail after the check has passed. §9.2's
+string-matching stays for that reply; the shadow's outcome is no longer
+recorded in `maple_unanswered`.*
 
 ### 9.4 Storage: `maple_unanswered`
 
