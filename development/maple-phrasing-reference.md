@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-10
+**Last updated:** 2026-10-11
 
 ### Recent changes
 
@@ -1385,6 +1385,7 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `add a note to him: call after 5` (contact in focus) / `add a note to Bob Lee saying …` / `jot down a note for 12 Oak St: …` | files the note, authored by you | ✅ rule *(it asked "which fields?" on the rules tier)* |
 | `add a note: she wants the gate locked` / `add a note: there is a dog` (a task in focus, an older contact or property anchor) | the note goes to the task in focus | ✅ rule *(2026-10-03, #726 — a pronoun inside the dictated note picked the contact or property)* |
 | `add a note: a dog in the yard` / `add a note: the estimate needs review` / `add a note: check the property line` (an estimate, property, contact or task in focus) | the note goes to the record in focus — a domain word in the body names nothing | ✅ rule *(2026-10-04, #806 — "yard" sent it to a property, "estimate" to the estimate. With nothing in focus, or a material or role in focus (they take no notes), the body is still the only signal: `add a note: the estimate needs review` goes to the estimate)* |
+| `Add a note to Elm House. The note should say: remember to buy more trees` / `… It should say: …` / `Add a note to Elm House, the note should say …` / `Add a note to Bob Lee. Note: call after 5` (the words introduced in a sentence of their own) | files the words after "should say" / "Note:" on the record named | ⚠️ gap on the rules tier *(it reads the second sentence into the record's name and says it couldn't find "Elm House. The note should say")*; ✅ on the LLM planner *(Simon, 2026-10-11 — acceptance rows `note-said-in-its-own-sentence*`)* |
 | `add a note to Bob Lee` → *"What should the note say?"* → the text | files the reply, even if it reads like a command | ✅ rule |
 | `note: call after 5` / `Note - bring the trailer` (the shorthand, said first) | files the note on the record in focus | ✅ rule |
 | `Please note: I want to change the markup to 20%` / `please note - the price changed` | not a note — "please note" is "be aware"; the request is read as a request (on the rules tier Maple asks what to do) | ✅ rule *(2026-10-04, #742 — it was filed as a note and the request wasn't carried out. A lead word before a verbless "note" makes it the idiom; with a verb, `please add a note: …` is still a note)* |

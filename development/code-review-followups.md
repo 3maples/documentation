@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **838**. Never
+- **Entries are numbered and permanent.** Next free number: **840**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -5281,6 +5281,16 @@ total row count rather than blank-row count.
 `platform/agents/task/planned.py:122` — (Edge case: a defensive guard no caller reaches.) Every key comes from `TaskFields`, so `raise ValueError(f"no task field {name}")` can't run. It is untested. (review 2026-10-08 (4b) #21, deferred)
 
 **Suggested fix:** Keep it as the explicit guard and add a direct test: `_planned_change("colour", "red", …)` raises ValueError. Or fold `due_date` into the `cleared` table's style and drop the raise.
+
+### 838. [LOW] A failing planner-only acceptance row is listed twice in the report
+`platform/tests/planner_parity/acceptance.py:148` — `render` builds "Gaps of today's still open" from `r["gap"] and not r["passed"]`. A failing `Conversation.planner=True` row also has `counts_against=True`, so it appears under both "Failures that count" and "Gaps of today's still open". The second listing makes a planner regression look expected, and inflates the "still open" count. LOW, not MEDIUM: the run's assertion and the header counts are right; only the report's sections mislead. (review 2026-10-11 #1, deferred)
+
+**Suggested fix:** Exclude counted rows from that section: `[r for r in results if r["gap"] and not r["passed"] and not r["counts_against"]]`. Add a `test_planner_acceptance_report.py` test that renders a failing `planner=True` row and asserts it appears under "Failures that count (1)" and that the report has "Gaps of today's still open (0)".
+
+### 839. [LOW] An explained planner-only acceptance row is reported as a still-open gap
+`platform/tests/planner_parity/acceptance.py:146` — "Explained failures" filters `not r["gap"]`, so a failing `planner=True` row that is in `EXPLAINED_CONVERSATIONS` (counts_against False) lands only in "Gaps of today's still open". The report never shows its explanation where a reader looks for it. LOW: it only matters once a planner row is explained, and none is today. (review 2026-10-11 #2, deferred)
+
+**Suggested fix:** Filter by whether the planner owns the row: `[r for r in results if not r["passed"] and r["explained"] and (not r["gap"] or r["planner"])]`. Carry `"planner": conv.planner` in `conversation_result`'s dict, and drop explained planner rows from "still open". Add a render test with an explained failing `planner=True` row that asserts "Explained failures (1)".
 
 ## Codebase hygiene (batchable)
 
