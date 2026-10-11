@@ -1229,6 +1229,58 @@ Phase 6 is split: **6a** a create from a description (and its property),
   (a note by its record), `test_planner_policy.py` (a parent with no kind),
   `test_planner_turn.py` (the tax question on a turn). Parity run owed.
 
+### 7.26 As built: phase 7e — the rows explained, and four more fixed (2026-10-10)
+
+- **Explained** (`tests/planner_parity/explained.py`, each with its reason;
+  a test now checks every explained id is a corpus conversation): the five
+  task titles (the planner leaves out the words it set as fields — "Call
+  Bob", due tomorrow); the three sold counts that name their statuses
+  (#784); "You don't have any estimates that use Topsoil" for today's "None
+  of your estimates use Topsoil"; "what's the total value of my draft
+  estimates?" as the metric engine's figure (CLAUDE.md); a work item's note
+  "drainage" for "… about drainage"; and "estimates from last month" as the
+  calendar month (below).
+- **Checked:** the sold count "worth $0.00" (7c) is right — that
+  conversation's sold estimates carry no total. "Estimates from last month"
+  finding none is the calendar month, as every figure and the dashboard read
+  it; today's list reads the last 30 days, and the corpus's estimates were
+  made this month. **Decided (Simon, 2026-10-10): the planner keeps the
+  calendar month.**
+- **An estimate's details show its title** (Simon, 2026-10-10): today's
+  get_estimate reply (`delegate_get_estimate.estimate_details_reply`, "show
+  me estimate E0001"), which both pipelines use, led with the code and never
+  named the estimate; it now follows the header with "Title: Oak St patio"
+  (`_details_lines`; none when there is no title, and the header is the title
+  when there is no code).
+- **"change the cost of Topsoil to 20" after "which material?"** was the
+  answer to it on the planner — appended to "remove size 1 yd from it", and
+  asked again. A reply opening with a command is a new request after the
+  planner's own "which record?" too, as after today's "Which material do you
+  mean?" (`open_question._command_is_a_request`); never after its detail
+  questions (which size, teammate, status) or text ones — "change the 1 yd"
+  answers "which size?".
+- **A date planned as a task status** is today's turn: "push it to next
+  week" planned once as In Progress (a wrong write: the due date untouched)
+  and once as "Next Week", a status the company lacks. A status the message
+  doesn't say beside a due-date change is `unsaid:update_task.status`
+  (`said.py`, by today's `detect_due_change` / `detect_status_verb`); a status
+  the company lacks that reads as a date is `policy.date_as_status`, never
+  "which status?". A company that has a "Next Week" status still gets it (7c).
+- **A status breakdown's rows as said:** "won vs lost status" planned with no
+  rows listed every status; the rows (and the Won status alone, when
+  "status" is said with them, #784) come from today's grammar
+  (`metric_query.read_metric_query`) when the model leaves them out.
+- **Run (the whole corpus):** 255 of 275 pass, 2 counting against (7d part
+  2: 253, 17), 18 explained; both fixed above and pass on re-runs.
+  "list tasks at St" still clarifies now and then (passed every re-run this
+  phase).
+- **Tests:** `test_agent_helpers_delegate_get_estimate.py` (the title line),
+  `test_open_question.py` (the planner's which-record and detail
+  questions), `test_planner_said.py` (a date as a status, a breakdown's
+  rows), `test_planner_detail_asks.py` (a date-like status the company
+  lacks), `test_planner_acceptance_report.py` (explained ids). Parity run
+  owed.
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
