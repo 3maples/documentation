@@ -998,7 +998,7 @@ showed, and the question it last asked.
 | `reduce the markup 5%` / `raise the tax 2%` | the planner's, as above; without it Maple asks what to change and writes nothing — a change BY 5 is never applied as the new value | 🤖 planner *(corrected 2026-09-27)* |
 | `why is the markup 20%?` / `i think the markup of 20% is too high` | not an edit; nothing is written | ✅ rule |
 | `set the hours on the overhead pruning activity to 6` | edits the activity's hours; "overhead" is part of its name | ✅ rule |
-| `rename the grading activity to Rough Grade` | "I can't rename an activity from chat yet" — never retitles the estimate | 🛑 refused |
+| `rename the grading activity to Rough Grade` | on the LLM planner: renames the activity — "I've updated activity "Rough Grade" on "Patio": renamed from "Grading"." *(Simon, 2026-10-10)*; today's Maple says "I can't rename an activity from chat yet". Never retitles the estimate | 🤖 planner |
 | `add a work item Patio, add 10 pavers to it` (planner) | the pavers go on the new Patio work item | 🤖 planner |
 | `generate a work item for installing 200 sq ft of pavers` / `add a scope for … and price it` | runs the estimate pipeline for that scope and appends it (15–30 s) | ✅ rule |
 | `show work item #1` | description, division, materials, activities, markup/overhead/tax, gross margin, sub-total | ✅ rule |

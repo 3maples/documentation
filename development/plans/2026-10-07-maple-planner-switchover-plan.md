@@ -1299,6 +1299,24 @@ Phase 6 is split: **6a** a create from a description (and its property),
   run), invalid plans 97 → 12. Still invalid: "add a note to the patio work
   item please" (a work-item note with no text; today's asks for it after
   the fallback).
+- **An activity is renamed** (Simon, 2026-10-10): "rename the grading
+  activity to Rough Grade" was a refusal the planner missed — explained,
+  waiting on a decision. The planner renames it, through today's edit
+  executor (`UpdateActivity.name`), whose reply now says what it was
+  called: 'I've updated activity "Rough Grade" on "Patio": renamed from
+  "Grading".' Today's Maple still refuses (fixes only). The reference row
+  is 🤖 planner and the explained entry is gone
+  (`test_planner_execute_estimate_writes.py::test_an_activity_is_renamed`).
+- **Parity run 2 (2026-10-11, after the fixes above):** 4,078 of 4,897 as
+  expected (4,022 in run 1), 786 differ (804), invalid plans 31 (67), no
+  blocker; the conversations 553 agree, 28 differ (551 / 30). The two missed
+  refusals left are the explained template edits. By group, run 1 → run 2:
+  burden reads 5/10 → 10/10, divisions and units 44/54 → 54/54, activity
+  edits 19/73 → 48/73, work-item notes 57/71 → 68/71. The full suite passed
+  the same day (13,120). Still open: a bare name or a comparison planned as
+  help ("overhead lighting", "draft vs approved estimates") — about a third
+  of the time, with or without the divisions line (checked both ways live);
+  the Oct 7 run had it too.
 
 ## 8. Plan fields with no handler today
 
