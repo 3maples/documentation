@@ -15,7 +15,7 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
-- **Entries are numbered and permanent.** Next free number: **840**. Never
+- **Entries are numbered and permanent.** Next free number: **929**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -142,6 +142,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 860 | [platform/services/maple_metrics.py](../../platform/services/maple_metrics.py) | the metrics engine, first measured 2026-10-06; +7 that day (`pre_tax_total`). **Next step:** the Phase 3 ratios (`run_win_rate`, `run_margin` and their helpers) into `maple_ratios.py` |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
 | ~~1,027~~ 322 | [platform/agents/planner/execute.py](../../platform/agents/planner/execute.py) | **RESOLVED 2026-10-08** — split before switchover phase 5, no behavior change: the handlers moved to `execute_records.py` (contacts, properties, materials, roles, templates, tasks; 404), `execute_estimates.py` (estimate reads joined its writes; 309), `execute_links.py` (the notes feed joined links and notes; 142) and `execute_figures.py` (catalog figures, dashboard, metric; 94). `execute.py` keeps the meta replies, the gate and the run, and builds `COVERED` from each module's `HANDLERS`; `test_each_op_has_one_handler_across_the_executors_modules` fails on an op two modules register. Move to the archive in the next cleanup |
+| 817 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
 lifecycle into `routers/invitations.py` (~400 lines, a clean seam, leaves
@@ -288,6 +289,11 @@ seams that already exist as separate classes.
 | 64 | `list_properties_reply` — agents/property/service.py:2458 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_property_list_items(serialized)` — review 2026-10-08 #11, deferred) |
 | 63 | `list_labours_reply` — agents/labour/service.py:1253 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_labour_list_items(serialized)` — review 2026-10-08 #12, deferred) |
 | 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
+| 59 | `execute` — platform/agents/planner/execute.py:447 (was 46; phase 8 added step pointing and the policy refusal. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
+| 60 | `_redo` — platform/agents/planner/followups.py:136 (was 44; a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
+| 52 | `_refine` — platform/agents/planner/followups.py:198 (was 41; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
+| 54 | `resolve_work_item` — platform/agents/planner/resolve.py:386 (was 49; move the `by == "name"` arm and its retry into `_work_item_by_name` — review 2026-10-11 #76) |
+| 74 | `_reply_rules` — platform/services/maple_outcomes.py:80 (was 60; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
 
 #### Watch
 
@@ -1714,6 +1720,16 @@ Both prompts gained another rule (reverse + now labor-time). Still clear, but th
 
 **Suggested fix:** Validate it against a URL-path pattern such as `^/[\w\-/]*$`. Also add `source` and `current_path` to `TRANSIENT_KEYS` (`routers/agent_helpers/finalize_result.py`), so they are not saved with the conversation as stale state (review 2026-09-25 fifth pass #26, a duplicate of this entry).
 
+### 898. [MEDIUM] Prompt entanglement: "More readings" restates rules from other sections
+`platform/prompts/maple_planner.py:129` — The new section repeats rules that live elsewhere: acknowledge, help, redo_last/refine_last, edit targeting, links, empty creates and focus. The next edit to one copy will leave the other stale. No injection issue: the text is static and the fences are unchanged. (review 2026-10-11 #78, deferred)
+
+**Suggested fix:** Fold each bullet into its home section and delete the duplicates. This owes a parity run (#846).
+
+### 899. [MEDIUM] "while a work item is in play" is undefined
+`platform/prompts/maple_planner.py:131` — Line 111 says a catalog price is settable (update_material); line 131 sends "set the price of pavers to $4.25" to the estimate line when a work item is "in play". A user with an estimate open who means the catalog price gets the line changed. (review 2026-10-11 #79, deferred)
+
+**Suggested fix:** Define it: "a work item in focus in the state, or named in the message". Add one contrasting catalog example, and cover both in the parity run.
+
 ## Platform — Maple agents
 
 ### 49. ~~[MEDIUM] `_ADDRESS_PATTERN` can false-match "N <word>+ way/court"~~ — RESOLVED 2026-10-03
@@ -2926,6 +2942,468 @@ It is also a new regex outside command_grammar.py deciding estimate phrasings (c
 
 **Suggested fix:** Make them module functions in `agents/estimate/crud_helpers.py` (`estimate_summary(estimate)`, `estimate_list_entry(summary)`), keep the mixin methods as one-line wrappers for today's callers, and drop the `helpers` parameter and the executor's `_estimate_agent` lookup for the list.
 
+### 840. [HIGH] Public Maple widget never runs the planner — a decision before the switchover
+
+**File**: [routers/public_maple.py](../../platform/routers/public_maple.py)
+**Severity**: HIGH
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P2h)
+
+`/public/maple/ask` answers on today's pipeline only. When today's pipeline is
+retired (switchover plan §10), the public widget has nothing to run on. Decide:
+move it onto the planner (with its own narrower op set — public Maple refuses
+metrics and every write), or keep a small public-only reader. Needs Simon's call
+before the switchover.
+
+### 841. [MEDIUM] Planner: tasks referred to by recency, date or place
+
+**File**: [agents/planner/refs.py:13](../../platform/agents/planner/refs.py), [agents/conversation/record_names.py:98](../../platform/agents/conversation/record_names.py)
+**Severity**: MEDIUM
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P1, reference §7.11 rows 1963–1966)
+
+"the last task", "my latest task", "the task from yesterday / 3 days ago",
+"the task at Elm House", and fuzzy titles: `RefBy` has no recency, date or
+property kind, and name lookup is exact or word-start only. "add a description
+to the last task" was planned as a task named "last task" and found nothing. Fix:
+a `recent` (and date) ref for tasks, or route task names through today's
+`find_task_from_context_or_message`.
+
+### 842. [MEDIUM] Planner: task list and count filters it can't say
+
+**File**: [agents/planner/schema_fields.py:185](../../platform/agents/planner/schema_fields.py), [agents/planner/execute_records.py](../../platform/agents/planner/execute_records.py) (`_task_ask`, `_task_count`)
+**Severity**: MEDIUM
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P1, reference §7.4–§7.5)
+
+- "tasks for Jordan": today tries a property, then a teammate
+  (`TaskListAsk.property_or_person`); the planner always picks the assignee.
+  Add `TaskFilter.for_name`.
+- "tasks due whenever", "what's due 10/3": no unread-date slot, so the planner
+  guesses (10/3 read the US way) where today says the date back. Add `due_unread`.
+- "all tasks by assignee": `_task_count` forces open tasks unless a status, due
+  window or archived is said. Add `TaskFilter.all`.
+- "who has the fewest tasks?": `TaskCount` has only `most`.
+
+Each adds schema characters (budget 58,000, at ~57,100): batch them, and check live.
+
+### 843. [MEDIUM] Planner: template names read as estimate titles
+
+**File**: [agents/planner/resolve.py:352](../../platform/agents/planner/resolve.py)
+**Severity**: MEDIUM
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P3; parity `explained.py`)
+
+"tell me about Driveway Maintenance" was planned as `list_estimates
+{title_contains}`. "update Driveway Maintenance's description" was planned as an
+estimate edit, where it should be the `template_edit` refusal. The planner can't
+know a bare name's kind, and the resolver looks in one kind only. Fix: when a
+bare-name reference finds nothing in its kind, try the other named kinds by exact
+name (as today's `catalog_names.py` does). If a template matches an estimate
+edit, refuse `template_edit`. Then drop the two `EXPLAINED` rows.
+
+### 844. [MEDIUM] Planner: turns that still fall back whole — errors, and today's old questions
+
+**File**: [agents/planner/turn.py](../../platform/agents/planner/turn.py) (`run_planner_turn`, `_kept_turn`)
+**Severity**: MEDIUM
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md)
+
+After phase 8 (switchover plan §7.27), two kinds of turn still go to today's
+pipeline, and both need an answer before it is retired:
+- **A planner failure:** a timeout, the LLM down, a second invalid plan, or a
+  check or execute error before a write. It needs the planner's own "something
+  went wrong, try again" reply.
+- **A question today's pipeline asked in an earlier fallback turn**
+  (`open_question`). These shrink as fallbacks go. At the switchover, drop them
+  with `LOST_TRACK`, or convert them as `kept_questions` does.
+
+### 845. [LOW] Planner: smaller shapes that still fall back
+
+**File**: [agents/planner/confirm.py](../../platform/agents/planner/confirm.py), [agents/planner/execute.py](../../platform/agents/planner/execute.py), [agents/planner/execute_figures.py](../../platform/agents/planner/execute_figures.py)
+**Severity**: LOW
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md)
+
+- Two deletes in one plan (`confirm:several_deletes`). Ask about the first and
+  keep the second for the next turn, or refuse as a bulk delete.
+- A city or role beside another list filter ("contacts named Ana in Toronto"):
+  `record_lists.list_reply` takes city and role alone.
+- An estimate's lines by category or price ("which of E0001's materials cost
+  over $10?"): `_lines_beyond`.
+- A dashboard breakdown over a period it doesn't take, or "all time" on a
+  windowed card (`_dashboard_uncovered`).
+- A kept handler question in a multi-action plan where another action wrote
+  (`kept_questions._wrote_beside`).
+- A relative percentage that lands out of bounds raises before the write
+  (`execute_estimates._changed_by`; `edit_estimate` is a write, so the reply is WRITE_FAILED — "part of the change may already be saved" — though nothing was written). It should be said
+  ("that would make the markup −3%").
+- "who owns 12 Oak St?": `get_property {field: owner}` lists every contact
+  there, not the owners.
+
+### 846. [HIGH] Planner: owed verification after phase 8
+
+**File**: [tests/test_planner_parity_live.py:66](../../platform/tests/test_planner_parity_live.py), [tests/maple_conversations/](../../platform/tests/maple_conversations/)
+**Severity**: HIGH
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md)
+
+Phase 8 changed the prompt and the schema. They were checked live on 43
+phrasings, all as intended, but that's not the parity run. Owed:
+- **The parity run** (on request, ~$1.50). Diff it against
+  `planner_parity.json` from 2026-10-11 00:24.
+- **Task statuses in the parity state.** `plan_turn` is called without
+  `planner_task_statuses`, so every task-status row is planned blind.
+- **The acceptance corpus on the planner pipeline.** It was last run on 4
+  conversations.
+- **Acceptance conversations for the ~250 reference rows never put to the
+  planner.** These are multi-step rows, rows that need a state, and rows with an
+  ellipsis (`scripts/phrasing_reference_rows.py` lists them as not checked):
+  §1.1 list refinements, §1.11, §4.8, §7.11, and §10.4–10.9.
+
+### 847. [LOW] Planner: negated commands write
+
+**File**: [prompts/maple_planner.py](../../platform/prompts/maple_planner.py), [agents/planner/said.py](../../platform/agents/planner/said.py)
+**Severity**: LOW *(Simon 2026-10-11: users say what to do; a delete always asks)*
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P0, deprioritised)
+
+"don't drop the markup on work item 2" was planned as markup 0, and "don't add a
+note to it: call Bob" appended the note. Nothing on the planner path reads
+negation. Recorded only, not to be worked unless it shows up in use.
+
+### 848. [MEDIUM] An unknown stored status gives a blank refusal
+`platform/agents/planner/policy.py:593` — Edge case. `_locked()` refuses any status outside Draft/Review, but `locked_edit_text` returns None for an unknown one, so the refusal text is `""` and the reply is empty. Today's handler fails open and allows the edit. (review 2026-10-11 #22, deferred)
+
+**Suggested fix:** Refuse only when `locked_edit_text(...)` returns text. Test: an estimate stored with status "Pending" → the edit runs.
+
+### 849. [MEDIUM] "tasks are off" is checked after the role and convert refusals
+`platform/agents/planner/policy.py:605` — Edge case. The first refusal is the one said. With tasks off, a Member's task delete gets the archive offer (kept as a question), and a convert gets "Want to add one first?". Today's Task agent checks tasks-off first. (review 2026-10-11 #23, deferred)
+
+**Suggested fix:** Move the tasks-off check to the top of `_check_rules`. Test: tasks off + Member `delete_task` → TASKS_DISABLED_MESSAGE, no question kept.
+
+### 850. [MEDIUM] The archive/unarchive role refusal wording is untested
+`platform/agents/planner/policy.py:304` — Edge case. The `who == "archive"` text is never asserted. (review 2026-10-11 #24, deferred)
+
+**Suggested fix:** A non-creator Member archiving → `response == status_role_refusal_text("archive", code, DRAFT, ARCHIVED)`.
+
+### 851. [MEDIUM] The missing-items send block, and the new refusal order, are untested
+`platform/agents/planner/policy.py:355` — Edge case. Neither MISSING_ITEMS_SEND_BLOCK_MESSAGE as the reply, nor role-before-send-gate for a Member, is asserted. (review 2026-10-11 #25, deferred)
+
+**Suggested fix:** An Owner sends the "gaps" estimate → MISSING_ITEMS_SEND_BLOCK_MESSAGE. A Member → the "only an Owner or Admin can send" text.
+
+### 852. [MEDIUM] A status jump from a status with nowhere to go (`asks=False`) is untested
+`platform/agents/planner/policy.py:295` — Edge case. The "there's nowhere I can move it from chat" arm, and that no question is kept, are untested. (It's unreachable with today's transition table; see #31.) (review 2026-10-11 #26, deferred)
+
+**Suggested fix:** Monkeypatch `ESTIMATE_STATUS_TRANSITIONS` so the current status has no targets → assert the text and `_asks_again(done)` false.
+
+### 853. [MEDIUM] `_from_step` when the earlier step found no single record is untested
+`platform/agents/planner/policy.py:379` — Edge case. A step pointing at a list action becomes "unresolved", which should give would_ask; no test covers it. (review 2026-10-11 #27, deferred)
+
+**Suggested fix:** `[list_contacts, update_contact {target: step 1}]` → the second ref status is "unresolved" and the decision is "ask".
+
+### 854. [MEDIUM] A work item's label in the several-stale-records question is untested
+`platform/agents/planner/confirm.py:226` — Edge case. The `work_item` arm of `_stale_label` isn't reached. (review 2026-10-11 #28, deferred)
+
+**Suggested fix:** Two stale refs, one a work item → the question contains `the "Patio" work item on E00xx 'Birch Patio'`.
+
+### 855. [MEDIUM] The `confirm:overage_with_others` / `convert_with_others` fallbacks are untested
+`platform/agents/planner/confirm.py:200` — Edge cases. An overage beside a stale ref, and a convert beside a stale ref or a second convert, reach no test. (review 2026-10-11 #29, deferred)
+
+**Suggested fix:** `confirm.ask` with OVERAGE_REASON + a stale ref → "confirm:overage_with_others"; the same for CONVERT_REASON.
+
+### 856. [MEDIUM] An empty list total is untested
+`platform/agents/estimate/list_core.py:118` — Edge case. The "You don't have any matching {plural} to total up." arm isn't reached. (review 2026-10-11 #30, deferred)
+
+**Suggested fix:** `{list_estimates, filter:{statuses:[Lost]}, total}` with no Lost estimates → that text and count 0.
+
+### 859. [MEDIUM] A city/role count with no results is untested
+`platform/agents/conversation/record_lists.py:119` — Edge case. The `ask.count` arm with no rows isn't reached on either pipeline. (review 2026-10-11 #33, deferred)
+
+**Suggested fix:** `{list_properties, filter:{city:"Ottawa"}, count}` → "You don't have any properties in Ottawa."
+
+### 860. [MEDIUM] A count of exactly one is untested
+`platform/agents/conversation/record_lists.py:121` — Edge case. The singular-noun arm isn't reached. (review 2026-10-11 #34, deferred)
+
+**Suggested fix:** Guelph count → "You have 1 property in Guelph."; Administrator count → "You have 1 administrator."
+
+### 861. [MEDIUM] The comparison said-back for average/largest/smallest, and "smallest", are untested
+`platform/agents/estimate/metric_ratios.py:58` — Edge case. The fall-through arm, and every "smallest" entry, are never used by a test. (review 2026-10-11 #35, deferred)
+
+**Suggested fix:** `said_back(_metric(metric="average", compare="quarter", status="sold", period="quarter"))` == the "I can't compare average estimates yet…" text, and smallest ranking → "I can't rank by smallest estimate yet.".
+
+### 862. [MEDIUM] The task-delete archive offer's words are never asserted
+`platform/agents/role_utils.py:25` — Edge case. The arm is driven, but only "owners and admins" is asserted, never "You can archive it instead — want me to do that?". MEDIUM, not HIGH, because the arm is driven. (review 2026-10-11 #36, deferred)
+
+**Suggested fix:** Unit test: `manager_denial("delete tasks", DELETE_TASK_DENIAL_SUFFIX)` == the full sentence; tighten `test_delete_non_manager_refused`.
+
+### 863. [MEDIUM] The role-rate refusal exists as two copies
+`platform/agents/planner/execute.py:60` — `LABOUR_RATE_REFUSAL` is a hand copy of today's text at agents/labour/service.py:1016, which breaks the "one source" rule. The two can drift with no test failing. (review 2026-10-11 #37, deferred)
+
+**Suggested fix:** Make it one constant in agents/labour/ (used at service.py:1016), imported by planner/execute.py and maple_outcomes.
+
+### 864. [MEDIUM] A create followed by a work-item edit of the new estimate reports "Something went wrong"
+`platform/agents/planner/execute.py:355` — `_made_by_a_step` lets `edit_estimate{estimate: step(create_estimate)}` through. But the policy skips work-item picks unless the estimate resolved to one, so `_commands` raises RecordNotLoaded after the create wrote, and the reply is WRITE_FAILED. MEDIUM, not HIGH: an unusual combination, and the create itself is saved and reported. (review 2026-10-11 #38, deferred)
+
+**Suggested fix:** In `uncovered`, return `ref:…step` when a step-made estimate is the `estimate` of an op that needs work-item refs. Test: `[create_estimate, edit_estimate{estimate: step 1, commands:[… target position 1]}]` → uncovered is not None.
+
+### 865. [MEDIUM] When a create makes nothing, the later steps are dropped without a word
+`platform/agents/planner/execute.py:477` — Edge case. `_pointed` returns None and the loop breaks, so "create Mark Liu and link him to Birch House" answers only the create's reply and never says the link wasn't made. Untested. (review 2026-10-11 #39, deferred)
+
+**Suggested fix:** When breaking with results, append "I didn't do the rest of that, since the first step didn't finish." Test: `create_contact_reply` monkeypatched to return a clarify with no contact → no link, and that sentence in the reply.
+
+### 866. [MEDIUM] A policy refusal keeps the first refusal's text as the question, even when another one asks
+`platform/agents/planner/execute.py:417` — `ask_again(..., first.refusal)` fires when any refusal asks. If action 1's refusal doesn't ask and action 2's does, the kept question is action 1's statement. (review 2026-10-11 #40, deferred)
+
+**Suggested fix:** `asking = next(c for c in refused if c.refusal_asks); ask_again(context, message_en, asking.refusal)`. Test: a two-action refusal where only the second asks → the kept question equals the second.
+
+### 867. [MEDIUM] A relative change on the work item this edit adds writes the amount as the value
+`platform/agents/planner/execute_estimates.py:297` — The "added" target is converted before `_changed_by`, so "add a work item Fence and raise its markup by 5%" sets 5%. A negative value raises ValidationError, giving WRITE_FAILED. (review 2026-10-11 #41, deferred)
+
+**Suggested fix:** For an added target with `relative=True`, ask or refuse ("set it to what?"), or add the company's default markup as the base. I'd refuse/ask: there's no current value yet. Test: `[add_work_item Fence, set_work_item_percentage{target: added, value:5, relative:true}]` → not written as 5.
+
+### 868. [MEDIUM] The "kept the task" sentence is appended after a question
+`platform/agents/planner/execute_records.py:414` — It fires on a clarify too (e.g. `convert_needs_description`), so the question is no longer last and `kept_questions._last_paragraph` could keep the wrong text. Untested. (review 2026-10-11 #42, deferred)
+
+**Suggested fix:** Also require `not result.get("needs_clarification")`. Tests: `delete_task:true` on a convertible task → ends with KEPT_AFTER_CONVERT; on a blank task → ends with "Want to add one first?".
+
+### 869. [MEDIUM] A policy refusal with no words falling back (`decision:refuse`) is untested
+`platform/agents/planner/execute.py:334` — Edge case. The `all(c.refusal …)` False arm isn't reached by a test. (review 2026-10-11 #44, deferred)
+
+**Suggested fix:** `PlanCheck("refuse", [ActionCheck(1, "edit_estimate", verdict="would_refuse", refusal="")])` → `uncovered == "decision:refuse"`.
+
+### 870. [MEDIUM] Several refusals joined and de-duplicated is untested
+`platform/agents/planner/execute.py:415` — Edge case. The two-action join is never driven. (review 2026-10-11 #45, deferred)
+
+**Suggested fix:** Two refused actions, the same text twice plus one different → the response holds two paragraphs.
+
+### 871. [MEDIUM] An estimate's lines by category or price falling back is untested
+`platform/agents/planner/execute.py:313` — Edge case. The `_lines_beyond` True arm for an estimate isn't reached (the existing test uses a contact). (review 2026-10-11 #46, deferred)
+
+**Suggested fix:** `list_materials{filter:{related: estimate, category:"Mulch"}}` with an estimate ref → "filter:list_materials.related".
+
+### 873. [MEDIUM] `_metric`'s said-back reply is untested
+`platform/agents/planner/execute_figures.py:102` — Edge case. Only `said_back()` and the gate are tested, not the handler arm. (review 2026-10-11 #48, deferred)
+
+**Suggested fix:** `asyncio.run(_metric(metric{average, by_month}, …))` → the response equals the `said_back` text and the operation is "refusal".
+
+### 874. [MEDIUM] Notes on a work item or a catalog record are only reached through the gate
+`platform/agents/planner/execute_links.py:199` — Edge case. The `said_reply(no_notes_feed(domain))` arm isn't driven. (review 2026-10-11 #49, deferred)
+
+**Suggested fix:** `list_notes` with a material parent → NOTES_NOT_ON_CATALOG_MESSAGE; with a work_item parent → WORK_ITEM_NOTES_IN_APP.
+
+### 875. [MEDIUM] The estimate-first contact link, and an estimate whose property isn't the company's, are untested
+`platform/agents/planner/execute_links.py:85` — Edge case. The second case is also misleading: it says the estimate "isn't linked to a property yet". (review 2026-10-11 #50, deferred)
+
+**Suggested fix:** `_link(world, ("draft","estimate"), ("ana","contact"))` → Ana is on Birch. For a foreign property id, say "I couldn't find that estimate's property" and test it.
+
+### 876. [MEDIUM] The guard for an estimate's property outside the company is untested
+`platform/agents/planner/execute_records.py:108` — Edge case. (review 2026-10-11 #51, deferred)
+
+**Suggested fix:** The estimate's property points at another company's property → `pytest.raises(execute.RecordNotLoaded)`.
+
+### 877. [MEDIUM] A customer with several properties, and a property plus a customer, are untested
+`platform/agents/planner/execute_estimates.py:374` — Edge case. (review 2026-10-11 #52, deferred)
+
+**Suggested fix:** Ana on two properties → `made.property is None`. With both `property: Birch` and `customer: Ana` → `made.property == birch`.
+
+### 878. [MEDIUM] `catalog_within`'s role wording is untested
+`platform/agents/planner/execute_figures.py:23` — Edge case. Only the material arm is tested. (review 2026-10-11 #53, deferred)
+
+**Suggested fix:** `catalog_within("foremen", "labour")` contains "all your roles".
+
+### 879. [MEDIUM] The singular "uses 1 material" is untested
+`platform/agents/planner/execute_records.py:261` — Edge case. (review 2026-10-11 #54, deferred)
+
+**Suggested fix:** Count on an estimate with one material → "Estimate X uses 1 material."
+
+### 880. [MEDIUM] A follow-up with nothing before it and only a limit or "last N days" gets the tax message
+`platform/agents/planner/followups.py:300` — Edge case. `_nothing_before` falls through to NO_FIGURE for `redo_last {limit}` or `{period: last_n_days}`. (review 2026-10-11 #55, deferred)
+
+**Suggested fix:** Return NO_FIGURE only when `before_tax` is set; otherwise ask "Which list or figure would you like …?". Tests for both shapes.
+
+### 881. [MEDIUM] A ranking by count is treated as money
+`platform/agents/planner/followups.py:112` — Edge case. `metric {shape: ranking, measure: count}` re-runs on a tax question instead of answering NO_FIGURE. (review 2026-10-11 #56, deferred)
+
+**Suggested fix:** `_money` returns False when `last.get("measure") == "count"`. Test: a count ranking + before_tax → `Reply(NO_FIGURE)`.
+
+### 882. [MEDIUM] `_redo_list`'s period fallback is untested
+`platform/agents/planner/followups.py:123` — Edge case. (review 2026-10-11 #57, deferred)
+
+**Suggested fix:** `_expand(_stored({"op":"list_tasks"}), {"op":"redo_last","period":"last_month"}) == "followup:redo_last.list_tasks.period"`.
+
+### 883. [MEDIUM] A link side by listed or viewed with no kind is resolved as the focus kind
+`platform/agents/planner/schema.py:386` — The validator now allows any non-name side without a domain. `resolve_ref` then uses `active_entity_domain`, which a list doesn't set. So "link the second one to Elm House" after a contact list asks the wrong question. Only focus (and step) were meant. (review 2026-10-11 #58, deferred)
+
+**Suggested fix:** Allow a missing domain only for `focus` and `step`, or resolve `listed` from `last_listed_items.resource`. Test: `a={"by":"listed","n":2}` with no domain → raises, or resolves to the contact row.
+
+### 884. [MEDIUM] The validator arm rejecting a name side with no kind is untested
+`platform/agents/planner/schema.py:386` — Edge case. (review 2026-10-11 #59, deferred)
+
+**Suggested fix:** `pytest.raises(ValidationError)` for a link `{"a":{"by":"name","text":"Ana"}, …}`.
+
+### 885. [MEDIUM] `_the_note_itself` drops the record the user named
+`platform/agents/planner/schema.py:416` — Edge case. "delete the first note on Bob Lee" while the notes listed are Ana's proposes Ana's first note. The confirmation names the record, which limits the harm. (review 2026-10-11 #60, deferred)
+
+**Suggested fix:** Drop `parent` only when the listed notes' parent matches it; otherwise keep both and let the policy check the note belongs to the parent (ask on a mismatch). Test: Ana's list + parent Bob → asks.
+
+### 886. [MEDIUM] `Dashboard.days` was added, but the unsaid guard skips dashboards
+`platform/agents/planner/said.py:31` — Edge case. A card window carried from history is never dropped. "last 6 months" can only be planned as days (there's no `window_unit`). (review 2026-10-11 #61, deferred)
+
+**Suggested fix:** Add `window_unit` to `Dashboard`, pass it to `_card_window`, and add "dashboard" to `_WINDOWED`. Tests for the dropped window and (6, "month").
+
+### 887. [MEDIUM] The "sold or Review" question isn't in today's words and can repeat
+`platform/agents/planner/said.py:277` — Today's says "That asks for two statuses at once — won or review. Which one did you mean? Ask again with just one…", using the user's own word. The planner says "sold". The appended answer still contains both words, so the same question can come back. (review 2026-10-11 #62, deferred)
+
+**Suggested fix:** Word it from the user's word ("won"/"sold") as today does. On the answer, rewrite deterministically (keep the plan, drop `sold` or `statuses` per the reply). Test: "won" → the question says "won"; answer "Review" → statuses [Review], sold false.
+
+### 888. [MEDIUM] Policy reason strings matched by literal copies
+`platform/agents/planner/asks.py:316` — `_CONFIRMING` and `_other_question` copy six policy.py reason strings. Rewording one in policy.py silently turns those turns into the `ask:other` fallback. (review 2026-10-11 #63, deferred)
+
+**Suggested fix:** Export them as constants from policy.py (STALE_WRITE_ASKS, DELETE_ASKS, NOTHING_ASKED, BARE_YES_NOTHING_ASKED, QUESTION_EXPIRED_PREFIX, DATE_AS_STATUS_PREFIX) and import them in both files.
+
+### 889. [MEDIUM] A create's missing field in a multi-action plan is untested
+`platform/agents/planner/asks.py:338` — Edge case. The "What's the name of the new contact?" arm isn't reached. (review 2026-10-11 #64, deferred)
+
+**Suggested fix:** `[create_contact {}, link step 1 → property]` with `create_need("create_contact","name")` → that text, `label == "name"`, domain PLANNER_TEXT; plus a labour case ("wage").
+
+### 890. [MEDIUM] LOST_TRACK through asks is untested
+`platform/agents/planner/asks.py:329` — Edge case. (review 2026-10-11 #65, deferred)
+
+**Suggested fix:** Reasons `["the question expired (asked over an hour ago)"]` → `found.text == confirm.LOST_TRACK and found.ask is False`.
+
+### 891. [MEDIUM] The fallback text for a subject that matches nothing is untested
+`platform/agents/planner/asks.py:293` — Edge case. When `found.reason` is empty, "Which customer or property did you mean by {said}?" is never tested. (review 2026-10-11 #66, deferred)
+
+**Suggested fix:** `Resolved("name","subject","none")` with no reason → that text and `replace_text == said`.
+
+### 892. [MEDIUM] The singular "I only listed 1 …" is untested
+`platform/agents/planner/asks.py:271` — Edge case. (review 2026-10-11 #67, deferred)
+
+**Suggested fix:** Reason "row 2 of a list of 1" for a task → "I only listed 1 task — which one did you mean?".
+
+### 893. [MEDIUM] The note question's "that record" fallback is untested
+`platform/agents/planner/asks.py:305` — Edge case. (review 2026-10-11 #68, deferred)
+
+**Suggested fix:** A note ref resolved `via="parent"` with no `parent` ref → "You don't have any notes on that record to delete."
+
+### 894. [MEDIUM] Ranking-of-nothing turning into "smallest" is untested
+`platform/agents/planner/metric_ask.py:94` — Edge case. (review 2026-10-11 #69, deferred)
+
+**Suggested fix:** `metric_ask(_metric(metric="smallest", shape="ranking"))` → ("figure", "smallest").
+
+### 895. [MEDIUM] The `by == "added"` branch is unreachable and untested
+`platform/agents/planner/resolve.py:412` — Edge case. A defensive guard: the policy handles "added" before calling the resolver. (review 2026-10-11 #70, deferred)
+
+**Suggested fix:** `_pick(world, {"by":"added"}).status == "unresolved"`, or remove the branch with a comment.
+
+### 896. [MEDIUM] The override's absolute out-of-bounds arm is untested
+`platform/agents/planner/schema_edits.py:112` — The override replaces the base validator, and nothing asserts that a value of 600 (markup) still raises. (review 2026-10-11 #71, deferred)
+
+**Suggested fix:** `pytest.raises(ValidationError)` for `{set_work_item_percentage, field: markup, value: 600}`.
+
+### 897. [MEDIUM] The retry's failure arms are untested, and the first error is lost
+`platform/agents/planner/planner.py:132` — Edge cases: the retry timing out or hitting an LLM error, and `_tool_error`'s missing-id fallback. A failed retry also drops the first invalid plan's raw args and error, which the shadow log exists to show. (review 2026-10-11 #72, deferred)
+
+**Suggested fix:** When the retry yields no plan, keep the first `raw` and combine the errors (`f"{second} after {first}"`). Tests: invalid then a timeout → the error starts with "timeout" and raw is the first args; a tool call with no id → `tool_call_id == "plan"`.
+
+### 900. [MEDIUM] The unsaid question at turn level is untested
+`platform/agents/planner/turn.py:283` — Edge case. `said.without_unsaid` returning text, which becomes a kept question through `run_planner_turn`, is only tested at the `said` level. (review 2026-10-11 #80, deferred)
+
+**Suggested fix:** Wire `list_estimates {sold, statuses:[Review]}` with "how many won estimates in review?" → the response is the question, and an open question carries REPLAN_KEY.
+
+### 901. [MEDIUM] A question asked on a confirmed yes being kept is untested
+`platform/agents/planner/turn.py:123` — Edge case. The overage-yes test asserts only the response prefix. (review 2026-10-11 #81, deferred)
+
+**Suggested fix:** After "yes" to an overage create with no property, assert the open question is REWRITE_OP with `original_message == "link estimate E00xx to a property"` and OFFER_LABEL_KEY set.
+
+### 902. [MEDIUM] The older estimate follow-up is untested, and its "no" isn't today's words
+`platform/agents/planner/kept_questions.py:79` — Edge case. The `"estimate_code" in stored` arm is untested, and its decline says "Okay, I left E0042 unchanged." where today's (pending_estimate_follow_up.py:197) says "Okay, I left estimate '<title>' unlinked.". (review 2026-10-11 #82, deferred)
+
+**Suggested fix:** Store the decline text per offer (today's sentence for the legacy record). Test the request and the decline.
+
+### 903. [MEDIUM] Several handler questions in one turn is untested
+`platform/agents/planner/kept_questions.py:122` — Edge case. All are dropped and only the newest is kept; nothing asserts this. (review 2026-10-11 #83, deferred)
+
+**Suggested fix:** Two non-yes/no handler questions in `ran["context"]` → exactly one open question, with the newest text.
+
+### 904. [MEDIUM] An estimate with no contacts is logged as an unanswered refusal
+`platform/agents/planner/execute_records.py:104` — `said_reply` marks "…has no contacts yet" as `operation: refusal`, so the tracker records `policy/refusal` for what is an empty answer (CLAUDE.md: "nor is an empty list"). The same phrasing also exists in execute_links.py:93. MEDIUM rather than LOW: it skews the switchover gap list. (review 2026-10-11 #84, deferred)
+
+**Suggested fix:** Return a non-refusal envelope (`operation: "list_contacts", count: 0`), and share one "isn't linked to a property" phrase.
+
+### 905. [LOW] A tax follow-up on a list's total still falls back
+`platform/agents/planner/followups.py:175` — `ListEstimates.before_tax` now exists, but "does that include tax?" after a planner list total returns `followup:redo_last.list_estimates.before_tax`, which test_planner_followups.py:255 pins. Today's pipeline answers it correctly, so this is LOW. (review 2026-10-11 #85, deferred)
+
+**Suggested fix:** When `last.get("total")`, set `last["before_tax"] = change.before_tax` and return `last`; keep the fallback for a list or count. Update the test.
+
+### 906. [LOW] With nothing before it, the follow-up's reply drops the plan's other actions
+`platform/agents/planner/followups.py:321` — "thanks — and last month?" never runs the acknowledge. Only a pleasantry is lost. (review 2026-10-11 #86, deferred)
+
+**Suggested fix:** Return the Reply only when the follow-up is the plan's only action; otherwise note it in the docstring.
+
+### 907. [LOW] `unsaid_period` is dead code and its new arm breaks its contract
+`platform/agents/planner/said.py:216` — Only tests call it. The `_sold_beside` arm returns a sentence, not `unsaid:<op>.<what>`. (review 2026-10-11 #87, deferred)
+
+**Suggested fix:** Delete it, port its tests to `without_unsaid`, and update the module docstring.
+
+### 908. [LOW] The guard against a carried customer passes after the question is answered
+`platform/agents/planner/said.py:313` — The answered request contains "Bob Lee" in the question text, so `_named` passes even after a "no". It depends on the model keeping the filter. (review 2026-10-11 #88, deferred)
+
+**Suggested fix:** Check only the user's text before the "— asked" suffix, or rewrite deterministically on "no".
+
+### 911. [LOW] A note whose record is gone gets the work-item message
+`platform/agents/planner/confirm.py:150` — `note_feed_of` returns None for a deleted parent too, which now says WORK_ITEM_NOTES_IN_APP. (review 2026-10-11 #91, deferred)
+
+**Suggested fix:** Use that sentence only when `note.parent_type == WORK_ITEM`; otherwise "confirm:delete_unresolved".
+
+### 912. [LOW] The docstring claims a plain no gets today's words
+`platform/agents/planner/kept_questions.py:17` — A bare "no" is cancelled at the gate ("No problem, I've left it as is."); only longer declines reach `offer_declined`. (review 2026-10-11 #92, deferred)
+
+**Suggested fix:** Correct the docstring.
+
+### 913. [LOW] Four `_OFFERS` entries can't be reached from a planner turn
+`platform/agents/planner/kept_questions.py:41` — Only `delegate_create_estimate` and calculate's `delegate_generic` arm offers. The contact, property, labour and material entries are dead. (review 2026-10-11 #93, deferred)
+
+**Suggested fix:** Drop them, or arm the offers on the planner's creates and cover them.
+
+### 914. [LOW] Branches that can't run
+`platform/agents/planner/turn.py:238` — The LOST_TRACK arm of `_ask_back`, `_user_now`'s `now is None` arm, and `confirm:{op}` after all the delete kinds are unreachable. (review 2026-10-11 #94, deferred)
+
+**Suggested fix:** Remove them, or comment why they're kept.
+
+### 916. [LOW] Private names imported across modules
+`platform/agents/planner/kept_questions.py:55` — `_router_flow_keys` here, and `_PARENT_TYPES` in note_pick.py:25, which also rebuilds `_remember_list`'s shape by hand. (review 2026-10-11 #96, deferred)
+
+**Suggested fix:** Make them public accessors and reuse `_remember_list`.
+
+### 917. [LOW] The `_answer` handler is effectively unreachable, and its docstring overstates it
+`platform/agents/planner/execute.py:132` — An answer with nothing open goes through `_ask_back`. `_answer` runs only when a question was open, where "not waiting" would be wrong. (review 2026-10-11 #97, deferred)
+
+**Suggested fix:** Say in the docstring that it only marks `answer` covered, or raise there.
+
+### 919. [LOW] Public `narrowed()` has no docstring
+`platform/agents/planner/execute_records.py:41` — A public helper is missing its docstring. (review 2026-10-11 #99, deferred)
+
+**Suggested fix:** Add a one-line docstring.
+
+### 920. [LOW] "other" refusals are filed as `guide_no_answer`
+`platform/agents/planner/execute.py:84` — The planner's own unsupported verdict is mixed into the guide's misses in the report. (review 2026-10-11 #100, deferred)
+
+**Suggested fix:** Give it its own constant (or a `result.reason == "other"` check classified first).
+
+### 923. [LOW] `CONVERT_DECLINED` is used for every task "no"
+`platform/agents/task/base.py:466` — `_resume_pending_confirmation` uses it for any pending task confirmation, so the name and comment are wrong. (review 2026-10-11 #103, deferred)
+
+**Suggested fix:** Rename to `TASK_CONFIRMATION_DECLINED` and fix the comment.
+
+### 924. [LOW] The `confirmed=False` default has no caller
+`platform/agents/task/planned.py:61` — The only caller always passes True. A future caller that leaves it out gets a question the planner can't answer. (review 2026-10-11 #104, deferred)
+
+**Suggested fix:** Make `confirmed` a required keyword.
+
+### 926. [LOW] The `company_id` guard didn't move into `list_reply`
+`platform/agents/conversation/record_lists.py:95` — An empty id raises `InvalidId` in the now-public `list_reply`. (review 2026-10-11 #106, deferred)
+
+**Suggested fix:** Move the guard into `list_reply`.
+
+### 928. [LOW] "isn't linked to a property" phrasing duplicated across the executors
+`platform/agents/planner/execute.py:433` — execute_records.py:104 and execute_links.py:93 build near-identical sentences by hand, so they will drift. (review 2026-10-11 #108, deferred)
+
+**Suggested fix:** One helper in execute_links (`no_property_text(code, …)`) used by both.
+
 ## Platform — API, models and data
 
 **Resolved 2026-09-27** (platform `2c2e5d0`): `agents/conversation/out_of_chat.py` answers company default percentages, team/invitations, billing/plan/credits, Load Standard, CSV import, units, divisions, unlink, duplicate, the estimate document and photos with the place in the app where each is done (user-guide wording), as a policy refusal read on the command head only. Pinned by `tests/test_out_of_chat_redirects.py` (including false-positive guards: work-item markup, "the duplicate contact", "the invoice task", note bodies) and corpus rows `boundary-*`. Snapshot: "duplicate it" and "set the company's default markup for work items to 20%" now redirect.
@@ -3770,6 +4248,21 @@ row count first — this may be years away.
 `platform/main.py:59` — `sentry_sdk.init` leaves `include_local_variables` at its default (True; SDK 2.70), and `send_default_pii=False` does not strip frame variables. The default scrubber denylists exact keys such as `token`, not `decoded_token`, `message` or `context_payload`. So each of the ~29 `logger.exception` calls on Maple paths (`routers/agents.py:1828` among them) can send the user's Firebase claims (uid, email), their chat message and conversation state to Sentry. The estimate edit executor and the template instantiation (#318) log the exception type only for this reason, but that costs the stack. Found reviewing #318 (review 2026-10-05 #1).
 
 **Suggested fix:** Needs your decision. Either set `include_local_variables=False` in `sentry_sdk.init`, which keeps every stack and drops locals everywhere (my pick: one line, covers all sites, and the type-only logs could go back to full tracebacks); or keep locals and add an `EventScrubber` denylist for `decoded_token`, `message`, `context_payload`, `chat_history` and the user/email names — narrower, but every new local name is a new leak.
+
+### 857. [MEDIUM] Public `or_join`'s empty and two-item arms are untested
+`platform/services/estimate_status.py:98` — Edge case, unreachable today (every status allows 1 or 3 targets), but the helper is now public. (review 2026-10-11 #31, deferred)
+
+**Suggested fix:** Unit test: `or_join([])==""`, `["A"]`→"A", `["A","B"]`→"A or B", `["A","B","C"]`→"A, B, or C".
+
+### 858. [MEDIUM] `locked_edit_text` failing open on an unknown status is untested
+`platform/services/estimate_status.py:140` — Edge case. It's now the planner's lock as well as today's. (review 2026-10-11 #32, deferred)
+
+**Suggested fix:** Assert `locked_edit_text("E1", None) is None`, and None for Draft and Review.
+
+### 922. [LOW] `who` accepts any string
+`platform/services/estimate_status.py:127` — Any `who` other than "sent" gets the archive wording. (review 2026-10-11 #102, deferred)
+
+**Suggested fix:** Type it as `Literal["sent", "archive"]` (and `status_change_role_refusal`'s return), with an explicit archive arm.
 
 ## Portal — estimate builder
 
@@ -5292,6 +5785,16 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Filter by whether the planner owns the row: `[r for r in results if not r["passed"] and r["explained"] and (not r["gap"] or r["planner"])]`. Carry `"planner": conv.planner` in `conversation_result`'s dict, and drop explained planner rows from "still open". Add a render test with an explained failing `planner=True` row that asserts "Explained failures (1)".
 
+### 872. [MEDIUM] "a breakdown over N days falls back" is never really tested
+`platform/tests/test_planner_execute_figures.py:323` — The test strips `days`, so the new arm at execute_figures.py:50 (days given + a breakdown → fallback) isn't reached. (review 2026-10-11 #47, deferred)
+
+**Suggested fix:** Keep `days` for that case, or add one: `{card:"by_division", period:"last_n_days", days:7}` → "filter:dashboard.period".
+
+### 910. [LOW] The test asserts only what the reply isn't
+`platform/tests/test_planner_adjust_assumption.py:182` — It never checks that the change was applied. (review 2026-10-11 #90, deferred)
+
+**Suggested fix:** Assert the saved quantity changed, or today's adjustment wording.
+
 ## Codebase hygiene (batchable)
 
 Small, low-risk cleanups. Safe to batch into a single `chore: code hygiene`
@@ -6075,3 +6578,33 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `documentation/development/plans/2026-10-02-maple-planner-shadow-design.md:445` — "Getting it onto the wire" says it is not known whether langchain-openai 1.6.6 keeps a content-block breakpoint, and plans a raw `AsyncOpenAI` fallback (step 6a). Step 0 established it does: `ChatOpenAI` has a `prompt_cache_options` field and `_format_message_content` keeps `prompt_cache_breakpoint`, pinned by `platform/tests/test_llm_prompt_cache.py`. The plan describes a fallback that will never be needed. (review 2026-10-07 #8)
 
 **Suggested fix:** Replace the two "Getting it onto the wire" bullets with: "langchain-openai 1.6.6 supports both natively (`ChatOpenAI.prompt_cache_options`; `prompt_cache_breakpoint` on a text block), pinned by `tests/test_llm_prompt_cache.py`", and reduce step 6a to the live `cached_tokens > 0` check.
+
+### 909. [LOW] Redundant local import of `create_needs`
+`platform/agents/planner/asks.py:324` — It repeats the module-level import. (review 2026-10-11 #89, deferred)
+
+**Suggested fix:** Remove the local import.
+
+### 915. [LOW] `_question_text` never uses its `question` parameter
+`platform/agents/planner/kept_questions.py:65` — Dead parameter. (review 2026-10-11 #95, deferred)
+
+**Suggested fix:** Remove it from the signature and the call.
+
+### 918. [LOW] `_WRITE_FIELDS = {}` leaves dead code in `_uncovered_write`
+`platform/agents/planner/execute.py:212` — The allowed/unread tail can't fire. (review 2026-10-11 #98, deferred)
+
+**Suggested fix:** Remove `_WRITE_FIELDS` and that tail.
+
+### 921. [LOW] A dead copy of `_or_join`
+`platform/agents/estimate/crud_handlers.py:173` — Nothing references it after the move to `estimate_status.or_join`. (review 2026-10-11 #101, deferred)
+
+**Suggested fix:** Delete it.
+
+### 925. [LOW] A stray third blank line
+`platform/agents/task/operations.py:64` — Extra blank line before `class TaskOperationsBase`. (review 2026-10-11 #105, deferred)
+
+**Suggested fix:** Remove it.
+
+### 927. [LOW] A comment points to where the lock's words used to live
+`platform/services/maple_outcomes.py:137` — It names `crud_handlers._locked_status_edit_refusal`. (review 2026-10-11 #107, deferred)
+
+**Suggested fix:** Point it at `estimate_status.locked_edit_text`.

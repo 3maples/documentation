@@ -673,7 +673,7 @@ The rename handler already covers description updates. These phrasings extend th
 | `what's the recurring schedule on {WI}?` | — | 🛑 deferred |
 | `change the recurrence on {WI} to 12 occurrences` | — | 🛑 deferred |
 
-**🛑 Deferred 2026-09-26 (user decision):** Maple no longer sets, clears or answers a work item's recurring schedule — set it on the estimate page. The `set_recurring` ported entry, its detector (`recurring_enable/disable/query`), the three handlers, their schedule parsing and the orchestrator's recurring routing rule were removed; a recurring request gets the ordinary "What would you like to change?" reply (or the edit planner's, which already treated recurrence as out of scope). Recurrence itself — the model, templates, grand-total math, the document generator and the portal — is unchanged, and work-item details still show "Recurring: Yes/No".
+**🛑 Deferred 2026-09-26 (user decision):** Maple no longer sets, clears or answers a work item's recurring schedule — set it on the estimate page. The `set_recurring` ported entry, its detector (`recurring_enable/disable/query`), the three handlers, their schedule parsing and the orchestrator's recurring routing rule were removed; a recurring request gets the ordinary "What would you like to change?" reply (or the edit planner's, which already treated recurrence as out of scope). The planner (Dev) says so: "I can't set, change or read a work item's recurring schedule from chat — you can see and set it on the estimate page." (`execute.RECURRING_REFUSAL_MESSAGE`). Recurrence itself — the model, templates, grand-total math, the document generator and the portal — is unchanged, and work-item details still show "Recurring: Yes/No".
 
 ### 1.5.5 Materials within a work item
 
@@ -986,7 +986,7 @@ showed, and the question it last asked.
 | `update the description on work item 2` → *"what should it be?"* → `cancel` / `no` / `never mind` | "No problem, I've left it as is." — nothing is written | ✅ rule |
 | `update the description on work item 2` → *"what should it be?"* → `list my estimates` / `show me estimate E0004` | the question is dropped and the request runs | ✅ rule |
 | `rename the patio work item on the Smith estimate to Back Patio` | renames the work item; never retitles the estimate | ✅ rule |
-| `add a task to follow up on E0042` / `add Bob as the contact on E0042` | creates the task / contact; E0042 is not priced | ✅ rule |
+| `add a task to follow up on E0042` / `add Bob as the contact on E0042` | creates the task / contact; E0042 is not priced. The planner (Dev) links Bob to E0042's property — an estimate's customer is its property's contact — or says E0042 has no property yet | ✅ rule · 🤖 planner |
 | `rename the patio work item to X` → *(menu "Add mulch beds / Remove stump")* → `Remove stump` | picks that row — a row's own description is always a pick | ✅ rule |
 | `update the description on work item 2` → `Show homeowner the revised quote before starting` | sets it as the description | ✅ rule |
 | `add a note to the patio work item please` → *"What should the note say?"* → `gate code 1234` | filed on the patio work item | ✅ rule |
@@ -1544,7 +1544,7 @@ reply says how many.
 | `what's my most expensive material?` / `which material is the priciest?` / `which material costs the most?` / `what's my cheapest material?` | *"Your most expensive material by price is Pea Gravel (1 yd) at $49.50 per Cubic Yard."* — the size and its unit; it is "the first one" next | ✅ rule *(a guide answer with no figure)* |
 | `what's my average material price?` / `what's the average cost of my materials?` | *"Average material price, by unit:\n- Bag: $4.40 across 1 size\n- Cubic Yard: $40.33 across 3 sizes\n- Each: $2.75 across 1 size\nPrices in different units aren't averaged together."* | ✅ rule *(a guide answer)* |
 | `what's the price of Topsoil?` / `how much does mulch cost?` / `how many materials do I have?` / `list my material categories` | one material's price, the count, the categories — not a catalog figure | ✅ rule |
-| `what's the average price of my mulch?` / `most expensive material in Bulk Materials` — a category or material narrowing | not read | ⚠️ gap *(Phase 4 — company-wide figures only)* |
+| `what's the average price of my mulch?` / `most expensive material in Bulk Materials` — a category or material narrowing | not read; the planner (Dev) says the figures are the whole catalog's and offers that one, never passing it off as the narrowed one | ⚠️ gap *(Phase 4 — company-wide figures only)* |
 
 **Open gaps:** #768 (a lead word before a size command) (see [code-review-followups.md](code-review-followups.md)). #775 was resolved 2026-09-29; #763 and #764 on 2026-10-04. Resolved 2026-09-27: #495, #674, #675, #676, #677, #678, #680, #681, #682, #683, #690, #694, #697; #700 on 2026-10-02; #701 on 2026-10-03 (a failed size command says so instead of a server error); #760 on 2026-10-03.
 

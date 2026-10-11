@@ -1322,26 +1322,108 @@ Phase 6 is split: **6a** a create from a description (and its property),
   of the time, with or without the divisions line (checked both ways live);
   the Oct 7 run had it too.
 
+### 7.27 As built: phase 8 — the fallbacks closed (2026-10-11)
+
+From the gap review ([`2026-10-11-planner-phrasing-gap-review.md`](2026-10-11-planner-phrasing-gap-review.md)):
+the reference's every row against the planner, and every reason a planner turn
+still went to today's pipeline. Simon (2026-10-11): close what falls back first;
+negated commands ("don't add …") are low priority — users say what to do, and a
+delete always asks.
+
+- **Refusals are the planner's.** Each policy refusal carries today's words
+  (`ActionCheck.refusal`, from `services/estimate_status.py`'s
+  `transition_refusal_text` / `status_role_refusal_text` / `locked_edit_text`,
+  `role_utils.manager_denial`, `NOTE_DELETE_REFUSAL`, the quota and task-limit
+  messages — today's handlers now call the same words). One ending on a
+  question (the statuses it can move to, the archive offer) is kept as the
+  planner's question. `recurring`, `labour_rate` (asks for the wage) and
+  `other` (the guide's "outside my toolkit") have words of their own. **Tasks
+  turned off now refuse every task op**, not only a create.
+- **A task convert is the planner's confirmation** (`policy.CONVERT_REASON`,
+  `confirm._ask_convert`): today's question; yes runs the kept convert
+  (`convert_task_reply(confirmed=True)`); no is today's words. A task with no
+  description is refused with today's offer, kept as a question.
+- **Questions today's handlers ask during a planner turn are kept as the
+  planner's** (`agents/planner/kept_questions.py`): a "which property?", a
+  calculation's missing value, the template size, the estimate gathering — the
+  answer added to the request, planned again. An offer after a write ("link a
+  property to this estimate?") becomes its own request ("link estimate E0042 to
+  a property"), so the write is never made twice; a "nah, leave it" is today's
+  "Okay, I left E0042 unchanged." Never a yes/no confirmation, never in a plan
+  where another action wrote.
+- **The router:** any rewrite answer on a planner company is planned (not only
+  the planner's own); a new request while any question waits is the planner's;
+  a question asked under another company is dropped before the planner reads it.
+- **Asks:** every "which record?" is the planner's question — a filter's
+  customer, a figure's subject (today's "Which one did you mean: A or B?"), a
+  work item, a step, a row past the end of the list ("I only listed 3 tasks"),
+  one record at a time when several are missing. "My note on Ana" with none is
+  today's "You don't have any notes on …"; with several, today's numbered list,
+  its rows kept so "2" picks one. A stray yes is today's "not waiting".
+- **Confirmations:** a delete, an overage create or a convert beside other
+  actions asks its own question and the yes runs the whole kept plan; several
+  stale records are named in one "Just to check"; a delete about a note or a
+  link is today's redirect.
+- **What the message doesn't say** is set right, not handed over
+  (`said.without_unsaid`): an unsaid window is dropped (a count said but not
+  planned is filled in); a status planned beside a date is dropped and the date
+  kept; an estimate filter's unsaid name is asked about; an assumption change
+  the reader can't take is read in the user's words, else asked; the sold set
+  beside a status outside it is asked about (#780).
+- **Follow-ups:** "what about X?" swaps the record any list is about; "show
+  more" with nothing open, a tax question about an answer with no money in it,
+  and a follow-up with nothing before it are said or asked
+  (`followups.Reply`); a comparison redone for another period is that period's
+  figure; "show me the top 10" re-runs a ranking (`RedoLast.limit`); a task
+  list is narrowed by status, assignee or property.
+- **Steps:** a record an earlier action finds is that record at check time; one
+  a create makes is pointed at once it has run (`execute._made`) — "create a
+  contact and link him to 14 Birch Rd" runs. A link side in focus needs no kind.
+- **Invalid plans** are asked for once more, with what was wrong
+  (`planner._call`); a note delete naming its row and its record is the row; an
+  answer naming several slots is the most specific.
+- **Schema** (budget raised to 58,000 characters): `EstimateFilter.stale_days`
+  ("older than 60 days"), `GetEstimate.field` created / updated / code,
+  `ListWorkItemLines.count`, `ListEstimates.before_tax`, `Dashboard.days`,
+  `CatalogFigure.within` (said back — the catalog's figures aren't narrowed),
+  `RedoLast.limit`, `RefineLast.task_status / assignee / property`,
+  `PSetWorkItemPercentage.relative` ("raise the markup by 5%" was written as 5%),
+  `WorkItemPick` by added (a command on the work item the same edit adds).
+- **Coverage:** every op the planner plans has a handler (a test pins it);
+  city / role lists (`record_lists.list_reply`), an estimate's contacts (its
+  property's), its lines counted or named, a contact added to an estimate (its
+  property), a metric in a shape it means (`metric_ask._shaped`) or said back.
+- **Prompt:** a "More readings" section; checked live on 43 phrasings (all as
+  intended). **Owes a parity run.**
+- **Offline recount** of the 2026-10-11 parity run's 4,897 plans through the
+  new gates: 4,226 run, 629 ask or refuse, 8 still fall back (none of them a
+  reference row), 28 invalid plans that now get a retry.
+- **Still today's:** planner errors (timeouts, a second invalid plan), a
+  question today's pipeline asked in an earlier fallback turn, two deletes in one
+  plan, a city or role beside another list filter, an estimate's lines by
+  category or price, a dashboard breakdown over a period it doesn't take, and
+  the public widget (never on the planner).
+
 ## 8. Plan fields with no handler today
 
 Each gets a core in the phase that covers its op, or the planner stops offering
 it (a schema change, with a parity run):
 
-- `convert_task.delete_task` — no delete-after-convert anywhere.
-- `create_estimate.customer` — only a property is linked today (falls back, phase 6a).
+- ~~`convert_task.delete_task`~~ — phase 8 (§7.27): converted, the task kept, and the reply says so.
+- ~~`create_estimate.customer`~~ — phase 8: the customer's one property is linked (a property's name is that property).
 - ~~`apply_template.size`~~ — done in phase 6b (§7.14): the applied template is scaled.
 - ~~`edit_estimate` on **every** work item~~ — done in phase 4c (§7.8): one
   command per work item.
 - ~~Several task fields in one update~~ — done in phase 4b (§7.7).
 - `get_<record>.field` — the agents always return full details (material size
-  aside); `get_estimate.field` lacks division, title and description.
-- `list_notes` / `delete_note` on a work item or task, and a note by name. (A note by its row in the
-  list just shown is done, phase 5c.)
+  aside). `get_estimate.field` takes notes, created, updated and code too (phase 8).
+- ~~`list_notes` / `delete_note` on a work item or task~~ — phase 8: a task's notes are its description
+  (shown with it); a work item's are said to be on the estimate page. A note by name is still asked about.
 - A listed material or activity line — no line list records rows, so
   `resolve_line` always asks.
 - `refine_last.sort` oldest / lowest total.
-- Refusal copy for `notes_on_catalog`, `recurring` and `other`; `labour_rate`'s
-  is inline (`agents/labour/service.py:959`) and becomes a constant.
+- ~~Refusal copy for `notes_on_catalog`, `recurring` and `other`; `labour_rate`'s~~ — phase 8: every
+  refusal reason has the planner's words (`execute._refusal_copy`).
 
 ## 9. Risks
 
