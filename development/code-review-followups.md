@@ -15,6 +15,10 @@ remainder by theme instead of by review date. The chronological
 "deferred from /code-review on <date>" session headers are gone; every entry
 kept its number and its body.
 
+**Maple pass 2026-10-11** — 133 resolved Maple entries moved to the archive, and 33
+entries about code only today's pipeline runs dropped there too (the planner never
+runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
+
 - **Entries are numbered and permanent.** Next free number: **929**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
@@ -58,7 +62,7 @@ unchanged.
 | 1 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. **In progress 2026-09-22:** the server mechanism and the TaskDialog are built; the estimate builder is the remaining surface — see the entry for what it still needs. |
 | 2 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
 | 3 | [#4](#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
-| 4 | [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](#25-medium-regex-email-lookup-in-_resolve_user), [#26](#26-medium-find_contacts_by_name-fetches-whole-company-filters-in-python), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths), [#443](#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
+| 4 | [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](#25-medium-regex-email-lookup-in-_resolve_user), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths), [#443](#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
 | 5 | [Silently swallowed errors](#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
 | 6 | [Accessibility](#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name), [#469](#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
 | 7 | [#60](#60-medium-no-unique-compound-index-on-material--contact) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
@@ -327,24 +331,6 @@ on write (override `__init__` / validator so any create or update lowercases
 the field). (c) Replace the regex with `User.find_one(User.email == email)`.
 Don't do (c) before (a) — a stray capitalized row would silently fail auth.
 
-### 26. ~~[MEDIUM] `find_contacts_by_name` fetches whole company, filters in Python~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** the substring match runs in Mongo (`agents/contact/utils.full_name_contains`: `$regexMatch` on the trimmed "first last", escaped, case-insensitive), and only a miss reads the company's contact names (`_contact_names`, ids and names only) for the fuzzy fallback, loading in full just the ones it picks. The contact and property agents no longer pass `_list_contacts_via_api` (which loaded every contact); `list_contacts_fn` stays as an injection point. `cross_resource.find_contacts_by_full_name` uses the same filter. Tests: `tests/test_contact_name_lookup.py`.
-
-**File**: `agents/contact/utils.py:158-170`
-**Severity**: MEDIUM
-
-`Contact.find(Contact.company == ...).to_list()` pulls every contact for
-the tenant, then lines 163-170 iterate and match names in Python. Fine at
-dozens of contacts; degrades linearly with tenant size.
-
-Fix: push the name match into Mongo. Either a `$regex` with
-`^<escaped>$` and `$options: "i"` (bearable here because the query is
-per-tenant-scoped and low-frequency), or — better — a case-insensitive
-collation index on `first_name` / `last_name` with an equality query. If
-fuzzy matching is required, keep the Python filter but pre-narrow with a
-Mongo text-ish prefix filter so the in-memory set is small.
-
 ### 33. [MEDIUM] `$in` × `$in` bulk-fetch over-fetches the cross-product
 **Files**: `routers/equipments.py:138-144`, `routers/labours.py:195-201`
 **Severity**: MEDIUM (theoretical) / LOW (in practice)
@@ -541,22 +527,6 @@ order is preserved. Same shape for `MaterialUnit`. If attaching a
 collation is awkward via Beanie, leave the Python sort — clarity beats
 a half-done DB push-down.
 
-### 159. ~~[LOW] `agents/cross_resource.py` filters in-Python on full collections~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** `find_materials_by_name` and `find_labours_by_name` match in Mongo (`_name_contains`: escaped, case-insensitive substring — Mongo folds accented letters); contacts moved with #26 and properties with #812. Tests: `tests/test_catalog_name_lookup.py`.
-
-**File**: [platform/agents/cross_resource.py](../../platform/agents/cross_resource.py)
-**Severity**: LOW (scaling)
-
-All four `find_X_by_name` helpers load the full collection and filter
-in Python. Acceptable for typical company sizes (<1k materials, <100
-labour roles, <100 properties) but won't scale to enterprise tenants.
-
-Fix: document the scaling boundary in the module docstring (already
-present — "pragmatic for typical company sizes; revisit if a tenant
-exceeds ~10k properties"). Future refactor: push substring matching
-to MongoDB via `$regex` filters with case-insensitive option.
-
 ### 410. [LOW] platform/routers/tasks.py — sort=due_date sorts in memory, unindexed
 The $sort runs on computed fields, so no index can serve it; Mongo sorts the company's matched tasks in memory (100MB stage cap). Fine at current volumes, and the dashboard passes limit=5, but it's O(company task count) per dashboard visit.
 **Suggested fix:** None needed now; if task volumes grow, maintain a stored "due-or-updated" sort field on write, indexed under the existing Settings.indexes convention.
@@ -570,47 +540,6 @@ grows.
 **Suggested fix:** Add `IndexModel([("feature", 1), ("created_at", -1)])` to
 `Settings.indexes` when/if per-feature dashboards materialize; harmless to add
 now.
-
-### 448. ~~[LOW] platform/agents/template/service.py:161 — full-collection load to resolve one id~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** a positional pick loads its one template (`TemplateAgent._template_by_id`: `_id` and `company` in one query) instead of the whole collection. The Property / Contact / Material / Labour `_resolve_target_*` id branches the entry mentions were not changed.
-
-`_template_from_listed_position` calls `_list_templates_db` and scans the result
-for the picked id; `Template.get(...)` plus a company check is one round trip
-instead of a full-collection load. It only runs when a positional reference
-actually resolved, and it matches the existing `_find_templates_by_name` scan
-pattern, so this is consistency-vs-efficiency rather than a defect.
-**Suggested fix:** fetch by id directly, keeping the
-`safe_str(template.company) == company_id` tenant check. Consider doing the same
-for the `_resolve_target_*` id branches in Property / Contact / Material /
-Labour, which scan a full `_list_*_via_api` result for the same reason.
-
-### 618. ~~[LOW] The estimate is loaded twice per planned edit~~ — CLOSED 2026-10-04 — not a defect
-
-**Closed 2026-10-04:** the second load is the freshness guard across the planner's LLM call (up to `PLANNER_TIMEOUT_SECONDS`, 12 s). The executor's write replaces `job_items` wholesale through `versioned_set`, which has no version precondition, so applying the plan to the copy loaded before planning would overwrite a portal edit made meanwhile; reloading applies it, pinned by job item id, to the current list. An extra indexed query is the cheaper risk. A comment at the call site (`edit_planner.py`) says so.
-
-`platform/agents/estimate/edit_planner.py:248` — `_plan_and_apply_edits` loads it, then `_run_edit_commands` loads it again: an extra query, and a snapshot that may be out of date.
-
-**Suggested fix:** Pass the loaded `target` into the executor as an optional parameter.
-
-### 669. ~~[MEDIUM] Maple's named-estimate lookup loads every estimate document in full~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** one shared helper, `agents/estimate/title_reference.find_named_estimates`, reads every estimate's `title` and `property` (archived included, no cap), runs the title ladder and customer fallback (`resolve_named_estimates`) over that projection, then loads the matched estimates in full. The router's resolver, the get-estimate delegate and the Estimate agent all use it; the delegate also stops loading the newest 100 when a title is named (only the loose match after it reads them). Tests: `tests/test_estimate_title_lookup.py`. The customer fallback still calls `find_properties_by_name_or_address`, which loads every property — #812.
-
-**Update 2026-09-29:** name-answers phase 1 added no caller: a title given in answer to "Which estimate?" is looked up exactly and indexed (`title_reference.find_estimates_titled`, index `company_title`). The ladder for titles named inside a request still loads everything; the projection fix is unchanged.
-`platform/routers/agent_helpers/estimate_resolver.py:188` (and `delegate_get_estimate.py:~219`, `agents/estimate/crud_handlers.py` `_match_estimates_by_title`) — to match "the Patio estimate" by title, each path loads every estimate the company has, whole documents with their job items, then filters in Python. Round 32 #2 widened the router's two paths from the newest 100 to the full set, so they agree with the agent's resolver (a capped list matched the wrong estimate as an exact target); the cost grows with the company's estimate count, per named message.
-
-**Suggested fix:** Load a projection for title matching — `_id`, `estimate_id`, `title`, `property` (plus whatever `_effective_title` reads) — with the company filter, and fetch the one matched document afterwards. One shared helper for the router and the agent. Keep the full set (no newest-N cap): the cap is what caused the wrong match.
-
-*(Review 2026-09-26 round 32 #2, cost of the fix.)*
-
-### 709. ~~[MEDIUM] Each turn loads the whole catalog, up to twice, plus every contact and property~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** `catalog_names._lookup_name_kinds` asks, for one name, five indexed company-scoped queries run together — material, role, template and property by exact name (`name_lookup.same_name`: anchored, escaped, any case and spacing) and one contact query for the full or first name — instead of loading up to 5,000 of each kind plus every contact and property. A name is looked up once per message (`_KINDS_SEEN`, set by `_rewrite`). Tests: `tests/test_catalog_names.py` (the #709 section).
-
-`platform/agents/conversation/catalog_names.py:96` — `_catalog` reads every material, role and template in the company (up to 5,000 each) to compare names in Python. `_record_kind` (:138) and `_kind_of` (:157) each call it, and each also runs the whole-collection contact and property finders. `_GET_RE` / `_QUESTION_RE` match most short messages, so most turns run 3–6 catalog scans before routing. Related to tracked #26 (`find_contacts_by_name` fetches the whole company), but this is a new caller multiplying it. (review 2026-09-27 #36)
-
-**Suggested fix:** Look names up with an indexed, anchored, escaped, case-insensitive query per model with `limit(2)`, and resolve the kind once per message.
 
 ### 715. ~~[MEDIUM] No `company` index, so `_teammate_email` scans users across tenants on the chat path~~ — RESOLVED 2026-09-29
 
@@ -628,22 +557,6 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 
 **Suggested fix:** Add `IndexModel([("company", 1), ("due_date", 1)])`, or correct the docstring.
 
-### 776. ~~[LOW] The material-name lookup silently stops at 5000 names, in no set order~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 0): the loader is gone. `named_answers` looks the reply up with one anchored, escaped, case-insensitive `find_one` per candidate, projected to `name` so the `(company, name)` index answers it (`agents/conversation/name_lookup.py`); sources are keyed by (owner, field).
-
-`platform/routers/agent_helpers/named_answers.py:36` — `_material_names` reads `find({"company": company}, {"name": 1})` with no sort, then `to_list(length=_NAME_CAP)` with a cap of 5000. For a company with more than 5000 materials, the names past the cap are dropped without any log, and which ones are dropped is whatever order Mongo returns. A dropped name that opens with a command verb ("Clear Stone") then reads as a new request again. It also reads up to 5000 rows on every turn where "Which material do you mean?" is open. LOW because no company is near 5000 materials, and a missed name falls back to the checks Maple used before names were looked up. (review 2026-09-28 seventh round #1)
-
-**Suggested fix:** Look up only the reply instead of loading the catalog, as [`plans/2026-09-28-maple-name-answers-plan.md`](plans/2026-09-28-maple-name-answers-plan.md) §3.2 proposes: have the router pass `name_in_reply(message)` and run one `find_one({"company": company, "name": {"$regex": f"^{re.escape(name)}$", "$options": "i"}})`, answering when it hits. Deferred (2026-09-28) to phase 0 of that plan (renumbered 2026-09-29), which replaces this loader; the minimum change in the meantime is a warning when the cap is reached.
-
-### 808. ~~[LOW] A template lookup miss loads every template twice~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** `_find_templates_by_name` matches in Mongo (case-insensitive, escaped substring) instead of loading every template, and `_templates_named` tries the name before an aside only when it differs. Tests: `tests/test_template_lookups.py`.
-
-`platform/agents/template/service.py:184` — Both handlers run `_find_templates_by_name(company_id, name_hint) or _find_templates_by_name(company_id, _before_aside(name_hint))`. `_find_templates_by_name` loads the company's whole template collection (a pre-existing full scan), so every miss reloads it — including when the hint has no ", " and the second query is identical to the first. LOW: a template list is small, and a miss already ends in "I couldn't find a template". (review 2026-10-03, wrong-answers batch 2 round 2 #1)
-
-**Suggested fix:** Call the fallback only when it differs: `short = _before_aside(name_hint); matches = await find(name_hint) or (await find(short) if short != name_hint else [])`, or load the list once and filter twice.
-
 ### 812. ~~[MEDIUM] `find_properties_by_name_or_address` loads every property to match a name~~ — RESOLVED 2026-10-04
 
 **Resolved 2026-10-04:** the finder reads only the address fields of the company's properties, matches in Python exactly as before, and loads the matches in full — the #669 pattern. The match stays in Python on purpose: the reverse direction (a stored name inside the query, user option a) has no indexed form, and Mongo's `$toLower` would not fold "Île" / "École" the way `str.lower` does. It still reads every property's address row, but no longer every document. `PropertyAgent._find_properties_by_name_or_address` (its twin, over `_list_properties_via_api`) is unchanged. Tests: `tests/test_property_name_lookup.py`.
@@ -651,11 +564,6 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 `platform/agents/cross_resource.py:34` — The finder loads all the company's properties and matches in Python: the query inside the name, street or full address, or a stored name or street inside the query. It serves the estimate customer fallback (`title_reference.resolve_named_estimates`, after a title matches nothing) and the property agent's twin (`PropertyAgent._find_properties_by_name_or_address`). Left out of the slow-lookups batch (#709, #669, #328, #26) because the reverse containment ("Elm House" inside "the elm house job") has no indexed form, and Mongo's `$toLower` lowercases ASCII only, so moving it to `$expr` could miss accented names the Python match finds. (logged 2026-10-04)
 
 **Suggested fix:** Run the forward containment in Mongo (`$regexMatch` on name, street and the composed address, escaped, case-insensitive) and keep the reverse check, or drop it if no phrasing needs it — the customer fallback already re-checks whole words in `_names_whole`. Then project only the fields matched, and share one finder between `cross_resource` and the property agent.
-
-### 815. [LOW] The contact, property, material and role agents load their whole collection to resolve one id
-`platform/agents/contact/service.py:826` — `ContactAgent` (agents/contact/service.py:826), `PropertyAgent` (agents/property/service.py:910), `MaterialAgent` (agents/material/service.py:773) and `LabourAgent` (agents/labour/service.py:452) each resolve a record id by loading the company's whole collection through `_list_*_via_api` and comparing ids in Python. The id is usually the active anchor, so every "update it" / "change its phone" reaches one. Split out of #448, whose template half was fixed 2026-10-04 (`TemplateAgent._template_by_id`); resolving #448 had left this half untracked. LOW: correct, and the loop is company-scoped. (review 2026-10-04, slow-queries batch #1)
-
-**Suggested fix:** Replace each loop with `Model.find_one({"_id": oid, "company": company_oid})` behind a small `_<kind>_by_id` helper, as `TemplateAgent._template_by_id` does; the agent tests that stub `_list_*_via_api` for id resolution move to stubbing the helper.
 
 ### 819. [LOW] `export_unanswered.py` loads the whole period into memory
 `platform/scripts/export_unanswered.py:112` — `collect()` reads every `MapleUnanswered` row between `--since` and `--until` with `.to_list()`. With the 180-day TTL and an early `--since`, that is every unanswered turn for six months held in memory at once. LOW: a manual review script; two weeks of traffic is small. (review 2026-10-07 #9)
@@ -667,28 +575,6 @@ Labour, which scan a full `_list_*_via_api` result for the same reason.
 Paths that discard the real failure. #64 is the anchor; #430 is the standing
 bandit `B110` baseline (11 bare `except Exception: pass` blocks — a count above
 11 means a change added one).
-
-### 20. ~~[MEDIUM] Narrow `except Exception` around `PydanticObjectId(company_id)` cast in `_resolve_latest_estimate`~~ — RESOLVED 2026-10-05
-
-**Resolved 2026-10-05:** the cast in `agents/estimate/crud_helpers.py::_resolve_latest_estimate` (moved there from `service.py`) catches `(InvalidId, TypeError)` only, so a malformed id still fails closed and anything else surfaces. The logged broad except around the query stays. Pinned by `test_resolve_latest_estimate_lets_an_unexpected_error_through`.
-
-**File**: `agents/estimate/service.py` — the first of two `except Exception`
-clauses in `_resolve_latest_estimate` (around line 3266 post-fix).
-**Severity**: MEDIUM (hygiene, matches entry #0 of the original batch)
-
-The `PydanticObjectId(company_id)` cast is wrapped in `except Exception:
-return None`. Only `InvalidId` / `TypeError` can arise from a bad cast,
-so broadening to `Exception` masks unrelated failures.
-
-The same defect in `_load_estimate_for_update` and `_load_estimate_for_read`
-was fixed in the 2026-04-26 #80 refactor by extracting the shared
-`_coerce_company_oid` helper with a narrowed `except (InvalidId, TypeError)`.
-The same helper can be used here.
-
-Fix: replace the inline cast with `self._coerce_company_oid(company_id)`,
-or apply the same `except (InvalidId, TypeError)` narrowing inline.
-Keep the second broad-except (around line 3277 post-fix) — it logs via
-`logger.exception` so a surprise failure is still observable.
 
 ### 64. [MEDIUM] WorkItem divisions fetch swallows errors silently
 **File**: [portal/src/components/estimates/WorkItemInlineContent.tsx:73](../../portal/src/components/estimates/WorkItemInlineContent.tsx)
@@ -847,38 +733,6 @@ and add `logger.debug(...)` (or `logger.exception(...)` where a failure is not
 routine) before falling through. Best done as one focused sweep, since the
 pattern is near-identical across the six files.
 
-### 619. ~~[LOW] A failed estimate-edit persist logs nothing about the cause~~ — RESOLVED 2026-10-05
-
-**Resolved 2026-10-05:** the failed save logs the exception type (no message, no traceback — they hold line values): a `_TRANSIENT_ERRORS` hiccup at WARNING and offered as a retry, anything else at ERROR where Sentry sees it and answered with the batch's bug reply (`_EDIT_BUG_REPLY`, "make this change on the estimate page") — a retry would fail the same way. Pinned by `test_a_failed_save_logs_why`.
-
-`platform/agents/estimate/edit_executor.py:219` — `logger.warning(..., code)` makes version conflicts and outages indistinguishable.
-
-**Suggested fix:** Log `type(exc).__name__` (still no exc_info, to keep note bodies out of logs).
-
-### 714. ~~[MEDIUM] `_teammate_email` hides database errors~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 3): `_teammate_email` runs one company-scoped query (`agents/task/teammates.py::find_teammates`) and logs a failure (`Teammate lookup failed: <type>`) before reading it as "no one". Pinned by `test_a_failed_teammate_lookup_is_logged_not_swallowed`.
-
-`platform/agents/task/operations.py:303` — `except Exception: return None, []` has no logging. A Mongo failure is reported as "I couldn't find a teammate called Jordan", or on create quietly assigns the task to the creator. (review 2026-09-27 #41)
-
-**Suggested fix:** Remove the try/except, or log `type(err).__name__` at warning level and re-raise.
-
-### 747. ~~[LOW] `except Exception: return None` hides errors without logging~~ — RESOLVED 2026-10-05
-
-**Resolved 2026-10-05:** `rewrite_catalog_reference` logs `Catalog name rewrite failed (<type>)` at WARNING before leaving the message as it was. Pinned by `test_a_failed_rewrite_is_logged_and_leaves_the_message`.
-
-`platform/agents/conversation/catalog_names.py:171` — A programming error in the rewrite is silently dropped, and the message routes as if no rewrite applied. (review 2026-09-27 #77)
-
-**Suggested fix:** Log `type(err).__name__` at warning level before returning None, as viewed_record.py does.
-
-### 748. ~~[LOW] `except Exception: return None` hides errors without logging~~ — RESOLVED 2026-10-05
-
-**Resolved 2026-10-05:** `rewrite_bare_property_name` logs `Bare property name lookup failed (<type>)` at WARNING. Pinned by `test_a_failed_lookup_is_logged_and_leaves_the_message`.
-
-`platform/agents/conversation/record_lists.py:180` — Same pattern as #747 in the city/role list filter. (review 2026-09-27 #78)
-
-**Suggested fix:** Log `type(err).__name__` at warning level before returning None.
-
 ## Duplicated code and twin files
 
 Copy-paste that has to be changed in two or more places and can drift. Includes
@@ -923,26 +777,6 @@ Roll into the next OnboardingPage edit.
 
 **Fix:** define an `EstimateAgentHostProtocol(Protocol)` in `agents/estimate/host_protocol.py` (or a shared types module) that captures the cross-mixin contract once. Each mixin can reference the Protocol via `Self` bound or via inheritance from a shared base. Short-term mitigation: per-method docstring pointers (`# See agents/estimate/crud_helpers.py:381 — keep in sync`). Worth doing if the stubs grow further; for now the 23 stubs are stable enough.
 
-### 308. ~~[MEDIUM] Duplicated work-item/help bypass in orchestrator~~ — RESOLVED 2026-09-29
-
-**Resolved** (verified 2026-09-29): the guard is one predicate, `_is_work_item_question` (`platform/agents/orchestrator/service.py:286`), called from all three sites (`6cc41e8`).
-**Where:** `agents/orchestrator/service.py:578` and `:2173`
-
-**Issue:** The `what + work item (excluding definitional)` pre-help guard appears in both `_classify_with_rules` and `process()` with the same 3-regex check. If one is updated the other can drift.
-
-**Fix:** Extract into a `_is_work_item_field_query(text: str) -> bool` predicate called from both sites.
-
-### 316. [MEDIUM] Company-context resolution duplicated across both template-estimate entry points
-**Where:** `platform/routers/agent_helpers/template_estimate.py:106-126`, and
-the near-identical block in `begin_template_estimate:215-225`.
-
-**Issue:** The company-context validation is duplicated almost verbatim between
-the two entry points, so a change to the refusal shape has to be made twice.
-(The function's length is tracked under #4.)
-
-**Fix:** Extract a shared `_resolve_company_or_refuse(...)` used by both entry
-points, and lift the audit-log + success-envelope tail into a helper.
-
 ### 317. [MEDIUM] `recentEstimates.ts` reinvents archived-status normalization
 **Where:** `portal/src/lib/recentEstimates.ts:18`
 
@@ -973,18 +807,6 @@ and modal added ~110 more duplicated lines each (differing only in wording and
 API object). Divergence bugs get likelier each time. Fix: extract a shared
 `ResourceCatalogTab` parameterized by labels + API object, the same move that
 extracted `ActionsMenu` from `RowActionsMenu`.
-
-### 445. ~~[MEDIUM] platform/agents/estimate/crud_handlers.py:2917 — shared "resolve target estimate" preamble duplicated across three handlers~~ — RESOLVED 2026-09-29
-
-**Resolved** (verified 2026-09-29): `_resolve_update_estimate_code` (`platform/agents/estimate/crud_handlers.py:2626`) is the shared preamble for the title, description and property-link handlers (`7213840`).
-The first ~20 lines of `_handle_update_estimate_title` (resolve code-or-title →
-return clarify → ask-which-estimate envelope → `_load_estimate_for_update`) are
-near-identical to `_handle_update_estimate_description` and
-`_handle_update_estimate_property_link`. (The handler lengths are tracked
-under #4.)
-**Suggested fix:** extract the shared "resolve target estimate or return an
-envelope" preamble into one helper and call it from all three handlers. Best
-done together with the crud_handlers.py file split.
 
 ### 456. [MEDIUM] website/index.html:698 — footer icon block duplicated five ways
 The social row adds ~13 lines of CSS and ~20 lines of SVG markup, copy-pasted verbatim into
@@ -1124,10 +946,6 @@ conscious tradeoff, not a bug.
 **Suggested fix:** No action needed now. If these multiply, consider a shared copy module or
 surfacing them from an API. Note kept so a future guide edit remembers to update the UI strings too.
 
-### 370. [LOW] platform/agents/estimate/crud_handlers.py:1635 — canonical-span constants duplicated across two files
-The `named` dict keys {7, 30, 91, 365} in `_describe_date_window` mirror `days_per_unit` in `text_helpers.py` and must stay in lockstep. If `quarter` were ever retuned to 90 in the parser, the label would silently stop matching and fall back to "in the last 90 days". Latent drift coupling, not a current bug.
-**Suggested fix:** Acceptable as-is given the small surface; optionally derive both from one shared constant if these spans are touched again.
-
 ### 398. [LOW] portal — duplicated staff-session persistence block in App.tsx + LoginPage.tsx
 Both `onIdTokenChanged` (App.tsx) and `handleLogin` (LoginPage.tsx) build the same staff `AuthUser` object and call `setCurrentUser` / session helpers inline. Extract a shared `persistStaffSession(authData)` helper (mirroring `resolvePostLoginRoute` in `src/lib/staffAuth.ts`) and wire both call sites through it.
 
@@ -1181,16 +999,6 @@ both tables' headers.
 `platform/agents/task/text_helpers.py:109` — `agents/estimate/lead_words.py` exists so the lead words are written once ("so the two can't drift apart"), but `_LEAD_FILLER` is a separate list. "perfect, mark it done", "one more thing, archive it" and "quick, archive it" return None, though the shared list has perfect / one more thing / quick. (review 2026-09-28 third round #6)
 
 **Suggested fix:** Build `_LEAD_FILLER` from `lead_words.LEADS` (move the module to `agents/lead_words.py` if a task import from `agents/estimate` is unwanted), add task-only words there, and add the three cases to `test_a_polite_edit_still_counts`. Keep "I need to" out (user decision 2026-09-28).
-
-### 768. [LOW] The size-command `_LEAD` is a fourth lead-word list
-`platform/agents/material/size_commands.py:32` — "thanks, remove size 1 yd from it", "great. …", "actually …" and "then remove size 1 yd from it" return None; with Topsoil in focus "thanks, remove size 1 yd from it" dead-ends at "Please specify which fields to update." (writes nothing). (review 2026-09-28 third round #7)
-
-**Suggested fix:** Build `_LEAD` from the same shared list as #767; add a lead-word case to test_material_size_commands.py.
-
-### 777. [LOW] `_SET_TARGET_STATUS_RE` repeats `_TARGET_FIRST_LEAD` inline
-`platform/agents/task/text_helpers.py:333` — The status pattern copies the "task before the field" lead (`_COMMAND_LEAD` + verbs + `_TARGET_OR_PRONOUN` + optional possessive) instead of using `_TARGET_FIRST_LEAD`; the only difference is two extra verbs (move, mark). A later change to the shared lead — a new verb, say — would leave the status form behind. (review 2026-09-28 #6)
-
-**Suggested fix:** Build both from one helper, e.g. `def _target_first(verbs: str) -> str: return _COMMAND_LEAD + rf"(?:{verbs})\s+" + _TARGET_OR_PRONOUN + r"(?:['’]s)?\s+"`, with `_TARGET_FIRST_LEAD = _target_first("set|change|update|edit|modify")` and the status pattern using `_target_first("set|change|update|edit|modify|move|mark")`.
 
 ### 803. [LOW] A third copy of the small-number words
 `platform/agents/task/list_filters.py:175` — The "wrong answers that look right" batch (#717/#718/#724) added `_SMALL_COUNTS` (list_filters.py:175, one…ten) and `_COUNT_WORDS` (estimate/crud_helpers.py:188, one…ten) beside the existing `_SMALL_NUMBERS` (task/text_helpers.py:992, a/an/one…three). Three maps for one idea drift apart: "in four days" works in a task list but not in a task edit, and the next person to add "eleven" adds it to one of three. LOW: no wrong answer today — each map covers what its parser accepts. (review 2026-10-02 round 3 #1)
@@ -1710,11 +1518,6 @@ Both prompts gained another rule (reverse + now labor-time). Still clear, but th
 
 **Update 2026-09-27:** #382 (the extraction prompt at `agents/calculator/service.py:88` accumulating routing rules) was merged into this entry — same file, same watch-point, same periodic /agent-prompt-review.
 
-### 620. [LOW] The edit planner's `clarifying_question` is shown to the user verbatim
-`platform/agents/estimate/edit_planner.py:242` — Model-written text, influenced by fenced company data, can put up to 500 arbitrary characters into Maple's reply.
-
-**Suggested fix:** Use it only when `needs_clarification` is true, and strip URLs.
-
 ### 621. [LOW] `client_context.current_path` only has a length limit and reaches the classifier prompt unfenced
 `platform/routers/agent_helpers/client_context.py:52` — It is saved and injected unfenced into the orchestrator LLM context ("Current page: …", orchestrator/service.py:1176). The client can only affect its own session.
 
@@ -1732,145 +1535,6 @@ Both prompts gained another rule (reverse + now labor-time). Still clear, but th
 
 ## Platform — Maple agents
 
-### 49. ~~[MEDIUM] `_ADDRESS_PATTERN` can false-match "N <word>+ way/court"~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** A unit right after the number (seconds … years, times, miles, km, metres, feet, yards, percent) is an amount, never a street number, so "60 minutes one way", "3 days back way" and "20 miles each way" no longer read as an address. Every suffix is kept, so "123 Cedar Way" and "who lives at 12 Elm Court" still do — chosen over dropping way/court/ct or requiring the whole residual, both of which lose real addresses. Tests: `test_orchestrator_intents.py::test_a_quantity_is_no_street_address` / `test_a_street_address_still_reads`.
-
-**File**: [agents/orchestrator/service.py:65](../../platform/agents/orchestrator/service.py)
-**Severity**: MEDIUM
-
-Pattern uses `.search()` (not `.fullmatch()`) with permissive suffixes
-including `way`, `court`, `ct`. Phrasings like `"3 days back way"` or
-`"60 minutes one way"` trigger `domain=property` → `get_property`. Low
-real-world frequency but demonstrably triggerable.
-
-Fix (quick win): drop the most-ambiguous suffixes (`way`, `court`,
-`ct`). Smaller coverage, fewer false positives. For the permanent fix,
-require the match to be the entire residual after stripping any
-action-phrase prefix via `_bare_entity_residual`. Catalog-backed
-lookup (per the plan's deferred Phase 2a-proper) would retire the
-concern entirely.
-
-### 279. ~~[MEDIUM] Maple-chat estimate-creation refusal still uses the legacy direct add-card link~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** User decision: a yes/no. Every Maple create starts in `delegate_create_estimate`, which now asks before claiming a slot when the next estimate would bill overage — the portal's rule (`services/estimate_quota.estimate_bills_overage`: capped, at or over the plan's included estimates, a card on file, a plan with an overage price) and the user's `show_overage_notification`. It says what the estimate pages' dialog says, word for word — "…Additional charges will apply at $3/additional estimate. Create it anyway?" (user 2026-10-03: the price is $3; `overage_confirmation.OVERAGE_NOTICE`, change both). Only Free has estimate overage; Base and Pro are unlimited, so Base's config went from 100 included / $2 overage to 1,000,000 / $0, like Pro, in `plan_config.py` and the portal's `billing-plans.ts` together. The Stripe price `est_overage_base` keeps its old tiers until `scripts/seed_stripe_products.py` is re-run with its drift update; Base isn't selectable at launch, so nothing is billed by it meanwhile. "Yes" re-runs the create once with `overage_acknowledged` (per-turn); "no" creates nothing (`routers/agent_helpers/overage_confirmation.py`, a router yes/no flow in `open_question`). A failed check never blocks the create — the quota gate still runs. Without a card the add-card refusal is unchanged. Tests: `test_maple_overage_confirmation.py`; corpus `estimate-create-over-quota-asks-then-yes` / `-then-no`.
-
-
-`ESTIMATE_LIMIT_REFUSAL_MESSAGE` in `platform/agents/text_utils.py:237-240` still embeds
-`ADD_CARD_LINK` (`/settings?tab=billing&openAddCard=1`) when the orchestrator's
-estimate-creation path is over quota with no card. The new acknowledgment
-dialog flow is wired into `EstimatesPage` and `NewEstimateWithActivityPage`,
-but the Maple-chat estimate-creation path bypasses the dialog and routes
-directly to the billing tab.
-
-Same-resource UX divergence:
-- **EstimatesPage / NewEstimateWithActivityPage**: over-quota → sentinel-style
-  dialog → OK acknowledges (has-card) or opens AddCard (no-card).
-- **Maple chat → orchestrator → estimate creation**: over-quota + no-card →
-  refusal bubble with direct add-card link; has-card silently passes
-  through with metered overage (no acknowledgment required).
-
-Fix: route the orchestrator estimate-refusal through a sentinel link that
-opens the `OverageWarningDialog` with `resource="estimates"`. Two additional
-pieces of work are needed:
-
-1. Add a per-user `estimates_overage_acknowledged_at` enforcement in
-   `services/estimate_quota.py` (parallel to the Maple-credits gate change),
-   so has-card + over-quota also requires acknowledgment in the Maple chat
-   path. Today `claim_estimate_slot_with_status` silently allows the overage
-   when a card is on file; the spec implies acknowledgment should always
-   precede billed overage.
-2. Implement a chat-retry mechanism so OK in the dialog re-submits the user's
-   last estimate-creation message. Without this, the user has to manually
-   re-type their request after acknowledging. This is the bigger lift and is
-   the reason the divergence is acceptable as an interim state.
-
-Why deferred: implementing #2 cleanly requires hooking into `useMapleAgent`'s
-last-message buffer + adding a "re-send after dialog confirm" callback path,
-which is non-trivial and would expand the scope of the current PR beyond the
-spec the user signed off on. Track until product asks for the consistent UX
-across all three resources or a customer reports the dual-flow inconsistency.
-
-### 329. ~~[MEDIUM] "Please don't" is consumed as a property value by the one-turn shortcut~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `agents/conversation/replies.py::declines_offer` reads a no to an offer: a polite lead ("please", "ok") is dropped, then a plain no, a bare decline ("don't", "nah, leave it") or a not-now ("not right now", "not yet", "later") declines. Only a closed set of words may follow, so "please add bob@example.com" is still a value. Used by `optional_follow_up.py` (the live path, estimates included) and the legacy `pending_estimate_follow_up.py`. "I'll do it from the portal" stays a ⚠️ gap in §10.4. Tests in `test_agent_helpers_optional_follow_up.py`, `test_agent_helpers_pending_estimate_follow_up.py` and `test_maple_estimate_field_edits.py`.
-
-`optional_follow_up.py` — `please` is in `_AFFIRMATION_PREFIX` and `don't` is
-not in the exact-match `_NEGATIVE_VALUES`, so a "Please don't" reply at the
-confirm stage delegates a property lookup for the literal value "don't" (fails
-gracefully → re-prompt, but reads badly). Same family as the §9.4-documented
-soft-negative gap (`not right now`, `I'll do it from the portal`, `nah, leave
-it`). Fix once for both: check the post-affirmation residual against a
-soft-negative list (`don't`, `do not`, `never mind`, `not right now`, …) before
-treating it as a value, or extend `_NEGATIVE_VALUES` prefix-matching.
-
-**Update 2026-09-27:** `_NEGATIVE_VALUES` lives in `routers/agent_helpers/text_helpers.py:27-35` (exact match through `is_negative_text`, `:97`), not in `optional_follow_up.py`, which holds only `_AFFIRMATION_PREFIX` (`:45`). The planned fix is the question registry's normalized yes/no (2026-09-27-maple-multi-turn-everywhere-design.md §5.1).
-
-### 22. ~~[LOW] "Last estimate" with zero estimates falls back to generic "Which estimate?"~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 1): `_handle_get_estimate` and `_resolve_estimate_code_or_title` answer "You don't have any estimates yet." (`_no_estimates_yet`) when "the last estimate" finds none. Pinned by `test_the_last_estimate_with_none_says_there_are_none`.
-
-**File**: `agents/estimate/service.py` — the `_handle_get_estimate` branch
-that falls through when `_resolve_latest_estimate` returns `None`.
-**Severity**: LOW (UX polish)
-
-When a user asks "what is the grand total for the last estimate" and the
-company has no estimates yet, the handler shows the generic "Which
-estimate? Please share the estimate code (e.g. EST-2026-001)." prompt.
-Correct behavior but confusing for a new user.
-
-Fix: detect the latest-estimate intent (via `_looks_like_latest_estimate_query`)
-before the generic clarification and respond with "You don't have any
-estimates yet."
-
-**Update 2026-09-27:** the handler is now `_handle_get_estimate` in `agents/estimate/crud_handlers.py:2567` (latest check at `:2628`; `_looks_like_latest_estimate_query` and `_resolve_latest_estimate` live in `agents/estimate/crud_helpers.py:305, :314`), not `service.py`. Still valid: with no estimates, "the last estimate" falls through to "Which estimate would you like to view? … (e.g. E0042) or title."
-
-### 23. [LOW] `_NOTE_WITH_IMPLICIT_TAIL` can false-positive on descriptive phrasings
-**File**: `agents/estimate/service.py` — the `_NOTE_WITH_IMPLICIT_TAIL`
-regex inside `_detect_note_update`.
-**Severity**: LOW (edge-case UX)
-
-The pattern `\b(?:with|add(?:ing)?|append(?:ing)?)\s+(?:a(?:nother)?\s+)?
-notes?\s+(?P<value>.+?)\s*$` will match phrasings like "update estimate X
-with notes about the call" and capture "about the call" as a note body.
-Very unlikely in practice (users rarely ask Maple to describe things), but
-the capture is silent so a false positive would append unwanted text to
-the estimate.
-
-Fix: require a cue token after `note/notes` signaling that a value is
-coming — e.g. a quote, a colon, or a preposition like `to`/`saying`/
-`that reads`. Or fall back to the quoted-only path when the implicit tail
-looks descriptive.
-
-**Update 2026-09-27:** the regex now lives in `agents/estimate/note_handlers.py:84` (read by `_detect_note_update`, `:112`), not `service.py`, and it accepts more verbs (leave / write / drop / create / make). A false positive no longer appends text to `Estimate.notes`: since 2026-09-23 it files a new estimate-level `Note` on the Notes feed — still unwanted, but visible and deletable. Same family: #684.
-
-### 101. [LOW] US-address regex could match noisy mid-message text
-File: `platform/agents/property/service.py:457-480`
-**Severity**: LOW
-
-The new pattern matches anywhere in the message:
-`\d{1,6}` + 3-120 chars + `,` + city + `,` + 2-letter state + space + ZIP.
-A free-form sentence like "I owe 23456 dollars, paid via bank, NY 11768
-reference" technically matches and would produce spurious `street`/`city`/
-`prov_state`/`postal_zip` extractions. The same false-positive surface
-exists in the pre-existing Canadian regex variants in this file, so it's
-consistent — but worth noting.
-
-Fix: acceptable for now. The downstream Google address-enrichment step or
-LLM extraction usually overrides nonsense. If false positives surface in
-production, anchor the pattern to the start of a line or after a verb hint
-(`at|address[: ]`).
-
-### 322. ~~[LOW] `find_property_by_name_or_address` auto-matches a blank-street property to any query~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 7): a blank name or street is no match; the characterization test was flipped deliberately (`test_find_property_blank_street_never_matches_an_unrelated_query`).
-
-**Where:** `platform/routers/agent_helpers/pending_estimate_follow_up.py:101-110`
-
-**Issue:** The contains-match block tests `_property_address_of(item).lower() in query`. When a property's `street` is blank, `"" in query` is always true, so a property with no street is treated as a substring-match candidate for *every* property query. With a single such property in the company, the estimate-link follow-up will silently link the new estimate to it even for an unrelated reply. Surfaced and characterized while backfilling #303 (`test_find_property_blank_street_contains_matches_any_query`).
-
-**Fix:** Guard the empty-string clauses — only test `address in query` / `name in query` when the field is non-empty. Flip the characterization test's assertion in the same change.
-
 ### 325. [LOW] `sacá …todos` can false-positive the fail-open bulk-delete net
 `_BULK_DELETE_PATTERNS` in `agents/text_utils.py` now matches `saca/sacá`
 (remove/take-out) + an all/every quantifier, so a phrasing like "sacá una foto
@@ -1885,162 +1549,6 @@ a record-noun nearby.
 > file-size cluster. This change added ~20 lines to that pre-existing handler.
 
 **Update 2026-09-27:** inbound translation now fails **closed** (`detect_and_translate_to_english` raises and the canned message is returned), so this is no longer a fail-open path. Untranslated Spanish reaches the guard only on a **prefilter miss** — `prefilter_language` (`services/translation.py:269`) judging the message English. The pattern is `agents/text_utils.py:241, :247`.
-
-### 334. ~~[LOW] `_TITLE_TAIL_STOP` excludes mid-title connector words~~ — RESOLVED 2026-09-27
-A real title like "Edge of the Garden" won't bare-extract (the tail stops at
-"of"); quoted and `called X` forms still work, and the failure mode is the
-standard ask-for-code clarification. Documented tradeoff in the phrasing
-reference — revisit only if real titles hit it.
-
-**Update 2026-09-27:** the constant is now `TITLE_TAIL_STOP` (`agents/estimate/title_reference.py:66`), and the failure is no longer a clean miss: "Edge of the Garden" now extracts a fragment ("Garden") that the title ladder can match — the same fragment-then-substring family as #673. Fix it with #673's four-part fix.
-
-**Resolved 2026-09-27** with #673 (platform `69fd512`).
-
-### 346. [LOW] Redundant double resolution in `apply_template`
-
-**Update 2026-09-29:** reviewed in name-answers phase 1 and left as is. The `names_target` pre-check is not only a repeat: it separates "the user named an estimate" from "the resolver fell back to the open one", which `_resolve_estimate_code_or_title` does not report. Folding it in means widening that return for every caller to save a regex. Candidate to close as won't-fix.
-Added 2026-06-09. `agents/estimate/crud_handlers.py` (~L631): computing
-`names_target` calls `_resolve_estimate_code(query, None)` and
-`_query_names_estimate_title(query)`, then the subsequent
-`_resolve_estimate_code_or_title(...)` re-runs both internally. Regex-only
-cost, so negligible, but it duplicates the precedence intent. Fix (optional):
-`_resolve_estimate_code_or_title` already encodes the full precedence, so the
-`names_target` pre-check could be folded into how its `(code, clarify)` return
-is interpreted rather than pre-resolving.
-
-### 354. [LOW] platform/agents/orchestrator/service.py:~1858 — status offer made without pre-validating legality/role
-`_maybe_attach_status_offer` offers "Yes — I can set {EST} to {Y}…" whenever an
-EST-code + recognized target status is present, without checking the estimate's
-current status or the user's role. A Member, or a request for an illegal edge, is
-still offered the action and only refused after they say "yes". The copy is hedged
-("as long as that's an allowed next step from its current status"), so this is a UX
-nuance, not a correctness bug — the execution path enforces the state machine and
-role gate correctly on confirmation.
-**Suggested fix:** Pre-validate at offer time: load the estimate, run
-`validate_estimate_status_transition` + the role/creator gates, and if the
-transition would be refused, return that refusal as the help answer instead of an
-offer. NOTE this is deliberately deferred — it requires making the (currently
-sync) help-lane offer path async and duplicating the state-machine/role checks the
-agent already performs on "yes". Only worth doing if the optimistic offer proves
-confusing in practice.
-
-### 366. [LOW] platform/agents/orchestrator/service.py:2657 — `_classify_specific_phrasings` evaluated twice on the LLM-reconciliation path
-When the pre-LLM fast-path returns None, the LLM runs, then `_prefer_explicit_rule_match` →
-`_classify_with_rules` → `_match_unambiguous_command` re-invokes `_classify_specific_phrasings`.
-Same regexes run twice per ambiguous message. Cheap (regex only), no correctness impact.
-**Suggested fix:** If optimizing, reuse the pre-LLM rule classification in reconciliation instead
-of recomputing it.
-
-### 383. [LOW] platform/agents/calculator/text_helpers.py:54 — "how long" is a broad gate trigger
-`\bhow\s+long\b` routes any "how long … <spatial unit>" query to the Calculator. Mitigated by the measurement-unit requirement, CRUD-override precedence, and the no-unit negative test — but non-labor phrasings like "how long is a 10 ft board" now reach open-math too.
-**Suggested fix:** Accept — open-math handles such strays gracefully (trivial answer). Monitor; tighten only if a real misroute surfaces.
-
-### 406. ~~[LOW] platform/routers/agent_helpers/estimate_gathering.py:238 — gathering-path response never mentions the auto-linked property~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `_finalize_gathering` now says the link, in the one-shot path's words: "Created estimate 'E0042' and linked it to property 'Primavera Residence'." Both paths build the line with `estimate_gathering.created_estimate_line`. Test: `test_estimate_gathering.py::TestFinalizeGatheringStashedProperty`.
-
-The one-shot path confirms "…and linked it to property '{label}'", but `_finalize_gathering` applies the stashed property silently (the stash's `label` field is unused) — inconsistent UX, no confirmation of the link.
-**Suggested fix:** Append "and linked it to property '{label}'" to the finalize response when the stash was applied.
-
-### 437. ~~[LOW] platform/agents/estimate/crud_handlers.py — fuzzy disclosure dropped on sorted and aggregate list responses~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** The sorted lead-ins name everything the list was narrowed by, as the plain list does: "Your latest estimate for 'Primavera':", "Your top 3 draft estimates for Bob Lee by value:". The aggregate total already did, through `described`. Test: `test_maple_estimate_field_edits.py::TestFuzzyListFilterDisclosure::test_a_sorted_fuzzy_read_names_the_match`.
-
-`_handle_list_estimates` names the fuzzily-matched property via
-`property_constraint_label`, but the `sort_field == "grand_total"` /
-`sort_field == "created_at"` branches and the `total_value` aggregate return all
-precede that branch. So *"show me my latest estimate for 153 Ashroken Ave"*
-filters on a fuzzy-matched property and never says which one it picked — the
-read path's entire safety mechanism (disclose, don't gate) silently does not
-apply to those phrasings.
-**Suggested fix:** thread the label into the sorted/aggregate lead-ins too, or
-hoist the disclosure ahead of the response-shape branch so it cannot be skipped.
-
-### 439. ~~[LOW] platform/routers/agent_helpers/pending_property_link.py — `_is_pivot` exempts any action on the `property` domain~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 7): a property-domain message that opens with a request verb (create, add, delete, remove, list, show, find) releases the turn; a property named in answer — "the new Downtown property" — still doesn't.
-
-The exemption exists so a property name ("the Downtown property") reads as an
-answer rather than a pivot. It is coarser than that: a genuine pivot such as
-*"create a new property at 42 Elm St"* mid-confirmation also fails to release the
-turn and is answered as a failed property lookup. It errs toward keeping the
-turn, which is the safe direction here, but it is now the only escape hatch from
-a flow that can re-ask indefinitely.
-**Suggested fix:** exempt only a domain match with no action verb; tighten as
-part of the state-machine consolidation above.
-
-### 442. ~~[LOW] agents/task/resolver.py:94 — `-updated_at` recency sort has no tiebreaker~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** The resolver sorts `-updated_at, -_id`, so a tie goes to the newer task, and the `(company, updated_at)` index gained `_id` so the sort stays index-served. Test: `test_task_resolver.py::test_last_task_breaks_a_recency_tie_by_newest_id` (both tasks forced to one timestamp). **Per environment, after the deploy:** `python scripts/drop_redundant_task_index.py --apply` drops the old `company_1_updated_at_-1`, now a redundant prefix (`init_beanie` never drops indexes); it refuses until the new index exists, and re-running is a no-op.
-
-`_fetch_candidates` sorts on `.sort("-updated_at")` alone. BSON dates are
-millisecond-precision and `Task.update_timestamp` is a
-`@before_event([Replace, Insert])` hook that re-stamps `updated_at` to *now* on
-every write, so two tasks written inside the same millisecond store an identical
-value. Under a tie the sort is unspecified and Mongo returned the **older**
-document deterministically — verified with a temporary probe that forced both
-seeds to one timestamp: "the last task" resolved to "Older task".
-
-Impact in production is small: it needs two task writes inside one millisecond
-for the same company (a bulk/scripted path, not human editing), and the wrong
-answer is a neighbouring task rather than a foreign one. It surfaced as an
-intermittent `test_task_resolver.py::test_last_task_recency` failure (1 of 4
-full-suite runs; 0 of 25 runs in isolation, where the machine is unloaded and
-the two inserts reliably land in different milliseconds). The test has since
-been hardened with a `_backdate` helper, so the flake is gone — this entry is
-about the underlying resolver behaviour, which is unchanged.
-
-**Suggested fix (needs a decision, not a drive-by):** add `-_id` as a secondary
-sort key so ties resolve in insertion order. Note the cost: the existing
-`IndexModel([("company", 1), ("updated_at", DESCENDING)])` on `models/task.py`
-would no longer cover the compound sort, so Mongo would fall back to a blocking
-in-memory sort over the tenant's matching tasks — precisely the scaling the
-`_fetch_candidates` docstring set out to avoid. Doing it properly means
-extending that index to `(company, updated_at DESC, _id DESC)`, which is an
-index migration (Beanie's `init_db` create cannot reshape an existing index in
-place — the old one has to be dropped), so it should ship deliberately with a
-migration step rather than bundled into unrelated work.
-
-### 447. [LOW] platform/agents/task/text_helpers.py:117 — "add to the tasks: X" with no active task appends to an unrelated task
-
-**Kept 2026-10-03 (user):** append stays the behavior — asked again and confirmed; no change.
-
-The plural now routes to a notes append. With no `active_task_id`, the resolver's
-step-7 recency fallback picks the most-recently-updated task in the company, so a
-user who meant "add an item to my task list" annotates whatever they last
-touched. Pre-existing behavior for every notes phrasing, but the plural widening
-makes it materially easier to reach.
-**Suggested fix:** none required — this is an accepted design decision, not an
-oversight. The append/create fork was put to the user, who chose append; the
-trade is recorded in §6 of
-`documentation/development/plans/maple-append-to-task-and-ordinal-replies.md`.
-Mitigated by the append being additive (never overwrites) and by Maple echoing
-the updated task back. If it bites in practice, gate the plural form on an active
-task being present and fall through to create otherwise.
-
-### 470. ~~[LOW] platform/agents/task/create.py — Maple still asks "What should the task be called?"~~ — RESOLVED 2026-09-30
-
-**Resolved 2026-09-30** (name-answers plan phase 8): create asks "What should the task say?", and the reply is the task's text (its title derives from it) unless it is itself a task create. The rename flow's own "What should the task be called? I'll update the first line…" (field_flow) is unchanged: that one names the note's first line.
-
-When a create message carries neither a title cue nor usable content, create falls through
-to asking for a title — a concept the portal no longer exposes. The answer is now folded
-into the note (so the behaviour is correct), but the wording still names a field the user
-cannot see anywhere in the UI.
-
-**Suggested fix:** reword to "What should the task say?" and route the bare reply straight
-into `description`. Touches `_resolve_create_title` / `_CREATE_TITLE_PENDING_ID` /
-`_stash_awaiting_title` plus three agent test files; the branch is rare, hence deferred.
-
-### 495. ~~[LOW] platform/agents/material/service.py:1899 — `narrow_to_changes` call lacks `always=fields.keys()`, unlike every sibling~~ — RESOLVED 2026-09-27 agent
-Contact, labour, and property agents force-keep explicitly-requested fields so an idempotent
-"set cost to 14" (already 14) still writes; the material agent drops it. Harmless today
-(response is still correct), but the asymmetry will surprise the next reader and diverges the
-audit trail.
-**Suggested fix:** pass `always=fields.keys()` to match the siblings.
-
-**Update 2026-09-27:** the call is now `agents/material/service.py:1908`. `always=fields.keys()` alone isn't enough here: in the material agent `cost`, `price` and `size` map onto `sizes`, not onto top-level keys, so the forced keys wouldn't name what the user asked to write. Fix it with #680, which changes the same cost/price mapping.
-
-**Resolved 2026-09-27** (platform `ffbc3b0`): the call passes `always=_forced_payload_keys(fields)`, which maps the fields a message set onto payload keys — `cost`, `price`, `size` and `unit` write `sizes` — so an idempotent edit is kept, as in the sibling agents. Pinned by `test_an_idempotent_edit_still_writes_what_was_asked` and `test_forced_payload_keys_name_what_the_fields_write` in `tests/test_material_agent.py`.
 
 ### 565. [MEDIUM] The reuse removal's cost to estimate generation is unmeasured
 
@@ -2066,864 +1574,10 @@ turned on the first time generation feels slow. If the side-by-side shows the
 research path is worse, that is a reason to improve the prompt context, not to
 bring back copying.
 
-### 569. ~~[LOW] `or target.company` fallback can file a Maple note under another tenant~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** Wider than the entry: `crud_handlers.py` had three `Estimate.find_one(Estimate.estimate_id == code)` fallbacks with no company — `_load_estimate_for_update`, `_load_estimate_for_read` and `_handle_update_estimate_status_transition` — so a missing or malformed company read, edited or changed the status of whichever company's estimate had the code. Each now replies `NO_COMPANY_FOR_ESTIMATE` ("I need a company before I can pull up an estimate.", shared with the #37 guard) and never queries; `_file_estimate_note` never falls back to `target.company`. `tests/test_estimate_company_scope.py` fails if any estimate query runs with no company. `test_estimates_work_item_add_with_unusable_company_id_*` no longer expects the add to land: it is refused, and still doesn't raise.
-
-`platform/agents/estimate/note_handlers.py:164` — When `company_id` is empty or malformed, the loader falls back to an unscoped `Estimate.find_one(estimate_id == code)` and the note is filed under `target.company`, which could be any tenant's estimate with that code. The orchestrator always supplies a company today, so this is defense in depth.
-
-**Suggested fix:** If `_coerce_company_oid(company_id)` is None, return the failure envelope; never fall back to `target.company`.
-
-**Update 2026-09-27:** the fallback is now `note_handlers.py:182`. The same unscoped `Estimate.find_one(Estimate.estimate_id == code)` fallback exists in three more places, all reached when the company id doesn't coerce: `agents/estimate/crud_handlers.py:946-947`, `:1061` and `:3243` (and `crud_helpers.py:331`, #20). Fix them together: fail closed.
-
-### 581. [LOW] `_detect_note_update` keeps a dead `mode` with a false rationale
-`platform/agents/estimate/note_handlers.py:98` — The docstring says `mode` is needed to extract the right value, but it is computed after extraction and the only caller discards it (every note phrasing now adds a note).
-
-**Suggested fix:** Return just `Optional[str]` and drop the set/add verb patterns from this path (update `TestNoteCueBroadening`), or correct the docstring.
-
-### 614. ~~[LOW] `run_confirmed_edits` acts on the stashed code, not the verified target~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `fuzzy_confirmation` passes the code of the estimate it loaded company-scoped by id (`target.estimate_id`) in place of the stashed one, so the re-run acts on the verified target. Test: `test_agent_helpers_fuzzy_confirmation.py::test_confirmed_edit_batch_reruns_the_stashed_commands`.
-
-`platform/agents/estimate/edit_executor.py:274` — `fuzzy_confirmation.py:92` loads the target by `pending["estimate_id"]` (company-scoped), but the re-run looks up `pending["estimate_code"]`, and nothing checks the two agree. Pending state is server-owned, so this is defense in depth.
-
-**Suggested fix:** Pass `target.estimate_id` from fuzzy_confirmation into `run_confirmed_edits`, or reject when it differs from the stashed code.
-
-### 615. ~~[LOW] Several title matches collapse to "not found" on update/delete~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 1): `find_estimate_from_context_or_message(..., several_out=)` receives the live matches; the router's update lists them and remembers the menu, the delete lists them without remembering (the estimate agent that reads an answer doesn't delete). Pinned in `test_agent_helpers_estimate_resolver.py` and `test_agent_helpers_delegate_estimate_ops.py`.
-
-`platform/routers/agent_helpers/estimate_resolver.py:184` — `_from_named_title` returns `(None, False)` on more than one match, so update/delete ask a generic "Which estimate…?" without listing the candidates (get does list them).
-
-**Suggested fix:** Return the matches, or a sentinel, so callers can show the codes.
-
-### 616. ~~[LOW] A named title with no match still reaches the loose substring rung~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 1): step 3 of `delegate_get_estimate` is gated on `not names_title`; the not-found reply now also remembers "Which estimate?". Pinned by `test_a_named_title_that_matches_nothing_is_not_answered_loosely`.
-
-`platform/routers/agent_helpers/delegate_get_estimate.py:252` — With `names_title` true and zero named matches, step 3 can still answer with a different estimate. The resolver treats this case as the end of the search.
-
-**Suggested fix:** Gate step 3 on `not names_title`, or return the not-found clarification.
-
-### 617. ~~[LOW] `intent` and `existing_estimate_id` aren't treated as per-turn keys~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `intent` and `existing_estimate_id` are in `finalize_result.TRANSIENT_KEYS`. Test: `test_agent_helpers_finalize_result.py::test_finalize_strips_the_update_dispatch_keys`.
-
-`platform/routers/agent_helpers/finalize_result.py:47` — `run_update_estimate` puts them in `dispatch_context`, and the CRUD passthrough returns that context, so they get saved and a later generation reads them (service.py:984). Company-checked; impact unconfirmed.
-
-**Suggested fix:** Add both to `TRANSIENT_KEYS`.
-
-**Update 2026-09-27:** the reader is `agents/estimate/service.py:991` (`existing_estimate_id` for `intent == "update_estimate"`), and `TRANSIENT_KEYS` is now `routers/agent_helpers/finalize_result.py:57`.
-
-### 645. ~~[LOW] The planner rejects references to a work item added in the same plan~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `invalid_targets` counts a work item an earlier `add_work_item` in the plan adds: "it" (`use_active`) and its exact description name it, as the executor resolves them. A position still numbers the estimate as loaded (the executor does), so "work item 3" after an add on a two-item estimate is rejected. Tests: `test_maple_edit_planner.py::test_a_plan_can_target_the_work_item_it_adds`, `test_a_just_added_item_has_no_new_position`, `test_a_plan_still_cannot_target_an_item_before_adding_it`.
-
-`platform/agents/estimate/edit_planner.py:120` — `invalid_targets` rejects any target that isn't in the snapshot unless it is `use_active` with an anchor, so "add a Fence work item and put 10 mulch on it" can't be planned when nothing is anchored.
-
-**Suggested fix:** Allow `use_active` or a description hint naming an `add_work_item` earlier in the plan (the executor already resolves these). Add a test.
-
-*(Review 2026-09-24 fourth pass #32.)*
-
-### 659. ~~[LOW] Setting a work item back to its original total doesn't reset the adjustment the way the portal does~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `_edit_set_work_item_total` treats a total equal (to the cent) to the one at `original_profit_margin` as a reset, as the portal's `handleAdjustSet` does: the original markup exactly, `original_profit_margin` cleared, and "I've set the total … back to $440.00 (markup back to 10%)." Test: `test_estimate_edit_executor.py::test_setting_the_original_total_again_resets_the_adjustment`.
-
-`platform/agents/estimate/edit_executor.py:824` — The portal's `handleAdjustSet` (WorkItemInlineContent.tsx:233-250) treats a total equal to the baseline as a reset: it restores the baseline markup and clears `original_profit_margin`. Maple stores the back-calculated markup, float residue included, and keeps `original_profit_margin`, so "set work item 1 back to $440" leaves the Adjust pill showing and the markup slightly off.
-
-**Suggested fix:** If `round(amount*100) == round(baseline_total*100)` (the baseline being the total at `original_profit_margin`), set `profit_margin = original_profit_margin` and `original_profit_margin = None`. Add a test.
-
-*(Review 2026-09-25 fifth pass #29.)*
-
-### 663. ~~[LOW] The "Just to check" question names the open work item, not one forced by a "… job" name~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/crud_handlers.py:167` — `_anchored_work_item_stash` always takes `active_work_item`. When `_resolve_listed_estimate` has already forced a work item for this turn (a "<name> job" reference matching an open item), the executor writes to the forced one, but the question names and pins the anchor. Verified: work item 3 renamed "Paint second last coat", work item 1 open, then "set the markup to 20% on the second last coat job" → "Just to check: apply this to the "Front patio pavers" work item on E0042 …?", and "yes" would pin Front patio pavers. The wrong item is named in the question, so it is not silent, and the trigger needs a work-item name that itself contains a from-end phrase.
-
-**Suggested fix:** In `_anchored_work_item_stash`, prefer `context[FORCED_WORK_ITEM_ID_KEY]` (and `FORCED_WORK_ITEM_FALLBACK_KEY`) over `active_work_item` — the same precedence `_anchored_index` uses — so the question names exactly the item the write will land on. Test: the case above names and pins "Paint second last coat".
-
-*(Review 2026-09-26 round 21 #1.)*
-
-**Resolved 2026-09-27** (platform `17eea39`): `_anchored_work_item_stash` prefers the turn's forced work item over the anchor; the two places a "<name> job" forces one now record its label in `FORCED_WORK_ITEM_FALLBACK_KEY`, and with no label the question names no work item, so "yes" re-runs the message and forces the same item again. Pinned by `test_the_just_to_check_question_names_the_work_item_the_write_lands_on` in `tests/test_maple_estimate_targeting.py`.
-
-### 664. ~~[MEDIUM] An estimate note addressed by code or "that estimate" asks unless its separator is a colon~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/command_grammar.py:472` — `_addresses_a_non_estimate` strips the estimate reference but leaves the preposition before it, and `_NOTE_ADDRESS_RE` then reads that preposition plus the next word (only `with`/`as` are excused) as a target. Verified: "add a note to that estimate saying call the client", "add a note to our estimate that says call the client", "drop a note on E0042 saying the gate sticks", "new note for this estimate saying call Bob" and "add a note to E0042 about the gate: code 1234" all ask "Which estimate or work item should the note go on?". Before round 27 they filed, and the colon forms still do. No write goes wrong (it asks), but the user has to retype a supported note. A regression from the round-27 fix.
-
-**Suggested fix:** Strip the preposition together with the estimate reference: `_NOTE_ESTIMATE_REF_RE = re.compile(rf"(?:\b(?:{_NOTE_PREP})\s+)?(?:(?:\bestimate\s+)?(?<!\w){_REF_CODE}|\b(?:this|that|the|our|your|my)\s+(?:current\s+)?{_EST_NOUN}\b)", re.I)`, then drop the `with|as` lookahead from `_NOTE_ADDRESS_RE`. Add the five messages as False rows in `test_note_names_an_unlisted_target`. If the note-target area keeps producing findings, the lean alternative is to retire the ported `estimate_note` detector: give its few remaining forms core entries in `command_grammar.py` and let everything else ask.
-
-*(Review 2026-09-26 round 28 #3.)*
-
-**Resolved 2026-09-27** (platform `71473ce`): the five shapes are `add_note` entries (the note target accepts "that/our/my/your estimate"; "drop a note" and "new note" are note verbs), and the ported check strips the preposition with the estimate reference as suggested. Pinned by the False rows in `test_note_names_an_unlisted_target` and `test_more_note_shapes_are_listed`.
-
-### 665. ~~[MEDIUM] A target named before "note" is never checked, so the note goes on the estimate~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/command_grammar.py:496` — `note_names_an_unlisted_target` only reads the text after the first "note", and `foreign_note_target` / `note_names_unparsed_work_item` only read a head that starts with the verb. Verified: "On work item 2, add a note: check drainage" with E0042 open and fresh → ported `estimate_note`, and the agent attempts `add_estimate_note` on E0042 — an estimate-level note, not one on work item 2. MEDIUM rather than HIGH: it needs the target fronted before the verb, and the reply names the estimate.
-
-**Suggested fix:** Also check a leading prepositional clause: if the text before "note" (after `_LEAD`) starts with a preposition, run `_addresses_a_non_estimate` on it up to the first comma — `re.match(rf"^\s*(?:{_NOTE_PREP})\s+[^,]+", parts[0])`. Anchor it at the start so "I want to add a note: …" is not flagged by "to add". Add a True row for the message above and a False row for "I want to add a note: call the client".
-
-*(Review 2026-09-26 round 28 #4.)*
-
-**Resolved 2026-09-27** (platform `71473ce`): "On work item 2, add a note: …" is an `add_note` entry that files on that work item; any other fronted target that isn't an estimate makes the ported path ask. Pinned by corpus row `estimate-note-target-said-first`.
-
-### 666. ~~[LOW] The "<target> - <text>" body check also runs on bodies after a colon~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/command_grammar.py:499` — `_NOTE_BODY_ADDRESS_RE` is meant for implicit-tail bodies ("… note to the work item on E0042 - check drainage") but runs whichever extractor produced the body. Verified: "note: on Friday - bring the trailer" asks where the note goes instead of filing an untargeted note. LOW: it needs a body that opens with a preposition phrase followed by " - ".
-
-**Suggested fix:** Run the body-head check only when nothing but whitespace separates "note" from the body: `if not parts[-1].strip() and head and _addresses_a_non_estimate(head.group("head"))`. Add "note: on Friday - bring the trailer" as a False row.
-
-*(Review 2026-09-26 round 28 #5.)*
-
-**Resolved 2026-09-27** (platform `71473ce`): the body-head check runs only when nothing but whitespace separates "note" from the body. Pinned by the "note: on Friday - bring the trailer" row.
-
-### 668. ~~[LOW] A work-item field question reads the field as the work item's name~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/work_item_field_handlers.py:63` — `_extract_wi_hint` tries the words after "work item" before the name in front of it, so "what is the patio work item division" / "…subtotal" look for a work item called "division" / "subtotal" and answer "I couldn't find a work item matching …". Read-only: no write. Round 31 #1 reported the same misread on the recurring commands, where it wrote to the wrong work item; the user resolved that by deferring recurring from chat (2026-09-26), which removed the write path — this read path remains.
-
-**Suggested fix:** Keep the leading number check first ("work item 2 …"). Then read the name before the noun: "this"/"that" directly before it returns "" (the anchor); otherwise the name left after stripping `_WI_HINT_PRE_STOP`; only then the words after the noun ("rename work item Front patio to Fence"). Add `test_work_item_hint_extraction` rows ("patio" for "what is the patio work item division").
-
-*(Review 2026-09-26 round 31 #1, residual after the recurring deferral.)*
-
-**Resolved 2026-09-27** (platform `07935d7`): `_extract_wi_hint` takes a number after the noun, then the name before it ("this"/"that" → the anchor), and only then the words after it. New `test_work_item_hint_extraction` rows: "what is the patio work item division" → "patio", "rename work item Front patio to Fence" → "Front patio".
-
-**Update 2026-09-27:** `_extract_wi_hint` is now `work_item_field_handlers.py:51`. "this work item division" misreads too: the field word after the noun is taken as the name even when "this" points at the anchored work item.
-
-### 670. ~~[LOW] A customer name that starts or ends with punctuation never matches~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/title_reference.py:368` — `_names_whole` bounds the candidate (and, since round 33 #5, the stored name) with `\b`, which can't match next to a non-word character at the edge. A candidate like "Acme Inc." never matches a property named "Acme Inc." (verified: the finder returns it, the filter drops it, 0 resolved). LOW: Maple asks instead of answering.
-
-**Suggested fix:** Use `(?<!\w)` + `re.escape(text)` + `(?!\w)` instead of `\b…\b`, in both directions. Add a row for "Acme Inc.".
-
-*(Review 2026-09-26 round 33 #6.)*
-
-**Resolved 2026-09-27** (platform `e376e0e`): `_names_whole` uses `(?<!\w)…(?!\w)` in both directions. Pinned by `test_names_meet_as_whole_words_even_with_punctuation` ("Acme Inc.", "(Acme)"; "lee" still never matches "Kathleen").
-
-**Update 2026-09-27:** mostly masked in practice: the extractor trims a trailing "." ("the estimate for Acme Inc." → "Acme Inc"), so the candidate itself no longer ends in punctuation. What still fails is a name that *starts* with a non-word character — "the estimate for #1 Landscaping" extracts nothing, so it can never match.
-
-### 671. ~~[HIGH] A delete question survives turns that don't answer it, and a later "ok thanks" deletes the estimate~~ — RESOLVED 2026-09-27
-`platform/routers/agents.py:1105` — Six handlers return before the open-question decider without dropping the estimate yes/no question: pending status transition, gathering, template size, property link, estimate follow-up and optional follow-up. Only the help (line ~1094) and calculator (~1102) paths call `_drop_unanswered_estimate_yes_no`. The end-of-turn release in `routers/agent_helpers/finalize_result.py:~222` compares only the `pending_intents` question (`estimate_question`), never `pending_estimate_fuzzy_confirmation`. And a multi-intent turn (agents.py:~1394-1435) can leave the delete question pending beside a second question. Reproduced through the real endpoint on local Mongo, standing in for the LLM classifier's multi-intent output (`[create_estimate, delete_estimate]`): "Create a new estimate and delete estimate E0002" asks both questions. "confirm" is taken by the gathering handler (it creates E0003 with "Work: confirm") while the delete question stays saved. "ok thanks" is then read as yes: "Estimate 'Smith Deck' has been deleted." Confirmed in the code that only the two paths drop it and that finalize doesn't consider it. HIGH, not CRITICAL: it needs a compound request that leaves two questions open, but the result is an irreversible delete nobody confirmed.
-
-**Suggested fix:** In `finalize_orchestrate_result`, snapshot `pending_estimate_fuzzy_confirmation` at load alongside `estimate_question_at_load`, and drop it when the turn ends with it unchanged. That covers all six early returns at once. Give the stored question an id, so one re-asked this turn doesn't compare equal. In the multi-intent assembly, never leave a delete confirmation pending beside another question: keep the delete question alone, or drop it and say so. Endpoint test: seed a gathering state plus a delete question, send "confirm", then "ok thanks", and assert the estimate still exists.
-
-*(Review 2026-09-26 round 34 #1; deferred at /fix-issues none.)*
-
-**Update 2026-09-27:** fix approach revised. `pending_estimate_fuzzy_confirmation` has **eight** writers (`routers/agent_helpers/delegate_estimate_ops.py:121, :249`; `agents/estimate/edit_executor.py:468, :559`; `work_item_handlers.py:819`; `work_item_context.py:293`; `crud_handlers.py:2379, :2474`), so a snapshot-at-load comparison is fragile. Stamp at finalize instead, which covers all eight: `finalize_orchestrate_result` stamps the turn on an unstamped record and drops a record stamped on an earlier turn that this turn didn't answer. In a multi-intent turn, drop the delete question and say so. This is the question registry's one-turn rule (2026-09-27-maple-multi-turn-everywhere-design.md §5.1, §4). The six early returns are at `routers/agents.py:1109, :1115, :1126, :1137, :1143, :1147`.
-
-**Resolved 2026-09-27** (platform `19e34f8`, `2b67761`): one gate for every question Maple asks — `routers/agent_helpers/open_question.py::decide_turn` lists every open question (Estimate yes/no and records, every agent's pending records and `pending_delete_*` keys, task confirmations, status offers, gathering, template size, property link, both follow-up machines, pending calculations) and reads the message once: it answers the newest question it fits, cancels, or is a new request, and then every open question is dropped before classification. A question lives one turn. A delete question no longer survives a turn another handler answered, and `settle_after_turn` never leaves a delete question beside another one. Pinned by `tests/test_question_registry.py` and corpus row `safety-delete-question-does-not-outlive-its-turn` (status offer + delete question → "yes" → "ok thanks": nothing deleted). Still open, separate: gathering accepts a bare "confirm" as the work description (design §7.2).
-
-### 672. ~~[HIGH] A task whose title starts with "Last" is taken as "the newest task", so another task is edited~~ — RESOLVED 2026-09-27
-`platform/agents/task/resolver.py:204` — Step 2 (recency) fires on any "last/latest/newest/previous" in the message, before the title step, and returns the newest task. Reproduced on local Mongo: tasks "Last mow of the season" (older) and "Send contract to Lisa" (newer) → "archive the last mow of the season task" resolves to "Send contract to Lisa"; the note and "mark … as done" versions write to it too, and "Last walkthrough" behaves the same. "First/Second/Next/Final…" titles resolve by title correctly. Older than the 2026-09-26 routing work.
-
-**Suggested fix:** Take step 2 only when the task reference (`title_hint` or `extract_reference_hint(text)`, which is "last mow of the season" here) holds nothing but recency words, "my", "the" and "task" ("the last task", "my latest task", "most recent task"). Otherwise fall through to the title step. Add regression rows for "Last mow of the season" and "Last walkthrough".
-
-*(Review 2026-09-26 round 34 #2; deferred at /fix-issues none.)*
-
-**Update 2026-09-27:** wider than a title starting with "Last": `_LAST_TASK_RE.search(text)` (`resolver.py:204`) fires on a recency word *anywhere* in the message, and step 2 ignores `allow_recent_fallback=False`. Get, delete and convert pass an empty hint, so the "only recency words" test has nothing to read there: for an empty hint require adjacency — `(?:last|latest|newest|most recent|previous)\s+(?:one|task)`. Otherwise take step 2 only when the hint holds nothing but recency words, "my", "the", "task" and "one" (a sibling of `_only_position_words`, `:53`).
-
-**Resolved 2026-09-27** (platform `f924d4f`): the recency step fires only when the reference is nothing but recency words ("the last task", "my latest task", "delete the latest one"); a title holding one resolves by title, and "the task called X" reads X. Pinned by `tests/test_task_resolver.py::TestRecencyWordsInsideATitle` and corpus row `safety-task-title-with-last`.
-
-### 673. ~~[HIGH] An address-style estimate name drops its house number, so another address's estimate is written~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/title_reference.py:163` — `_is_stop` treats a digit as a stop word, so the loose extractor stops before the house number: `extract_named_title("rename the 4 Elm St estimate to Spring Cleanup")` → "Elm St". With only "14 Elm St Front Walk" in the company, the agent renamed that estimate to "Spring Cleanup" with no question. The customer fallback does the same: `_names_whole` matches "elm st" whole-word inside the street "14 Elm St", and the router returns it as exact. "12 Oak St" matches "112 Oak St Patio" the same way. If 4 Elm St has its own estimate, both match and Maple asks; the silent wrong write happens when it has none, or when its only estimate is archived and the live-wins tie rule (round 33 #3) picks the other address.
-
-**Suggested fix:** In the loose extractor (`_loose_pre_noun`), keep a number that directly precedes the collected words ("4 Elm St"), so the candidate carries the house number; whole-word matching then keeps "4 elm st" from matching "14 Elm St". Add rows: "the 4 Elm St estimate" with only "14 Elm St Front Walk" → no match (asks); with a "4 Elm St" estimate → that one.
-
-*(Review 2026-09-26 round 34 #3; deferred at /fix-issues none.)*
-
-**Update 2026-09-27:** two tiers drop the number. The strict tier `TITLE_PRE_NOUN_RE` (`title_reference.py:71-74`) needs a capitalized first word, so "4 Elm St" can't open a title; and a listed rename resolves through `_match_estimates_by_title`, whose rung 3 is a raw substring (`:354-355`) — "4 elm st" ⊂ "14 elm st front walk". Four-part fix: (1) the strict pre-noun pattern allows `\d+[A-Za-z]?\s+` before the capitalized word; (2) the loose pre/post extractors keep a number when a non-stop word follows it; (3) rung 3 gets digit guards, `(?<!\d)…(?!\d)`; (4) `_names_whole` then needs no change once the candidate carries the number. Fix #334 in the same change.
-
-**Resolved 2026-09-27** (platform `69fd512`): the strict and loose extractors keep a house number ("4 Elm St"), and the title ladder's substring rung never matches inside a longer number. #334 fixed in the same change: connectors between capitalized words stay in the name ("Edge of the Garden"). Pinned by `tests/test_estimate_title_reference.py` and corpus row `safety-address-estimate-keeps-house-number`.
-
-### 698. ~~[HIGH] A task field answer lands on the newest task, not the one being edited~~ — RESOLVED 2026-09-27
-`platform/agents/task/field_flow.py:_handle_awaited_field_value` — "update task T0001" → "due date" → "Friday" set the due date on T0003, the most recently updated task. The "which field?" question never resolved the task the message named (its pending record took `active_task_id`, empty when no task had been shown), and the value turn fell back to the resolver's recency step. Surfaced by the multi-turn corpus once the question gate began routing the field answer (2026-09-27); the underlying defect is older.
-
-**Resolved 2026-09-27** (platform `bd3dabf`): the task a message names is resolved before the field question, so the pending record carries it; an awaited value with no task asks "Which task should I update?" instead of guessing. Pinned by corpus rows `task-field-then-due-date` and `task-field-value-never-lands-on-the-newest-task`.
-
-### 674. ~~[HIGH] Catalog delete confirmation is a substring test, so "delete it" deletes at once~~ — RESOLVED 2026-09-27
-`platform/agents/property/text_helpers.py:100` — `_is_confirm_text` is true when the message *contains* "confirm", "yes", "yep", "proceed", "delete it" or "do it" (twins: `contact/text_helpers.py:86`, `labour/text_helpers.py:91`, `material/text_helpers.py:139`, `equipment/text_helpers.py:68`). It is OR'd into `confirm_delete` on the first delete turn (`property/service.py:1394, :2025`; `contact/service.py:958, :1447`; `labour/service.py:1090`; `material/service.py:1497, :2307`), so "delete it" and "delete item 3" delete without asking, "no, don't delete it" confirms, and a name containing "yes" — "Yesler", "Yesenia", "Reyes" — confirms too. A property delete is hard and cascades its notes (`property/service.py:490-513`). HIGH: an irreversible delete nobody confirmed, from ordinary phrasings.
-
-**Suggested fix:** Delete the helper. The first delete request always asks, even with a clearly named target (design §2.4), and a confirmation is accepted only through the question registry (design §5.1) with a normalized yes/no — never a substring.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `3526a08`): the five `_is_confirm_text` helpers are gone. A delete runs only when a confirmation is pending and the reply is a plain yes (`agents/conversation/delete_confirmation.py`, reading replies through `agents/conversation/replies.py`); a no, a cancel or "don't" clears it. Pinned by `tests/test_conversation_replies.py` and the corpus rows `safety-delete-it-asks-first`, `safety-dont-delete-is-a-no`, `safety-name-containing-yes-still-asks`.
-
-### 675. ~~[HIGH] Non-estimate delete confirmations never expire and can't be cancelled~~ — RESOLVED 2026-09-27
-`platform/routers/agents.py:417` — the `pending_delete_{property,contact,material,labour,equipment,task,template}_id` keys are cleared only by a completed delete. "no" or "cancel" re-asks, and a bare "yes" any number of turns later is routed back to the owning agent by `_get_pending_fallback_match` (called at `agents.py:1462`) and deletes; "delete contact Yesenia" while a delete of Bob is pending deletes Bob. The confirm-time load is by bare id, not company-scoped (`Contact.get` at `contact/service.py:753`, `Template.get` at `template/service.py:365`), and `ConversationContext` is keyed by user id, so a pending delete survives a company change. HIGH: a stale question deletes a record the user has moved on from.
-
-**Suggested fix:** Registry expiry and cancel (design §5.1: a question lives one turn; "cancel" or any new request drops it), and company-scoped loads at confirm time (design §4).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Update 2026-09-27:** partly closed by #674 — "yes, delete contact Carla Diaz" is no longer a yes, so it asks about Carla instead of deleting the pending Bob (corpus row `safety-stale-delete-not-applied-to-new-target`), and a no/cancel now clears the pending delete. Expiry and the company check at confirm time remain (design §5.1).
-
-**Resolved 2026-09-27** (platform `19e34f8`, `2b67761`): one gate for every question Maple asks — `routers/agent_helpers/open_question.py::decide_turn` lists every open question (Estimate yes/no and records, every agent's pending records and `pending_delete_*` keys, task confirmations, status offers, gathering, template size, property link, both follow-up machines, pending calculations) and reads the message once: it answers the newest question it fits, cancels, or is a new request, and then every open question is dropped before classification. A question lives one turn. A stale delete confirmation is dropped by the next message that doesn't answer it; "no"/"cancel" clears it (#674); a question asked under another company is dropped unread (`QUESTION_COMPANY_KEY`). Pinned by `tests/test_question_registry.py` and corpus rows `safety-stale-delete-*`.
-
-### 676. ~~[HIGH] An awaited field value captures every later message~~ — RESOLVED 2026-09-27
-`platform/routers/agents.py:1341` — while a pending intent carries `awaiting_value_for`, the router overrides classification (`AWAITED_VALUE_CONFIDENCE = 0.95`, `agents.py:143`) and hands the message to that agent, which writes the raw text into the field (`property/service.py:1583`). The slot is removed only when `pending_override_applied` is set (`property/service.py:1903`, `contact/service.py:1362`), and on the awaited-value path it never releases: after "update 12 Oak St" → "city", every later message — "show me my properties" included — is written into the city. The task create-title prompt has the same shape: any reply that isn't a fresh command becomes the title (`task/create.py:274`). HIGH: silent wrong writes that continue until the slot is cleared.
-
-**Suggested fix:** Make it a registry `value` question (design §5.1): commands, record codes, questions and cancel release it, and it lives one turn. Delete the router's awaited-value override.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `19e34f8`, `2b67761`): one gate for every question Maple asks — `routers/agent_helpers/open_question.py::decide_turn` lists every open question (Estimate yes/no and records, every agent's pending records and `pending_delete_*` keys, task confirmations, status offers, gathering, template size, property link, both follow-up machines, pending calculations) and reads the message once: it answers the newest question it fits, cancels, or is a new request, and then every open question is dropped before classification. A question lives one turn. A structured value question ("what's the new city?") treats a cancel as a cancel and a different command, a question, a help query, an estimate code or a listed estimate command as a new request; a free-text value (note, description) keeps the reply as text (the override's original purpose). Pinned by `tests/test_question_registry.py`, `tests/test_maple_task_operations.py::TestAwaitedValueWins`, corpus rows `safety-never-mind-is-not-a-value`, `safety-value-slot-releases`.
-
-### 677. ~~[HIGH] Stale anchors, pronoun domains and stale lists write to the wrong record~~ — RESOLVED 2026-09-27
-Catalog anchors never go stale: an update with no target falls back to `active_*_id` however old it is (`contact/service.py:800`, `property/service.py:874`, `material/service.py:728`, `labour/service.py:441`). Viewing a template doesn't move `active_entity_domain` (`routers/agent_helpers/finalize_result.py:79-83` knows contact/property/material/labour/estimate/task only), so "delete it" after a template hits the previous property. "add a note to him" follows recency, not the pronoun (`agents/orchestrator/service.py:1742` → `_resolve_domain_from_history`, :3281). A positional pick uses the last recorded list forever (`orchestrator/service.py:2095`; `record_listed_items`, `agents/text_utils.py:1133`). "Multiple X matched" menus neither list nor record their candidates, and property/labour drop the original update (`property/service.py:1457-1473`, `labour/service.py:843-860`), so a reply of "2" picked row 2 of an older list and wrote Ana's phone number to Bob. Work-item material/activity lists and "materials/roles on E0042" record no rows at all. HIGH: writes land on a record the user didn't mean.
-
-**Suggested fix:** The focus model (design §5.2): per-domain anchors with a set-turn, pronoun → domain (him/her → contact, there → property, it → the freshest anchor of the command's domain), a write through a stale anchor asks "Did you mean …?", and a deleted record clears its anchor. Plus list memory (§5.4): every list records domain, filter and turn, menus record their candidates, and a positional write is honoured only while nothing else has taken focus.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `b74fef4`, `9eb5486`): every anchor records the turn it was set on (`agents/conversation/focus.py`); an update that reaches a contact, property, material or role only through "it" or no name asks "Just to check — do you mean Ana Reyes?" once the anchor is older than the previous turn, and "yes" replays the request on it. "him"/"her" pick the contact and "there" the property before recency does; a viewed template is "it" for a following get or delete. A recorded list answers "the second one" only while nothing else has taken focus since it was shown; listing an estimate's materials/roles or the categories clears it. Pinned by `tests/test_question_registry.py`, `tests/test_list_memory.py` and corpus rows `contact-stale-anchor-asks`, `contact-stale-list-asks`, `note-to-him-goes-to-the-contact`. Moved to the per-feature work (design §7.3), not part of this entry any more: the "Multiple X matched" menus that neither list nor record their candidates and drop the original update.
-
-### 678. ~~[HIGH] Maple's material and labour writes call route functions without the signed-in user~~ — RESOLVED 2026-09-27
-`platform/agents/material/service.py:651, :655` and `platform/agents/labour/service.py:405, :409` call the routers' `update_material`/`delete_material` and `update_labour`/`delete_labour` directly without `current_user`, so the parameter keeps its `Depends(...)` default object. With auth enabled, `assert_user_company_access` (`dependencies.py:139`) reads `.company` on that object and raises `AttributeError`; the test suite runs with `firebase_auth_disabled`, where the check returns early, so nothing fails. The call shape dates from aad01b8 (2026-04-10). **Not verified end to end** — confirm on Dev. HIGH: if confirmed, every Maple material/labour edit and delete fails in production.
-
-**Suggested fix:** Pass the verified user through and keep the manager gate on delete (design §4). Per decision 9, the fix lands with a test that runs with auth enabled and fails today.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `6dfb5b0`): the orchestrate and estimate endpoints set the verified user for the turn (`services/acting_user.py`) and the material/labour agents pass it to the route functions; a write outside a signed-in turn raises `NoActingUser` instead of an `AttributeError`. Pinned with auth ON by `tests/test_maple_catalog_writes_auth.py`. Found while fixing it: Maple's property, contact, material, labour and equipment deletes had no role check at all, so a Member could delete through chat what the REST routes (`assert_is_manager`) forbid — every catalog delete now checks the role before it asks (`agents/conversation/delete_confirmation.py::delete_role_refusal`; corpus rows `safety-member-cannot-delete-*`).
-
-### 679. ~~[HIGH] "remove X from Y" and note edit/delete phrasings delete the parent record~~ — RESOLVED 2026-09-27
-Reproduced end to end on the rules tier: "remove Carla Diaz from 12 Oak St" classifies as `delete_property` before the LLM runs, and "yes" deletes the property and its notes; "remove Ana Reyes from this property" deletes with no question at all, because "Reyes" contains "yes" (#674). "delete the last note on 12 Oak St" and "delete that note" also become `delete_property`, and "update the gate code note … to 5522" becomes `update_property`. The same parent-record misread turns "delete the Rv Yard estimate" into `delete_property`. There is no unlink capability, and notes can't be edited or deleted from chat. The property delete is hard and cascades notes (`platform/agents/property/service.py:490-513`). HIGH: the user asked to detach a person or remove a note and lost the property.
-
-**Suggested fix:** Never delete when the message names two records or a note (design §4). Unlink gets an out-of-chat redirect (§5.7, decision 3); note delete goes to the new notes capability — read/list, and delete your own note with confirmation (decision 2b).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `6609de8`): a catalog delete that mentions a note, or takes one record "from"/"off" another, deletes nothing and says where to do it in the app (`agents/conversation/delete_confirmation.py::delete_scope_redirect`). Unlinking stays out of chat (owner decision 2026-09-27); deleting your own note arrives with the notes capability (design §7.3), which will replace the note redirect. Pinned by `tests/test_delete_scope_redirect.py` and corpus rows `safety-remove-contact-from-property-deletes-nothing`, `safety-delete-that-note-keeps-the-property`.
-
-### 680. ~~[HIGH] Maple writes a material's price equal to its cost~~ — RESOLVED 2026-09-27
-`platform/agents/material/service.py:111` — `MATERIAL_FIELD_ALIASES` maps `cost` → `price`, and normalization then sets `cost = price` (`:411-417`). `routers/materials.py:_normalize_size_entry` (`:93-124`) derives `price = cost × (1 + material_markup%)` only when no price is sent, so every Maple create or cost edit stores a price equal to the cost and the company's material markup is lost. An edit that names no size changes only the first size. HIGH: silently wrong customer prices on every estimate that later uses the material (see the pricing model in CLAUDE.md).
-
-**Suggested fix:** Cost is cost: stop aliasing it to price, send the cost alone and let the server derive the price; ask which size when the material has several (design §4).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `d17e460`): "cost" is no longer aliased to price in the agent or in the rules extractor; a cost edit sends only the cost and the server derives the price from the markup; a price edit keeps the cost; an edit naming no size on a material with several asks which size. Pinned by `tests/test_material_pricing_edits.py` and corpus rows `safety-material-cost-edit-keeps-markup`, `material-price-edit-keeps-cost`, `material-several-sizes-asks-which`. Still open, not part of this entry: the "which size?" answer does not resume the edit (question registry, design §5.1); a create or edit that gives only a price (no cost) still sets cost = price (`_should_default_cost_to_price`); "change the cost of Topsoil to 20" without the word "material" doesn't route on the rules tier (design §7.4).
-
-### 681. ~~[HIGH] A refusal is overridden by an unfinished create~~ — RESOLVED 2026-09-27
-After an incomplete "create a new material", "create a new category called Hardscape" is refused — but the refusal returns intent `unknown` (`platform/agents/orchestrator/service.py:420`), so the router's pending fallback (`routers/agents.py:1462`) hands the message to the Material agent's pending create, and `_find_or_create_category` (`agents/material/service.py:507`, called at :955) inserts the category. The equipment and template-create refusals fall through the same way, and `_find_or_create_unit` (:527, also called on update at :1684) creates units silently. HIGH: a policy refusal (phrasing reference §9.3) is bypassed and the catalog written.
-
-**Suggested fix:** A refusal ends the turn and drops the pending create; an unknown category or unit is refused, never created (design §4 and churn guard §3.4).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `ed64ff2`): the orchestrator tags a policy refusal (`result.operation == "refusal"`) and the router ends the turn on it when the message is a new request (`agents/conversation/replies.py::starts_with_command_verb`), dropping pending records — a free-text answer that trips a refusal keyword ("12 Equipment Road") still answers its question. The material agent looks categories and units up (`_find_category`, `_find_unit`) and never inserts one; an unknown name is explained with the Settings tab where it is added. Pinned by `tests/test_maple_refusal_is_final.py` and corpus row `safety-refusal-ends-the-turn`.
-
-### 682. ~~[MEDIUM] Cross-resource material and role joins query fields Estimate doesn't have~~ — RESOLVED 2026-09-27
-`platform/agents/property/service.py:647, :663` query `materials.material` and `labours.labour`, and `agents/estimate/crud_handlers.py:1362` filters estimates on `labours.labour`. `Estimate` has neither at the top level: its lines are `job_items[].materials[].material` and `job_items[].activities[].role` (`models/estimate.py:233-292, :456-470`). So "which properties use {material}?", "which properties need a {role}?" and "what estimates use the {role} role?" route correctly (#55) and always come back empty; the estimate list has no material filter at all (`filter_by` handles labour, property and contact, `crud_handlers.py:1195-1257`). MEDIUM: wrong empty answers, no writes.
-
-**Suggested fix:** Query the embedded paths (`job_items.materials.material`, `job_items.activities.role`), add a material filter to the estimate list, and add a join test against a real estimate line — today's tests stub the query and pin the wrong field (`tests/test_cross_resource_joins.py:299` asserts `field == "materials.material"`). Phrasing reference §8 marks these ⚠️ until then.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `634703f`, `695e0f8`): one filter and two readers in `agents/cross_resource.py` (`estimate_line_filter`, `estimate_material_names`, `estimate_role_names`) go through the work items — activities' roles and legacy labour lines both count — and every join uses them: the property join, the estimate list's role filter, the new material filter ("which estimates use Black Mulch?"; a role named without "role" resolves as one), and "what materials does / which roles are on E0042?", which read the same missing top-level lists. Found on the way: "what estimates use the Foreman role?" never reached the Estimate agent — `is_help_query` claimed it and the help pre-check returned the orchestrator's routing note; a help-shaped message the orchestrator routes to an agent is now delegated (`routers/agents.py::_routes_to_an_agent`). "find estimates with X" and "show me jobs needing a Y" dropped the filter and listed everything; they are joins now. The stubbed tests that pinned the wrong fields pin the work-item paths (`tests/test_cross_resource_joins.py`, `tests/test_cross_resource_envelope_property.py`), `tests/test_estimate_lines.py` covers the helpers, and corpus rows `estimates-using-a-role`, `estimates-using-a-material`, `properties-using-a-material-or-role`, `lines-on-an-estimate` run them against a real estimate.
-
-### 683. ~~[MEDIUM] Pending flows that can't be left, and post-create follow-ups that swallow the next message~~ — RESOLVED 2026-09-27
-The calculator's pending question releases only on an action+domain pivot (`platform/routers/agent_helpers/pending_calculation.py:57`). Template size treats "maybe later" as a no and creates the (billed) estimate at the baseline (`template_estimate.py:330`). Gathering takes "hi maple" as the work type (`estimate_gathering.py:170`). The post-create "link to a property?" follow-up (`optional_follow_up.py`) swallows "make the patio 400 sq ft instead"; the contact follow-up is registered only for email (`optional_follow_up.py:234`) though the Contact agent also asks for phone or address (`agents/contact/service.py:1741-1743`); the material and role follow-ups take "what's the rate now?" as the description. Nothing expires: the TTL keys on `updated_at`, which every save refreshes (`models/conversation_context.py:9, :24-26, :37-41`). MEDIUM: dead ends and one billed estimate nobody asked for; no destructive write.
-
-**Suggested fix:** All of them become registry entries (design §5.1): one-turn lifetime, cancel, and a new request releases them; for `value`/`flow` kinds a command, code or question is NEW, not an answer.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Update 2026-09-27:** partly closed by the question gate (platform `19e34f8`, `2b67761`): one gate for every question Maple asks — `routers/agent_helpers/open_question.py::decide_turn` lists every open question (Estimate yes/no and records, every agent's pending records and `pending_delete_*` keys, task confirmations, status offers, gathering, template size, property link, both follow-up machines, pending calculations) and reads the message once: it answers the newest question it fits, cancels, or is a new request, and then every open question is dropped before classification. A question lives one turn. Post-create follow-ups no longer swallow a question ("what's the rate now?") or a new command; the calculator and template size accept "cancel"; "maybe later"/"not now" to "what size?" cancel instead of creating a billed estimate. Still open: the estimate post-create "link a property?" question still takes an assumption adjustment ("make the patio 400 sq ft instead") as a property name, and gathering still takes "hi maple" as the work description (design §7.2).
-
-**Resolved 2026-09-27** (platform `fee6ef3`, `3980551`): the last two pieces — a greeting during estimate gathering is answered and the question asked again ("hi maple" was taken as the job), and while the estimate's post-create "link a property?" is open, any listed estimate command (ported ones included, e.g. "make the patio 400 sq ft instead") is a new request. A stated field ("zip M4B 1B3", "his phone is …") after any create is an update of that record, never the answer to "link a contact?". Pinned by `test_an_estimate_edit_is_not_the_answer_to_link_a_property` and corpus rows `estimate-gathering-hi-is-not-the-job`, `property-created-then-postal-code`, `contact-created-then-his-phone`.
-
-### 684. ~~[MEDIUM] "add a note to work item 2 about drainage" files a garbled estimate note~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/note_handlers.py:84` — `_NOTE_WITH_IMPLICIT_TAIL` captures everything after "note", and the `add_note` dispatch files it on the estimate (`crud_handlers.py:2911`): the note reads "to work item 2 about drainage" and sits on the estimate, not on work item 2. The phrasing reference listed this ✅ (§1.11). MEDIUM: a wrong but visible note, deletable in the app.
-
-**Suggested fix:** Give "add a note to <work item> about / to / , <text>" a grammar entry that targets the work item (design §7.2, planner-only phrasings promoted); until then a note body that opens with a work-item reference asks which work item.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `71473ce`): an `add_note` entry takes "about / regarding …" as the body after a work-item or estimate target, so the note is "about drainage" on work item 2. Pinned by `test_more_note_shapes_are_listed` and corpus row `estimate-note-to-work-item-not-garbled`.
-
-### 685. ~~[MEDIUM] The several-estimates "which one did you mean?" stores no question~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/crud_handlers.py:2065` (`_several_titles_question`) and `platform/routers/agent_helpers/delegate_get_estimate.py:140` (`_multi_match_envelope`) list the matching estimates but store nothing, so the answer — "2", a code, a title — is classified from scratch and the original request is lost. MEDIUM: a dead end. Related: #615.
-
-**Suggested fix:** Store it as a registry `pick` question (design §5.1) whose answer — ordinal, readable code or a candidate's label — resumes the original request (design §7.2).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `9b87099`): both menus store a `choose_estimate` question with the request and the estimates offered; a code, a number or words from a title resume it. Pinned by corpus rows `estimate-several-matches-answer-by-{code,name}`, `estimate-show-several-matches-answer-by-number` and `estimate-several-matches-then-something-else`.
-
-### 686. ~~[MEDIUM] "delete the second one" after a list targets the open estimate~~ — RESOLVED 2026-09-27
-`platform/routers/agent_helpers/estimate_resolver.py:159` — `find_estimate_from_context_or_message` has no listed-row step, so with an estimate open, "list my estimates" → "delete the second one" proposes deleting the open estimate, not row 2. It asks first, so nothing is lost unless the user confirms the wrong name. MEDIUM.
-
-**Suggested fix:** Resolve listed rows ahead of the open estimate for delete/update (design §7.2), under the list-memory rule that a positional write is honoured only while nothing else has taken focus (§5.4).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `00d88a6`): `find_estimate_from_context_or_message` resolves a row of the current estimate list ahead of the open estimate; a stale list is no target. Pinned by corpus row `estimate-delete-listed-row-not-the-open-one` (fails without the fix).
-
-### 687. ~~[MEDIUM] Lists silently drop filters; "last month" returns one row; the assigned-to email filter never matches~~ — RESOLVED 2026-09-27
-`platform/agents/estimate/crud_helpers.py:401` reads "last" as a newest-first sort with limit 1, so "estimates from last month" shows one row. These lists come back unfiltered without saying so: estimates by title, customer or property ("list estimates for Ana Reyes"); tasks overdue, due this week, or by property, status or assignee name; contacts by role or city ("show contacts in Toronto"); and the property count by city (`agents/property/service.py:2367`). `agents/task/service.py:59` — `_ASSIGNED_TO_FILTER_RE` stops the email at ".", so "tasks assigned to bob@acme.com" filters on "bob@acme" and is always empty. MEDIUM: wrong answers presented as complete.
-
-**Suggested fix:** "last month" is a date range, not a sort (design §7.2); a filter the list can't apply is named in the reply, never dropped (§5.4); fix the email regex and add the task and contact filters (§7.1, §7.3).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Update 2026-09-27** (platform `00c17d8`): the task half is done — task lists filter by overdue, due window, upcoming, status, open, assignee (email, name, "Jordan's tasks"), unassigned and property; the assigned-to email is read whole; a teammate, status or property that doesn't resolve is answered, not dropped. Pinned by `tests/test_task_list_filters.py` and the `task-*-filter*` corpus rows. Still open: estimates ("last month", title/customer/property), contact role/city, property count by city.
-
-**Update 2026-09-27** (platform `00d88a6`): the estimate half is done — "list estimates for Bob Lee / Elm House" filters by that customer or property (a name that is neither is answered), and "last month" is the date window, never "the latest one". Refinements of the list just shown ("just the drafts", "only the ones over $1000") also filter (`a74fa30`). Still open: contact role/city and the property count by city (design §7.3).
-
-**Resolved 2026-09-27** (platform `f75f549`): property and contact lists filter by city, and contacts by role ("how many properties are in Toronto?", "list homeowners", "which contacts are administrators?"); a city nobody has is said so. With the task (`00c17d8`) and estimate (`00d88a6`) halves, no list drops a filter it recognises. Pinned by `tests/test_record_lists.py` and corpus rows `property-count-by-city`, `contacts-by-city-then-pick`, `contacts-by-role`, `properties-in-a-city-nobody-has`.
-
-### 690. ~~[MEDIUM] `_prefer_explicit_rule_match` demotes correct LLM answers to off_topic~~ — RESOLVED 2026-09-27
-`platform/agents/orchestrator/service.py:1712` — when a message has no action or domain keyword and history resolution finds nothing, the LLM's CRUD intent is overwritten with `off_topic` (`:1764-1777`). "what's its price?" and "link Carla Diaz to 12 Oak St" lose a correct LLM answer this way; "link" isn't in `ACTION_HINTS` (`agents/orchestrator/intents.py:143`). MEDIUM: a right answer thrown away for a canned one.
-
-**Suggested fix:** Rules decide what they parse, the LLM decides the rest, and a weaker rule never overwrites a correct LLM answer (design churn guard §3.5). Add "link" as an action.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `47b2319`): an LLM read (`get_`/`list_`) about a field of the domain it chose — "what's its price?" as `get_material`, "what's the wage on that one?" as `get_labour` — is kept instead of demoted; a read writes nothing, and one that finds nothing says so. The guard still demotes writes, reads that name no field of their own ("what's the weather today?"), and a field of another domain, so its original purpose holds. "link" was not added to `ACTION_HINTS`: link phrasings are answered by the router's link handler before classification on both tiers (`agents/conversation/record_links.py`, §3.9), so they no longer reach the guard, and adding the word would have re-routed existing link rules. Pinned by `test_an_llm_read_about_its_own_field_is_not_demoted` in `tests/test_orchestrator_intents.py`.
-
-### 691. ~~[MEDIUM] The help short-circuit swallows record questions and shows an "Intent identified" placeholder~~ — RESOLVED 2026-09-27
-`platform/routers/agents.py:1093` — `is_help_query` runs before classification and never delegates, so "what's the status of E0042?" is answered by the user-guide responder instead of from the estimate. Separately, CRUD intents that end in the orchestrator's own envelope get the placeholder reply "Intent identified: `get_material` via Material Agent." (`agents/orchestrator/service.py:1379, :1526, :2038, :2294`). MEDIUM: a question about a record gets a generic or internal-looking answer.
-
-**Suggested fix:** Questions about the record in focus (status, total, customer, property, markup, margin) are matched ahead of help (design §7.2); the placeholder is never user-facing — delegate or answer.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `f98c59a`, `fa863c0`): questions about one estimate (status, total, customer, property, markup, margin, dates, code — by code, title or in focus) are answered from the estimate ahead of help (`agents/estimate/focus_questions.py`); the "Intent identified" placeholder and the "I detected … at N% confidence" reply are replaced with plain questions. Pinned by `tests/test_estimate_focus_questions.py`, `tests/test_router_fallback_wording.py` and the `estimate-*question*` corpus rows.
-
-### 692. ~~[MEDIUM] Task delete can never be confirmed; convert, menu and value replies dead-end~~ — RESOLVED 2026-09-27
-`platform/agents/task/service.py:621` stashes `pending_delete_task_id` but writes no `pending_intents` record, so the router has nothing to route the confirming "yes" to and a task delete never completes from chat. `tests/test_maple_task_crud.py:1297` hides it by re-injecting the `delete_task` intent alongside the "yes". Convert confirmations and "which task?" menu replies work only when the classifier happens to route them back; value questions (assignee, status, date) dead-end, and a bare "due date" reply to the field question routes to `get_material`. MEDIUM: a supported capability that doesn't work.
-
-**Suggested fix:** Task confirmations, menus and value questions become registry entries (design §5.1, §7.1). Drop the intent injection from the test so it exercises the real path.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Update 2026-09-27:** the delete confirmation now completes — the gate routes the "yes" to the Task Agent (corpus row `task-delete-confirmed`). Convert confirmations and menu replies go through the same gate. Still open: value questions (assignee, status, date) and menu replies by readable id or partial title (design §7.1).
-
-**Resolved 2026-09-27** (platform `5d0a33c`): value questions resume — "assign it", "change the status", "reschedule it" ask for that one value and the reply applies it; an unparseable date asks again. A "which task?" menu takes a number, the task's readable id ("T0004") or words from its title ("the paint one"); the question gate reads a reply that names a choice as the answer. The agent-level tests in `test_maple_task_crud.py` still pass the intent — that is the router's contract with the agent — and the real router path is pinned by corpus rows `task-delete-confirmed`, `task-assign-asks-who-then-resumes`, `task-status-asks-which-then-resumes`, `task-due-date-bad-value-asks-again` and `task-which-task-menu-by-{code,partial-title,number}`.
-
-### 693. ~~[MEDIUM] "show me my labour roles" filters by "S"; the equipment refusal blocks "Heavy Equipment Operator"~~ — RESOLVED 2026-09-27
-`platform/agents/labour/text_helpers.py:180` — `_extract_name_from_message` returns "S" for "show me my labour roles" (and "list all labour roles"), and the Labour agent adopts it as the role name (`agents/labour/service.py:1365`), so the list is filtered to roles matching "S". Separately, `is_equipment_request` (`agents/text_utils.py:403`, pattern :398) matches the word "equipment", so the standard "Heavy Equipment Operator" role can't be read, created or edited from chat. MEDIUM: a wrong list, and a blocked role.
-
-**Suggested fix:** Treat "roles" / "labour roles" as the list noun, never a name (design §7.4); a known role name wins over the equipment refusal — "Heavy Equipment Operator" is a role, not equipment.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `00110ed`, tests `c2aa1ac`): "roles" / "labour roles" is the list noun, never a name, so "list my roles", "show me my labour roles" and "what labour roles do I have?" list every role; "roles" is a labour domain hint. "operator" after "equipment" is a role, not equipment, so "Heavy Equipment Operator" is read, created and edited. Pinned by corpus rows `people-list-roles`, `people-list-my-roles`, `people-equipment-operator-is-a-role` and the `_EQUIPMENT_OPERATOR_RE` cases in `tests/test_text_utils.py`.
-
-### 694. ~~[MEDIUM] Moving a material to another category always fails~~ — RESOLVED 2026-09-27
-`platform/routers/materials.py:479` — `UpdateMaterialRequest.category` is a `PydanticObjectId`, but Maple's update sends the category *name*: the update path resolves unit names to ids (`agents/material/service.py:1684`) and never category names, which only the create path converts (`:953-957`). So "move black mulch to Hardscape" fails every time. MEDIUM: a supported edit that never works.
-
-**Suggested fix:** Resolve the category name to an existing category's id on update — never create one (#681) — design §7.4 "category move by name".
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `00110ed`): the update path resolves a category name to the company's category id, and a name the company doesn't have is answered, never created. "move Topsoil to the Bulk Materials category" is rewritten to the one shape the material parser reads a category move from. `test_material_update_category_field` used to pin the bug (it asserted the name was sent); it now asserts the id, and a second test covers the unknown category. Corpus row `material-move-category`.
-
-### 697. ~~[MEDIUM] Out-of-chat features are misrouted instead of redirected~~ — RESOLVED 2026-09-27
-Features Maple doesn't handle in chat fall into whichever rule matches: "add a division" becomes `create_contact`, "upgrade my plan" a material lookup (the material-shape residual, `platform/agents/orchestrator/service.py:3209-3221`), and "create a document for E0042" `create_estimate`. Conversation turns — "cancel", "never mind", "thanks", "ok", "repeat that", "show more", "go back", "clear chat" — reach the same material fallback. MEDIUM: confusing replies, and a misroute can open a create question.
-
-**Suggested fix:** One out-of-chat table (`agents/conversation/out_of_chat.py`, design §5.7) that refuses with a redirect to the page or user-guide section for everything in design §2.3, plus a meta layer ahead of classification for cancel / thanks / repeat / show more / clear chat (§5.6).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-### 699. ~~[MEDIUM] The display-text save for non-English turns can erase another turn's chat lines~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** Both halves. The merge now matches chat lines on role and text, and carries a `display_text` this turn put on lines both copies hold onto the newer copy (`conversation_store._merge_history`), so the display-text save no longer looks like a rewritten history and the other turn's lines survive. And `_save_display_text` runs only once the turn's own save went through (`routers/agents._TURN_SAVED`); before that the snapshot is the pre-turn one. Tests: `test_conversation_store.py::test_display_text_added_to_this_turns_lines_survives_a_merge`, `test_the_display_text_save_is_skipped_when_the_turns_save_failed`, `…marks_this_turns_lines_once_the_turn_saved`.
-
-`platform/routers/agents.py:705` — `_save_display_text` saves again, conditional on the version just written. If another turn saved during the outbound translation call, `merge_turn` looks for `base[-1]` in ours, which now has an extra `display_text` key, finds no match, treats the history as rewritten and keeps only ours. The other turn's lines are dropped: the #689 loss again, for non-English conversations. Also, if the first save failed, the pre-turn snapshot's lines are stamped with this turn's text. MEDIUM: needs a non-English user with two overlapping turns. (review 2026-09-27 #25)
-
-**Suggested fix:** In `_new_lines`, match history lines on (role, text) only and carry `display_text` onto `latest`'s matching lines. Better, translate before the turn's single save. Skip `_save_display_text` when the first save returned "".
-
-### 700. ~~[MEDIUM] Removing or renaming a size the material doesn't have replies "I've updated the material"~~ — RESOLVED 2026-10-02
-
-**Resolved 2026-10-02:** `_check_size_label_refusal` says a missing size back — "Topsoil doesn't come in 1 cu yd — it comes in 1 yd, 2 cu ft, Bag." — matching labels as `_build_sizes_from_fields` does (normalized, any case), and it now runs before the last-size check, so a one-size material isn't told it "needs at least one size" about a size it never had. It covers the classifier path as well as the size commands. Tests in `tests/test_material_agent.py`.
-
-`platform/agents/material/service.py:1769` — `_handle_size_command` never checks that `command.size` exists for remove or rename; `_build_sizes_from_fields` returns the sizes unchanged and the success reply (2192-2196) still goes out. "delete size 1 yd for Black Mulch" when the size is "1 cu yd" claims success. (review 2026-09-27 #26)
-
-**Suggested fix:** Look the size up on `target.sizes` with `_normalize_size_text` (case-insensitive). If it's missing, reply "X doesn't come in … — it comes in …", as the read op does.
-
-### 701. ~~[MEDIUM] The size-command branch skips `process()`'s error handling~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** The size branch runs inside the same failure reply as every other request — one `_request_failed` helper serves both. `tests/test_material_agent.py::test_a_failed_size_command_says_so`.
-
-`platform/agents/material/service.py:3079` — `return await self._handle_size_command(...)` sits before the `try/except` around `_dispatch_intent_to_handler` (3054-3086). A DB error, an `HTTPException(404)` when the material is deleted between resolve and write, or `NoActingUser` escapes, and routers/agents.py:1666-1670 turns it into a 500 instead of "I could not complete the material request." MEDIUM: failure paths only. (review 2026-09-27 #27)
-
-**Suggested fix:** Move the size branch inside the existing try, or wrap it in the same failure reply.
-
-### 702. ~~[MEDIUM] A category id typed into the message skips the company check, and the details lookup reads it unscoped~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** per the user's rule (CLAUDE.md "Tenant scope of referenced ids"): Maple no longer accepts an id typed into the message — a category or unit is always resolved by name within the company, so an id-shaped value is an unknown name. `POST`/`PUT /materials` refuse (404) a category or size unit that isn't the material's company's (`dependencies.assert_company_refs`), and `_with_catalog_names` reads names only within the material's company.
-
-`platform/agents/material/service.py:1949` — The update-path resolver resolves only category values that aren't 24-hex; a hex id passes straight to `UpdateMaterialRequest`, and routers/materials.py:516-548 doesn't check the category's company. `_with_catalog_names` (807/812) then loads it with an unscoped `MaterialCategory.get` / `MaterialUnit.get` and prints the name. This exposes another tenant's category name to anyone holding its ObjectId. (review 2026-09-27 #28)
-
-**Suggested fix:** Resolve hex ids with `find_one(id == oid, company == company_oid)`, here and in `_resolve_create_category_unit_ids`. Scope both lookups in `_with_catalog_names` to `material_doc["company"]`.
-
-### 703. ~~[MEDIUM] "show me his contact info" / "delete it" look up a contact named by the pronoun~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (Maple data-safety batch): `_extract_name_from_message` skips a name made only of pronouns/"one" (`_POINTING_WORDS` in contact/text_helpers.py; utils.NAME_STOPWORDS untouched), so the contact in focus answers.
-`platform/agents/contact/service.py:2238` — This diff removed `and not active_contact_id` from the get/delete fallback gate (also :2322), so `_extract_name_from_message` runs for pronoun references. "show me his contact info" → "His", which substring-matches "Chris"; "delete that one" → "One". The wrong contact is shown and becomes focus, so the next "change the phone to …" edits it. A delete asks first but names the wrong contact. MEDIUM: the write needs a second turn that names the contact. (review 2026-09-27 #30)
-
-**Suggested fix:** Keep the fallback, but discard an extracted name that is only a pronoun or "one" before setting `parsed["full_name"]`. Leave the "notes" stopword in contact/utils.py alone (CLAUDE.md Notes item 2).
-
-### 704. ~~[MEDIUM] "it/this/that" anywhere in a message picks the focused template over one the user named~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** The template in focus is used only when `_extract_name_hint` finds no name, and the hint drops an aside after ", " ("Old Patio, it's a duplicate" → Old Patio). The staleness check the entry mentions is not added: a delete always asks first and names the template in its confirmation. Tests: `test_maple_template_crud.py::test_a_named_template_beats_the_one_in_focus` / `test_it_alone_is_still_the_template_in_focus`.
-
-`platform/agents/template/service.py:205` — `_POINTS_AT_FOCUS_RE` is an unanchored search that runs before `_extract_name_hint`. "delete template Old Patio, it's a duplicate" asks to delete the focused "Patio", so a quick "yes" deletes the wrong one. This breaks "a name in the message beats the anchor", and `active_template_id` has no staleness check. (review 2026-09-27 #31)
-
-**Suggested fix:** Use the anchor only when `_extract_name_hint` finds no name, and anchor the regex to the whole reference, e.g. `^\s*(?:delete|remove|show(?:\s+me)?|get|open)\s+(?:it|this(?:\s+one)?|that(?:\s+one)?)\s*[.!?]?\s*$`.
-
-### 705. ~~[MEDIUM] "delete my note" offers an Owner someone else's note and calls it "your note"~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (Maple data-safety batch): "delete my note" never falls back to other authors' notes (`NoteRequest.mine`), and the confirmation and the "deleted" reply name the author when it isn't the requester (`record_notes._whose`).
-`platform/agents/conversation/record_notes.py:326` — The "my" in `_DELETE_RE` is non-capturing. When the requester has no notes on the record, `chosen` falls back to every note they may delete, which for an Owner is all of them. The confirmation (:345) says "Delete your note on Ana Reyes: …?", so "yes" deletes an employee's note under a misleading prompt. Untested: the corpus seeds only Owner-written notes. (review 2026-09-27 #32)
-
-**Suggested fix:** Capture "my" in `NoteRequest`; when present, never fall back to other authors' notes. Name the author in the confirmation whenever it isn't the requester.
-
-### 706. ~~[MEDIUM] Requests starting with no / don't / keep it / wait are answered "I'm not waiting on an answer"~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (Maple data-safety batch): `meta_reply` uses `replies.is_plain_no` (the closed no-list and bare no-heads), so "No, set the markup to 25%" and friends reach an agent.
-`platform/agents/conversation/meta.py:74` — `meta_reply` uses `is_decline_text`, which treats any message opening with a decline word as a decline. "No, set the markup to 25%", "keep it at 20% markup", "don't forget to call Bob Lee tomorrow" and "Do not charge tax on work item 2" all return NOT_WAITING and never reach an agent. (review 2026-09-27 #33)
-
-**Suggested fix:** Use the closed lists (`is_negative_text(bare) or bare in _DECLINE_HEADS`) instead of `is_decline_text`, and add the "no, …" counterpart to the existing "yes, delete contact Bob" test.
-
-### 707. ~~[MEDIUM] `_BARE_GET_RE` runs before the 80-character guard~~ — RESOLVED 2026-10-02
-
-**Resolved 2026-10-02:** `rewrite_bare_property_name` checks the company and the 80-character cap before matching. Measured 1.36 s on "show me a" + 2,000 spaces + "x" before the fix. `tests/test_record_lists.py::test_a_long_message_never_reaches_the_bare_name_pattern` bounds it at 0.1 s.
-
-`platform/agents/conversation/record_lists.py:155` — `_BARE_GET_RE.match(text)` runs before `len(text) > 80` (:156). Its `\s*[?.!]?\s*$` tail after a 60-char group backtracks quadratically: about 0.48 s on a crafted 2,000-char message, on every turn that isn't answering a question. (review 2026-09-27 #34)
-
-**Suggested fix:** Check the length before matching.
-
-### 708. ~~[MEDIUM] `rewrite_focus_question` has no length cap~~ — RESOLVED 2026-10-02
-
-**Resolved 2026-10-02:** Returns None past 80 characters before matching, as the neighbouring rewrites do (0.16 s before). `tests/test_catalog_names.py::test_a_long_message_is_no_focus_question` bounds it at 0.1 s.
-
-`platform/agents/conversation/catalog_names.py:264` — `_FOCUS_QUESTION_RE` takes about 0.16 s on "the a" + 1995 spaces + "b", and runs on every turn that isn't answering a question. (review 2026-09-27 #35)
-
-**Suggested fix:** Return None when `len(message) > 80` before matching, as the neighbouring rewrites do.
-
-### 710. ~~[MEDIUM] A due-date question becomes a write~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (Maple data-safety batch): The four due-change patterns end `(?P<value>[^?]+?)\s*[.!]?$`; a polite "could you push it to Friday?" still reads (its "?" is removed by `_as_request`).
-`platform/agents/task/text_helpers.py:817` — The due-change patterns (818-821) end in `(?P<value>.+)$`, and `_clean_value` strips "?". With a task in focus, "due today?" → `('', 'today')` sets its due date. The status-verb patterns deliberately exclude "?"; these don't. (review 2026-09-27 #37)
-
-**Suggested fix:** Use `(?P<value>[^?]+?)\s*[.!]?$` in the four due-change patterns, and add "due today?" reject tests.
-
-### 711. ~~[MEDIUM] Status columns named like dates now set a due date instead~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 3): a move/push value that is exactly one of the company's status names (`_names_a_status` — no synonyms, no fuzzy match) goes to the status change. Pinned by `task-move-to-a-status-named-like-a-date`.
-
-`platform/agents/task/service.py:635` — The due-date reading of "move it to …" is tried before the status reading. For a company with a column called "Next Week", "Today" or "Monday", "move it to Next Week" now sets the due date to next Monday; before this diff it moved the card. (review 2026-09-27 #38)
-
-**Suggested fix:** Before treating a move/push value as a date, check whether it exactly names one of the company's statuses; if so, route to the status change.
-
-### 712. ~~[MEDIUM] "for X" at the end of a create silently links a property~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (Maple data-safety batch): A bare "for …" create tail links a property only when the value has a digit (an address); "at …" and "the … property" are unchanged.
-`platform/agents/task/text_helpers.py:1078` — A non-explicit "for X" tail links a property on a single whole-word match with no question. "create a task to pick up mulch for Jordan" links "14 Jordan Rd"; "for the crew" links any property named with "crew" (create.py:206-213). (review 2026-09-27 #39)
-
-**Suggested fix:** Link from a non-explicit tail only for "at X" or an address-shaped value (contains a digit). Treat "for X" as property-or-person, as the list parser does, or ask.
-
-### 713. ~~[MEDIUM] The new "which one?" questions store no pending record~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phases 3 and 5): the teammate questions store a value record (phase 3); "Which task did you mean?", "Which task should I update?" and the Task agent's property questions store a name question (`record_names.ask_for_name`) that the router answers by replaying the request on the record named, via a one-shot `forced_<domain>_id`. A value asked for about a task that is gone rides along as `resume_record` and is applied to the task named. Pinned by `test_a_value_for_a_task_that_is_gone_asks_which_task_and_keeps_the_value`, `test_a_replay_puts_the_carried_question_back_on_the_record_named` and three corpus rows.
-
-`platform/agents/task/operations.py:344` — "More than one teammate is called Jordan…", "More than one property matches…" (:450, :459) and "I couldn't find a property called X. Which property did you mean?" (service.py:418, :474) go through `_clarify`, which stores nothing. The next reply is routed as a brand-new request, against the CLAUDE.md rule that every question goes through `open_question`. (review 2026-09-27 #40)
-
-**Suggested fix:** Record a `pending_intents` entry with `choices` (task id, field, candidate ids), as `_stash_candidates_and_ask` does.
-
-### 717. ~~[MEDIUM] "assigned to <name>" swallows the next word~~ — RESOLVED 2026-10-02
-
-**Resolved 2026-10-02:** The surname is case-sensitive (`(?-i:\s[A-Z]…)`) and may not be a word that opens another filter (due, at, for, marked, today, overdue …), so "Tasks Assigned To Jordan Due Today" is Jordan too. A lowercase surname ("assigned to jordan crew") is now just "jordan", which the teammate lookup resolves or asks about. Tests in `tests/test_task_list_filters.py`.
-
-`platform/agents/task/list_filters.py:56` — The optional surname `(?:\s[A-Z][A-Za-z'-]{0,30})?` is compiled with IGNORECASE, so it takes any word. "tasks assigned to Jordan due today" → assignee "Jordan due", and Maple replies "I couldn't find a teammate called Jordan due." An assignee can't be combined with any other filter. (review 2026-09-27 #44)
-
-**Suggested fix:** Make the surname part case-sensitive (`(?-i:\s[A-Z][A-Za-z'-]{0,30})`) and add `(?!\s(?:due|at|and|in|for|with|marked|status|that|which)\b)`. Add these cases to test_task_list_filters.py.
-
-### 718. ~~[MEDIUM] Due questions without a parseable date list every task~~ — RESOLVED 2026-10-02
-
-**Resolved 2026-10-02:** `_DUE_RE`'s catch-all may not start with a filter word, so "what's due for Jordan?" keeps Jordan (property first, then teammate). "due" with no date after it is the upcoming list (overdue plus the next 7 days, not finished) — the dashboard card's. A date it can't read ("tasks due whenever") is `TaskListAsk.due_unread` and said back — "I couldn't read 'whenever' as a date …". The due phrase is scrubbed from the place search only once read. Tests in `tests/test_task_list_filters.py` and `tests/test_maple_task_operations.py::TestDueQuestionsWithoutADate`.
-
-`platform/agents/task/list_filters.py:44` — The catch-all `when` branch of `_DUE_RE` captures non-dates; the window comes back None, but line 192 still deletes the match. So "what's due for Jordan?" loses both the date and the person. It, "what's due?" and "anything due?" produce an empty filter, and the reply is "Here are your tasks:" with every task, including finished ones — a wrong answer that looks right. (review 2026-09-27 #45)
-
-**Suggested fix:** Remove the `_DUE_RE` match only when its window parses. When a due question yields no window, default to the upcoming window (overdue plus the next 7 days) or ask; `TaskListAsk.any` is there for the check.
-
-### 719. ~~[MEDIUM] With an estimate in focus, help and catalog questions get that estimate's figures~~ — RESOLVED 2026-09-30
-
-**Resolution:** `estimate_question` answers from the open estimate with no reference only for "it"/"this"/"that" or the plainest shape (`_BARE_FIELD_QUESTION_RE`: "what's the total?", "who's the customer?"); "what is markup?", "how much does mulch cost?" and "what's the address for bob lee?" are not that. A ranking, average, lifetime, comparison or definition word (`_NOT_ONE_ESTIMATE_RE`) rejects even a named estimate. `tests/test_estimate_focus_questions.py`: 13 reject and 8 accept rows. The suggested move into a grammar entry is not done here — filed as #781.
-
-`platform/agents/estimate/focus_questions.py:92` — `estimate_question` runs before the help check and accepts any question containing a field word and no capitalised word:
-
-- "what is markup?" → the estimate's markup;
-- "what's the difference between markup and gross margin?" → its margin;
-- "how much does mulch cost?" → its total;
-- "what's the address for bob lee?" → its property.
-
-It is also a new regex outside command_grammar.py deciding estimate phrasings (contract 1). MEDIUM: read-only, visibly off. (review 2026-09-27 #48)
-
-**Suggested fix:** Reject definitional or comparative questions ("what is (a|an)? <field>?" with no target, "difference between") and superlatives. Take the no-reference fallback only with "it", "this" or "the estimate", or for exactly "what's the <field>?". Move the phrasings into a listed grammar entry with accept/reject tests.
-
-### 720. ~~[MEDIUM] "which estimate has the highest total?" now asks "Which estimate would you like to view?"~~ — RESOLVED 2026-09-30
-
-**Resolution:** superlatives are in `_NOT_ONE_ESTIMATE_RE` (with #719), so the question falls through to the sorted list again; `test_which_estimate_has_the_highest_total_lists_them_by_total` pins the route. Reject rows are in `tests/test_estimate_focus_questions.py` rather than the routing corpus, since the router asks this module before classification.
-
-`platform/agents/estimate/focus_questions.py:84` — With nothing in focus, line 84 treats any singular "estimate/quote" as naming one estimate and returns `('total', False)`. `delegate_get_estimate` finds none and asks which estimate. Before this diff the message listed estimates sorted by `grand_total`. (review 2026-09-27 #49)
-
-**Suggested fix:** Don't match superlatives (highest|biggest|largest|most|lowest). Add these as reject rows in the routing corpus.
-
-### 721. ~~[MEDIUM] The pipeline/backlog analytics patterns catch estimate writes and value replies~~ — RESOLVED 2026-09-30
-
-**Resolution:** `match_analytics_query` returns None when `match_command` parses the message, and the three unanchored pipeline/backlog patterns now need a question or show head after at most a shared `LEAD` (`_METRIC_QUESTION_HEAD`), or the bare noun alone — a little wider than the suggested exact-match anchor, so "how big is my backlog?" and "can I see my pipeline?" still work. `tests/test_orchestrator_intents.py`: five commands, four replies, seven questions. Routing snapshot unchanged.
-
-`platform/agents/orchestrator/intents.py:761` — `\b(?:my|our|the)\s+(?:sales\s+)?(?:pipeline|backlog)\b` matches anywhere, and analytics routing runs before `_route_listed_command`. "add a note to this estimate: locate the pipeline before digging" and "rename work item 2 to the pipeline trench" route to `analytics_estimates`, and nothing is written. The same function is the new-request test in open_question.py:345, so "check the pipeline under the driveway" as a note reply drops the question. (review 2026-09-27 #50)
-
-**Suggested fix:** Anchor to a question or command head (`^\s*(?:what'?s|show(?: me)?|how'?s)\s+(?:in\s+)?(?:my|our|the)\s+(?:sales\s+)?(?:pipeline|backlog)\s*\??$`), and skip analytics when `match_command(message)` is not None.
-
-### 722. ~~[MEDIUM] "show me estimates with the highest total" is read as a material join~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 7): one lookahead, `_NOT_AN_ESTIMATE_LINE` in `agents/orchestrator/service.py`, placed before the optional article, excludes list-filter, sort and status words. Pinned in `test_list_worded_line_join_leaves_list_filters_alone`.
-
-`platform/agents/orchestrator/service.py:685` — In the "find/show/list estimates with …" pattern, the exclusion lookahead comes after an optional article. The regex skips the article, the lookahead sees "the", and status/total words are never excluded. The result is `filter_by {material: 'highest total'}` → "I couldn't find a material or role matching 'highest total'", where the message used to list estimates sorted by total. (review 2026-09-27 #51)
-
-**Suggested fix:** Put the lookahead before the article: `(?!(?:(?:the|a|an|any)\s+)?(?:status|…|highest|largest|biggest|most|lowest|latest|newest|been)\b)`. Add reject rows.
-
-### 723. ~~[MEDIUM] "which estimates have been sent?" is read as a material join~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 7): the same lookahead covers "which estimates have …"; and the status reader now takes "have/has been" and a bare "were/is/was" (`crud_helpers._build_status_patterns`), so "which estimates have been sent?" lists the Sent ones instead of every estimate.
-
-`platform/agents/orchestrator/service.py:711` — The "which estimates use/include/has/have …" pattern has no exclusions. "which estimates have been sent?" → `{material: 'been sent'}`, and "which estimates have the highest totals?" → `'highest totals'`. Both reach the material-not-found reply. (review 2026-09-27 #52)
-
-**Suggested fix:** Apply the same exclusions as #722 to this pattern, or drop `ha(?:s|ve)` from its verbs. Add reject rows.
-
-### 724. ~~[MEDIUM] "show me recent draft estimates" is cut to one row~~ — RESOLVED 2026-10-02
-
-**Resolved 2026-10-02:** Up to two words may sit between the keyword and the plural noun (`\b{kw}\s+(?:\w+\s+){0,2}(?:estimates|quotes)\b`) → `_RECENT_ESTIMATES_LIMIT`; the singular stays one row. Tests in `tests/test_estimate_list_sort_words.py`.
-
-`platform/agents/estimate/crud_helpers.py:433` — This diff added bare `recent` to `date_kw`. The plural branch needs the noun right after the keyword, so "recent draft estimates", "recent won estimates" and "recent sent quotes" fall through to `limit = 1`, titled "Your latest estimate:". Before, these listed every matching estimate. (review 2026-09-27 #53)
-
-**Suggested fix:** Allow up to two words between the keyword and the noun (`\b{kw}\s+(?:\w+\s+){0,2}(?:estimates|quotes)\b`) → `_RECENT_ESTIMATES_LIMIT`. Add these cases to test_estimate_list_sort_words.py.
-
-### 725. ~~[MEDIUM] An estimate code before "work item" is taken as the work item's name~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** In the before-noun branch, words up to and including an E-code are dropped, so "the markup on E0042 work item Patio" falls through to Patio after the noun. Rows in `test_maple_work_item_context.py::test_work_item_hint_extraction`.
-
-`platform/agents/estimate/work_item_field_handlers.py:72` — The #668 reorder reads the words before the noun first, and E-codes aren't stop words. "what's the markup on E0042 work item Patio?" now gives hint "E0042" (was "Patio"), so the handler looks for a work item named E0042. Read-only. (review 2026-09-27 #54)
-
-**Suggested fix:** In the before-noun branch, treat `[Ee]-?\d{4,7}` as a stop and fall through to the words after the noun. Add the case to the #668 tests.
-
-### 726. ~~[MEDIUM] `pronoun_domain` reads the dictated note body~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `pronoun_domain(strip_assigned_value(strip_dictated_payload(message)), …)`, as suggested. `test_question_registry.py::test_a_pronoun_in_a_dictated_note_names_nothing`. A domain WORD in the note body is a separate path and still routes — logged as #806.
-
-`platform/agents/orchestrator/service.py:3521` — `_resolve_intent_with_history` strips the dictated payload for routing but passes the raw message to `pronoun_domain`. With a task in focus and an older contact anchor, "add a note: she wants the gate locked" routes to `update_contact` ("…wants the gate locked" routes to `update_task`). "there is a dog" pulls a note to a property the same way. (review 2026-09-27 #55)
-
-**Suggested fix:** `pronoun_domain(strip_assigned_value(strip_dictated_payload(message)), context or {})`.
-
-### 737. ~~[LOW] A turn's chat lines are lost on merge when its last line repeats the previous last line~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** The merge lines this turn's history up against what it loaded by position (`_offset`): the loaded lines, less any the 40-line cap dropped, must open it, and everything after them is this turn's. It no longer searches for the last loaded line from the end, so a repeated "thanks" → "You're welcome!" keeps its lines. Test: `test_conversation_store.py::test_a_turn_whose_last_line_repeats_the_previous_one_keeps_its_lines`.
-
-`platform/routers/agent_helpers/conversation_store.py:82` — `_new_lines` matches `base[-1]` by value, scanning from the end, and lines carry no timestamp. If this turn's last line equals the previous last line ("thanks" → "You're welcome!" twice), it matches at the end, returns [], and a concurrent merge drops this turn's lines. (review 2026-09-27 #67)
-
-**Suggested fix:** Match the whole base tail (last 2 lines) at its known offset, or take `ours[len(base):]` after aligning for the 40-line cap.
-
-### 738. ~~[LOW] A turn that overlaps Clear brings the cleared conversation back~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** When the conversation was deleted mid-turn, the save inserts `merge_turn(snapshot, ours, {})` — only the keys this turn changed and the lines it added — never the copy it loaded. Test: `test_conversation_store.py::test_a_turn_that_overlaps_clear_saves_only_its_own_changes`.
-
-`platform/routers/agent_helpers/conversation_store.py:151` — When the document vanished mid-turn, the loop re-inserts the whole `ours`: pre-clear history, anchors and questions. Same as the old code; reachable only from a second tab or the TTL. (review 2026-09-27 #68)
-
-**Suggested fix:** Insert `merge_turn(base.snapshot, ours, {})`, which keeps only this turn's changed keys and new lines.
-
-### 740. ~~[LOW] After a task list, any "what is/are …" question becomes a task filter~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** a task-list refinement must read as a task filter: `followup._reads_as_a_task_filter` runs the task list parser (`parse_task_list_ask`) over it — a status, assignee, due window or place — and a place alone must be said with "at" / "for" / "in", as an estimate refinement's is. "what is the rate for Foreman?" after a task list is left to route on its own. Tests: `test_conversation_followup.py`.
-
-`platform/agents/conversation/followup.py:104` — `_REFINE_RE` accepts `(which|what) … (is|are) <anything>`, and `_refined_tasks` adds any `q`. After "list my tasks", "what is the rate for Foreman?" becomes "list my tasks, only the rate for Foreman", and the rewrite stays `list_tasks` so it repeats. Read-only. (review 2026-09-27 #70)
-
-**Suggested fix:** Give tasks the closed vocabulary `_refined_estimates` uses (statuses, overdue, due-when, assignee).
-
-### 741. ~~[LOW] "and her email is …" is swallowed by the "what about X?" rewrite~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** `_looks_like_a_target` refuses a target that states a value (`=`, " is ", " are ", "should be"), so "and her email is …" falls through to `rewrite_field_statement` and updates Ana. Tests: `test_conversation_followup.py`.
-
-`platform/agents/conversation/followup.py:53` — `_looks_like_a_target` accepts "her email is ana@new.example.com", and `rewrite_elliptical` runs before `rewrite_field_statement`, so after "show me contact Ana Reyes" the update becomes the garbled read "show me contact her email is …". (review 2026-09-27 #71)
-
-**Suggested fix:** Reject targets containing " is ", "=" or "should be", or try `rewrite_field_statement` first.
-
-### 742. ~~[LOW] "Please note: …" is filed as a note~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** a verbless note must start the message (`note: …`, the tested shorthand); after a lead word ("please", "ok" …) a verb is required, so "Please note: I want the markup at 20%" is the idiom, not a note. The suggested fix (always require the verb) would have dropped the shorthand. Tests: `test_record_notes.py`.
-
-`platform/agents/conversation/record_notes.py:50` — The targetless note rule makes the verb optional (`(?:<verb> …)?note\s*[:-]`), so "Please note: I want to change the markup to 20%" files a note on the record in focus and the request isn't carried out. The written entry (§10.7) is "add a note: …", and the estimate grammar requires a verb. (review 2026-09-27 #72)
-
-**Suggested fix:** Require the verb, as `_NOTE_VERB` does in command_grammar.
-
-### 743. ~~[LOW] `NOTE_DELETE_REDIRECT` still says notes can't be deleted from chat~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `NOTE_DELETE_REDIRECT` now names the forms the note handler reads — "Say \"delete my note on <name>\" — or \"show me the notes for <name>\", then \"delete note 2\"" — and still says nothing was deleted; editing stays in the app. Test: `test_delete_scope_redirect.py::test_the_note_redirect_points_at_the_form_that_deletes`.
-
-`platform/agents/conversation/delete_confirmation.py:54` — record_notes now deletes notes ("delete my note on Bob Lee"), but a phrasing it doesn't parse ("delete Bob Lee's note") reaches the agent's delete and gets "I can't delete or edit notes from chat yet". (review 2026-09-27 #73)
-
-**Suggested fix:** Point the copy at the working form: "Say 'delete my note on <name>' and I'll find it."
-
-### 745. [LOW] The saved `note_ids` are never read
-`platform/agents/conversation/record_notes.py:303` — `_remember_list` stores the listed ids, but `_delete` (319-323) indexes a fresh `list_notes` result, so a note added in between shifts "delete note 2". The confirmation preview limits the harm. (review 2026-09-27 #75)
-
-**Suggested fix:** Resolve the position against the saved `note_ids` while the list is still current.
-
 ### 746. [LOW] Linking rewrites the whole `contacts` array
 `platform/agents/conversation/record_links.py:141` — `fresh.set({"contacts": [*fresh.contacts, id]})` reads, modifies and writes, so a concurrent link (another turn or a portal edit) is overwritten. The docstring (13-14) says the write goes through the property agent; it doesn't. (review 2026-09-27 #76)
 
 **Suggested fix:** Use `{"$addToSet": {"contacts": contact.id}}` with an `updated_at` `$set`, and correct the docstring.
-
-### 751. ~~[LOW] A teammate's name with punctuation isn't recognised~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 3): the teammate lookup tidies the reply (`replies.tidy_reply`), so "Jordan." and "Jordan Crew." match. Pinned by the corpus row `task-assign-asks-who-then-a-full-name-with-a-full-stop`.
-
-`platform/agents/task/field_flow.py:277` — The prompt now says "A teammate's name or email works", but the raw reply goes to `_teammate_email` uncleaned, so "Jordan." never matches and falls back to "An email address works best." (review 2026-09-27 #81)
-
-**Suggested fix:** Apply `_clean_value` to the reply, or strip `.,!?` in `_teammate_email`.
-
-### 752. ~~[LOW] An ambiguous teammate is reported as "not found"~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 3): the property-or-person path returns the ambiguity question (`_several_teammates`). Pinned by `task-list-for-an-ambiguous-teammate-says-so`.
-
-`platform/agents/task/service.py:482` — When `teammate()` returns "More than one teammate…" on the property-or-person path, the reply replaces it with "I couldn't find a property or a teammate called X." (review 2026-09-27 #82)
-
-**Suggested fix:** Return the ambiguity message when that is what `teammate()` found.
-
-### 758. ~~[LOW] The positional note delete also says "your note" for someone else's note~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (Maple data-safety batch): Same change as #705: the positional path names the author too.
-`platform/agents/conversation/record_notes.py:350` — "delete note 2" on a list containing another author's note (an Owner may delete it) asks "Delete your note on …?", the same wrong wording as #705 through the positional path. (review 2026-09-27 #88)
-
-**Suggested fix:** Name the author in the confirmation whenever it isn't the requester (same change as #705).
-
-### 760. ~~[LOW] Space grouping merges two numbers into one cost~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** A space-grouped number followed by a size unit (lb, kg, yd, ft, bag …) keeps only the groups before that last space: "$20 100lb bag" and "$20 100 lb bag" are 20, "1,200 500 lbs" is 1200, "$2 000 a pallet" is still 2000. A bare "45 100" is still 45100; nothing says which number is the cost. Tests: `test_create_questions.py::test_bare_answer`.
-
-`platform/agents/conversation/create_questions.py:48` — `(?:[, ]\d{3})` reads a space followed by three digits as a thousands separator. "$20 100lb bag" gives 20100 and "45 100" gives 45100, and the material is created at that cost without a question. Before the 2026-09-27 fix it read 20. LOW because it needs an unusual reply to the cost question. (review 2026-09-27, second round #7)
-
-**Suggested fix:** Require a word boundary after the grouped form (`…){1,2}\b`), or accept only a comma, NBSP or thin space as a group separator. Add "$20 100lb bag" to test_create_questions.py.
-
-### 761. ~~[LOW] The overdue midnight keeps `fold` and disagrees with the other midnight helpers~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `agents/local_time.midnight(now)` builds the day's start fresh (fold 0), and both the overdue cutoff and the due windows (`list_filters`) use it. On Havana's 2026-11-01 it is 04:00 UTC, not the second midnight an hour later. Tests: `test_local_time.py::test_midnight_is_the_first_one_on_a_day_whose_midnight_repeats`, `test_the_overdue_cutoff_is_the_shared_midnight`.
-
-`platform/agents/task/service.py:458` — `user_now(ctx).replace(hour=0, …)` keeps `fold=1` when now falls in a repeated hour. On a day whose midnight repeats (America/Havana 2026-11-01), `today` becomes the second midnight, one hour late, and the overdue query then includes tasks due today. `_midnight` (list_filters.py:102) and `parse_due_phrase` build `datetime(y, m, d, tzinfo=zone)` (fold 0), which matches the portal. (review 2026-09-27, second round #9)
-
-**Suggested fix:** Build `today` with the same constructor, e.g. reuse `list_filters._midnight(user_now(working_context))`.
-
-### 762. ~~[HIGH] Negated rename, field and notes edits still write~~ — RESOLVED 2026-09-30
-
-**Resolution:** `_RENAME_RE`, `_FIELD_OF_RE`, `_FIELD_BARE_RE`, `_ADD_DESCRIPTION_RE`, `_SET_NOTES_RE`, `_ADD_NOTES_RE`, `_ADD_NOTES_TRAILING_RE`, `_ADD_BARE_NOTES_RE` and `_ADD_BARE_NOTES_BY_CODE_RE` now start with `_COMMAND_LEAD`, as the other task edits do; no negation rule. `tests/test_task_verbs.py`: the entry's phrasings (and five more) joined `_NEGATED_EDITS`, which now also asserts `detect_update_op` / `detect_notes_update` return None; `test_a_led_field_edit_still_counts` and `test_a_led_notes_edit_still_counts` pin leads and a note body containing "don't" / "shouldn't". Plan: `plans/2026-09-30-maple-metrics-and-next-batch-plan.md` Phase 0.
-
-`platform/agents/task/text_helpers.py:178` — `_RENAME_RE`, `_FIELD_OF_RE`, `_FIELD_BARE_RE`, `_SET_NOTES_RE` and the notes-append patterns (`_ADD_NOTES_RE`, `_ADD_NOTES_TRAILING_RE`, `_ADD_BARE_NOTES_RE`) are still unanchored `\b<verb>` searches, so a sentence that merely mentions the verb writes: `detect_update_op("don't rename the fence task to Gate")` → ('title', 'fence', 'Gate'); "I won't change the due date of the fence task to Friday" sets the due date; `detect_notes_update("don't add a note to it: call Bob")` appends; "we shouldn't set the notes on the fence task to foo" replaces the notes. The other task edits were anchored at the message start in the 2026-09-28 rounds (`_COMMAND_LEAD`). (review 2026-09-28 #2)
-
-**Decision (user, 2026-09-28):** "negation should not be part of the commands.... so it should not get confused with notes." No negation-specific rule goes into the command patterns — a negated sentence is simply not a command — and a note's own text ("add a note: don't park on the lawn") must never be read as a negated command. Deferred, not fixed, in that round.
-
-**Suggested fix:** Anchor these patterns with `_COMMAND_LEAD`, as the other edits are — that adds no negation logic (a negation is just not a lead), and the anchor sits before the verb, so a note body is untouched. Add the phrasings above to `_NEGATED_EDITS` in tests/test_task_verbs.py (asserting `detect_update_op` / `detect_notes_update` return None), plus a note whose body contains "don't" that still appends. Confirm the approach with the user first.
-
-### 763. ~~[LOW] "what sizes does it come in?" is claimed for materials whatever is in focus~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** the suggested copy: with no material in focus and another record (task, contact, estimate …) in focus, the material question reads *"Only materials have sizes — which material do you mean?"* — the same pending question, so its reply still finishes the request; no fall-through. Tests: `test_material_agent.py`.
-
-`platform/agents/orchestrator/service.py:2669` — `parse_size_command` yields a pronoun "sizes"/"read" command (material "") and the orchestrator always routes it to get_material, so with a task, contact or estimate in focus Maple asks "Which material do you mean?" and opens a material question that catches the next message. (review 2026-09-28 third round #2)
-
-**Tried and backed out (2026-09-28):** letting it fall through when another domain is in focus is worse — on the rules tier, with a task in focus, "what sizes does it come in?" fell to the task creator ("What should the task be called?") and the next turn, "mark it as done", created a task named "mark it as done". Asking which material is the safer answer.
-
-**Suggested fix:** Only with a real destination for the other domain: answer a pronoun sizes question about a task / contact / estimate with "Only materials have sizes — which material do you mean?" (still the material question), or leave as is. The fall-through must not reach create_task.
-
-### 764. ~~[LOW] The size-command pronoun set misses they / these / those and "it please"~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** the pronoun set takes they / these / those, and a trailing "please" is stripped (after the 200-character cap) before parsing, so "… from it please" is the material in focus and "… from Black Mulch please" names Black Mulch. Tests: `test_material_size_commands.py`.
-
-`platform/agents/material/size_commands.py:89` — "what sizes do they come in?", "remove size 1 yd from those" and "… from it please" parse as names ('they', 'those', 'it please') and answer "No material found matching 'They'" — the same name-lookup path as review 2026-09-27 #18. (review 2026-09-28 third round #3)
-
-**Suggested fix:** `^(?:(?:this|that|the)\s+)?(?:it|this|that|they|them|these|those|one|material)$`, and strip a trailing "please" before the check; add the cases to `test_a_pronoun_is_the_material_in_focus`.
-
-### 765. [LOW] A material literally named "One", "Material" or "It" can't be named in a size command
-`platform/agents/material/size_commands.py:89` — "… from one" and "… from material one" both become the material in focus. (review 2026-09-28 third round #4)
-
-**Decision (user, 2026-09-28):** accepted — "yes, this is an unlikely case". No change; kept for the record.
-
-### 766. ~~[LOW] "Black Mulch?" as the reply to "Which material do you mean?" abandons the size change~~ — RESOLVED 2026-09-28
-
-**Resolved 2026-09-28** for the company's own materials: a reply that is one of them answers the question before the "ends in ?" check (`routers/agent_helpers/named_answers.py`), pinned by `tests/test_open_question.py::test_a_known_material_name_answers_before_the_command_checks`. An unknown "X?" is still read as a new request, by design.
-
-`platform/agents/material/service.py:1676` — the question gate treats a reply ending in "?" as a new request, so it shows Black Mulch's details and the size removal is lost. (review 2026-09-28 third round #5)
-
-**Suggested fix:** Optional. In `open_question._is_new_request`, don't count a trailing "?" as new when the open question is a value question in `_NAME_VALUE_FIELDS` and the reply is short (≤ 4 words).
-
-### 773. ~~[LOW] "now Topsoil" answers "Which material do you mean?" but isn't cleaned~~ — RESOLVED 2026-09-28
-
-**Resolved 2026-09-28:** the reply is cleaned by the shared `replies.name_in_reply`, which strips "now", "ok" and "please" too; pinned by `tests/test_open_question.py::test_the_name_in_a_reply`.
-
-`platform/agents/material/service.py:161` — the question gate's `_POLITE_LEADS` strips "now ", so "now Topsoil" is judged an answer, but `_SIZE_REPLY_WRAPPER_RE` doesn't strip "now": "No material found matching name 'Now Topsoil'". The two lead lists disagree. (review 2026-09-28 fourth round #2)
-
-**Suggested fix:** Add `now|ok(?:ay)?|please` to the leading alternatives of `_SIZE_REPLY_WRAPPER_RE` (or strip with `replies._without_polite_leads`); add "now Topsoil" to a unit test.
-
-### 774. ~~[LOW] "I need you to mark it done" no longer counts as a command~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** the shared `COMMAND_LEAD` (agents/text_utils.py) accepts "I need you to" — it requires "you", so plain "I need to …" stays excluded (user decision 2026-09-28). The routing snapshot is unchanged. Tests: `test_task_verbs.py`.
-
-`platform/agents/task/text_helpers.py:114` — with a task in focus it shows the task's details and writes nothing; HEAD's unanchored `\bmark` matched it. "I need to archive the fence gate task" replies "What would you like to update on the task?" (no write, confusing). "I need to …" was deliberately dropped from the lead (user decision 2026-09-28: it notes work still to do). (review 2026-09-28 fourth round #3)
-
-**Suggested fix:** Accept `i\s+need\s+you\s+to` — it requires "you", so plain "I need to" stays excluded — and add "I need you to mark it done" to `test_a_polite_edit_still_counts`.
-
-### 775. ~~[MEDIUM] The reply cleaner also cuts real names, so an exact name can still dead-end~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 0): the router looks the reply up whole first, then cleaned (`replies.reply_name_candidates`, `routers/agent_helpers/named_answers.py`); no stored name is cleaned any more; `_resume_size_command` resolves an exact whole reply to the material's id (`SizeCommand.material_id`), since `_normalize_material_name` would strip "The" again; "." no longer ends a leading "no". Pinned by `tests/test_named_answers.py`, `test_the_answer_to_which_material_is_tried_whole_first`, and the corpus rows `material-which-material-answered-by-a-name-starting-no` / `-the`.
-
-`platform/agents/conversation/replies.py:178` — `_NAME_REPLY_WRAPPER_RE` strips a leading no / nope / sorry / now / ok / please / the / it's / "I meant" from every name, stored ones included, and with `[,.!]?` also takes "No." off "No. 57 Stone": `name_in_reply("No. 57 Stone")` → "57 Stone", "Please Stone" → "Stone", "Okay Mix" → "Mix", "The Good Stuff" → "Good Stuff". The folded keys still agree, so the gate answers "Which material do you mean?", but the agent then looks the cut name up by substring — with "No. 57 Stone" and "Washed 57 Stone" seeded, the exact reply "No. 57 Stone" answers "Multiple materials matched. Please specify the exact material name." and no size is removed; that reply stores no record, so it is a dead end. (review 2026-09-28 sixth round #1)
-
-**Suggested fix:** Fold stored names with whitespace + casefold only (never the cleaner); in the gate, match either the whole tidied reply or the cleaned one; in `_resume_size_command`, try the whole reply as an exact name before the cleaned one; drop "." from the separator after no/nope. Add "No. 57 Stone" and "The Good Stuff" to the gate test and to `test_the_name_in_a_reply`.
-
-### 778. [LOW] The work-item question lane routes by regex outside `command_grammar.py`
-`platform/agents/orchestrator/service.py:279` — `_is_work_item_question` is an orchestrator rule that sends messages to the Estimate Agent without an entry in `agents/estimate/command_grammar.py`. The convergence design (§5.3) says only §4 commands route to the Estimate Agent by rule, and CLAUDE.md says "a rule that isn't there doesn't exist". The lane predates the 2026-09-28 change, which overall narrowed it: a question must now open with a question word, so a bare "is", a relative "which" or a "?" on a request no longer counts. That change also let it accept messages opening with are / was / were / who / whose / when / where, which the old `what|which|is` test never matched. No probe changed routing ("are there any tasks for the patio work item?", "who owns the patio work item?", "when did I add the patio work item?" route the same with the lane on, off, or on the old logic), and the snapshot showed no change to an existing row. (review 2026-09-28 work-item question lane, second round #2)
-
-**Decision (user, 2026-09-28):** keep the lane and its openers as they are (they follow the user's rule: "Is, Are, What, When, Who, etc."), and register it in the written list rather than trimming or retiring it.
-
-**Suggested fix:** Register the lane as a ported entry in `command_grammar.py` §4.3, wrapping `_is_work_item_question` unchanged, with accept/reject tests and a row in the design's ported table, so it's part of the written list. Mind the interaction: the `process()` lane currently runs only when `match_command(...) is None`, and ported entries are tried only when an agent is passed to `match_command`, so decide whether the orchestrator's three call sites read the entry or keep calling the helper. Either way, the routing snapshot must not change.
-
-### 779. ~~[MEDIUM] A bare status word is stripped even when it's the customer's surname, and the shortened name substring-matches other contacts~~ — RESOLVED 2026-09-30
-
-**Resolution:** lookup-first, as suggested. `ListQuery` keeps the name as said (`said`) and the status said outside it (`own`, read from the question with the name cut out — the whole-text reader also took "Won" from "Min Won"). `_handle_list_estimates` tries `said` first through `_exactly_named` — an exact contact full name or property name/street, since the finders' substring and reverse-containment match would take "Bob Lee in review" for a property called "Lee" — and uses `whole_name()` when it matches; otherwise the split name as before. One extra lookup, only when a status was read off the name. `tests/test_estimate_list_answers.py` seeds Min Won and Jasmine Park: "how many estimates for Min Won?", "… won estimates …", "… draft estimates …" and "show me estimates for Min Won" count only Min's.
-
-`platform/agents/estimate/list_query.py:53` — `_STATUS_TAILS`' second pattern (the name-tail status reader; it was `_NAME_QUALIFIER_TAIL_RE` in `crud_handlers.py` until the same day's reader rework) makes its lead-in optional, so a bare status word at the end of any name is removed: "Min Won" → "Min", and the same for a property or person whose name ends in Open, Sent, Review, Draft and so on. `find_contacts_by_full_name` matches by substring (`agents/cross_resource.py:147`), so "min" matches Min Won and also Jasmine, Carmine or Minh, and the count or list silently combines them. Before the 2026-09-29 change "Min Won" was looked up whole and matched only Min Won; a probe returned the right answer only because no other contact contained "min". MEDIUM rather than HIGH because it needs a surname or property name that ends in a status word. (review 2026-09-29 sold estimates, third round #2)
-
-**Decision (user, 2026-09-29):** deferred. If the list/count question reader is rewritten as one parser (status, name, period and amount read together), re-check this against it — lookup-first may fall out of that design.
-
-**Suggested fix:** Look up the whole name first and use the split one only if the whole name matches no contact and no property. `read_list_query` splits the name before `_named_list_constraint` sees it, so keep the unsplit name on `ListQuery` (e.g. a `said` field) and have `_named_list_constraint` try `said` first, then `name` — and apply the trailing status only when the split name is the one used. Alternative: require a lead-in (`in` / `that are` / `with`, or a trailing `status`) for a single bare status word, which drops "for Bob Lee on hold". Lookup-first is preferred: it keeps every phrasing and costs one extra query only when a name doesn't resolve. Test: add "Min Won" and "Jasmine Park" to `tests/test_estimate_list_answers.py`'s seed; "how many estimates for Min Won?" counts only Min's.
-
-### 780. ~~[LOW] When a question names two statuses, one wins silently~~ — RESOLVED 2026-09-30
-
-**Resolution:** `read_list_query` records every status read (the question's own and each one trailing the name) and sets `ListQuery.conflict` when they differ; the handler answers "That asks for two statuses at once — review or won. Which one did you mean? Ask again with just one, for example "how many won estimates for Bob Lee"." (`needs_clarification`, like the name-not-found reply) instead of counting. Checked after the whole-name lookup, so "draft estimates for Min Won" is one status and a surname. Not a resumable question: the reply asks the user to re-ask. `tests/test_estimate_list_query.py` and `tests/test_estimate_list_answers.py`.
-
-`platform/agents/estimate/list_query.py:99` — `read_list_query` takes the question's own status first, then the one trailing the name, and among trailing statuses keeps the first one read (line 86). The other is dropped without a word. Verified: "how many won estimates for Bob Lee in review?" and "…in review that are won?" both read as Won; "how many draft estimates for Bob Lee that are sold?" reads as Draft. The reply names what it counted ("You have 1 won estimate for Bob Lee."), so the user can see which status was used, but it doesn't say the other was ignored. LOW because the input contradicts itself and the reply is explicit about what it counted. (review 2026-09-29 sold estimates, fourth round #2)
-
-**Suggested fix:** Record every status read (question-wide and trailing) in `ListQuery`. When they differ, the handler answers with a question instead of a count: "Which status did you mean: won or in review?" (`needs_clarification=True`, the same envelope the name-not-found reply uses). Add both probe phrasings to `tests/test_estimate_list_query.py` (reading carries both statuses) and one to `tests/test_estimate_list_answers.py` (reply is the question, not a count).
-
-### 781. [LOW] Questions about one estimate are decided outside the command grammar
-`platform/agents/estimate/focus_questions.py` — "what's the total on it?", "who's the customer?", "is it sent?" are estimate phrasings decided by the module's own regexes (`_QUESTION_RE`, `_FIELDS`, `_BARE_FIELD_QUESTION_RE`, `_NOT_ONE_ESTIMATE_RE`), which contract 1 of the routing-convergence design says belong in `command_grammar.py`. #719 and #720 tightened them in place (2026-09-30) and left the move. The router asks `estimate_question` before classification (`routers/agents.py`), so a grammar entry must be read there too, and `match_command` returning these would also change the #721 analytics gate and `_route_listed_command`. (split from #719, 2026-09-30)
-
-**Suggested fix:** Add `READ_IDS` entries for the field questions with accept/reject tests in `tests/test_command_grammar.py` (the rows in `tests/test_estimate_focus_questions.py` port one-to-one), have `estimate_question` read the matched entry instead of its own patterns, and check the routing snapshot diff.
-
-### 783. ~~[LOW] An estimate's title is not a metric subject, so "what's the total for Smith?" looks for a customer~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** When no customer, property or division matches, an exact estimate title in the company is said back with its code, total and status — "I couldn't find a customer, property or division called Smith, but E0042 'Smith' is an estimate: $1,234.00 including tax (Won)." (`metric_answers._estimate_titled`; Deleted estimates are left out of the query). Titles aren't unique: with two or more, Maple names none — "…but 2 estimates are titled Smith." (user, 2026-10-03). Only for a money figure — total, average, biggest, smallest. Corpus: `metrics-total-for-an-estimate-title`, `…-past-a-deleted-one`, `metrics-total-for-a-shared-estimate-title`.
-
-`platform/agents/estimate/metric_subject.py` — `resolve_subject` looks a name up among contacts, properties and divisions only. "What's the total for Smith?" (in the routing snapshot) now routes to `analytics_metric`; with an estimate titled "Smith" and no contact or property of that name it answers "I couldn't find a customer, property or division called Smith." Before, it went to help or a material lookup, so this is not a regression, but the user meant the estimate. (Maple metrics plan Phase 1 task 11, 2026-09-30)
-
-**Suggested fix:** When no customer, property or division matches, try an exact estimate title (the `(ESTIMATE_AGENT_LABEL, "estimate")` name source) and answer as the single-estimate focus question does ("The total on E0042 'Smith' is …"), or ask "Did you mean the estimate 'Smith'?".
-
-### 784. ~~[LOW] "Won" means the sold set in a money question but the Won status in a count or a list~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** User decision 2026-10-03: a bare "won" / "win" is the sold set (Won + Scheduled + Completed) in counts and lists too; only "status won" said outright ("with status won", "won status", "in Won status", "status is won", "currently won") is the Won status. One pattern, `agents/estimate/text_helpers.WON_STATUS_SAID_RE`, read by `list_query` (a `"won"` status set, filtered like "sold") and `metric_query` (now off the whole question: "total value of estimates with status won" counted every estimate, and "won status" was taken as a name). Count and list replies say "(Won, Scheduled, Completed)". CLAUDE.md's metrics section records the rule; tests in `test_estimate_list_query.py`, `test_estimate_list_answers.py`, `test_estimate_agent.py`, `test_metric_query.py` and the corpus.
-
-`platform/agents/estimate/metric_query.py` vs `platform/agents/estimate/list_query.py` — decision 8 (2026-09-30) made "won" in money and win-rate questions Won + Scheduled + Completed; counts and lists kept "won estimates" as the literal status (§1.1: "a named status still wins"). So "how much did I win?" can cover more estimates than "how many won estimates do I have?". Every reply names the statuses it counted, so the difference is visible, but it is a difference. (Maple metrics plan, decision 8)
-
-**Suggested fix:** A user decision, not a code one: either align counts and lists with decision 8 (a behaviour change to §1.1 rows and `tests/test_estimate_list_answers.py`), or keep the split and say "won (Won status)" in count replies. Phase 3's win-rate change is the natural moment.
-
-### 785. ~~[MEDIUM] The "X (customer)" / "X (property)" options break three of the four metric question shapes, so choosing one doesn't answer~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** As suggested: the options stay as shown, `SubjectAmbiguous.kinds` maps each to its kind, `ask_to_rewrite(option_kinds=…)` stores them, and the answer — the option's text, its number, or "the customer" / "the property" — is written back as the bare name while the router sets the one-turn `forced_metric_subject_kind` (`record_names.kind_in_answer` / `forced_kind_key`; transient in `finalize_result`). `resolve_subject` reads it first. Corpus: `metrics-shared-name-customer-picked` (owner shape) and `metrics-shared-name-property-picked-by-number` (the "X's" shape).
-
-`platform/agents/estimate/metric_subject.py:189` — When a customer and a property share a name, the option picked is written back into the question as "Birch Hollow (customer)". The `m_owner` / `m_owner2` / `m_of` grammar slots allow only `[\w&'.-]`, so "how much has Birch Hollow (customer) spent with us?" and "what's Birch Hollow (customer)'s average job size?" no longer match any entry (verified: None), and go to the spec tier or the dashboard. Only the "for/from/at X" tail shape works. A typed "Birch Hollow" rewrites to the same question and asks again. (Second code review of the metrics work, 2026-09-30.)
-
-**Suggested fix:** Don't write the kind into the text. Keep the options as shown, but store `{option: kind}` on the rewrite record. On the answer, write back the bare name and set a one-shot `forced_metric_kind` (transient, like `forced_<domain>_id`) that `resolve_subject` reads first. Map a bare "customer" / "the property" reply to its option. Test with the owner shape and the `m_of` shape.
-
-### 786. ~~[LOW] A city or province name matches every property in it as a metric subject~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `_names` (name, street) feeds the whole-word rung; `_address_forms` ("street, city", full address) the exact rung only. "Toronto", "Guelph" and "ON" are SubjectNotFound; "12 Oak St, Toronto" still names its property.
-
-`platform/agents/estimate/metric_subject.py:154` — The second round's #7 added "street, city" and the full address to `_names`, and `_names` feeds both the exact rung and the whole-word rung (`_has_words`). So "how much have I made from Guelph?" (or "… from ON") keeps every property in Guelph: an unbounded "Which one did you mean: …?" menu, or, with one property there, an answer labelled with that property's name rather than the city. Verified: `_has_words("14 elm st, guelph", "guelph")` is True. Low because the previous commit (HEAD) gave the same menu through the finder's substring match; the earlier round's fix had briefly made it "couldn't find". (Third code review of the metrics work, 2026-09-30.)
-
-**Suggested fix:** Use the address forms in the exact rung only: split `_names` into the words (name, street) and `_address_forms(doc)` ("street, city", full address), and check `exact` against both but `_has_words` against the words only. Add `resolve("Toronto")` → SubjectNotFound to tests/test_metric_subject.py (the seeded world has Toronto properties).
-
-### 787. ~~[LOW] The "can't narrow" reply says "a total" for an average or a biggest-estimate question~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** `Unread.asked` names what was asked, read from the matched slots as `_read` dispatches (`_figure_metric`, `_ratio_metric`, `shape_of`): "an average", "the biggest estimate", "a win rate", "a ranking" …, and the reply's second sentence says "I can narrow it by …". Tests in `test_metric_query.py`.
-
-`platform/agents/estimate/metric_answers.py:122` — `_cannot_narrow` always says "I can't narrow a total by …", so "what's Bob Lee's average job size since March?" is told about a total. Wording only, no wrong figure. (Third code review of the metrics work, 2026-09-30.)
-
-**Suggested fix:** Pass the metric the grammar matched (read it from the slots as `read_metric_query` does, or have `unread_scope` return it too) and say "an average" / "the biggest estimate" / "a total" accordingly. Add one test for an average.
-
-### 788. ~~[LOW] The comparison pattern slows sharply on long messages, and runs on every "what about X?"~~ — RESOLVED 2026-10-02
-
-**Resolved 2026-10-02:** `_compared_over` returns before searching when the new target isn't a unit, and `_COMPARISON_RE`'s gaps are bounded (`.{0,80}?`). A 4,000-character near-miss ("this month vs " repeated) took 0.44 s; now 1.6 ms, and 2.9 ms at 8,000. `tests/test_conversation_followup.py::test_a_long_comparison_stays_linear` bounds it at 0.1 s and pins a comparison with words between its parts still swapping.
-
-`platform/agents/conversation/followup.py:83` — `_compared_over` searches `previous` with `_COMPARISON_RE` (two lazy `.*?` gaps and a backreference) before checking whether the new target is a unit at all, so every elliptical follow-up pays for it. Super-linear: 2,000 characters take 0.056 s, 4,000 take 0.44 s (verified), 8,000 about 3.3 s. Messages are capped at 2,000 characters, so today's worst case is ~60 ms on the event loop; a stored rewrite or translation can be longer. Low because the cap bounds it now; the same class of bug as review 2026-09-27 #13. (Second code review of Maple metrics Phase 2, 2026-09-30.)
-
-**Suggested fix:** Check `_NEW_UNIT_RE.match(new_target)` first and return None early; bound the gaps (`.{0,80}?`) so the search is linear. Add a timing test on a 4,000-character previous message.
-
-### 789. ~~[LOW] "What about Bob Lee?" after a company-wide metric question goes to help~~ — RESOLVED 2026-10-03
-
-**Resolved 2026-10-03:** For an `analytics_metric` read with no label, "for <name>" is added to the previous question — only when `read_metric_query` then reads the name as its subject, and never for a ranking by customer or property. Corpus: `metrics-win-rate-then-a-customer`; unit rows in `test_conversation_followup.py`.
-
-`platform/agents/conversation/followup.py:120` — `rewrite_elliptical` swaps the name the previous read used (`labels`, from the reply's `filter_by.name`). A company-wide metric question ("what's my win rate?", "what's our revenue this year?", "what's my gross margin?") names no one, so there is nothing to swap and "what about Bob Lee?" falls to the guide. After a question that names someone it works. True of every metric shape since Phase 1; found writing the Phase 3 corpus conversation (2026-10-01). Phrasing reference §1.12 ⚠️ row.
-
-**Suggested fix:** For an `analytics_metric` read with no label, append ` for <name>` to the previous message when the new target is a name (not a period) — but only when the previous message has no status subject ("on lost estimates") the appended name would be read into. Tests: win rate, a total and a ranking, each company-wide then "what about Bob Lee?".
-
-### 796. ~~[LOW] The material agent still takes a unit id from the extracted fields~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (tenant batch 3): The material agent drops `unit_oid` and any id-shaped size `unit` from the model's reading (`_without_typed_ids`); `unit_oid` is set only after a unit name resolves within the company.
-`platform/agents/material/service.py:129` — `unit_oid` is in the allowed fields and `_normalize_fields` (~474) keeps any 24-hex value, which `text_helpers.py` ~374/402 writes onto a size; `_normalize_sizes_field` (`text_helpers.py` ~355) keeps a raw size `unit`. A typed id can reach `update_material` (the router now confines it to the company, so policy only). (tenant audit 2026-10-01, B1)
-
-**Suggested fix:** Drop `unit_oid` from the fields the classifier can fill (keep it internal-only, set after `_find_unit`), and resolve every size unit by name.
-
-### 797. ~~[LOW] Five agents look a record up by an id the model pulled from the message~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (tenant batch 3): The `*_id` fields are gone from the five agents' classifier and entity schemas (material, contact, property, labour, equipment); ids still come from server-owned anchors, picks and pending questions.
-`platform/agents/{material,contact,property,labour,equipment}/service.py` — each classifier schema has a `*_id` field, merged in and used to find the record (material 722–751, contact 809–838, property 891–921, labour 439–465, equipment 375–396), and each echoes "No X found for id '<typed>'". Company-scoped, so policy only. (tenant audit 2026-10-01, B2)
-
-**Suggested fix:** Remove the `*_id` fields from the classifier schemas; resolve by name, with server-owned anchors (`active_*_id`, `forced_*_id`) the only id route.
-
-### 798. ~~[LOW] A 24-hex id in the message is used as a task or estimate reference~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (tenant batch 3): A 24-hex id in the message ends the task and estimate searches and asks for the code or title (`TYPED_ID_CLARIFICATION`, `estimate_resolver.names_a_database_id`); it never falls through to the open record.
-`platform/agents/task/resolver.py:50`, `routers/agent_helpers/estimate_resolver.py:46`, `routers/agent_helpers/delegate_get_estimate.py:51` — explicit ObjectId regexes resolve a typed id (company-scoped via `load_company_estimate` / a compare after an unscoped `Task.get`). Policy only. (tenant audit 2026-10-01, B3)
-
-**Suggested fix:** Remove the ObjectId branches; tasks and estimates are named by readable id (T0001 / E0012) or title.
-
-### 799. ~~[LOW] The estimate extraction lets model output override the company and property~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (tenant batch 3): `ExtractedEstimate` no longer has `company`/`property`, the generation prompt no longer echoes them, `normalize_extracted_estimate` uses the request's values, and a pending `company` is never read from a reply.
-`platform/agents/estimate/extraction_helpers.py:171` — `payload.get("company") or company` / `payload.get("property") or property`; `merge_with_pending_estimate` (279) and `agents/estimate/text_helpers.py` 1183–1186 accept a typed 24-hex company. No save path persists it today (they use the request's values), but `parsed` is echoed by `/agents/estimate`. (tenant audit 2026-10-01, B4)
-
-**Suggested fix:** Always use the authenticated company and the request's property; never read them from model output.
-
-### 802. [LOW] The estimate and task checks read a typed id differently
-`platform/routers/agent_helpers/estimate_resolver.py:46` — The task resolver's `_OBJECT_ID_RE` is `\b[0-9a-f]{24}\b` with IGNORECASE; the estimate side (`_MONGO_OBJECT_ID`, behind `names_a_database_id`) is `[0-9a-f]{24}` — lowercase only, no word boundaries. So an id typed in capitals isn't caught for an estimate (it falls through to the title and open-estimate rungs, as before #798), and any 24+ run of lowercase hex inside a longer token ends the estimate search. LOW: portal URLs carry lowercase ids and no ordinary word is 24 hex characters, so neither happens in practice. (tenant batch 3 review #1)
-
-**Suggested fix:** One definition for both: move `names_a_database_id` to `agents/text_utils.py` with `re.compile(r"\b[0-9a-f]{24}\b", re.IGNORECASE)`, and use it from the task resolver, `estimate_resolver` and `delegate_get_estimate`; add a capitals case to `test_an_estimate_id_in_the_message_names_no_estimate`.
-
-### 804. ~~[LOW] A task-list place starting with "Next" or "This" is never read~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** `_PROPERTY_RE` refuses "this" / "next" only before week / month / year, so "tasks at Next Door Landscaping" and "tasks at This Old House" read the place and "tasks for next week" stays a window. Tests: `test_task_list_filters.py`.
-
-`platform/agents/task/list_filters.py:81` — `_PROPERTY_RE` refuses a place whose first word is `me|myself|today|tomorrow|this|next|the` (IGNORECASE), so "tasks at Next Door Landscaping" or "tasks at This Old House" finds no place and lists every task. Predates the "wrong answers that look right" batch; noticed while probing it. LOW: a place named that way is rare, and "tasks for the Next Door Landscaping property" can't reach it either. (review 2026-10-02 round 3, unnumbered)
-
-**Suggested fix:** Refuse "this"/"next" only when a date word follows — `(?!(?:me|myself|today|tomorrow|the)\b|(?:this|next)\s(?:week|month|year)\b)` — so "for next week" stays a window and "at Next Door Landscaping" is a place. Add both as rows in test_property.
-
-### 806. ~~[MEDIUM] A domain word in a dictated note routes the note~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** two rules read the note body. The action/domain last resort (`_classify_via_action_domain`) re-read the whole message when the head named no record ("yard" → property), and the estimate-field rule in `_classify_specific_phrasings` looked for "estimate" anywhere ("the estimate needs review" → estimate). Both now skip the body for a note request when an estimate, property, contact or task is in focus (`_NOTE_ANCHOR_DOMAINS`); with nothing in focus, or a material or role (no notes), the body still decides, so the routing snapshot is unchanged. Tests: `test_question_registry.py`, `test_maple_bare_note_routing.py`.
-
-`platform/agents/orchestrator/service.py` — With a task in focus, "add a note: a dog in the yard" goes to `update_property`: "yard" is a property domain hint (`agents/orchestrator/intents.py`), and an earlier rule path reads hints from the whole message, dictated payload included. `_resolve_intent_with_history` already classifies on the command head (`strip_dictated_payload`), but it returns early only when the HEAD has a domain word — the path that claims "yard" runs before it. Found fixing #726 (the pronoun half of the same problem). MEDIUM: the note lands on the wrong record, though it is a note, not an overwrite.
-
-**Suggested fix:** Find the rule path that reads DOMAIN_HINTS from the full message for a note request and give it `strip_dictated_payload(message)`, as `_resolve_intent_with_history` does. Add "add a note: a dog in the yard" (task in focus) → `update_task` to `test_question_registry.py::test_a_pronoun_in_a_dictated_note_names_nothing`'s neighbour.
-
-### 807. ~~[LOW] A filler word after "template" hides the template in focus~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** `TemplateAgent._extract_name_hint` trims trailing courtesy and timing words (please, now, again, thanks, for me …), so a hint of nothing else is no name and the focus applies — the get half. The shared helper fixes "delete this template please" too; deletion still confirms first, as decided.
-
-`platform/agents/template/service.py:213` — The #704 gate uses the focus only when `_extract_name_hint` finds no name, and the hint's fallback regex takes whatever follows the noun: "delete this template please" → "please", "show me that template now" → "now", so Maple replies "I couldn't find a template matching 'please'". Before #704 the focus won for both. (review 2026-10-03, wrong-answers batch 2 #1)
-
-**Decision 2026-10-03 (user):** Maple does not need to handle template deletion — it can be treated as an unsupported request — so the delete half is not worth a fix, and the finding drops from HIGH to LOW. A follow-up decision the same day: **no explicit refusal** for template deletion either — it keeps working as it does (confirm, then delete). **Still open:** the get half — "show me that template now" — reaches the same gate.
-
-**Suggested fix:** For the get half: treat a hint made only of filler words (`please|now|again|too|then|for me|thanks|thank you`) as no name in `_extract_name_hint`, and add "show me that template now" (focused template expected) beside `test_it_alone_is_still_the_template_in_focus`. Separately, if template deletion is to be refused as unsupported, that is a change to `delete_template`'s routing and copy, not to this gate.
-
-### 813. [LOW] The contact query's 20-row cap can hide a full-name match behind first-name matches
-`platform/agents/conversation/catalog_names.py:137` — `person()` runs one `$or` for both readings — a contact whose first name is the name, and one whose full name is — and reads at most 20 rows (`to_list(length=20)`). With more than 20 contacts sharing a first name, a contact whose full name is that same word (first name "Bob", no last name) can fall past row 20, so "contact" is missed. `_kind_of` then lets a material named "Bob" rewrite as the material, where the old code (every contact loaded) returned None. LOW: it needs 21+ contacts with one first name, one of them with no last name, and a catalog item of exactly that name. (review 2026-10-04, slow-lookups batch #1)
-
-**Suggested fix:** Ask the two questions separately, each as `find_one(..., {"_id": 1})`: one with the full-name alternatives (the first/last splits and the single-field forms with the other field blank), one with `{"first_name": same_name(name)}`. Two indexed queries in the same `asyncio.gather`, no cap, exact semantics; and the Python full/first re-check goes away.
 
 ### 818. [LOW] The template router saves the estimate before its work item exists, so every later failure needs cleanup
 `platform/agents/estimate/crud_handlers.py:768` — `_create_estimate_from_template` inserts an empty Draft, and the callers then build, scale and price the template's work item and save it with a second write. Any failure between the two writes leaves an empty estimate behind. The template router (`routers/agent_helpers/template_estimate.py::_finalize_template_estimate`) now copes: it deletes the estimate (`_discard_unfinished`), releases the quota slot, and skips the processor's audit (`audit=False`) so the record and the reply agree. That took four review rounds of #318 to get right (2026-10-05), and Maple's own template path (`crud_handlers.py:925`) has the same insert-then-fill shape without that cleanup. LOW: the router path is correct today; the agent path's exposure is the same rare failure window.
@@ -3384,11 +2038,6 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** Give it its own constant (or a `result.reason == "other"` check classified first).
 
-### 923. [LOW] `CONVERT_DECLINED` is used for every task "no"
-`platform/agents/task/base.py:466` — `_resume_pending_confirmation` uses it for any pending task confirmation, so the name and comment are wrong. (review 2026-10-11 #103, deferred)
-
-**Suggested fix:** Rename to `TASK_CONFIRMATION_DECLINED` and fix the comment.
-
 ### 924. [LOW] The `confirmed=False` default has no caller
 `platform/agents/task/planned.py:61` — The only caller always passes True. A future caller that leaves it out gets a question the planner can't answer. (review 2026-10-11 #104, deferred)
 
@@ -3457,24 +2106,6 @@ together.
 
 Fix: change to `raise HTTPException(404, "Template not found")` and update
 the parallel routers in the same PR.
-
-### 436. ~~[MEDIUM] platform/routers/agents.py — four pending state machines share one journey~~ — RESOLVED 2026-09-27
-`pending_estimate_follow_up` (legacy), `pending_optional_follow_up` (generic),
-`pending_estimate_fuzzy_confirmation`, and the new
-`pending_property_link_confirmation` are all live on the estimate→property
-journey, disambiguated only by dispatch order inside a ~60-line stretch of
-`orchestrate_agent_endpoint`. Three of the defects found on this branch were
-cases where a newer machine lacked behavior an older one already had (re-arming
-on a failed resolve; keeping the turn owned on a correction; not clobbering a
-sibling's key). The ordering is currently correct and pinned by
-`TestRouterOrderingRuntime`, but the coupling is implicit.
-**Suggested fix:** collapse them behind one registry that declares priority and
-ownership explicitly, so precedence is data rather than statement order.
-Sizeable; worth doing before a fifth machine is added.
-
-**Update 2026-09-27:** there are now **seven** statement-ordered handlers in `orchestrate_agent_endpoint`, not four (design 2026-09-27 §1), and the ordering is what lets a question outlive its turn — see #671, where six early returns skip the estimate yes/no decider. Closure is planned by the design's question registry (2026-09-27-maple-multi-turn-everywhere-design.md §5.1), which is the registry this entry asked for.
-
-**Resolved 2026-09-27** (platform `19e34f8`, `2b67761`): one gate for every question Maple asks — `routers/agent_helpers/open_question.py::decide_turn` lists every open question (Estimate yes/no and records, every agent's pending records and `pending_delete_*` keys, task confirmations, status offers, gathering, template size, property link, both follow-up machines, pending calculations) and reads the message once: it answers the newest question it fits, cancels, or is a new request, and then every open question is dropped before classification. A question lives one turn. The router's awaited-value override and pending fallback are gone; precedence is the registry's newest-first rule, not statement order.
 
 ### 490. [MEDIUM] Same-field conflicts are still silent — the conflict-detection phase
 Two writers changing the **same** field still resolve to whoever saves last,
@@ -3763,28 +2394,12 @@ geocode and note it in the comment.
 
 *(Review 2026-09-24 fourth pass #17.)*
 
-### 689. ~~[MEDIUM] ConversationContext has no concurrency control~~ — RESOLVED 2026-09-27
-`platform/routers/agents.py:677-713` — `_save_conversation_context` loads the user's single `ConversationContext`, modifies it and saves it back with no version check, so two overlapping turns (a double-send, two tabs) each write their own copy: the later save wins and the other turn's questions and anchors are lost. Nothing marks a create as in flight either, so a double-sent create request makes two billed estimates. MEDIUM: rare, but it bills.
-
-**Suggested fix:** Give `ConversationContext` a `version` and save it with a conditional write (the `find_one_and_update` idiom #490 uses); on a conflict, reload and re-apply the turn's changes or drop them and say so. Reject a duplicate in-flight message for the same user.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `c478a53`): `ConversationContext` carries a `version`, and a save is a `find_one_and_update` conditional on the version the turn loaded (`routers/agent_helpers/conversation_store.py`; a document from before versions matches version 0). On a conflict the turn's changes are merged onto the newer copy and the save retried: keys it changed or removed win, keys it left alone keep the other turn's value, and its new chat lines are appended after the other turn's (capped at 40). An identical message still in flight — the double-send that billed twice — is claimed first and refused with "I'm still working on that one"; different messages may overlap (and merge). A claim a crashed turn left expires after three minutes. Both fail open. The endpoint's body moved to `_orchestrate_turn`, wrapped by the claim. Pinned by `tests/test_conversation_store.py` (merge rules, the conditional save against the local test Mongo, the claim, and the endpoint's duplicate reply).
-
 ### 790. ~~[LOW] An estimate's activity role and rate card are saved unchecked~~ — RESOLVED 2026-10-01
 
 **Resolved 2026-10-01** (tenant batch 2): `snapshots.assert_own_line_refs` now covers activity roles (Labour) and `effort_rate_card_id` (RateCard) on estimate create/update; ids already stored aren't re-checked.
 `platform/routers/estimates.py:1169` — `activities[].role` and `activities[].effort_rate_card_id` (and the create path in `job_item_builders.py` ~176) are stored with no company check, so an estimate can link another company's role or rate card. Nothing is shown from them unless the same id is also a labours line, which batch 1 now checks. (tenant audit 2026-10-01, A3)
 
 **Suggested fix:** Check new ids with `dependencies.assert_company_refs` (Labour, RateCard), skipping ids already on the estimate, as `snapshots.assert_own_line_refs` does for lines (CLAUDE.md "Tenant scope of referenced ids").
-
-### 791. ~~[LOW] A template's line ids are saved unchecked~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (tenant batch 2): Template create/update run `assert_own_line_refs` over the template's materials and activities (ids already on the template kept).
-`platform/routers/templates.py:33` — create/update check `company` but not `materials[].material`, `activities[].role` or `effort_rate_card_id`. Maple's "create estimate from template" copies them as-is (`agents/estimate/crud_handlers.py` ~821); since batch 1 the next portal save of such an estimate is refused (404) rather than leaking, so the user hits an error instead. (tenant audit 2026-10-01, A7)
-
-**Suggested fix:** Check new line ids on template create/update with `assert_company_refs`, keeping ids already on the template.
 
 ### 792. ~~[LOW] Category and unit "in use" counts look across every company~~ — RESOLVED 2026-10-01
 
@@ -3806,13 +2421,6 @@ geocode and note it in the comment.
 `platform/routers/billing.py:440` — `sync-payment-method` retrieves `body.payment_method_id` and sets it as the default without checking `pm.customer == company.stripe_customer_id`. Stripe should refuse a card not attached to the customer, so likely not exploitable. (tenant audit 2026-10-01, A10)
 
 **Suggested fix:** Refuse (404) when `pm.customer` isn't the company's Stripe customer, before the update call.
-
-### 795. ~~[LOW] Archive/unarchive reveal another company's estimate status; an unscoped helper lingers~~ — RESOLVED 2026-10-01
-
-**Resolved 2026-10-01** (tenant batch 2): Archive/unarchive check the company first and answer another company's estimate with the same 404 as a missing one; `fetch_estimate` and its `routers/agents.py` re-export are deleted.
-`platform/routers/estimates.py:1390` / `:1469` — the status check runs before the tenant check, so a foreign id answers whether it is archived. `fetch_estimate` (~560) is an unscoped helper only re-exported from `routers/agents.py:153`. More broadly, most routes answer another company's id with 403 and a missing one with 404, which confirms existence. (tenant audit 2026-10-01, A11)
-
-**Suggested fix:** Move the tenant check first; delete `fetch_estimate` and its re-export; switch a route to 404-for-both when it is next touched.
 
 ## Platform — services, scripts and integrations
 
@@ -3987,20 +2595,6 @@ production eventually.
 `MONGODB_URL` from `.env.production`/`.env`, bypassing `.env.local`), `--mongo-url`, and a
 `--yes`-skippable confirmation before `--apply`. At minimum, print the target host before writing and
 document the `MONGODB_URL=` inline override in the module docstring.
-
-### 30. [LOW] `[A-Z]{2}` with `re.IGNORECASE` for state-code parsing
-**File**: `agents/property/service.py:520` (regex) and `:527` (flag)
-**Severity**: LOW (nit)
-
-The compiled pattern matches any two-letter substring when run with
-`IGNORECASE` — "in", "or", "to", "me" all pass. In practice the match runs
-against address-shaped input and the result flows through
-`_normalize_prov_state_token` (`service.py:298-323`) which does additional
-validation, so false positives in free prose aren't reaching users.
-
-Fix (when touching this file): drop the `IGNORECASE` flag and match
-`[A-Z]{2}` strictly, or validate the token against a `VALID_STATES` /
-`VALID_PROVINCES` set inside `_normalize_prov_state_token`. No hurry.
 
 ### 59. [LOW] Drive-filename filename-collision policy still implicit
 **Severity**: LOW
@@ -4236,13 +2830,6 @@ row count first — this may be years away.
 `platform/services/estimate_doc_images.py` — Found while fixing the 16-bit grayscale case (code review 2026-09-23 #2). For a 16-bit RGB PNG, Pillow reduces the pixels to 8-bit but leaves the tRNS key in 16-bit, so no pixel ever equals the key. The keyed color (often magenta or green) prints on the customer's doc instead of flattening to white. Rare: it needs a 16-bit RGB PNG that uses a color key rather than an alpha channel.
 
 **Suggested fix:** When `image.mode == "RGB"` and `image.info["transparency"]` has any component above 255, scale the key down to 8-bit (`>> 8`) before the convert to RGBA. Test: a 16-bit RGB PNG with a magenta key comes out with no magenta pixels.
-
-### 688. ~~[MEDIUM] Maple forgets the conversation's language between turns~~ — RESOLVED 2026-09-27
-`platform/services/translation.py:269` — `prefilter_language` doesn't flag short replies, and the detected language isn't persisted, so in a Spanish conversation a one- or two-word reply is processed as English and answered in English. `is_negative_text("No.")` is False — an exact match on `_NEGATIVE_VALUES` with no punctuation trim (`routers/agent_helpers/text_helpers.py:97`). A restored transcript is English, because `chat_history` is persisted in English. MEDIUM: the conversation switches language mid-flow.
-
-**Suggested fix:** Persist `conversation_lang`; in a non-English conversation, translate short replies too (design §5.6). Normalize trailing punctuation in the yes/no checks (the registry's normalized yes/no, §5.1).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
 
 ### 817. [MEDIUM] Sentry ships frame locals — token claims and chat messages — with every `logger.exception`
 `platform/main.py:59` — `sentry_sdk.init` leaves `include_local_variables` at its default (True; SDK 2.70), and `send_default_pii=False` does not strip frame variables. The default scrubber denylists exact keys such as `token`, not `decoded_token`, `message` or `context_payload`. So each of the ~29 `logger.exception` calls on Maple paths (`routers/agents.py:1828` among them) can send the user's Firebase claims (uid, email), their chat message and conversation state to Sentry. The estimate edit executor and the template instantiation (#318) log the exception type only for this reason, but that costs the stack. Found reviewing #318 (review 2026-10-05 #1).
@@ -4614,16 +3201,6 @@ test that breaks on every MDXEditor upgrade.
 
 *(Review 2026-09-25 fifth pass #20.)*
 
-### 654. ~~[MEDIUM] Notes filed by a mixed batch or the planner don't refresh the open feeds~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** Platform: `_file_batch_notes` sets `notes_filed` on the result whenever a batch files a note (work item or estimate), and only then (`test_estimate_edit_executor.py::test_a_batch_that_files_a_note_says_so_for_the_portal`, `…without_a_filed_note…`). Portal: `dispatchAgentMutation` carries it onto the estimates event, and the estimate page refreshes its notes feeds and badges on it, even while a reload waits (`tests/agentMutationEvents.test.ts`, `tests/NewEstimateWithActivityPage.mapleWrites.test.tsx` › a batch that filed a note refetches the notes feed).
-
-`portal/src/pages/NewEstimateWithActivityPage.tsx:568` — Only the rule note path reports `operation: "add_work_item_note"` (platform work_item_edit_handlers.py:189). Batches through `_run_edit_commands` report `"operation": "update_estimate"` with the note only in `applied`: the planner (edit_planner.py:260), the replay after a confirmation (edit_executor.py:383), mixed batches ("set markup 20% and note 'gate code' on item 2"), and estimate notes filed in a batch. `notesRefreshKey` never bumps, so the feeds stay stale. With the dialog open the reload is also blocked, so the badges don't update.
-
-**Suggested fix:** Platform: set `result["notes_filed"] = True` in `_run_edit_commands` when `batch.notes` is non-empty. Portal: carry it through `dispatchAgentMutation` and bump the key when `NOTE_OPERATIONS.has(op) || detail.notes_filed`. Add tests on both sides.
-
-*(Review 2026-09-25 fifth pass #23.)*
-
 ### 655. ~~[MEDIUM] A failed refresh empties the feed and loses a note edit in progress~~ — RESOLVED 2026-10-04
 
 **Resolved 2026-10-04:** `load` takes a `refresh` flag (the refresh key and the manual reload set it). A failed refresh keeps the list and shows the error; only a failed load after a parent switch clears it, as before. A card being edited stays mounted and the badge keeps its count. Tests: `tests/useNotes.test.tsx` › refresh failure (refresh key; manual reload); the parent-switch clearing test is unchanged.
@@ -4640,7 +3217,6 @@ test that breaks on every MDXEditor upgrade.
 **Suggested fix:** When `fromMaple` is true, call only `estimatesApi.get`.
 
 *(Review 2026-09-25 fifth pass #30.)*
-
 
 ### 811. [LOW] A note created on one record can be prepended to the next record's list
 `portal/src/hooks/useNotes.ts:189` — `createNote` awaits `notesApi.create`, then always prepends the created note. Switch from property A to B while the create is saving: if B's load has already landed, A's new note is added to the top of B's list, and nothing replaces it until B is next fetched (a Maple refresh, a reload or a revisit). If B's load is still in flight, `supersedeInFlight` fetches B and the stray note is replaced. LOW: it predates the notes-feed batch (#635/#654/#655), it's display only and same-company, and it needs a switch during the create's round trip. (review 2026-10-04, notes-feed batch round 3 #1)
@@ -4662,22 +3238,6 @@ types. Every future env-var lookup in the widget will repeat the cast.
 Fix: add a one-line `website/widget/vite-env.d.ts` containing
 `/// <reference types="vite/client" />`. Drop the cast and read
 `import.meta.env.VITE_PUBLIC_API_URL` directly.
-
-### 123. ~~[MEDIUM] `formatOrchestratorReply` mutates input parameter~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** `formatOrchestratorReply` is pure. A new `isOutOfScopeReply(result)` decides the out-of-scope path; the formatter uses it for the copy and `useMapleAgent` for the chip set, and `_outOfScope` is gone from both result types. (A pure predicate rather than the `{ text, outOfScope }` return the entry suggested: same contract, no churn at every call site.) Tests: `tests/orchestratorReply.test.ts` (and the input is never written to), `tests/useMapleAgent.test.tsx` › out-of-scope replies.
-
-**File**: [portal/src/lib/orchestratorReply.ts:54](../../portal/src/lib/orchestratorReply.ts)
-**Severity**: MEDIUM (mutation)
-
-Sets `result._outOfScope = true` so the caller can read it. Inherited
-from the original closure inside `PortalLayout.tsx`, copied verbatim
-during the extraction. The extraction was the right time to fix this
-contract; we kept it for parity instead.
-
-Fix: return `{ text, outOfScope }` (or a tuple). Caller assigns
-`result._outOfScope = outOfScope` explicitly. Cleaner contract; easier
-to test side effects independently.
 
 ### 289. [MEDIUM] `useEffect` references function declared later in the same component
 **Where:** `portal/src/pages/MaterialsPage.tsx` and `portal/src/pages/PeoplePage.tsx` — the `?open=<id>` effect calls `openEditMaterial` / `openEditLabour` declared further down. (Note: this was originally flagged when those effects opened the edit modal; the modal logic has since been removed, so the *symptom* is gone — but the pattern of effect-before-declaration may still apply if either page picks up a similar handler later.)
@@ -4825,23 +3385,6 @@ oversight.
 **Suggested fix:** Skip the dispatch when `agentResult.needs_clarification` is true or `result.missing_fields` is non-empty. Add a test.
 
 *(Review 2026-09-25 fifth pass #31.)*
-
-### 696. ~~[MEDIUM] No "waiting for your answer" state, wrong chips on confirmations, and a send before restore is lost (portal)~~ — RESOLVED 2026-09-27
-The Maple panel never shows that Maple is waiting for an answer, and offers no Cancel. `platform/routers/agent_helpers/finalize_result.py:286-291` attaches the agent's suggestion chips even when the turn is a clarification, so a yes/no question gets unrelated chips rather than Yes/No. A message sent before the restored history finishes loading is wiped when the restore lands (`portal/src/components/Layout/useMapleAgent.ts`). Also: `_aiConversationId` is dead state (`useMapleAgent.ts:90`), and the server echoes the full context back to the client. MEDIUM: users can't tell a question is open, which is how stale answers get applied (#671, #675).
-
-**Suggested fix:** A "Waiting for your answer · Cancel" strip and Yes/No chips on yes/no questions; restored history never wipes a message sent before the restore finished (design §8). Drop the dead state and trim the echoed context.
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (platform `9f657b4`, portal `97c87f4`): the reply and `GET /agents/conversation` carry `open_question` (`{"kind": …}` from the question gate); the composer shows "Waiting for your answer · Cancel" while one is open, restored on reload, and Cancel sends "cancel". A yes/no question's chips are Yes/No, and no clarification gets agent action chips. A message sent before the restored history lands is kept after it (a turn already in the restored lines isn't shown twice). The dead `_aiConversationId` state and `createConversationId` are gone, and `/agents/orchestrate` no longer echoes the conversation state to the browser (`response_model_exclude={"context"}`; in-process callers still see it). Pinned by `tests/test_agent_helpers_finalize_result.py`, `tests/test_conversation_api.py`, and the portal's `useMapleAgent.test.tsx` and `AiPanel.test.tsx`.
-
-### 727. ~~[MEDIUM] `mergeRestored` can wipe the restored transcript when the pending message repeats an earlier one~~ — RESOLVED 2026-10-04
-
-**Resolved 2026-10-04:** `mergeRestored` treats the local turn as already restored only when its question is at the end of the restored transcript — the last line, or the one before the reply — never an earlier line with the same words. A "yes" typed while the restore loaded no longer wipes the question it answers. Tests: `tests/useMapleAgent.test.tsx` › mergeRestored (a repeated earlier message; a finished turn; a question-only turn).
-
-`portal/src/components/Layout/useMapleAgent.ts:356` — `restored.findIndex(m => m.role === "user" && m.text === firstLocalUser.text)` finds the first earlier occurrence anywhere in history, and :357 drops every restored line from there on. Reload mid-question and type "yes" (already earlier in history): the panel shows only `[yes, Thinking…]`, and the question being answered is gone. MEDIUM rather than HIGH: display only — the server keeps the history and a reload restores it. (review 2026-09-27 #57)
-
-**Suggested fix:** Treat the local turn as already restored only when it is the tail of `restored` (check `restored[restored.length - 2]` is that user line); otherwise append. Add a test with a repeated earlier message.
 
 ### 733. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
 
@@ -5065,15 +3608,6 @@ rather than a performance defect. It is still an unguarded forced-layout read in
 **Suggested fix:** coalesce with `requestAnimationFrame` — keep the pending frame id in a ref, skip
 if one is already scheduled, clear it in the callback, and cancel it in the existing effect cleanup.
 
-### 695. ~~[MEDIUM] Maple writes remount the catalog pages, and several writes fire no refresh (portal)~~ — RESOLVED 2026-09-27
-`portal/src/pages/ContactsPage.tsx:231` sets `isLoading` on every refetch and `:647` then renders a `LoadingState` instead of the page, so each Maple write remounts the list and loses scroll, open dialogs and filters. Same in `PropertiesPage.tsx:105/:370`, `MaterialsPage.tsx:118/:544` and `PeoplePage.tsx:98/:328`. `src/components/Layout/agentMutationEvents.ts` has no entry for `create_estimate_from_template` or `delete_template`, and the dashboard and `PropertyActivityPanel` don't listen for Maple writes at all. MEDIUM: lost UI state, and screens that stay stale after Maple changes them.
-
-**Suggested fix:** A quiet refresh on catalog pages (no `isLoading` swap after the first load); refresh events for template-created estimates, template deletes, the dashboard and the property activity panel (design §8).
-
-*(Review 2026-09-27, multi-turn audit; fix planned in 2026-09-27-maple-multi-turn-everywhere-design.md.)*
-
-**Resolved 2026-09-27** (portal `19257da`): Contacts, Properties, Materials, People and Settings → Templates reload quietly after a Maple write — no `isLoading` swap, so the page, open dialogs and sheets, filters and scroll stay, and a failed refresh keeps what is shown; the first load still shows the spinner. `agentMutationEvents.ts` maps `create_estimate_from_template`, `delete_template` (new `portal:templates:changed`), `link_contact` (both Properties and Contacts) and Maple's `add_note`/`delete_note` (new `portal:notes:changed`, which the notes panel on that record listens for); `dispatchAgentMutation` fires every matching event. The dashboard reloads its lists and cards on an estimate change and its Upcoming Tasks card on a task change; the property activity panel also listens for estimate and task changes. Pinned by the quiet-refresh tests in `tests/{Contacts,Materials,People}PageDiffSave.test.tsx`, `PropertiesPageMobileSheet.test.tsx` and `TemplatesTabMapleRefresh.test.tsx`, plus `agentMutationEvents.test.ts`, `DashboardPage.test.tsx`, `UpcomingTasksCard.test.tsx`, `NotesPanel.test.tsx` and `PropertyActivityPanel.test.tsx`.
-
 ### 728. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
 
 **Resolved 2026-10-03:** `ContactsPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/ContactsPageDiffSave.test.tsx` — "a successful reload after a failed first load leaves the error screen".
@@ -5238,16 +3772,6 @@ malformed XML, and a malformed sitemap fails silently at Google rather than at b
 **Suggested fix:** escape `&`, `<` and `>` when building the `<loc>` value, and add a case to
 `robots-sitemap.test.ts` covering a path containing `&`.
 
-### 484. [LOW] website/seo/ — vendor audit docs include a duplicate download artifact
-`website/seo/` is untracked and about to be committed. It contains
-`3maples-wo-brevo-events (1).md`, byte-identical to `3maples-wo-brevo-events.md` — a browser
-download duplicate. The parenthesised filename is also awkward to reference from scripts or
-links.
-**Suggested fix:** delete the ` (1)` duplicate before committing. Separately, decide whether
-these vendor documents belong in the `website/` repo at all or in `documentation/` alongside
-the plan — `documentation/` is the better home, since they are process artifacts rather than
-site source, but that is a judgment call.
-
 ### 485. [LOW] website/package.json:6 — no type gate covers the `src/seo/` modules
 **Absorbs #433** (2026-09-20 consolidation): the same gap, first logged for
 `widget/api.ts` / `MapleWidget.tsx` importing the untyped `lib/recaptchaClient.js`.
@@ -5307,13 +3831,6 @@ def portal(client: TestClient):
 ```
 
 Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of `client.portal.call(_fn)`. Defer until another test-suite touch in any of the 10 files — refactoring purely for DRY is churn.
-
-### 304. [MEDIUM] Dual-mock pattern in `test_orchestrator_endpoint.py` after helper extractions
-**Where:** `tests/test_orchestrator_endpoint.py` — 4 sites for `properties_api_get_properties`, 4 sites for `estimates_api_get_estimates`, 2 sites for `estimates_api_get_estimate`, 2 sites for `prepare_generated_estimate` / `save_generated_estimate`.
-
-**Issue:** After the 2026-05-22 helper extractions, several `monkeypatch.setattr(agents_router, "X", ...)` calls now have a parallel `monkeypatch.setattr("routers.agent_helpers.<helper>.X", ...)`. The `agents_router.X` patches are NOT yet dead because two callsites of `estimates_api_get_estimate{s}` still live inside `_delegate_to_agent` (Estimate Agent fallback for unhandled intents — lines ~880-911 in `routers/agents.py`). Functionally correct but cluttered, and easy to forget which patches are load-bearing.
-
-**Fix:** When the remaining `_delegate_to_agent` Estimate Agent fallback is extracted (would naturally consolidate into a `delegate_estimate_misc.py` module or merge into `delegate_estimate_ops.py`), the `agents_router.estimates_api_get_estimate{s}` aliases become fully dead. At that point: drop the `agents_router`-targeted patches at lines 1835, 1886, 1953, 2028, 2853-2854, 2933-2934; keep only the helper-module patches. Also update `test_orchestrate_imports_plain_helpers_not_endpoints` contract test (line 3083) — its assertion that `agents_router.estimates_api_get_estimates is fetch_estimates` would need to drop both `estimates_api_*` aliases (the test already moved `properties_api_get_properties` to the helper module's binding).
 
 ### 395. [MEDIUM] platform/routers/ops.py — missing 409-path + status/pagination-edge tests
 No test coverage for the 409 conflict path, or for status-filter/pagination edge cases (empty page, out-of-range offset, invalid status value).
@@ -5439,14 +3956,6 @@ instead of sharing it with the class fixture (necessary because the fixture is
 int-only, but the block-carving regex is now written twice).
 **Suggested fix:** Extract a shared "parse plan blocks from billing-plans.ts"
 helper used by both the fixture and the nullable-field test.
-
-### 427. [LOW] platform/agents/orchestrator/intents.py — `is_anaphoric_add_request` has no direct unit test (finding #12)
-Exercised only through orchestrator behavior tests, so its own contract (which
-pronouns, which verbs, how it composes with `strip_dictated_payload`) is unpinned.
-It also now gates the #6 full-text fallback in `_classify_via_action_domain`,
-which widens what a regression there would break.
-**Suggested fix:** Add a parametrized unit test alongside
-`TestStripDictatedPayload` in `tests/test_maple_task_operations.py`.
 
 ### 432. [LOW] CLAUDE.md — the bandit baseline is a hardcoded "13" and will drift
 Logged 2026-07-27 from the second `/code-review` pass. The bandit section added
@@ -5618,11 +4127,6 @@ total row count rather than blank-row count.
 
 **Suggested fix:** `@pytest.mark.parametrize("status", ["Draft", "Review"])`.
 
-### 584. [LOW] Rewritten Maple note tests don't check `success` or the response copy
-`platform/tests/test_estimate_agent.py:5552` — They check only the created note bodies; `success` and the "I've added a note" copy are covered only in `test_maple_estimate_field_edits.py`.
-
-**Suggested fix:** Add `assert result["success"] is True` and a check on the response copy.
-
 ### 603. [LOW] No test re-renders the Documents dialog with the post-success versions
 `portal/tests/DocumentsDialog.test.tsx:97` — The kept-image reconciliation never runs against a freshly kept image — the path the adjust-during-render design was accepted for. It is believed correct; nothing pins it.
 
@@ -5662,14 +4166,6 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Make `estimatesApi.list` return a pending promise, dispatch inside `await act(async () => …)`, then assert no spinner, as the Contacts, Materials and Templates tests do.
 
-### 759. ~~[LOW] Corpus row `contact-stale-anchor-asks` passes for the wrong reason~~ — RESOLVED 2026-09-29
-
-**Resolved 2026-09-29** (name-answers plan phase 4): the turn now asserts `has=("Just to check",)` and the row is marked `gap=` (strict xfail), as suggested. The role-word gap itself is logged ⚠️ in the phrasing reference §10.7.
-
-`platform/tests/maple_conversations/corpus.py` (row `contact-stale-anchor-asks`) — its last turn, "change the homeowner's phone to 416-555-9999", is meant to prove the stale-anchor question, but "the homeowner's" is read as a contact named "Homeowner" and the reply is "No contact found with name 'Homeowner'." — which also satisfies `clarify=True` and the unchanged-phone check. Found while writing the stale-anchor answer rows (review 2026-09-27 #12), which use "her phone" and assert "Just to check".
-
-**Suggested fix:** Add `has=("Just to check",)` to that turn. It will then fail — a role word ("the homeowner", "the manager") naming the contact in focus is a gap in `agents/contact/`; record it in the phrasing reference (⚠️) or mark the row `gap=` until the contact agent reads a role word as the anchored contact.
-
 ### 769. [LOW] The `?contactId=` announce test never checks the link is consumed
 `portal/tests/ContactsPageDiffSave.test.tsx:194` — with no sheet the `if (close)` branch is skipped, so the test only checks "announced c2, never unannounced"; deleting `setSearchParams(... delete("contactId"))` (the snap-back fix) leaves it green, and the `?open=` case never asserts the sheet opened. (review 2026-09-28 third round #9)
 
@@ -5680,20 +4176,10 @@ total row count rather than blank-row count.
 
 **Suggested fix:** As #769: assert the sheet state per case, tap prop-1, trigger a quiet reload, assert prop-1 stays announced.
 
-### 782. [LOW] `test_a_new_command_naming_a_code_does_not_answer_which_estimate` fails on "attached to a different loop"
-`platform/tests/test_maple_work_item_context.py:437` — all three cases ("show E0042", "delete E0042", "open E0042") fail at HEAD (`77e55ef`, verified 2026-09-30), alone and in a combined run: `RuntimeError: … got Future <Future pending> attached to a different loop` from a Beanie cursor under `EstimateAgent.process()` (`agents/estimate/service.py:854`). The test drives the agent with `asyncio.run` through `_say` against a stub world, and the reply path now reaches the database — likely a lookup added by the name-answers phases (the exact title lookup, or `named_answers.py`). The test itself last changed 2026-09-27. (found 2026-09-30 while running the list-estimate suites for #779/#780)
-
-**Suggested fix:** Find the query the reply path now makes (run one case with `-x --tb=long`) and either stub it in `wired` like `_resolve_estimate_code_or_title`, or run `_say` on the client portal's loop as `tests/test_estimate_list_answers.py` does.
-
 ### 800. [LOW] The CSV upload test leaves a "Hardscape" category in use
 `platform/tests/test_material_upload_api.py:11` — its "Patio Stone" material stays in the test company, so `test_material_categories_api.py::test_load_standard_categories_removes_non_standard_when_requested` fails when it runs after the upload tests (`skipped_in_use == ['Hardscape']`). Fails on a clean checkout too; order-dependent.
 
 **Suggested fix:** Delete the uploaded materials (and their created categories/units) in the upload tests' teardown.
-
-### 801. [LOW] Three work-item context tests fail on "attached to a different loop"
-`platform/tests/test_maple_work_item_context.py:438` — `test_a_new_command_naming_a_code_does_not_answer_which_estimate` (all three parametrizations) fails with `RuntimeError: … got Future attached to a different loop` inside `EstimateAgent.process()`. It fails at `0bfe2fc` (before the 2026-10-01 tenant work) and every commit since, run alone or in a batch, so it predates that work; it was missed because the related-test runs didn't include this file.
-
-**Suggested fix:** Find what the `wired` fixture's `_say` drives through `asyncio.run` that reaches a Motor client bound to the TestClient's loop (likely a real DB call the stubs don't cover), and stub it or run the turn on the client's portal.
 
 ### 805. [LOW] Two of the three guards are pinned only by a 0.1 s wall clock
 `platform/tests/test_record_lists.py:1` — `test_a_long_message_never_reaches_the_bare_name_pattern` and `test_catalog_names.py::test_a_long_message_is_no_focus_question` assert `elapsed < 0.1`. What #707 and #708 fixed is an ORDER: the length check runs before the pattern. That is directly testable, but the tests check it through timing instead. The fixed path is microseconds, so they pass by a wide margin today. But the neighbouring test (`test_a_long_what_about_stays_linear`) deliberately uses 1.0 s because "a wall-clock bound must not flake on a GC pause", and these two are the only 0.1 s bounds in the conversation suites. LOW: no flake observed; it's suite hygiene. (review 2026-10-02, guards batch #1)
@@ -6336,10 +4822,6 @@ add a "post-implementation: line refs may be stale, search by function name"
 disclaimer to the plan template. Low priority since plans aren't authoritative
 documentation.
 
-### 371. [LOW] platform/agents/estimate/text_helpers.py:589 — `_parse_estimate_date_filter` docstring not updated for numeric windows
-The docstring still enumerates only word-form phrasings ("from last week" / "this month" / "in the past year") and says it returns `None` "when no recognized qualifier appears" — it now also handles numeric windows ("last 90 days", "past 6 months"). The inline comment above the new regex documents it, but the function-level docstring is the public contract.
-**Suggested fix:** Add one line noting numeric windows are also recognized (and capped at one year).
-
 ### 392. [LOW] platform/routers/feedback.py — backend /feedback route + Trello service are now dead code
 With portal/src/api/feedback.ts deleted, nothing calls POST /feedback anymore. The feedback router, trello_service, and the TRELLO_* config keys (trello_api_key/secret/api_token + three list IDs in config.py) are dead code in platform — an unused authenticated route that still writes to Trello if hit, plus live Trello credentials in prod env for a retired feature.
 **Suggested fix:** Separate platform change: remove routers/feedback.py (+ main.py registration), trello_service, the TRELLO_* Settings fields (or keep them declared-but-unused like trello_secret if .env files still carry them), and their tests; then revoke the Trello API token. Also retire the golden-sprouting-adleman plan doc as superseded.
@@ -6513,12 +4995,6 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 
 **Suggested fix:** Use `MAX_DOC_IMAGE_MB` in the message.
 
-
-### 608. [LOW] `QUOTED_VALUE_GROUP` comment names a caller that doesn't use it, and the constant splits a block
-`platform/agents/estimate/text_helpers.py:32` — The comment says the group is shared by the "note / description / title detectors", but no title detector uses it. The constant also sits between `PENDING_FIELDS_CONTEXT_KEY` and `PARTIAL_ESTIMATE_CONTEXT_KEY`, splitting that block of context keys.
-
-**Suggested fix:** Change the comment to "note / description detectors" and move the block below the context-key constants.
-
 ### 609. [LOW] Estimate Brevo hook docstring names only one of the two raw writes that bypass it
 `platform/models/estimate.py:617` — It says one hook catches every write path and names `append_doc_version_to_estimate`'s raw `$push` as the only write no event sees (which now runs the after-Update actions itself via `as_written`). `remove_doc_version_from_estimate` also writes a raw `$pull` that fires nothing. Harmless, since removing a version can't cross a lifecycle line, but unstated.
 
@@ -6539,16 +5015,6 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 
 **Suggested fix:** Update the message and the docstring.
 
-### 625. [LOW] `WorkItemEdit` has no docstring
-`platform/agents/estimate/work_item_edit_detectors.py:55` — A public dataclass with no docstring.
-
-**Suggested fix:** Add a one-line docstring naming its kind/fields/name_hint contract.
-
-### 626. [LOW] `_handle_work_item_edit` has no docstring
-`platform/agents/estimate/work_item_edit_handlers.py:55` — The entry point for rule-detected work-item edits isn't documented.
-
-**Suggested fix:** Add a one-line docstring.
-
 ### 739. [LOW] `load_conversation` is used only by tests
 `platform/routers/agent_helpers/conversation_store.py:75` — Production re-implements it in `routers/agents.py:_load_conversation_context` (`find_one` + `loaded_from`), so the tests cover a path production never calls. (review 2026-09-27 #69)
 
@@ -6558,11 +5024,6 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `platform/agents/task/base.py:204` — No caller passes `assigned_to` to `_list_conditions`, `_list_tasks_db` (:243) or `_count_tasks_db` (:275) any more; `extra` replaced it. (review 2026-09-27 #79)
 
 **Suggested fix:** Remove the parameter from all three.
-
-### 809. [LOW] `_before_aside` split a comment from the regex it describes
-`platform/agents/template/service.py:26` — The new function sits between `# "it", "this", "that one" — a reference to the template in focus.` and `_POINTS_AT_FOCUS_RE`, so the comment now heads `_before_aside`. LOW: a misplaced comment, no behaviour. (review 2026-10-03, wrong-answers batch 2 round 2 #2)
-
-**Suggested fix:** Move `_before_aside` below `_POINTS_AT_FOCUS_RE` (or above the comment), so the comment sits directly on the regex again.
 
 ### 810. [LOW] The router imports an agent module's private `_recalculate_sub_total`
 `platform/routers/agent_helpers/template_estimate.py:26` — The sized-template fix (#631 review) imports `agents.estimate.work_item_field_handlers._recalculate_sub_total`, a leading-underscore helper, into `routers/agent_helpers`. That is the cross-module private import #575 and #750 flag elsewhere. It ties the router to one agent mixin's internals, for a one-line wrapper around `work_item_breakdown(unburdened(item)).total`, which already lives in the routers' own `routers/estimate_helpers/calculations.py`. LOW: no behavioral effect. (review 2026-10-03, wrong-answers batch 4 round 3 #1)
