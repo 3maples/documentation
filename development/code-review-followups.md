@@ -19,7 +19,7 @@ kept its number and its body.
 entries about code only today's pipeline runs dropped there too (the planner never
 runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
 
-- **Entries are numbered and permanent.** Next free number: **947**. Never
+- **Entries are numbered and permanent.** Next free number: **951**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2185,6 +2185,21 @@ negation. Recorded only, not to be worked unless it shows up in use.
 `platform/agents/planner/other_kinds.py:67` — Edge case (defensive). An invalid company id returns the plan unchanged; nothing drives it. (review 2026-10-11 #29, deferred)
 
 **Suggested fix:** `as_template(plan, "not-an-id")` returns the same plan.
+
+### 947. [MEDIUM] Planner: "add Bob as the contact on E0042" can create a new Bob
+`platform/prompts/maple_planner.py:140` — In one of four parity runs (2026-10-12) the planner planned `create_contact {Bob}` + `link` where the others asked "Which Bob?". Nothing checks the company for a contact already named that before the create, so a user with a Bob may get a second one linked to the estimate. Today's contact create asks for missing fields before it writes, which may stop it, but the plan itself is wrong.
+
+**Suggested fix:** In the policy, a `create_contact` planned beside a `link` whose name matches one or more of the company's contacts → link that contact (one match) or ask which (several), as the `link` does for a name; a test with a seeded "Bob Lee" and this plan.
+
+### 948. [MEDIUM] Planner: a property create beside a link doesn't check the address exists
+`platform/agents/planner/policy.py` — "the property for this quote is 123 Main St" was planned as `create_property {street}` + `link` in one of five parity runs (2026-10-12). Today's property create has no duplicate check, so the turn adds a second "123 Main St" and links it. Fixed in the prompt only ("link to it by name — create_property only when the user asks for a new one"), which the model can still miss.
+
+**Suggested fix:** In the policy, a `create_property` whose street or name matches a company property, planned beside a `link` to its step → link the existing property instead; a test with a seeded property and this plan. An explicit "add a property at …" keeps today's behaviour.
+
+### 949. [LOW] Planner: a line price for a material not on the open work item fails instead of reaching the catalog
+`platform/agents/planner/line_prices.py:46` — With a work item open, "set the price of concrete blocks to $5" stays a line edit (the reference reads a line's price while a work item is in play), but when concrete blocks isn't one of its lines the executor answers that it can't find the line and nothing is written. Today's rule checks the lines and changes the catalog price instead (`expected.json`: "set the price of concrete blocks to $5" in `wi` is not `update_estimate`). The planner can't see a work item's lines, so `line_or_catalog` can't tell.
+
+**Suggested fix:** In the policy (which loads the estimate), a price-only `update_material` by focus whose `material_query` matches no line on the work item in focus, with no work item named → the catalog's `update_material {price}`; a test with a seeded work item holding mulch and the plan for concrete blocks.
 
 
 ## Platform — API, models and data
@@ -4414,6 +4429,11 @@ total row count rather than blank-row count.
 `platform/tests/test_planner_adjust_assumption.py:182` — It never checks that the change was applied. (review 2026-10-11 #90, deferred)
 
 **Suggested fix:** Assert the saved quantity changed, or today's adjustment wording.
+
+### 950. [LOW] The planner parity run scores the raw plan, not what a turn runs
+`platform/tests/test_planner_parity_live.py:66` — `plan_turn`'s plan is scored before the turn's own correction steps (`said.py`, `line_prices.py`, `other_kinds.py`), so a row a guard sets right still flags and needs an `explained.py` entry (six were added 2026-10-12). The model also varies run to run: about half of the first 2026-10-12 run's worse rows came back right when re-planned, and reference rows are keyed `line N:…`, so a phrasing-reference edit shifts every id after it. Telling a regression from noise took a scratch script.
+
+**Suggested fix:** Score a second column — the plan after the pure correction steps (`said.told_not_to`, `without_unsaid`, `said_words`, `asked_for_a_task`, `asked_which_there_are`, `line_prices.line_or_catalog`) — and gate on it, keeping the raw score in the report. Add `PARITY_MESSAGES=<file>` to re-plan chosen rows N times without overwriting the full report, and key reference rows by message, not line number.
 
 ## Codebase hygiene (batchable)
 
