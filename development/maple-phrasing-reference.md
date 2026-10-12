@@ -506,7 +506,7 @@ Handled by `agents/estimate/conversation_guide.py` + `agents/estimate/assumption
 **Assume instead of ask (2026-07-26; sizes became per work item 2026-08-10):** generation no longer blocks on missing details. Only an unknowable **work type** still asks a question ("What type of work needs to be done?"); missing area size, material preferences, etc. are **assumed** and generation runs immediately. The area question is never asked at all.
 
 **Sizes are resolved per work item, after decomposition.** A multi-item request used to get ONE size from a first-keyword-match over the whole message — "build a paver patio and mow the lawn" produced a 5,000 sq ft *patio*. The architect now decomposes first, then each scope missing a size resolves its own (`resolve_scope_area_assumption`), in priority order:
-1. **Stated size wins** — a scope whose description carries a size ("a 400 sq ft patio") gets **no** assumption; nothing was assumed.
+1. **Stated size wins** — a scope whose description carries a size ("a 400 sq ft patio", "24 by 18 ft", "a 24-by-18-foot patio", "24' x 18'", "1,200 sqft") gets **no** assumption; nothing was assumed. *(2026-10-11: sizes said with "by", with feet marks or with a thousands comma were unread — "a 24 by 18 ft. paver patio" stored the 300 sq ft default, and "1,200 sqft" read as 200. A paver's own size, "12x12 inch", is not the job's.)*
 2. **Company history** — median job size parsed (`parse_job_size`) from similar past **Won-and-beyond** work items, via the per-company vector search, queried with *that scope's* text rather than the whole message (`infer_area_from_history`; needs ≥2 parseable samples). *(The corpus tightened from Sent/Approved to Won/Scheduled/Completed on 2026-08-10 — a quote nobody bought is not history.)*
 3. **Curated defaults table** — `WORK_TYPE_DEFAULTS`, recalibrated 2026-08-10 against typical residential jobs: sod 2,000 sq ft, lawn/mow 5,000 sq ft, patio 300 sq ft, deck 320 sq ft, beds 800 sq ft, driveway 600 sq ft, fence 150 linear ft, wall 40 linear ft, irrigation 5,000 sq ft. Sod split out of the lawn bucket so a mow request no longer suggests sod as its material.
 4. **Researcher/architect LLM fallback** — anything still invented is reported in a structured `assumptions` array (never silently guessed).
@@ -555,6 +555,24 @@ Each assumption is stored structured on the estimate (`EstimateAssumption`: `key
 Legacy estimates created before per-item sizes carry a single `scope="estimate"` assumption that genuinely described the whole estimate — those still rescale every work item, unchanged.
 
 **Guards:** locked statuses refuse via the standard edit loader; absurd factors (×<0.01 or >100), out-of-range positions, and cross-family unit changes clarify without mutating; estimates with **no stored assumptions** (created before this feature, or fully-specified requests) get a graceful "no stored assumptions — use the estimate editor" reply; phrasings owned by other sub-ops (work items, status, financial fields, `{size} of {material}` quantities) are never claimed by this detector.
+
+### 1.3.2 A work item at a new size — the planner *(2026-10-11)*
+
+A converted task, or a request that said its size, stores no assumed size — so "make the patio 1,200 sq ft" had nothing to rescale (*"I don't have any stored assumptions on estimate … to adjust"*). On the planner every new size for priced work is `resize_work_item`, and the work item it names is **repriced** (user decision 2026-10-11; `agents/estimate/work_item_reprice.py`):
+
+- **Priced from a size Maple stored** → rescaled from it, as §1.3.1, nothing asked: *"I've repriced work item 1 for 600 sq ft (it was priced for 300 sq ft) on estimate {EST} — new grand total: $X."*
+- **Anything else** (no stored size, a unit it can't convert, a change past ×100) → priced again by the generation pipeline for the new size, **asked first**: *"I'll price work item 1 ("…") on {EST} again from scratch for 1,200 sq ft. That replaces its description, materials and activities, including any changes made to them. Go ahead? (yes/no)"* — naming the estimate, so it is asked the same when the estimate in focus has gone stale. On yes the item keeps its id (its notes), position, markup, overhead, tax and division; its lines are the new pricing (a scope the pipeline split is merged back into one item); the size is stored on the item, so the next change rescales it. "No": *"Okay — I've left the work item as it is."*
+
+| Phrasing | Plan | Status |
+|---|---|---|
+| `Update the patio size to 1200 sqft.` (just after a task convert) | `resize_work_item {work_item: name "patio", size: 1200 sq ft}` | ✅ planner |
+| `Recalculate the Work Items #1 for 1200 sqft patio` / `redo work item 1 for a 1200 sq ft patio` | `resize_work_item {work_item: position 1}` | ✅ planner |
+| `the patio is actually 24 by 18 ft` / `it's 20 by 30` | `resize_work_item {size: 432 sq ft}` — no item named: the estimate's only one, or the only one priced from a size | ✅ planner |
+| `make it 600 sq ft` with several items, none priced from a size | asks *"Which work item do you mean?"* | ⚠️ asks |
+| `make the patio bigger` (no size said) | asks *"What size should the work item be? Say it with its unit, like "1,200 sq ft"."* — a size the message doesn't say is never the model's | ⚠️ asks |
+| `assume premium pavers instead` | `adjust_assumption` (a material — §1.3.1) | ✅ planner |
+
+Today's pipeline is unchanged: it still rescales only an assumed size and refers the rest to the estimate editor.
 
 ## 1.4 Status transitions
 
