@@ -19,7 +19,7 @@ kept its number and its body.
 entries about code only today's pipeline runs dropped there too (the planner never
 runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
 
-- **Entries are numbered and permanent.** Next free number: **929**. Never
+- **Entries are numbered and permanent.** Next free number: **947**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -293,7 +293,9 @@ seams that already exist as separate classes.
 | 64 | `list_properties_reply` — agents/property/service.py:2458 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_property_list_items(serialized)` — review 2026-10-08 #11, deferred) |
 | 63 | `list_labours_reply` — agents/labour/service.py:1253 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_labour_list_items(serialized)` — review 2026-10-08 #12, deferred) |
 | 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
-| 59 | `execute` — platform/agents/planner/execute.py:447 (was 46; phase 8 added step pointing and the policy refusal. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
+| 63 | `execute` — platform/agents/planner/execute.py:463 (was 46; phase 8 added step pointing and the policy refusal; +4 on 2026-10-11 for the work items of an estimate a create of the plan made, #864. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
+| 56 | `run_planner_turn` — platform/agents/planner/turn.py:385 (new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
+| 51 | `list_reply` — platform/agents/conversation/record_lists.py:99 (new 2026-10-11: the `within` filter, #845. Move the query building into `_rows(ask, company)` — review 2026-10-11 #11, deferred) |
 | 60 | `_redo` — platform/agents/planner/followups.py:136 (was 44; a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
 | 52 | `_refine` — platform/agents/planner/followups.py:198 (was 41; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
 | 54 | `resolve_work_item` — platform/agents/planner/resolve.py:386 (was 49; move the `by == "name"` arm and its retry into `_work_item_by_name` — review 2026-10-11 #76) |
@@ -1596,7 +1598,7 @@ bring back copying.
 
 **Suggested fix:** Make them module functions in `agents/estimate/crud_helpers.py` (`estimate_summary(estimate)`, `estimate_list_entry(summary)`), keep the mixin methods as one-line wrappers for today's callers, and drop the `helpers` parameter and the executor's `_estimate_agent` lookup for the list.
 
-### 840. [HIGH] Public Maple widget never runs the planner — a decision before the switchover
+### 840. ~~[HIGH] Public Maple widget never runs the planner — a decision before the switchover~~ — RESOLVED 2026-10-11
 
 **File**: [routers/public_maple.py](../../platform/routers/public_maple.py)
 **Severity**: HIGH
@@ -1608,7 +1610,9 @@ move it onto the planner (with its own narrower op set — public Maple refuses
 metrics and every write), or keep a small public-only reader. Needs Simon's call
 before the switchover.
 
-### 841. [MEDIUM] Planner: tasks referred to by recency, date or place
+**Resolved 2026-10-11:** Decided: keep the public widget as its own small reader — it already was one. `/public/maple/ask` never ran today's routing; `agents/maple_public` refuses actions and figures by rule and answers the rest from the user guide. Its one tie to code that goes, `HELP_INSTRUCTIONAL_PATTERNS`, moved from `agents/orchestrator/intents.py` to `agents/text_utils.py`; `tests/test_public_maple_boundary.py` fails if it imports anything but shared code. Moving it onto the planner remains open if a public planner is ever wanted.
+
+### 841. ~~[MEDIUM] Planner: tasks referred to by recency, date or place~~ — RESOLVED 2026-10-11
 
 **File**: [agents/planner/refs.py:13](../../platform/agents/planner/refs.py), [agents/conversation/record_names.py:98](../../platform/agents/conversation/record_names.py)
 **Severity**: MEDIUM
@@ -1621,7 +1625,9 @@ to the last task" was planned as a task named "last task" and found nothing. Fix
 a `recent` (and date) ref for tasks, or route task names through today's
 `find_task_from_context_or_message`.
 
-### 842. [MEDIUM] Planner: task list and count filters it can't say
+**Resolved 2026-10-11:** A task named with words that match no title or code goes through today's task finder (`resolve._task_by_words` → `find_task_from_context_or_message`, no focus or newest-task fallback): recency ("my" = assigned to me), a date, a property, a loose title — the last marked stale, so a write asks "Just to check". Tests: `test_planner_resolve.py`.
+
+### 842. ~~[MEDIUM] Planner: task list and count filters it can't say~~ — RESOLVED 2026-10-11
 
 **File**: [agents/planner/schema_fields.py:185](../../platform/agents/planner/schema_fields.py), [agents/planner/execute_records.py](../../platform/agents/planner/execute_records.py) (`_task_ask`, `_task_count`)
 **Severity**: MEDIUM
@@ -1638,7 +1644,9 @@ a `recent` (and date) ref for tasks, or route task names through today's
 
 Each adds schema characters (budget 58,000, at ~57,100): batch them, and check live.
 
-### 843. [MEDIUM] Planner: template names read as estimate titles
+**Resolved 2026-10-11:** `TaskFilter.for_name` (a place, else a teammate, as today), `due_unread` (said back), `include_done` ("all tasks" counts finished ones), `TaskCount.fewest` (today's `group_counts_text` takes it too); prompt lines added. The schema fits the 58,500 budget at 58,469 by dropping the parameters' copy of the tool description and shorter unit wording. Tests: `test_planner_execute_figures.py`.
+
+### 843. ~~[MEDIUM] Planner: template names read as estimate titles~~ — RESOLVED 2026-10-11
 
 **File**: [agents/planner/resolve.py:352](../../platform/agents/planner/resolve.py)
 **Severity**: MEDIUM
@@ -1652,7 +1660,9 @@ bare-name reference finds nothing in its kind, try the other named kinds by exac
 name (as today's `catalog_names.py` does). If a template matches an estimate
 edit, refuse `template_edit`. Then drop the two `EXPLAINED` rows.
 
-### 844. [MEDIUM] Planner: turns that still fall back whole — errors, and today's old questions
+**Resolved 2026-10-11:** `agents/planner/other_kinds.py`, before the policy check: a name no estimate has that is exactly a template's is the template — a read `get_template`, a delete `delete_template`, an edit today's `template_edit` refusal. The two `EXPLAINED` rows are gone. Tests: `test_planner_other_kinds.py`.
+
+### 844. ~~[MEDIUM] Planner: turns that still fall back whole — errors, and today's old questions~~ — RESOLVED 2026-10-11
 
 **File**: [agents/planner/turn.py](../../platform/agents/planner/turn.py) (`run_planner_turn`, `_kept_turn`)
 **Severity**: MEDIUM
@@ -1667,7 +1677,9 @@ pipeline, and both need an answer before it is retired:
   (`open_question`). These shrink as fallbacks go. At the switchover, drop them
   with `LOST_TRACK`, or convert them as `kept_questions` does.
 
-### 845. [LOW] Planner: smaller shapes that still fall back
+**Resolved 2026-10-11:** Behind `MAPLE_PLANNER_ONLY` (`settings.maple_planner_only`, off until the switchover): a planner failure says `PLANNER_TRY_AGAIN`, a turn it can't run `PLANNER_CANT_YET` (both still recorded as `planner_gap`), and a question today's pipeline asked before the switch is dropped — an answer gets `LOST_TRACK`, a cancel today's words, a new request is planned; today's rewrite question is still planned with its answer. Tests: `test_planner_pipeline_endpoint.py`.
+
+### 845. ~~[LOW] Planner: smaller shapes that still fall back~~ — RESOLVED 2026-10-11
 
 **File**: [agents/planner/confirm.py](../../platform/agents/planner/confirm.py), [agents/planner/execute.py](../../platform/agents/planner/execute.py), [agents/planner/execute_figures.py](../../platform/agents/planner/execute_figures.py)
 **Severity**: LOW
@@ -1689,6 +1701,8 @@ pipeline, and both need an answer before it is retired:
 - "who owns 12 Oak St?": `get_property {field: owner}` lists every contact
   there, not the owners.
 
+**Resolved 2026-10-11:** Every shape: two or more deletes are one question naming each (`confirm._ask_delete`); a name, words or an owner beside a city or role (`ListAsk.within`; a related record beside them stays today's); an estimate's materials by unit price or catalog category (`_materials_priced_on_estimate`); a breakdown over another period is the metric engine's, "all time" on a windowed card is every estimate, "the last N days" with no count is asked; a handler's question beside a write is kept with the writes that ran (`kept_questions.DONE_KEY`), which the plan made again drops — never run whole; a relative change out of bounds is said (`execute_estimates.OutOfBounds`); "who owns 12 Oak St?" is its Home Owners.
+
 ### 846. [HIGH] Planner: owed verification after phase 8
 
 **File**: [tests/test_planner_parity_live.py:66](../../platform/tests/test_planner_parity_live.py), [tests/maple_conversations/](../../platform/tests/maple_conversations/)
@@ -1707,8 +1721,13 @@ phrasings, all as intended, but that's not the parity run. Owed:
   planner.** These are multi-step rows, rows that need a state, and rows with an
   ellipsis (`scripts/phrasing_reference_rows.py` lists them as not checked):
   §1.1 list refinements, §1.11, §4.8, §7.11, and §10.4–10.9.
+- **The later 2026-10-11 changes, also unrun live:** `resize_work_item`, the
+  task-text append rule, name-and-street properties, and the #841–#847 batch —
+  four new task fields, `fewest`, the tool's parameters without their copy of
+  its description, shorter unit wording and new prompt lines. Check those rows
+  in the parity diff first.
 
-### 847. [LOW] Planner: negated commands write
+### 847. ~~[LOW] Planner: negated commands write~~ — RESOLVED 2026-10-11
 
 **File**: [prompts/maple_planner.py](../../platform/prompts/maple_planner.py), [agents/planner/said.py](../../platform/agents/planner/said.py)
 **Severity**: LOW *(Simon 2026-10-11: users say what to do; a delete always asks)*
@@ -1717,6 +1736,8 @@ phrasings, all as intended, but that's not the parity run. Owed:
 "don't drop the markup on work item 2" was planned as markup 0, and "don't add a
 note to it: call Bob" appended the note. Nothing on the planner path reads
 negation. Recorded only, not to be worked unless it shows up in use.
+
+**Resolved 2026-10-11:** Done after all (Simon, 2026-10-11): `said.told_not_to` — a message opening "don't / do not / never" + a write verb, with a plan that writes, is "Okay — I'll leave it as it is." Not "don't forget to …", nor a message that says what to do instead. Tests: `test_planner_said.py`.
 
 ### 848. [MEDIUM] An unknown stored status gives a blank refusal
 `platform/agents/planner/policy.py:593` — Edge case. `_locked()` refuses any status outside Draft/Review, but `locked_edit_text` returns None for an unknown one, so the refusal text is `""` and the reply is empty. Today's handler fails open and allows the edit. (review 2026-10-11 #22, deferred)
@@ -1788,10 +1809,12 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** Make it one constant in agents/labour/ (used at service.py:1016), imported by planner/execute.py and maple_outcomes.
 
-### 864. [MEDIUM] A create followed by a work-item edit of the new estimate reports "Something went wrong"
+### 864. ~~[MEDIUM] A create followed by a work-item edit of the new estimate reports "Something went wrong"~~ — RESOLVED 2026-10-11
 `platform/agents/planner/execute.py:355` — `_made_by_a_step` lets `edit_estimate{estimate: step(create_estimate)}` through. But the policy skips work-item picks unless the estimate resolved to one, so `_commands` raises RecordNotLoaded after the create wrote, and the reply is WRITE_FAILED. MEDIUM, not HIGH: an unusual combination, and the create itself is saved and reported. (review 2026-10-11 #38, deferred)
 
 **Suggested fix:** In `uncovered`, return `ref:…step` when a step-made estimate is the `estimate` of an op that needs work-item refs. Test: `[create_estimate, edit_estimate{estimate: step 1, commands:[… target position 1]}]` → uncovered is not None.
+
+**Resolved 2026-10-11:** Once the create has run, the work items are picked on the estimate it made (`policy.resolve_work_items`, from `execute._items_missing_on_made`); one not on it is said (`MADE_ITEM_MISSING`), never WRITE_FAILED. Tests: `test_planner_execute_estimate_writes.py`.
 
 ### 865. [MEDIUM] When a create makes nothing, the later steps are dropped without a word
 `platform/agents/planner/execute.py:477` — Edge case. `_pointed` returns None and the loop breaks, so "create Mark Liu and link him to Birch House" answers only the create's reply and never says the link wasn't made. Untested. (review 2026-10-11 #39, deferred)
@@ -1803,10 +1826,12 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** `asking = next(c for c in refused if c.refusal_asks); ask_again(context, message_en, asking.refusal)`. Test: a two-action refusal where only the second asks → the kept question equals the second.
 
-### 867. [MEDIUM] A relative change on the work item this edit adds writes the amount as the value
+### 867. ~~[MEDIUM] A relative change on the work item this edit adds writes the amount as the value~~ — RESOLVED 2026-10-11
 `platform/agents/planner/execute_estimates.py:297` — The "added" target is converted before `_changed_by`, so "add a work item Fence and raise its markup by 5%" sets 5%. A negative value raises ValidationError, giving WRITE_FAILED. (review 2026-10-11 #41, deferred)
 
 **Suggested fix:** For an added target with `relative=True`, ask or refuse ("set it to what?"), or add the company's default markup as the base. I'd refuse/ask: there's no current value yet. Test: `[add_work_item Fence, set_work_item_percentage{target: added, value:5, relative:true}]` → not written as 5.
+
+**Resolved 2026-10-11:** A change by an amount on the work item this edit adds starts from the company's default (`execute_estimates._new_item`), as today's add gives it. Test: `test_a_change_by_an_amount_on_the_work_item_just_added_starts_from_its_default`.
 
 ### 868. [MEDIUM] The "kept the task" sentence is appended after a question
 `platform/agents/planner/execute_records.py:414` — It fires on a clarify too (e.g. `convert_needs_description`), so the question is no longer last and `kept_questions._last_paragraph` could keep the wrong text. Untested. (review 2026-10-11 #42, deferred)
@@ -1823,10 +1848,12 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** Two refused actions, the same text twice plus one different → the response holds two paragraphs.
 
-### 871. [MEDIUM] An estimate's lines by category or price falling back is untested
+### 871. ~~[MEDIUM] An estimate's lines by category or price falling back is untested~~ — RESOLVED 2026-10-11
 `platform/agents/planner/execute.py:313` — Edge case. The `_lines_beyond` True arm for an estimate isn't reached (the existing test uses a contact). (review 2026-10-11 #46, deferred)
 
 **Suggested fix:** `list_materials{filter:{related: estimate, category:"Mulch"}}` with an estimate ref → "filter:list_materials.related".
+
+**Resolved 2026-10-11:** Moot: an estimate's lines by category or price are answered now (#845), and tested in `test_planner_list_filters.py`.
 
 ### 873. [MEDIUM] `_metric`'s said-back reply is untested
 `platform/agents/planner/execute_figures.py:102` — Edge case. Only `said_back()` and the gate are tested, not the handler arm. (review 2026-10-11 #48, deferred)
@@ -1868,10 +1895,12 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** Return NO_FIGURE only when `before_tax` is set; otherwise ask "Which list or figure would you like …?". Tests for both shapes.
 
-### 881. [MEDIUM] A ranking by count is treated as money
+### 881. ~~[MEDIUM] A ranking by count is treated as money~~ — RESOLVED 2026-10-11
 `platform/agents/planner/followups.py:112` — Edge case. `metric {shape: ranking, measure: count}` re-runs on a tax question instead of answering NO_FIGURE. (review 2026-10-11 #56, deferred)
 
 **Suggested fix:** `_money` returns False when `last.get("measure") == "count"`. Test: a count ranking + before_tax → `Reply(NO_FIGURE)`.
+
+**Resolved 2026-10-11:** No change needed: a ranking by count prints each row's dollars and says the tax (`metric_shapes._ranking_text`), so tax is in it and the re-run is right. Pinned by `test_tax_on_a_ranking_by_count_is_the_ranking_the_other_way`.
 
 ### 882. [MEDIUM] `_redo_list`'s period fallback is untested
 `platform/agents/planner/followups.py:123` — Edge case. (review 2026-10-11 #57, deferred)
@@ -1888,10 +1917,12 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** `pytest.raises(ValidationError)` for a link `{"a":{"by":"name","text":"Ana"}, …}`.
 
-### 885. [MEDIUM] `_the_note_itself` drops the record the user named
+### 885. ~~[MEDIUM] `_the_note_itself` drops the record the user named~~ — RESOLVED 2026-10-11
 `platform/agents/planner/schema.py:416` — Edge case. "delete the first note on Bob Lee" while the notes listed are Ana's proposes Ana's first note. The confirmation names the record, which limits the harm. (review 2026-10-11 #60, deferred)
 
 **Suggested fix:** Drop `parent` only when the listed notes' parent matches it; otherwise keep both and let the policy check the note belongs to the parent (ask on a mismatch). Test: Ana's list + parent Bob → asks.
+
+**Resolved 2026-10-11:** The schema keeps both the row and the record; the policy takes the row only when the note is on the record named, else the record's own note (`note_pick.listed_or_record`); a record not found adds nothing to the row. Tests: `test_planner_deletes_estimates_notes.py`.
 
 ### 886. [MEDIUM] `Dashboard.days` was added, but the unsaid guard skips dashboards
 `platform/agents/planner/said.py:31` — Edge case. A card window carried from history is never dropped. "last 6 months" can only be planned as days (there's no `window_unit`). (review 2026-10-11 #61, deferred)
@@ -2052,6 +2083,97 @@ negation. Recorded only, not to be worked unless it shows up in use.
 `platform/agents/planner/execute.py:433` — execute_records.py:104 and execute_links.py:93 build near-identical sentences by hand, so they will drift. (review 2026-10-11 #108, deferred)
 
 **Suggested fix:** One helper in execute_links (`no_property_text(code, …)`) used by both.
+
+### 929. [MEDIUM] Several deletes where one can't be asked about are untested
+`platform/agents/planner/confirm.py:187` — Edge case. When one of several deletes returns a fallback string (e.g. `confirm:delete_unresolved`), `_ask_delete` returns that string and the turn falls back. No test drives it. (review 2026-10-11 #12, deferred)
+
+**Suggested fix:** Unit test: a PlanCheck with two delete actions, one with an unresolved target → `confirm.ask(...) == "confirm:delete_unresolved"`.
+
+### 930. [MEDIUM] Several deletes with a work item's note fall back under a misleading reason
+`platform/agents/planner/confirm.py:186` — Edge case. `_ask_note_delete` returns `Said` for a work item's or a task's note even beside other deletes. With no string among the answers, the default `"delete:scope_with_others"` is returned, which names the wrong cause in the shadow log. Untested. (review 2026-10-11 #13, deferred)
+
+**Suggested fix:** Return `"delete:note_said_with_others"` for a `Said` among several (or say it beside the combined question). Test: a contact delete plus a work-item note delete → that reason.
+
+### 931. [MEDIUM] An estimate in the combined delete question is untested
+`platform/agents/planner/confirm.py:138` — Edge case. The `what`/`name` an estimate delete gives ("estimate 'Birch Patio (E0001)'") is never shown in a combined question or its no. (review 2026-10-11 #14, deferred)
+
+**Suggested fix:** Test two deletes (an estimate and a contact) → the question lists "- estimate 'Birch Patio (E0001)'", and the no names both.
+
+### 932. [MEDIUM] A note in the combined delete question is untested
+`platform/agents/conversation/record_notes.py:516` — Edge case. `note_delete_label` ("your note on Ana Reyes: “Gate code 4411”") and the note's name, "the note", are never asserted. (review 2026-10-11 #15, deferred)
+
+**Suggested fix:** Test a note row delete plus a contact delete → the question lists "- your note on Ana Reyes: “Gate code 4411”".
+
+### 933. [MEDIUM] A role's "labor role" wording in the combined question is untested
+`platform/agents/planner/confirm.py:218` — Edge case. The `_KIND_WORD` arm (labour → "labor role 'Foreman'") is never driven. (review 2026-10-11 #16, deferred)
+
+**Suggested fix:** Add a two-delete test with a role → "- labor role 'Foreman'".
+
+### 934. [MEDIUM] A handler's own rewrite beside a write is untested
+`platform/agents/planner/kept_questions.py:137` — Edge case. The REWRITE_OP arm that sets `DONE_KEY` is not reached by a test (the existing one uses a name question). (review 2026-10-11 #17, deferred)
+
+**Suggested fix:** Test `ask_to_rewrite(...)` beside an earlier write → the record carries `DONE_KEY` (only when its original_message is the turn's message, the condition review 2026-10-11 #7 added).
+
+### 935. [MEDIUM] A row not found beside a record found is untested
+`platform/agents/planner/note_pick.py:40` — Edge case. When the listed row isn't `one` (out of range) and the record is, `on_it` is False, so the row is dropped and the record's own note is asked about. No test. (review 2026-10-11 #18, deferred)
+
+**Suggested fix:** Ana's notes listed, a plan with row 9 and parent Bob Lee (one note) → asks about Bob's note.
+
+### 936. [MEDIUM] A work item's note matched by its work item is untested
+`platform/agents/planner/note_pick.py:57` — Edge case. `_is_on` also matches `work_item_id`; no test points a work-item parent at its listed note. (review 2026-10-11 #19, deferred)
+
+**Suggested fix:** Unit test `_is_on` with the `on_item` note and a work_item `Resolved` whose record_id is the JobItem id → True.
+
+### 937. [MEDIUM] `_is_on`'s invalid-id guard is untested
+`platform/agents/planner/note_pick.py:53` — Edge case (defensive). A non-ObjectId note or company id returns False; nothing drives it. (review 2026-10-11 #20, deferred)
+
+**Suggested fix:** Assert `_is_on("x", parent, "y")` is False.
+
+### 938. [MEDIUM] The task finder's question back is untested
+`platform/agents/planner/resolve.py:428` — Edge case. When `find_task_from_context_or_message` returns a clarification (e.g. "the second to last task"), `_task_by_words` returns `unresolved` with that reason. No test. (review 2026-10-11 #21, deferred)
+
+**Suggested fix:** `_resolve(... "the second to last task")` → status `unresolved` and the reason "Which task did you mean? Tell me its name or ID.".
+
+### 939. [MEDIUM] Words and an owner together are untested
+`platform/agents/planner/execute_records.py:85` — Edge case (an unusual combination). Two sets are intersected and both phrases said; no test. (review 2026-10-11 #22, deferred)
+
+**Suggested fix:** `list_properties {text: "Birch", owner: "Ana Lee", city: "Toronto"}` → 'matching "Birch" owned by Ana Lee in Toronto'.
+
+### 940. [MEDIUM] A property beside a name to try is untested
+`platform/agents/planner/execute_records.py:559` — Edge case. In `_task_ask`, `property` wins over `for_name` (the elif); no test has both. (review 2026-10-11 #23, deferred)
+
+**Suggested fix:** `list_tasks {property: "Birch House", for_name: "Jordan"}` → the Birch House list, and no teammate lookup.
+
+### 941. [MEDIUM] Words beside a price on an estimate's materials are untested
+`platform/agents/planner/execute_records.py:319` — Edge case. The `said` filter and its ` matching "…"` qualifier are never driven. (review 2026-10-11 #24, deferred)
+
+**Suggested fix:** `{text: "sand", price_above: 10}` on the lines fixture → `Estimate E0001's materials priced over $10.00 matching "sand": Polymeric sand ($20.00).`
+
+### 942. [MEDIUM] A category with no catalog lines on the estimate is untested
+`platform/agents/planner/execute_records.py:357` — Edge case. When no line carries a valid material id, `ids` is empty and nothing is in the category; no test. (review 2026-10-11 #25, deferred)
+
+**Suggested fix:** The lines fixture as seeded (ids "m1", "m2") with a real "Stone" category → "Estimate E0001 doesn't use any materials in Stone."
+
+### 943. [MEDIUM] A work item with no description in the bounds reply is untested
+`platform/agents/planner/execute_estimates.py:332` — Edge case (optional data missing). `name` falls back to "Untitled". (review 2026-10-11 #26, deferred)
+
+**Suggested fix:** A work item with description "" lowered past bounds → 'That would make the tax on "Untitled" …'.
+
+### 944. [MEDIUM] A breakdown whose metric the engine can't read is untested
+`platform/agents/planner/execute_figures.py:52` — Edge case (likely unreachable). `_dashboard_uncovered` returns "filter:dashboard.period" when `_metric_uncovered(metric)` isn't None. (review 2026-10-11 #27, deferred)
+
+**Suggested fix:** Monkeypatch `metric_ask.metric_ask` to return None for a `by_status week` card → `uncovered == "filter:dashboard.period"`. If it proves unreachable, drop the arm.
+
+### 945. [MEDIUM] A counted list by a template's name is untested
+`platform/agents/planner/other_kinds.py:56` — Edge case. `list_estimates {title_contains, count: true}` stays as planned (the `not action.count` guard); no test. (review 2026-10-11 #28, deferred)
+
+**Suggested fix:** Add `{"op": "list_estimates", "filter": {"title_contains": "Driveway Maintenance"}, "count": True}` to `test_anything_else_is_as_planned`.
+
+### 946. [MEDIUM] `as_template`'s company guard is untested
+`platform/agents/planner/other_kinds.py:67` — Edge case (defensive). An invalid company id returns the plan unchanged; nothing drives it. (review 2026-10-11 #29, deferred)
+
+**Suggested fix:** `as_template(plan, "not-an-id")` returns the same plan.
+
 
 ## Platform — API, models and data
 

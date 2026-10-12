@@ -406,6 +406,7 @@ a note to a material or role. **Refused by the planner:** labor burden
 | `show me draft estimates from last week`             | `list_estimates` with `created_at` window                      | ✅ rule *(closed in xfail-wave-3 Workstream C — `_parse_estimate_date_filter` adds a `$gte/$lte` constraint on `created_at`)*                                                                                                                                        |
 | `approved quotes over $10k`                          | `list_estimates` with status + `grand_total` range             | ✅ rule *(closed in xfail-wave-3 Workstream C — verbless plural-domain inference + `_parse_estimate_amount_filter` adds a `$gt`/`$lt` constraint on `grand_total`; `k`/`m` suffixes supported)*                                                                      |
 | `what materials does {EST} use?`                     | `list_materials` filtered to one estimate's snapshot           | ✅ rule *(routes via `_CROSS_RESOURCE_QUERY_PATTERNS` with `filter_by={type=estimate, name=E0042}`; since 2026-09-27 (#682) it reads the materials of every work item — it read a top-level list `Estimate` doesn't have and always said "doesn't list any materials yet")* |
+| `which of {EST}'s materials cost over $10?` / `the Stone materials on {EST}` / `how many materials on {EST} are under $10?` | the estimate's own lines by unit price or catalog category — *"Estimate E0001's materials priced over $10.00: Polymeric sand ($20.00)."* | 🤖 planner *(2026-10-11, #845 — fell back)* · ⚠️ today's |
 | `what roles are on {EST}?` / `which roles are on {EST}?` | `list_labours` filtered to one estimate's snapshot             | ✅ rule *(symmetric Labour-agent drilldown; since 2026-09-27 (#682) it reads the activities' and labour lines' roles in every work item, and "which roles …" is delegated — it showed "Intent identified: …")* |
 | `how many estimates did I win this month?`           | `list_estimates` with status=WON + date filter                 | ✅ rule *(May expansion — "win" added as a verb-form alias for EstimateStatus.WON in `_estimate_status_from_text`)*                                                                                                                                                  |
 | `show only estimates with Won status this month`     | `list_estimates` with status=WON + date filter                 | ✅ rule *(status + date qualifiers already compose; no new code needed)*                                                                                                                                                                                              |
@@ -495,6 +496,7 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `can you put together / draw up / write up / work up / prepare / price out an estimate for …` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — "put together …" went to get_estimate)* |
 | `quote a fence for Bob Lee` | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-27 — was unknown)* |
 | `create an estimate for a planting bed that is 5 feet by 15 feet with 8 boxwood and mulch … Also as a separate work item build a 10 by patio using Cambridge pavers` — several work items in one request, one of them described with "is" | `create_estimate` → Estimate Agent | ✅ rule *(2026-09-28 — was a fuzzy `update_estimate` of an estimate titled like "Cambridge Paver Patio Installation"; the generation itself remains 🤖 LLM)* |
+| `create an estimate for a front-yard planting and set work item 2's markup to 30%` | the estimate made, then its work item 2 changed; one not on it is said | 🤖 planner *(2026-10-11, #864 — "Something went wrong partway through" after the create)* |
 | `create a residential estimate` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `new commercial quote` | `create_estimate` → Estimate Agent | 🤖 LLM |
 | `create an estimate to plant six hydrangea at the {property} residence` — property auto-linked at creation; "six" stays a plant quantity, never an area | `create_estimate` → Estimate Agent | ✅ rule *(2026-07-06 — property link + area grounding guard; the generation itself remains 🤖 LLM)* |
@@ -847,6 +849,7 @@ Sets a work item's total to an absolute dollar amount by **back-calculating its 
 | `show me the estimate` (nothing open) → *"Which estimate would you like to view?"* → `Oak St patio` | shows it | ✅ rule *(2026-09-29 — the question wasn't remembered; the title went to the Material agent)* |
 | `add a work item to the Patio estimate` (two live estimates titled Patio) | lists both, and the code or number picks | ✅ rule *(2026-09-29, #615 — "Which estimate would you like to update?" named neither)* |
 | `delete the Patio estimate` (two live estimates titled Patio) | lists both and asks for the code in a new request (`delete E0042`) — a delete is never resumed from a reply | ✅ rule *(2026-09-29, #615)* |
+| `delete Ana Reyes and Birch House` | one question naming both — *"Please confirm before I delete these 2:\n- contact 'Ana Reyes'\n- property 'Birch House'\nThis can't be undone."*; yes deletes both, no neither | 🤖 planner *(2026-10-11, #845 — fell back)* · ⚠️ today's |
 | `show me the Patio estimate` (no estimate titled that; one titled "Pat") | *"Which estimate would you like to view?"* — never the "Pat" estimate | ✅ rule *(2026-09-29, #616)* |
 | `show estimate 66f1c2…` / `delete 66f1c2…` (a database id, e.g. pasted from a portal URL) → `E0012` | *"Which estimate would you like to view? Please provide the estimate code or title."* — the id is never looked up, nor the open estimate used; the code in reply shows it | 🛑 by design *(2026-10-01, #798 — Maple never looks a record up by an id typed into the message; CLAUDE.md "Tenant scope of referenced ids")* |
 | `mark task 66f1c2… done` (a database id) | *"I can't look a task up by its database id. Tell me its code (like T0042) or its title."* | 🛑 by design *(2026-10-01, #798)* |
@@ -908,6 +911,9 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `what's the breakdown of estimates by divisions?` | `analytics_estimates` → Estimate Agent | ✅ rule |
 | `breakdown by divisions last month` / `by statuses last quarter` / `by divisions last year` | `analytics_estimates` → Estimate Agent (bounded previous period) | ✅ rule *(2026-07-08 — previously reported the CURRENT period; "last/previous month|quarter|year" now maps to `last_month`/`last_quarter`/`last_year`)* |
 | `breakdown by statuses for the previous quarter` | `analytics_estimates` → Estimate Agent (bounded previous period) | ✅ rule *(2026-07-08 — "previous …" synonym of "last …")* |
+| `breakdown by status this week` / `by division over the last 7 days` / `by status all time` | the metric engine's breakdown over that period, saying what it counted | 🤖 planner *(2026-10-11, #845 — fell back)* · ⚠️ today's |
+| `what's my pipeline all time?` / `completed value all time` / `give me a summary for all time` | every estimate — *"Your pipeline is worth **$X** across all time, including tax."* | 🤖 planner *(2026-10-11, #845)* · ⚠️ today's |
+| `what's my pipeline over the last few days?` (no count) | *"Over how many days?"* — never a guessed count | 🤖 planner *(2026-10-11, #845)* |
 | `what is my won-lost ratio?` / `win-loss ratio` / `win/loss ratio` / `won vs lost` / `how many estimates did I win vs lose?` / `what's my win rate?` / `what's my win rate this month?` / `how am I doing on bids?` | `analytics_metric` → the win rate, sold (Won, Scheduled, Completed) against Lost — §1.12 | ✅ rule *(2026-10-01, metrics Phase 3 — they were `analytics_estimates`, counting estimates still in Won, so a job left the wins when it was scheduled or completed; the window was rolling `updated_at`, now a calendar period dated by when each was sold or lost)* |
 | `won vs lost status` | `analytics_metric` — a status breakdown (Won alone and Lost, "status" said), §1.12 | ✅ rule *(2026-10-06, decision 2 — was the dashboard's literal count with an A:B ratio. 2026-10-01 — "status" keeps the literal statuses)* |
 | `draft vs approved estimates` | `analytics_metric` — a status breakdown, §1.12 | ✅ rule *(2026-10-06, decision 2 — was the dashboard's generic pair)* |
@@ -993,7 +999,9 @@ showed, and the question it last asked.
 | `set the markup on all work items to 20%` / `… for work items 1 and 2 …` | not a listed command: the edit planner's. Without it, Maple asks what to change ("… What would you like to change?") and writes nothing | 🤖 planner *(corrected 2026-09-27 — the "one work item at a time" reply no longer exists)* |
 | `remove work item 1 and set the markup on work item 2 to 20%` | the edit planner types both; without it, Maple asks what to change and writes nothing | 🤖 planner *(corrected 2026-09-27 — the "one change at a time" reply no longer exists)* |
 | `also raise the markup by 5%` / `change the markup by 5%` | a relative change isn't a listed command: the planner's. Without it, Maple asks what to change; a change BY 5 is never applied as the new value | 🤖 planner *(corrected 2026-09-27 — the "What should the new markup be?" reply no longer exists)* |
-| `create a task to set the markup to 20%` / `don't drop the markup on work item 2` / `if we set the markup to 20% …` | not an estimate edit; nothing is written | ✅ rule |
+| `add a work item Fence and raise its markup by 5%` | the new work item at the company's default markup plus 5% | 🤖 planner *(2026-10-11, #867 — it set 5%)* |
+| `lower the tax on Patio by 15%` (from 13%) | *"That would make the tax on "Patio" -2%, and it has to be between 0% and 100%. I've left it at 13%."* | 🤖 planner *(2026-10-11, #845 — "Something went wrong partway through")* |
+| `create a task to set the markup to 20%` / `don't drop the markup on work item 2` / `if we set the markup to 20% …` | not an estimate edit; nothing is written | ✅ rule · 🤖 planner: `don't drop …` is left as it is *(2026-10-11, #847 — it set the markup to 0)* |
 | `add 500 sq ft of sod to E0001` | prices the scope into E0001 (never a new estimate) | ✅ rule |
 | `delete work item 1 and …` → *question* → `Yes` | a bare yes/no never repeats a delete from the chat history | ✅ rule |
 | `list the work items` → `rename the second one to Front Patio Scope` | renames that work item; a work-item word in the new name doesn't stop the pick, and an ordinal rename never retitles the estimate | ✅ rule |
@@ -1284,7 +1292,7 @@ These routed but reached no record until 2026-09-27: the agent couldn't read a n
 
 `find properties named Toronto` · `search for properties matching Toronto`
 
-`how many properties are in Toronto?` → "You have 2 properties in Toronto." · `list properties in Guelph` · `show me properties in Toronto` — the city filters (2026-09-27, #687: every property was listed or counted); a city nobody has is said so ("You don't have any properties in Ottawa").
+`how many properties are in Toronto?` → "You have 2 properties in Toronto." · `list properties in Guelph` · `show me properties in Toronto` — the city filters (2026-09-27, #687: every property was listed or counted); a city nobody has is said so ("You don't have any properties in Ottawa"). On the planner with words or an owner too: `properties matching Elm in Toronto` · `how many properties does Ana Lee own in Toronto?` *(🤖 2026-10-11, #845 — fell back)*.
 
 ## 2.6 Field-targeted update
 
@@ -1367,7 +1375,7 @@ Routed, but found no one until 2026-09-27 — see §2.3.
 
 `find contacts named Smith` · `search for contacts matching Smith` — ✅ rule.
 
-`show contacts in Toronto` · `how many contacts are in Guelph?` · `list homeowners` · `show me the property managers` · `which contacts are administrators?` · `list homeowners in Guelph` — ✅ rule *(2026-09-27, #687: city and role filters; the list came back unfiltered)*. A filtered list is remembered, so `show me the second one` picks from it.
+`show contacts in Toronto` · `how many contacts are in Guelph?` · `list homeowners` · `show me the property managers` · `which contacts are administrators?` · `list homeowners in Guelph` — ✅ rule *(2026-09-27, #687: city and role filters; the list came back unfiltered)*. A filtered list is remembered, so `show me the second one` picks from it. On the planner a name beside them too: `contacts named Ana in Toronto` · `home owners named Di` *(🤖 2026-10-11, #845 — fell back)*.
 
 ## 3.6 Field-targeted update
 
@@ -1709,6 +1717,7 @@ Template **update** and **duplicate** are refused — see §9.5. Users must edit
 | `show me the {template} template` / `delete the {template} template` | `get_template` / `delete_template` | ✅ rule *(2026-09-27 — it asked "which template?")* |
 | `I want the details for {template}` | `get_template` → Template Agent | 🤖 LLM |
 | `tell me about {template}` / `tell me about the {template} template` | `get_template` → Template Agent | ✅ rule *(2026-09-27)* |
+| `tell me about Driveway Maintenance` / `delete Driveway Maintenance` / `update Driveway Maintenance's description` — a template's name, no "template", that no estimate has | its details; its delete (asked first); the template-edit refusal | 🤖 planner *(2026-10-11, #843 — read as an estimate's title)* |
 
 ## 6.7 Apply template to estimate
 
@@ -1813,10 +1822,11 @@ own filters match (`list_filters.task_group_of`). **Open tasks** unless
 | Phrasing | Answer | Status |
 |---|---|---|
 | `how many tasks does each person have?` / `how many open tasks does everyone have?` / `tasks by person` / `how many tasks are assigned to each person?` | *"Your open tasks by assignee:\n1. Jordan Crew — 2 tasks\n2. Sam Owner — 1 task\n3. Unassigned — 1 task\n4 open tasks in all."* | ✅ rule *(a flat list or one total; "each person" was looked up as a teammate; "tasks by person" was unknown)* |
-| `how many overdue tasks does each person have?` / `overdue tasks by assignee` / `all tasks by assignee` | the same for overdue tasks, or every task not archived | ✅ rule |
+| `how many overdue tasks does each person have?` / `overdue tasks by assignee` / `all tasks by assignee` | the same for overdue tasks, or every task not archived | ✅ rule · 🤖 planner too *(2026-10-11, #842 — "all tasks" is `include_done`; it counted open tasks only)* |
 | `how many tasks per property?` / `how many tasks does each property have?` / `count my tasks by property` | *"Your open tasks by property:\n1. Elm House — 2 tasks\n2. 12 Oak St — 1 task\n3. No property — 1 task\n4 open tasks in all."* — properties link to their page and are "the first one", "the second one" next | ✅ rule |
 | `who has the most overdue tasks?` / `who has the most tasks?` / `which property has the most tasks?` | *"Jordan Crew has the most overdue tasks — 1."*; a tie names both (*"… have the most open tasks — 2 each."*) | ✅ rule *(the last was help)* |
-| `who has the fewest tasks?` / `which teammates have no tasks?` | not read — teammates with none aren't in the count | ⚠️ gap |
+| `who has the fewest tasks?` | *"Dana Lee and Jordan Crew have the fewest open tasks — 2 each."* — the fewest among those who have tasks | 🤖 planner *(2026-10-11, #842 — `task_count {fewest}`)* · ⚠️ today's |
+| `which teammates have no tasks?` | not read — teammates with none aren't in the count | ⚠️ gap |
 | `rename the fence task to edging by property` / `mark the task sort tools by person as done` | the edit — a group is read only in a question or list request | ✅ rule *(Phase 4 review #1 — they became grouped counts and the edit was lost)* |
 
 ## 7.5 Filter / find
@@ -1827,7 +1837,7 @@ own filters match (`list_filters.task_group_of`). **Open tasks** unless
 | `tasks at Next Door Landscaping` / `tasks at This Old House` | `list_tasks` at that place — "this" / "next" make a due window only before week / month / year (`tasks for next week`) | ✅ rule *(2026-10-04, #804 — a place starting "Next" or "This" was never read, and every task was listed)* |
 | `tasks assigned to {email}` / `tasks assigned to me` / `tasks assigned to Jordan` / `Jordan's tasks` | `list_tasks` filtered by assignee | ✅ rule *(2026-09-27 — the email is read whole (it stopped at the first ".", #687); a teammate by first, last or full name; an unknown name is answered, never dropped)* |
 | `tasks assigned to Jordan due today` / `tasks assigned to Jordan Crew at 12 Oak St` / `tasks assigned to Jordan marked done` | `list_tasks` filtered by the assignee and the other filter | ✅ rule *(2026-10-02, #717 — the surname is a capitalised word that opens no other filter; "assigned to Jordan due today" was a teammate called "Jordan due")* |
-| `tasks for Jordan` | property first, then teammate | ✅ rule *(2026-09-27)* |
+| `tasks for Jordan` | property first, then teammate | ✅ rule *(2026-09-27)* · 🤖 planner too *(2026-10-11, #842 — filter `for_name`; it always took the assignee)* |
 | `unassigned tasks` | `list_tasks` with no assignee | ✅ rule *(2026-09-27)* |
 | `list my tasks` | `list_tasks` (ALL tasks — "my" is not an assignee filter, matching every other resource; use "assigned to me" to filter) | ✅ rule; on the LLM planner "my tasks" is the user's own (Simon, 2026-10-09; `agents/planner/said.py`, 2026-10-10 switchover phase 7d) |
 | `tasks in progress` / `show done tasks` / `list to do tasks` / `tasks with status {status}` | `list_tasks` filtered by status | ✅ rule *(2026-09-27; "to do" is a status only before "tasks" — "my to-dos" are all tasks)* |
@@ -1838,7 +1848,7 @@ own filters match (`list_filters.task_group_of`). **Open tasks** unless
 | `what's due for Jordan this week?` | due this week, for Jordan | ✅ rule *(2026-10-02 — "Jordan this week" was read as a place. A bare "this/next week/month" is a window only in a due question)* |
 | `what's due in progress?` / `tasks due marked done` | the status filter, on the upcoming list | ✅ rule *(2026-10-02 — a status after "due" isn't a date)* |
 | `what's due in the next 3 days?` / `tasks due within the next two weeks` / `what's due in the next week` | `list_tasks`, due from today for that many days or weeks | ✅ rule *(2026-10-02 — "in the next 3 days" was read as a status called "next 3 days"; "within the next 3 days" got the 7-day list. "in the …" is a status cue only before a column name)* |
-| `what's due 10/3` | *"I couldn't read '10/3' as a date — …"* | ⚠️ gap *(2026-10-02 — numeric dates aren't read anywhere in tasks: 10/3 is 3 October in the US and 10 March elsewhere, and there is no locale setting. Said back, never swapped for another window. "due Oct 3" works)* |
+| `what's due 10/3` | *"I couldn't read '10/3' as a date — …"* | ⚠️ gap *(2026-10-02 — numeric dates aren't read anywhere in tasks: 10/3 is 3 October in the US and 10 March elsewhere, and there is no locale setting. Said back, never swapped for another window. "due Oct 3" works)* · 🤖 planner says it back too *(2026-10-11, #842 — filter `due_unread`; it read 10/3 the US way)* |
 | `tasks due whenever` / `what's due on the blue moon?` | *"I couldn't read 'whenever' as a date — try something like "due Friday", "due Oct 3" or "due this week"."* | ✅ rule *(2026-10-02, #718 — a date it can't read is said back, never dropped)* |
 | `upcoming tasks` / `what's upcoming?` / `what's coming up this week?` / `anything due soon?` | `list_tasks`, overdue or due in the next 7 days and not finished — overdue first, each row saying whether it's overdue | ✅ rule *(2026-09-27 — the dashboard's Upcoming Tasks card in words; overdue tasks were left out)* |
 | `what's on my plate?` / `what's on my to-do list?` | the same, assigned to you — the card's default view | ✅ rule *(2026-09-27 — went to the user guide)* |
@@ -1888,7 +1898,7 @@ Additive is the default, matching estimate notes (§5.x) — a drive-by note nev
 | `Add another note: {text}` / `add a note: {text}` — **no target at all** | `update_task` (notes append) → Task Agent | ✅ rule *(2026-07-25 smoke-test fix — the active task is implied, same as the pronoun forms. 2026-09-24 — routing is now rule-tier: `is_note_add_request` sends a targetless note to whichever domain was touched most recently; before, the borrowed domain plus `add` resolved to `create_task`.)* |
 | `replace the notes on the task with: {text}` / `set the notes on the task to: {text}` | `update_task` (notes **set**) → Task Agent | ✅ rule |
 | `add a task with the notes: {text}` | `create_task` → Task Agent | ✅ rule *(create shape — the notes-update rule explicitly excludes it)* |
-| `don't add a note to it: call Bob` / `we shouldn't set the notes on the fence task to foo` / `please don't add to the task: call Bob` / `don't add to T0042 bring the contract` | nothing changes | ✅ rule *(2026-09-30, #762 — they appended or replaced the notes. The notes shapes are anchored with `agents.text_utils.COMMAND_LEAD`, and so are the router's copies of them — review 2026-09-30 #13: they still routed to `update_task`, which asked what to change)* |
+| `don't add a note to it: call Bob` / `we shouldn't set the notes on the fence task to foo` / `please don't add to the task: call Bob` / `don't add to T0042 bring the contract` | nothing changes | ✅ rule *(2026-09-30, #762 — they appended or replaced the notes. The notes shapes are anchored with `agents.text_utils.COMMAND_LEAD`, and so are the router's copies of them — review 2026-09-30 #13: they still routed to `update_task`, which asked what to change)* · 🤖 planner: *"Okay — I'll leave it as it is."* *(2026-10-11, #847 — it added the note. Not "don't forget to …", nor with what to do instead)* |
 | `add a note to it: don't park on the lawn` / `add to the fence task: we shouldn't dig here` | `update_task` (notes append) — the note's own words are content, never a negated command | ✅ rule *(2026-09-30, #762 — the anchor sits before the verb, so the note body is untouched)* |
 
 ### 7.6.1.1 Dictated payloads — the first intent wins
@@ -1983,10 +1993,10 @@ Resolver: `agents/task/resolver.py::find_task_from_context_or_message` — order
 
 | Reference form | Example | Status |
 |---|---|---|
-| Relative (recency) | `the last task` / `my latest task` (my = assigned to me) | ✅ |
-| Relative (date) | `the task from yesterday` / `from Tuesday` / `3 days ago` | ✅ |
-| By title (fuzzy) | `the fence gate task` (typos tolerated) | ✅ |
-| By property | `the task at {property}` | ✅ |
+| Relative (recency) | `the last task` / `my latest task` (my = assigned to me) | ✅ · 🤖 planner too *(2026-10-11, #841 — "add a description to the last task" found a task named "last task")* |
+| Relative (date) | `the task from yesterday` / `from Tuesday` / `3 days ago` | ✅ · 🤖 planner too *(2026-10-11, #841)* |
+| By title (fuzzy) | `the fence gate task` (typos tolerated) | ✅ · 🤖 planner too, asked first before a write *(2026-10-11, #841 — "Just to check — do you mean …?")* |
+| By property | `the task at {property}` | ✅ · 🤖 planner too *(2026-10-11, #841)* |
 | Anaphora (active task) | `mark it as done` / `convert it` / `rename it to {new}` | ✅ agent-side *(pronoun-only messages route via the LLM tier + active-task context. 2026-07-30 — two routing bugs used to steal these: a stale `active_estimate_code` from earlier in the session out-ranked the just-created task, and a Capitalized new value was mined as a person name and sent to Contact. The anchor is now chosen by recency (`active_entity_domain`), and a pronoun-targeted edit's payload is never read as a domain signal.)* |
 | Anaphora (bare determiner) | `mark the task as done` / `assign my task to {email}` / `archive the task` / `rename the task to {new}` | ✅ agent-side *(2026-07-25 — "the/my task" with no name in between is anaphora: the target hint collapses to empty and resolution goes through the active-task context. Previously the stray determiner leaked into the title matcher and could hit ANY title containing "the".)* *(2026-09-28 — with no task in focus Maple asks "Which task?" rather than editing the most recently updated task; notes appends still fall back to it, #447.)* |
 | Ambiguity → confirmation | two similar titles → numbered clarification, reply `1` / `the second one` / `T0004` / words from one title (`the paint one`) / `no` | ✅ *(2026-09-27 — the readable id and title words; the question gate reads a reply naming a choice as the answer, #692)* |
@@ -2030,7 +2040,7 @@ Questions users ask when they think about the domain rather than the database. R
 |---|---|---|
 | `who lives at {property}?` | `list_contacts` filtered by property | ✅ rule |
 | `what contacts are at {property}?` | `list_contacts` filtered by property | ✅ rule |
-| `who owns {property}?` | `list_contacts` filtered by property + role=owner | ✅ rule |
+| `who owns {property}?` | `list_contacts` filtered by property + role=owner | ✅ rule · 🤖 planner: its Home Owners only *(2026-10-11, #845 — it listed every contact linked; none marked: "None of 12 Oak St's contacts is a Home Owner.")* |
 | `what properties does {contact} own?` | `list_properties` filtered by contact | ✅ rule |
 | `where does {contact} live?` | `list_properties` filtered by contact | ✅ rule |
 | `show me {contact}'s properties` | `list_properties` filtered by contact | ✅ rule (possessive flow) |
@@ -2494,7 +2504,7 @@ Turns about the conversation itself are answered after the question gate has had
 | `cancel` / `never mind` / `stop` | "There's nothing to cancel right now — …" | ✅ rule |
 | a stray `yes` / `no` / `go ahead` | "I'm not waiting on an answer right now — …" | ✅ rule |
 | `No, set the markup to 25%` / `keep it at 20% markup` / `don't forget to call Bob Lee tomorrow` / `wait, add a work item called Fence` (nothing asked) | the request runs — only a plain no is a stray no | ✅ rule *(2026-10-01, #706 — they were answered "I'm not waiting on an answer")* |
-| `no, don't delete it` / `don't` / `no wait` / `keep it` / `leave it` / `don't delete Ana Reyes` (nothing asked) | "I'm not waiting on an answer right now — …" — a decline that asks for nothing stays a stray no | ✅ rule *(2026-10-01, #706 review — "no, don't delete it" and "don't delete Ana Reyes" offered the delete; a negated delete is a no whatever it names)* |
+| `no, don't delete it` / `don't` / `no wait` / `keep it` / `leave it` / `don't delete Ana Reyes` (nothing asked) | "I'm not waiting on an answer right now — …" — a decline that asks for nothing stays a stray no | ✅ rule *(2026-10-01, #706 review — "no, don't delete it" and "don't delete Ana Reyes" offered the delete; a negated delete is a no whatever it names)* · 🤖 planner: `don't delete Ana Reyes` is *"Okay — I'll leave it as it is."* *(2026-10-11, #847)* |
 | `repeat that` / `say that again` | Maple's last reply again | ✅ rule |
 | `start over` / `reset` / `clear the chat` | points to the clear button; drops anything Maple was waiting on | ✅ rule |
 
