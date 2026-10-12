@@ -1438,7 +1438,31 @@ it (a schema change, with a parity run):
 
 ## 10. Not in this plan
 
-- Retiring today's pipeline (design §12 point 5).
+- Retiring today's pipeline (design §12 point 5) — see §11.
 - Moving other calls onto the cache helper (design step 11a).
 - Any new capability: the executor does what today's Maple does, through
   today's write paths.
+
+## 11. The switchover (Simon, 2026-10-12)
+
+**Decided:** the planner replaces today's pipeline for every company.
+
+- **The default:** `MAPLE_PIPELINE=planner` (new; default) runs every company on
+  the planner, none shadowed; `MAPLE_PLANNER_ONLY` (default on) means no turn
+  falls back — a turn it can't run is said, a failure asks to try again, a
+  question today's pipeline asked before the switch is dropped. `current` keeps
+  §4's switch. No Render setting changes: the defaults do it. The test suite
+  pins `current` (`tests/conftest.py`).
+- **Decisions:** the planner's credits count against the company's quota (accepted);
+  the model stays gpt-6-luna for now; planner turns are kept 30 days in
+  `maple_shadow_turns` (was 45 — `database.align_ttl_indexes` moves the existing
+  TTL index at startup); no rollback window — today's pipeline code is deleted only
+  when Simon orders it, and nothing is deleted before.
+- **Before the release:** the prompt review (`/agent-prompt-review`), an offline
+  audit of the reference rows the parity script can't read, a manual test on Dev,
+  and — last — the parity run (#846).
+- **Retirement (on Simon's order):** delete today's language-reading code (design
+  §12 point 5) after a survey of what the planner imports; keep what it calls
+  (the agents' `*_reply` cores, reply constants, shared `text_utils` detectors,
+  `metric_query`, the question gate's records, translation, the public widget).
+

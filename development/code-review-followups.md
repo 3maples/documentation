@@ -294,9 +294,9 @@ seams that already exist as separate classes.
 | 63 | `list_labours_reply` — agents/labour/service.py:1253 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_labour_list_items(serialized)` — review 2026-10-08 #12, deferred) |
 | 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
 | 63 | `execute` — platform/agents/planner/execute.py:463 (was 46; phase 8 added step pointing and the policy refusal; +4 on 2026-10-11 for the work items of an estimate a create of the plan made, #864. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
-| 56 | `run_planner_turn` — platform/agents/planner/turn.py:385 (new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
+| 58 | `run_planner_turn` — platform/agents/planner/turn.py:390 (new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
 | 51 | `list_reply` — platform/agents/conversation/record_lists.py:99 (new 2026-10-11: the `within` filter, #845. Move the query building into `_rows(ask, company)` — review 2026-10-11 #11, deferred) |
-| 60 | `_redo` — platform/agents/planner/followups.py:136 (was 44; a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
+| 64 | `_redo` — platform/agents/planner/followups.py:152 (was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
 | 52 | `_refine` — platform/agents/planner/followups.py:198 (was 41; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
 | 54 | `resolve_work_item` — platform/agents/planner/resolve.py:386 (was 49; move the `by == "name"` arm and its retry into `_work_item_by_name` — review 2026-10-11 #76) |
 | 74 | `_reply_rules` — platform/services/maple_outcomes.py:80 (was 60; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
@@ -1726,6 +1726,9 @@ phrasings, all as intended, but that's not the parity run. Owed:
   four new task fields, `fewest`, the tool's parameters without their copy of
   its description, shorter unit wording and new prompt lines. Check those rows
   in the parity diff first.
+- **The 2026-10-12 audit's fixes:** optional fields for an unsaid text, a work
+  item's name, a note's text and a size's unit (budget now 59,000), and prompt
+  lines for them, a bare product/role/template name, and "the last task".
 
 ### 847. ~~[LOW] Planner: negated commands write~~ — RESOLVED 2026-10-11
 
@@ -1739,10 +1742,12 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Resolved 2026-10-11:** Done after all (Simon, 2026-10-11): `said.told_not_to` — a message opening "don't / do not / never" + a write verb, with a plan that writes, is "Okay — I'll leave it as it is." Not "don't forget to …", nor a message that says what to do instead. Tests: `test_planner_said.py`.
 
-### 848. [MEDIUM] An unknown stored status gives a blank refusal
+### 848. ~~[MEDIUM] An unknown stored status gives a blank refusal~~ — RESOLVED 2026-10-12
 `platform/agents/planner/policy.py:593` — Edge case. `_locked()` refuses any status outside Draft/Review, but `locked_edit_text` returns None for an unknown one, so the refusal text is `""` and the reply is empty. Today's handler fails open and allows the edit. (review 2026-10-11 #22, deferred)
 
 **Suggested fix:** Refuse only when `locked_edit_text(...)` returns text. Test: an estimate stored with status "Pending" → the edit runs.
+
+**Resolved 2026-10-12:** The planner's `_locked` fails open on a status it doesn't know (planner audit 2026-10-12). Unreachable through a Beanie load — `Estimate.status` is validated — so `test_an_estimate_with_a_status_maple_doesnt_know_stays_editable` pins the rule itself.
 
 ### 849. [MEDIUM] "tasks are off" is checked after the role and convert refusals
 `platform/agents/planner/policy.py:605` — Edge case. The first refusal is the one said. With tasks off, a Member's task delete gets the archive offer (kept as a question), and a convert gets "Want to add one first?". Today's Task agent checks tasks-off first. (review 2026-10-11 #23, deferred)
@@ -2009,10 +2014,12 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** Return a non-refusal envelope (`operation: "list_contacts", count: 0`), and share one "isn't linked to a property" phrase.
 
-### 905. [LOW] A tax follow-up on a list's total still falls back
+### 905. ~~[LOW] A tax follow-up on a list's total still falls back~~ — RESOLVED 2026-10-12
 `platform/agents/planner/followups.py:175` — `ListEstimates.before_tax` now exists, but "does that include tax?" after a planner list total returns `followup:redo_last.list_estimates.before_tax`, which test_planner_followups.py:255 pins. Today's pipeline answers it correctly, so this is LOW. (review 2026-10-11 #85, deferred)
 
 **Suggested fix:** When `last.get("total")`, set `last["before_tax"] = change.before_tax` and return `last`; keep the fallback for a list or count. Update the test.
+
+**Resolved 2026-10-12:** `followups._redo` re-runs a list's total the other way (`before_tax`) instead of falling back (planner audit 2026-10-12). Test: `test_tax_on_an_estimate_lists_total_is_that_total_the_other_way`.
 
 ### 906. [LOW] With nothing before it, the follow-up's reply drops the plan's other actions
 `platform/agents/planner/followups.py:321` — "thanks — and last month?" never runs the acknowledge. Only a pleasantry is lost. (review 2026-10-11 #86, deferred)
@@ -2039,10 +2046,12 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** Correct the docstring.
 
-### 913. [LOW] Four `_OFFERS` entries can't be reached from a planner turn
+### 913. ~~[LOW] Four `_OFFERS` entries can't be reached from a planner turn~~ — RESOLVED 2026-10-12
 `platform/agents/planner/kept_questions.py:41` — Only `delegate_create_estimate` and calculate's `delegate_generic` arm offers. The contact, property, labour and material entries are dead. (review 2026-10-11 #93, deferred)
 
 **Suggested fix:** Drop them, or arm the offers on the planner's creates and cover them.
+
+**Resolved 2026-10-12:** The planner's contact, property, material and role creates arm today's follow-up (`execute_records._with_offer`, as `delegate_generic` does), which `kept_questions` keeps as the planner's offer (planner audit 2026-10-12). Test: `test_the_offer_after_a_contact_create_is_armed_as_today_arms_it`.
 
 ### 914. [LOW] Branches that can't run
 `platform/agents/planner/turn.py:238` — The LOST_TRACK arm of `_ask_back`, `_user_now`'s `now is None` arm, and `confirm:{op}` after all the delete kinds are unreachable. (review 2026-10-11 #94, deferred)
