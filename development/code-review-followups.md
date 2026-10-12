@@ -1711,8 +1711,11 @@ pipeline, and both need an answer before it is retired:
 
 Phase 8 changed the prompt and the schema. They were checked live on 43
 phrasings, all as intended, but that's not the parity run. Owed:
-- **The parity run** (on request, ~$1.50). Diff it against
-  `planner_parity.json` from 2026-10-11 00:24.
+- ~~**The parity run**~~ — run 2026-10-12, twice: the first found wrong writes
+  (a line's price for the catalog's, a line's cost set as its price, a task's
+  words run as a request), fixed and run again clean — see the
+  [switchover plan §11](plans/2026-10-07-maple-planner-switchover-plan.md).
+  The rest of this entry is still owed.
 - **Task statuses in the parity state.** `plan_turn` is called without
   `planner_task_statuses`, so every task-status row is planned blind.
 - **The acceptance corpus on the planner pipeline.** It was last run on 4

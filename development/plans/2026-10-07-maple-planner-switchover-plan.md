@@ -1461,6 +1461,21 @@ it (a schema change, with a parity run):
 - **Before the release:** the prompt review (`/agent-prompt-review`), an offline
   audit of the reference rows the parity script can't read, a manual test on Dev,
   and — last — the parity run (#846).
+- **The parity run (2026-10-12).** The first run, against 2026-10-11's, failed on 6 rows and showed wrong
+  writes, most from the 2026-10-11 line-price prompt rule. With an estimate open and no work item, "set the
+  price of mulch to $5" became the line's price, where the reference reads the catalog's. "Set the cost of
+  sand in work item 1 to $3" and "the pavers … cost us $3.50" set the line's *price*. "Create a task to change
+  the price of mulch …" edited the estimate, and "add a task: lower the markup …" made the task and lowered it.
+  Fixed in code before anything runs (`agents/planner/line_prices.py`; `said.asked_for_a_task`;
+  `said.asked_which_there_are` for "which divisions are there?", which the model refused in a third of runs),
+  and in the prompt: the line-price rule narrowed, a line's cost refused, `bulk_delete` a quantity not records
+  each named ("delete Ana Reyes and Birch House" now runs, #845), the material markup read redirected, an
+  address said as an estimate's property linked rather than created. The second run: 0 blockers and 0 missed
+  refusals beyond the explained (`tests/planner_parity/explained.py`, each pointing at the test of the code
+  that sets it right); errors 31 → 3; 168 rows differ → agree, 82 agree → differ, re-run row by row — what
+  stays different is a read answered by another op (`get_contact {properties}` for "John Doe's properties"),
+  a question asked where nothing is open, or a line edit the executor refuses when the material isn't on the
+  work item (the planner can't see lines). A full reference re-run after the last prompt change: gate clean.
 - **Retirement (on Simon's order):** delete today's language-reading code (design
   §12 point 5) after a survey of what the planner imports; keep what it calls
   (the agents' `*_reply` cores, reply constants, shared `text_utils` detectors,
