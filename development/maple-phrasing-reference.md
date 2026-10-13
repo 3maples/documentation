@@ -327,15 +327,47 @@ Equipment is **explicitly blocked** via `is_equipment_request()` at the orchestr
 
 ## How to add new use cases
 
+**New rows use the Plan format** (2026-10-12; plan
+[`plans/2026-10-12-phrasing-reference-as-test-source-design.md`](plans/2026-10-12-phrasing-reference-as-test-source-design.md)).
+The rest of this doc moves to it section by section; `platform/tests/test_phrasing_reference_rows.py`
+fails on a new row in the old format, and on any Plan row it can't read.
+
+```
+| Phrasing | Plan | Status |
+|---|---|---|
+| `how many did I win?` / `count my wins` | `list_estimates` filter.sold count | ✅ |
+| `make the patio 800 sq ft` [wi] | `resize_work_item` | ✅ |
+| `make the patio bigger` [wi] | ask | ✅ |
+| `upload a CSV of my properties` | refuse `out_of_chat` `csv_import` | 🛑 |
+| `mark {EST} as won` | conversation `<id>` | 🛑 |
+| `mow every two weeks` | — | ⚠️ gap — #NNN |
+```
+
+- **Phrasing** — whole phrasings in backticks, separated by ` / `; placeholders
+  as in the table above. A starting state goes in brackets after them —
+  `[est]`, `[wi]`, `[est_then_mat]`, `[<kind>_focus]`. No prose, ellipses or
+  arrows: a row that takes several turns names an acceptance conversation
+  (`platform/tests/maple_conversations/corpus.py`) as its plan.
+- **Plan** — what the planner should do: an op from
+  `platform/agents/planner/schema.py` with the fields that are the point of
+  the row (a nested field as a dotted path, a bare name for a flag);
+  `refuse` with its reason (`out_of_chat` also names the capability); `ask`;
+  `conversation` with its id; or `—` for a gap with no plan yet.
+- **Status** — ✅ supported, 🛑 refused by design, ⚠️ gap (with its
+  follow-up). Notes go after the marker.
+
+`python scripts/phrasing_reference_rows.py` (in `platform/`) lists what's left in
+the old format by section and any Plan row's problem.
+
 **Estimates:** a phrasing a rule should handle becomes an entry in
 `platform/agents/estimate/command_grammar.py` with accept/reject examples in
 `tests/test_command_grammar.py` and a row in §1.0 — never a regex elsewhere
 (design 2026-09-25). A phrasing no entry covers is the planner's (🤖) or the
 classifier's; mark it ⚠️ gap only if the live suite shows they miss it.
 
-1. Add the phrasing under the appropriate resource section with status ⚠️ gap. Include the intended intent/agent if you have one.
-2. Ping Claude with "add these phrasings to Maple" — Claude will write failing tests, implement the rule, and flip the status to ✅ here.
-3. For phrasings that should be refused, add under §9 with status 🛑 and note why.
+1. Add a Plan row in the right section: the intended op as its plan (or `—` if you don't know it yet) and ⚠️ gap as its status.
+2. Ping Claude with "add these phrasings to Maple" — Claude will write failing tests, make the planner handle it, and flip the status to ✅ here.
+3. For phrasings that should be refused, add a Plan row with `refuse` and its reason and 🛑 — under §9 or the resource's own section — and note why after the marker.
 
 Tests live in `platform/tests/test_maple_crud_coverage.py` (matrix) and `platform/tests/test_maple_*.py` (targeted). Running the matrix regenerates `platform/tests/reports/maple_crud_gap_report.md` with live pass/fail counts.
 
@@ -565,7 +597,7 @@ A converted task, or a request that said its size, stores no assumed size — so
 - **Priced from a size Maple stored** → rescaled from it, as §1.3.1, nothing asked: *"I've repriced work item 1 for 600 sq ft (it was priced for 300 sq ft) on estimate {EST} — new grand total: $X."*
 - **Anything else** (no stored size, a unit it can't convert, a change past ×100) → priced again by the generation pipeline for the new size, **asked first**: *"I'll price work item 1 ("…") on {EST} again from scratch for 1,200 sq ft. That replaces its description, materials and activities, including any changes made to them. Go ahead? (yes/no)"* — naming the estimate, so it is asked the same when the estimate in focus has gone stale. On yes the item keeps its id (its notes), position, markup, overhead, tax and division; its lines are the new pricing (a scope the pipeline split is merged back into one item); the size is stored on the item, so the next change rescales it. "No": *"Okay — I've left the work item as it is."*
 
-| Phrasing | Plan | Status |
+| Phrasing | Planned as | Status |
 |---|---|---|
 | `Update the patio size to 1200 sqft.` (just after a task convert) | `resize_work_item {work_item: name "patio", size: 1200 sq ft}` | ✅ planner |
 | `Recalculate the Work Items #1 for 1200 sqft patio` / `redo work item 1 for a 1200 sq ft patio` | `resize_work_item {work_item: position 1}` | ✅ planner |

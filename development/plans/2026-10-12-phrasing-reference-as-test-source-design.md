@@ -1,6 +1,6 @@
 # The phrasing reference as Maple's test source — design (2026-10-12)
 
-**Status:** approved 2026-10-12 — Simon took every recommendation in §8. Not started.
+**Status:** approved 2026-10-12 — Simon took every recommendation in §8. Phase 1 done 2026-10-12.
 **Supersedes, once built:** the parity run's four-source design
 (`plans/2026-10-02-maple-planner-shadow-design.md` §4.5, step 11) and the
 parity half of follow-up #846.
@@ -84,8 +84,11 @@ Every table in §1–§11 uses three columns:
   Today the state is guessed from the section number and pronouns; making it
   explicit removes the guess.
 - **Plan** — exactly one of:
-  - an op, optionally with the fields that are the point of the row:
-    `list_estimates status=Won,Scheduled,Completed`, `metric before_tax`;
+  - an op, optionally with the fields that are the point of the row, a
+    nested field as a dotted path, a bare name for a flag:
+    `` `list_estimates` filter.sold count ``,
+    `` `list_estimates` filter.statuses=Draft,Sent ``, `` `metric` before_tax ``.
+    A value has no spaces;
   - `refuse <reason>` (an `UnsupportedReason`; `refuse out_of_chat <capability>`);
   - `ask` — the planner's question (a clarify plan);
   - `answer` / `help` / `social` — no action;
@@ -168,6 +171,19 @@ Each phase is its own commit, failing test first where code changes.
 1. **Format and parser.** Write the strict parser and the offline test against
    a sample (TDD). Teach it both formats for one phase, so the reference can be
    migrated section by section with the test reporting what's left.
+   *Done 2026-10-12:* `scripts/phrasing_reference_rows.py` reads both formats
+   (`read`, `problems`, `Plan`, `Vocabulary`);
+   `tests/planner_parity/cases.py::reference_vocabulary` builds the vocabulary
+   from the planner's schema (nested fields as dotted paths), the routing and
+   focus states and the conversation corpus; `reference_cases` scores a Plan
+   row on its op and skips gaps and conversation rows. The offline test fails
+   on any Plan-row problem and ratchets the old-format rows of §1–§11
+   (`LEGACY_ROWS_LEFT = 983` — lower it as sections move; `python
+   scripts/phrasing_reference_rows.py` reports them by section). Reading table
+   headers properly also stopped 5 header rows being listed as unreadable
+   phrasings (272 → 267). §1.3.2's free-form table, the one already headed
+   `Phrasing | Plan | Status`, was renamed `Planned as` to stay old-format
+   until phase 3 writes the conversations its state-dependent rows need.
 2. **Bootstrap the Plan column.** For the 536 checked rows with no op, propose
    one from the last live run (`tests/reports/planner_parity.json`) where the
    planner's plan agreed; Simon or the session reviews each section's
@@ -183,6 +199,20 @@ Each phase is its own commit, failing test first where code changes.
    and the conversations; the old parity sources and the shadow comparison are
    removed from it. Its first run is #846's owed run of the 2026-10-11
    changes; diff it against the 2026-10-12 parity report.
+   - **The package.** `git mv tests/planner_parity tests/planner_live`. In
+     `cases.py`, delete the parity-only builders — `routing_snapshot_cases`,
+     `expected_cases`, `crud_cases`, `all_corpus_cases` — and keep `Case`,
+     `FOCUS_STATES`, `reference_rows` / `reference_cases` and
+     `reference_vocabulary`; `run.py`, `score.py`, `report.py`, `explained.py`
+     and `acceptance.py` carry over as the suite's machinery. Delete
+     `test_planner_parity_live.py` and `test_planner_acceptance_live.py`, and
+     move the harness tests' surviving cases to the new package's names.
+   - **Scoring the whole row** (review 2026-10-12 #2, #10, #11). Carry a Plan
+     row's named fields, its refusal reason and capability, and whether it
+     asks onto `Case`, and compare each in `score.py` with the plan's action
+     fields, `plan.unsupported.reason` / `.capability` and `plan.clarify`. Until
+     then `ask` rows are not scored (phase 1 skips them) and fields and reasons
+     are read but not compared.
 7. **Docs.** Rewrite the reference's "How to read this doc", "How to add new
    use cases" and §12 (tests, how to run, the live report's numbers in place of
    the Tier 1 / Tier 2 matrix score). Update `CLAUDE.md`'s Maple sections
