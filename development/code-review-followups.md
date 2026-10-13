@@ -183,6 +183,7 @@ fixtures — but these are past the point of scanning.
 | 1,219 | portal/tests/TaskDialog.test.tsx |
 | 1,174 | platform/tests/test_cross_resource_joins.py |
 | 1,138 | platform/tests/test_maple_work_item_context.py |
+| 1,091 | platform/tests/test_estimate_gathering.py (823 when listed; +268 on 2026-10-12 for the created reply's property follow-up and every finalize branch — the seam is `TestFinalizeGatheringStashedProperty` + the helper classes → `tests/test_estimate_gathering_finalize.py`) |
 | 957 | platform/tests/test_user_api.py |
 | 926 | portal/tests/TasksPage.test.tsx |
 | 925 | platform/tests/test_task_convert_api.py |
@@ -192,7 +193,6 @@ fixtures — but these are past the point of scanning.
 | 890 | platform/tests/test_estimate_edit_executor.py |
 | 883 | platform/tests/test_maple_listed_positional_reference.py |
 | 862 | platform/tests/test_company_api.py |
-| 823 | platform/tests/test_estimate_gathering.py |
 | 822 | platform/tests/conftest.py |
 | 818 | platform/tests/test_agents_api.py |
 | 808 | platform/tests/test_llm_usage_tracking.py |
@@ -253,7 +253,8 @@ seams that already exist as separate classes.
 | 53 | `_match_listed_positional_follow_up` — agents/orchestrator/service.py:1058 (47 at HEAD; extract the scope check into `_list_pick_scope_matches` — fourth pass #33) |
 | 61 | `_resolve_intent_with_history` — agents/orchestrator/service.py:3230 (55 at HEAD, grew with the bare-reply and no-inferred-delete guards; extract `_history_action_allowed(message, action)` — fourth pass #34) |
 | 84 | `handle_estimate_fuzzy_confirmation` — routers/agent_helpers/fuzzy_confirmation.py:167 (79 at HEAD — fourth pass #35) |
-| 316 | `delegate_create_estimate` — routers/agent_helpers/delegate_create_estimate.py:102 (309 at HEAD, grew with the anchor write; extract the follow-up stash block — fourth pass #36) |
+| 265 | `create_estimate_reply` — routers/agent_helpers/delegate_create_estimate.py:198 (was `delegate_create_estimate` at 316; its body moved here when the planner began sharing it, leaving `delegate_create_estimate` at 92. Extract the follow-up stash block — fourth pass #36 — and the generate/save/audit core, as `_finalize_gathering` did on 2026-10-12) |
+| 66 | `_finalize_gathering` — routers/agent_helpers/estimate_gathering.py:478 (158 before 2026-10-12, when review #3 moved out the property pick, generation, the failure reply and the created reply; the rest is the company guard, the quota claim and the request — next cut `_claim_slot(company_ctx, ...)`) |
 | ~167 | `MarkdownDescriptionEditor` component body — portal/src/components/common/MarkdownDescriptionEditor.tsx:252 |
 | 153 | `_handle_update_estimate` — agents/estimate/crud_handlers.py:2378 (+14 on 2026-09-24; extract the work-item dispatch into `_dispatch_work_item_op(...)`, review #68) |
 | ~120 | `install()` — website/contact-modal/install.js |
@@ -287,7 +288,7 @@ seams that already exist as separate classes.
 | — | seven functions in `platform/agents/task/` (see archive for the list) |
 | — | four functions in `agents/estimate/assumption_handlers.py` (measured 2026-10-09, after the detector moved to `assumption_detect.py` in switchover phase 6c): `_handle_assumption_material_swap` :400 (92), `_handle_assumption_size_adjustment` :680 (63), `_find_size_assumption` :497 (62), `_resolve_swap_material` :280 (58; +7 in 6c for the planner's "Which material?" — extract the two `ask_to_rewrite` clarifies into `_ask_material(...)`) |
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
-| 125 | `_finalize_template_estimate` — routers/agent_helpers/template_estimate.py:102 (first measured 2026-10-05, +16 that day logging the failure, splitting the outage/bug reply and removing an estimate inserted before the failure, #318; extract the create/scale/save block into `_instantiate(processor, company_oid, template, factor, context_payload)`, leaving the gate, audit and envelope here — review 2026-10-05 #4) |
+| 125 | `_finalize_template_estimate` — routers/agent_helpers/template_estimate.py:119 (first measured 2026-10-05, +16 that day logging the failure, splitting the outage/bug reply and removing an estimate inserted before the failure, #318; extract the create/scale/save block into `_instantiate(processor, company_oid, template, factor, context_payload)`, leaving the gate, audit and envelope here — review 2026-10-05 #4) |
 | 51 | `_compare` — services/maple_compare.py:240 (first measured 2026-10-07, review of the planner parity run #1, deferred: the decline check, the both-answered branch and the item matching in one body. Extract the matching loop — from `unsure: List[str] = []` to the leftover-items loop — into `_match(current, current_items, planner_items) -> Tuple[List[str], List[str]]` returning `(why, unsure)`; `_compare` keeps the readings and the verdict. No behaviour change; tests/test_maple_compare.py must pass unchanged.) |
 | 62 | `list_contacts_reply` — agents/contact/service.py:2034 (new 2026-10-08, switchover phase 2a: the body of `_handle_list_contacts`, which shrank by as much, as the reply the planner's executor shares; split the row rendering into `_contact_list_items(serialized)` — review 2026-10-08 #10, deferred) |
 | 64 | `list_properties_reply` — agents/property/service.py:2458 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_property_list_items(serialized)` — review 2026-10-08 #11, deferred) |
