@@ -1733,6 +1733,7 @@ phrasings, all as intended, but that's not the parity run. Owed:
   words run as a request), fixed and run again clean — see the
   [switchover plan §11](plans/2026-10-07-maple-planner-switchover-plan.md).
   The rest of this entry is still owed.
+- **The reference rows, live** — run 2026-10-13 after the planner gap fixes: 1,504 rows, the model's raw plans (`PARITY_SOURCES=reference`); every difference read, the two real gaps fixed (a template's delete refused as its edit; a status after "due"), the flaky rows #951–#961 re-run 3× (nine closed). The rest of this entry is still owed.
 - **Task statuses in the parity state.** `plan_turn` is called without
   `planner_task_statuses`, so every task-status row is planned blind.
 - **The acceptance corpus on the planner pipeline.** It was last run on 4
@@ -2218,60 +2219,82 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Suggested fix:** In the policy (which loads the estimate), a price-only `update_material` by focus whose `material_query` matches no line on the work item in focus, with no work item named → the catalog's `update_material {price}`; a test with a seeded work item holding mulch and the plan for concrete blocks.
 
-### 951. [MEDIUM] Reference row fails 2 runs in 3: "delete it" [est]
+### 951. ~~[MEDIUM] Reference row fails 2 runs in 3: "delete it" [est]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:414` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as edit_estimate (removing every work item) instead of delete_estimate in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3 in both states ([est] delete_estimate, [wi] the work item's removal).
 
 ### 952. [MEDIUM] Reference row fails 2 runs in 3: "create a task for the fence work item, which is late" [wi]
 `documentation/development/maple-phrasing-reference.md:767` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as an acted create_task where the row asks first (still failing 3 in 3 on the re-runs after the 2026-10-13 fixes) in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
-### 953. [MEDIUM] Reference row fails 2 runs in 3: "create a task for the fence work item?" [wi]
+Re-run 3× on 2026-10-13: asked 1 of 3; the other two acted (create_task). Still open — and the row's `ask` is worth reading again: the message asks plainly for a task.
+
+### 953. ~~[MEDIUM] Reference row fails 2 runs in 3: "create a task for the fence work item?" [wi]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:769` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as an acted create_task where the row asks first (failing 3 in 3 on the re-runs after the 2026-10-13 fixes) in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
-### 954. [MEDIUM] Reference row fails 2 runs in 3: "which estimates are in my backlog?" [est]
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: asked 3 of 3.
+
+### 954. ~~[MEDIUM] Reference row fails 2 runs in 3: "which estimates are in my backlog?" [est]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:1037` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as list_estimates instead of the backlog card in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
-### 955. [MEDIUM] Reference row fails 2 runs in 3: "what's the rate for Foreman?" [none]
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
+
+### 955. ~~[MEDIUM] Reference row fails 2 runs in 3: "what's the rate for Foreman?" [none]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:2969` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as get_labour with no field instead of field rate in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
-### 956. [MEDIUM] Reference row fails 2 runs in 3: "overdue tasks by assignee" [none]
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
+
+### 956. ~~[MEDIUM] Reference row fails 2 runs in 3: "overdue tasks by assignee" [none]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:2201` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as list_tasks + task_count instead of one count by assignee in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
-### 957. [MEDIUM] Reference row fails 2 runs in 3: "tasks due marked done" [none]
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
+
+### 957. ~~[MEDIUM] Reference row fails 2 runs in 3: "tasks due marked done" [none]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:2240` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as a clarify instead of the list in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
-### 958. [MEDIUM] Reference row fails 2 runs in 3: "Add to it the following: check the drainage by the back gate" [est]
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3 since the prompt line "a status after 'due' … is that status on the upcoming list" (platform `a477074`).
+
+### 958. ~~[MEDIUM] Reference row fails 2 runs in 3: "Add to it the following: check the drainage by the back gate" [est]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:2329` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as edit_estimate instead of the estimate's add_note in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
-### 959. [MEDIUM] Reference row fails 2 runs in 3: "mark the task as done" [none]
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3 [task_focus]; [est] planned add_note 3 of 3, which the parity scorer reports "unsure" only because it has no notes intent.
+
+### 959. ~~[MEDIUM] Reference row fails 2 runs in 3: "mark the task as done" [none]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:2436` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as an acted update_task where the row asks which task in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
 
 ### 960. [MEDIUM] Reference row fails 2 runs in 3: "don't forget to call Bob Lee tomorrow" [none]
 `documentation/development/maple-phrasing-reference.md:2990` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as a clarify instead of create_task in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
-### 961. [MEDIUM] Reference row fails 2 runs in 3: "what are the contact roles?" [none]
+Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would you like me to create a task to call Bob Lee tomorrow?" — an extra question, never a wrong write. Still open.
+
+### 961. ~~[MEDIUM] Reference row fails 2 runs in 3: "what are the contact roles?" [none]~~ — RESOLVED 2026-10-13
 `documentation/development/maple-phrasing-reference.md:3040` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as a refusal (other) instead of help in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
 
 ### 962. [LOW] A placeholder task title is quoted as if it were a name
 `platform/agents/planner/confirm.py:299` — The question-write confirmation quotes the fallback too: "Should I move the due date of “the task” to …".
@@ -4626,145 +4649,195 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Report tests for both values, and say on `Turn` what `()` means.
 
-### 973. [MEDIUM] Untested: menu_labels' all-unique case and the menu end to end
+### 973. ~~[MEDIUM] Untested: menu_labels' all-unique case and the menu end to end~~ — RESOLVED 2026-10-14
 `platform/agents/planner/resize.py:45` — edge case — no turn test answers the work-item menu with "2" after duplicate names and asserts the right item is resized. (review 2026-10-13 round 2 #73, deferred)
 
 **Suggested fix:** Estimate with two "Mowing" items, "make it 8000 sq ft" → menu → "2" → the second Mowing resized.
 
-### 974. [MEDIUM] Untested: `_decide_value` with no record (a value question on a router flow)
+**Resolved 2026-10-14:** `test_planner_resize_work_item.py::test_two_items_of_one_name_are_asked_by_position_and_the_second_is_resized`. Each test fails with its arm broken (mutation-checked).
+
+### 974. ~~[MEDIUM] Untested: `_decide_value` with no record (a value question on a router flow)~~ — RESOLVED 2026-10-14
 `platform/routers/agent_helpers/open_question.py:520` — edge case — the `record is None → None` arm isn't driven. (review 2026-10-13 round 2 #74, deferred)
 
 **Suggested fix:** A `_VALUE` AnyQuestion with record None and a bare email → decided by the common path (ANSWER).
 
-### 975. [MEDIUM] Untested: offers_field for a postal code
+**Resolved 2026-10-14:** `test_open_question.py::test_a_value_question_on_a_router_flow_is_decided_as_any_question`. Each test fails with its arm broken (mutation-checked).
+
+### 975. ~~[MEDIUM] Untested: offers_field for a postal code~~ — RESOLVED 2026-10-14
 `platform/agents/planner/bare_value.py:56` — edge case — the postal_zip word set isn't driven. (review 2026-10-13 round 2 #75, deferred)
 
 **Suggested fix:** offer "set the postal code of 20 Birch Rd" with "M4B 1B3" → True.
 
-### 976. [MEDIUM] Untested: the which-record "… you mean" form
+**Resolved 2026-10-14:** `test_planner_bare_value.py::test_an_offer_of_the_postal_code_takes_a_bare_postal_code`. Each test fails with its arm broken (mutation-checked).
+
+### 976. ~~[MEDIUM] Untested: the which-record "… you mean" form~~ — RESOLVED 2026-10-14
 `platform/agents/planner/planner.py:153` — edge case — the "what is the <kind> you mean" alternative isn't driven (the "'s name" form is). (review 2026-10-13 round 2 #76, deferred)
 
 **Suggested fix:** Add "What is the task you mean?" to the which-record parametrize.
+
+**Resolved 2026-10-14:** "What is the task you mean?" in `test_planner_call.py::test_a_clarify_asking_which_record_is_asked_for_once_more`. Each test fails with its arm broken (mutation-checked).
 
 ### 980. [LOW] The year guard reads the machine's local clock
 `platform/tests/maple_conversations/corpus.py:2534` — `date.today().year - 1` vs Maple's UTC-default clock — wrong for a few hours around New Year west of UTC. (review 2026-10-13 round 2 #80, deferred)
 
 **Suggested fix:** `datetime.now(timezone.utc).year - 1`.
 
-### 983. [MEDIUM] `_named_day`: three arms untested
+### 983. ~~[MEDIUM] `_named_day`: three arms untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/said_metrics.py:225` — (a) :233 a unit without "start of" → None ("sales since the quarter" → question); (b) :233 the `beginning` word arm ("sales beginning the month" → 2026-10-01); (c) :182 the `previous` alternative ("since the previous quarter" → 2026-07-01). (review 2026-10-13 round 3 #29, deferred)
 
 **Suggested fix:** One case each in `test_a_day_said_is_read` / `test_a_day_said_that_cant_be_read_is_asked`.
 
-### 984. [MEDIUM] `_unit_start` across a year boundary untested
+**Resolved 2026-10-14:** cases in `test_planner_said_corrections.py::test_a_day_said_is_read` / `test_a_day_said_that_cant_be_read_is_asked`. Each test fails with its arm broken (mutation-checked).
+
+### 984. ~~[MEDIUM] `_unit_start` across a year boundary untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/said_metrics.py:208` — the month/quarter index math and the week arm only run with now in October. (review 2026-10-13 round 3 #30, deferred)
 
 **Suggested fix:** now 2026-01-10: "since last month" → 2025-12-01, "since last quarter" → 2025-10-01, "since last week" → 2025-12-29.
 
-### 985. [MEDIUM] `_since_found` / `_a_name_after` / `_since_said` edges untested
+**Resolved 2026-10-14:** `test_planner_said_corrections.py::test_the_last_period_in_january_is_last_years`. Each test fails with its arm broken (mutation-checked).
+
+### 985. ~~[MEDIUM] `_since_found` / `_a_name_after` / `_since_said` edges untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/said_metrics.py:268` — (a) :273 since beating a readable "from" day ("how much from may johnson since june" → 2026-06-01); (b) :275 the loop stepping past an unreadable match ("sales since Feb 30 or rather since March 1" → 2026-03-01); (c) :263 `_a_name_after` True changing a result ("how much did we make from May Johnson?" → since None); (d) :193 "after tax" not a since word ("revenue after tax" → since left out). (review 2026-10-13 round 3 #31, deferred)
 
 **Suggested fix:** One test per message, asserting the result shown.
 
-### 986. [MEDIUM] `pipeline_card`: two guards untested
+**Resolved 2026-10-14:** four tests in `test_planner_said_corrections.py` (`test_since_beats_a_readable_day_from_names`, `test_a_day_that_cant_be_read_is_stepped_past_for_one_that_can`, `test_from_a_name_opening_with_a_month_is_no_day`, `test_after_tax_is_no_day_a_figure_runs_from`). Each test fails with its arm broken (mutation-checked).
+
+### 986. ~~[MEDIUM] `pipeline_card`: two guards untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/as_asked.py:77` — :84 the metric guard ("what's my average pipeline estimate", average → stays metric); :88 the recurring operand ("what's my recurring pipeline worth", recurring True → stays). (review 2026-10-13 round 3 #32, deferred)
 
 **Suggested fix:** Add both to `test_a_pipeline_with_a_scope_said_stays_a_figure` → `is plan`.
 
-### 987. [MEDIUM] `company_margin`: two arms untested, one unreachable
+**Resolved 2026-10-14:** two cases in `test_planner_as_asked.py::test_a_pipeline_with_a_scope_said_stays_a_figure`. Each test fails with its arm broken (mutation-checked).
+
+### 987. ~~[MEDIUM] `company_margin`: two arms untested, one unreachable~~ — RESOLVED 2026-10-14
 `platform/agents/planner/as_asked.py:105` — :113 the field guard (get_estimate focus field total, "what's my margin?" → stays); :100 the `work item` alternative ("what's my margin on work item 2?" → stays). `"margin"` in `("gross_margin", "margin")` is unreachable (GetEstimate.field has no "margin"). (review 2026-10-13 round 3 #33, deferred)
 
 **Suggested fix:** One `is plan` test per arm; drop "margin" from the tuple.
 
-### 988. [MEDIUM] `win_rate_said`: arms untested
+**Resolved 2026-10-14:** `test_planner_as_asked.py::test_my_margin_planned_as_another_field_of_the_estimate_is_as_planned` and "what's my margin on work item 2?" in `test_one_estimates_margin_stays_the_estimates`; the unreachable "margin" dropped (`action.field != "gross_margin"`). Each test fails with its arm broken (mutation-checked).
+
+### 988. ~~[MEDIUM] `win_rate_said`: arms untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/as_asked.py:201` — :196 the "are we" / "is (the) business" alternatives ("how are we doing compared to last year?", "how is the business doing this year?" → total); :210 no win rate planned (a total plan → `is plan`). (review 2026-10-13 round 3 #34, deferred)
 
 **Suggested fix:** Add both messages and the identity case to `test_a_win_rate_only_when_its_words_are_said`.
 
-### 989. [MEDIUM] `_NUMBER_RE` edge untested
+**Resolved 2026-10-14:** two messages in `test_planner_as_asked.py::test_a_win_rate_only_when_its_words_are_said` and `test_no_win_rate_planned_is_as_planned`. Each test fails with its arm broken (mutation-checked).
+
+### 989. ~~[MEDIUM] `_NUMBER_RE` edge untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/said_resize.py:43` — (b) :108 `(?<!items )` never changes a tested result (size 1 from "make items 1 and 2 bigger" → RESIZE_QUESTION). (a), the mixed picks, was covered in round 3 (`test_round_3_a_said_position_beside_a_named_item_keeps_both`). (review 2026-10-13 round 3 #36, deferred)
 
 **Suggested fix:** One test asserting that result.
 
-### 990. [MEDIUM] `_kind_said`: kinds and forms untested
+**Resolved 2026-10-14:** already pinned: `test_planner_said_corrections.py::test_round_4_a_size_of_one_after_items_is_a_position` fails without the `(?<!items )` lookbehind — the entry's premise had gone; its comment now names this entry. Each test fails with its arm broken (mutation-checked).
+
+### 990. ~~[MEDIUM] `_kind_said`: kinds and forms untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/other_kinds.py:106` — only task/estimate/contact word lists are driven; property ("the site Driveway Maintenance"), material ("Driveway Maintenance material"), labour ("the role Driveway Maintenance"), the possessive "Name's task" and quoted `task "Name"` forms aren't. (review 2026-10-13 round 3 #37, deferred)
 
 **Suggested fix:** Parametrize `test_only_a_kind_said_of_the_name_keeps_that_kind` with get_property, get_material, get_labour and the two forms → op unchanged.
 
-### 991. [MEDIUM] `onto_handler_question`: newest record without REPLAN_KEY untested
+**Resolved 2026-10-14:** five cases in `test_planner_other_kinds.py::test_only_a_kind_said_of_the_name_keeps_that_kind`. Each test fails with its arm broken (mutation-checked).
+
+### 991. ~~[MEDIUM] `onto_handler_question`: newest record without REPLAN_KEY untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/overage_ack.py:55` — :68 a delete confirm or a "pipeline": "planner" yes/no record with a matching original_message must not be stamped; the offer test carries REPLAN_KEY, so the arm isn't driven. (review 2026-10-13 round 3 #38, deferred)
 
 **Suggested fix:** `{"context": {"pending_intents": [{"original_message": "m"}]}}` with the yes carried → no OVERAGE_ACKNOWLEDGED_KEY.
 
-### 992. [MEDIUM] `_check_action`: invalid company id untested
+**Resolved 2026-10-14:** `test_planner_confirm.py::test_a_question_that_replans_nothing_never_takes_the_yes`. Each test fails with its arm broken (mutation-checked).
+
+### 992. ~~[MEDIUM] `_check_action`: invalid company id untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/policy.py:688` — :696 company None skips `note_on_record` and `_check_rules`; only `recheck` is tested that way. (review 2026-10-13 round 3 #39, deferred)
 
 **Suggested fix:** `check_plan(update_task plan, company_id="x", …)` → would_run with no rule reasons.
 
-### 993. [MEDIUM] `unpriced_text` / `_ranking_text` / `_comparison_reply` edges untested
+**Resolved 2026-10-14:** `test_planner_policy.py::test_a_company_id_that_is_no_id_checks_no_rules` — with `create_task`, not the suggested `update_task`: an `update_task` with no company can't resolve its target and asks ("no record kind or company"), which is right. Each test fails with its arm broken (mutation-checked).
+
+### 993. ~~[MEDIUM] `unpriced_text` / `_ranking_text` / `_comparison_reply` edges untested~~ — RESOLVED 2026-10-14
 `platform/agents/estimate/metric_ratio_shapes.py:64` — (a) :67 the singular ("(1 work item)"); (b) :178 offset > 0 with total_rows 0 falls to `_nothing`; (c) :261 the change-None "." arm asserted only by substring; (d) :246 a margin side with nothing ("no sold work last month"). (review 2026-10-13 round 3 #40, deferred)
 
 **Suggested fix:** (a) margin ranking [], left_out 1 → endswith "(1 work item)."; (b) `_ranking([], offset=2, total=0)` → the "Nothing was sold or lost…" text; (c)+(d) `_compared(RatioRow("",200,1000,2), RatioRow("",0,0,0), "margin")` → endswith "against no sold work last month. Overhead is deducted; tax is left out."
 
-### 994. [MEDIUM] `_labelled`: a shared property whose second contact is gone
+**Resolved 2026-10-14:** three tests in `test_metric_ratio_shapes_replies.py` (the singular, a page past an empty ranking, a side with nothing). Each test fails with its arm broken (mutation-checked).
+
+### 994. ~~[MEDIUM] `_labelled`: a shared property whose second contact is gone~~ — RESOLVED 2026-10-14
 `platform/services/maple_ratio_shapes.py:244` — :265/:267 a shared property with one deleted (or other-company) contact must give shared False and drop that row; untested. (review 2026-10-13 round 3 #41, deferred)
 
 **Suggested fix:** In the mixed world delete Dee Ng → by customer: only Cy Ng, shared False.
+
+**Resolved 2026-10-14:** `test_metric_ratio_shapes.py::test_a_shared_property_whose_second_customer_is_gone_is_shared_by_no_one`. Each test fails with its arm broken (mutation-checked).
 
 ### 995. [LOW] Step 5's heading still forbids the grouping Step 2b.5 now allows
 `.claude/commands/code-review.md:269` — "Every finding gets its own number — no grouping, no exceptions" and "Do not collapse findings into … a bullet list under one index" contradict the per-function edge-case group; only the closing paragraph carves it out. (review 2026-10-13 round 3 #43, deferred)
 
 **Suggested fix:** Retitle "Every finding gets its own number — one exception" and add "(except edge-case coverage arms grouped per function, Step 2b.5)" to the lead.
 
-### 1008. [MEDIUM] `work_item_division`: `_ABBREVIATION_STOP` arms untested
+### 1008. ~~[MEDIUM] `work_item_division`: `_ABBREVIATION_STOP` arms untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/as_asked.py:52` — the `(?=\s+[A-Z])` lookahead, the `(?-i:)` scope and the lookbehinds' `\b` (:37) are never driven. (review 2026-10-13 round 7 #14, deferred)
 
 **Suggested fix:** "move work item 2 to Tree Co. then price it", "… to Maintenance now. Then price it", "… to TreeCo. Then price it" → each refused.
 
-### 1009. [MEDIUM] `new_estimate_said`: clause arms untested
+**Resolved 2026-10-14:** five cases in `test_planner_as_asked.py::test_round_6_a_sentence_after_is_no_division` (each lookbehind's `\b` too). Each test fails with its arm broken (mutation-checked).
+
+### 1009. ~~[MEDIUM] `new_estimate_said`: clause arms untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/as_asked.py:91` — `_NEW_AFTER_A_CLAUSE_RE`'s "." / ";" separators, its 60-character bound and `_NEW_SAID_RE`'s "separate" are never driven. (review 2026-10-13 round 7 #15, deferred)
 
 **Suggested fix:** "Johnson called. Make a new estimate for a cedar fence" → said; a ~50-character clause → said; one over 60 → not; "I need a separate quote for a cedar fence on this job" → said.
 
-### 1010. [MEDIUM] `company_margin`: `_NAME_WORD`'s capital lookahead untested
+**Resolved 2026-10-14:** cases in `test_planner_as_asked.py::test_round_6_a_new_estimate_after_a_clause` (".", ";", a 53- and a 67-character clause, "separate"). The suggested "I need a separate quote for a cedar fence on this job" is not read as new today — `_ASKED_FOR` opens with a/new/another only; the word rules are frozen, so the model's plan stands for it — and "separate" is driven by "… on this job, a separate quote" instead. Each test fails with its arm broken (mutation-checked).
+
+### 1010. ~~[MEDIUM] `company_margin`: `_NAME_WORD`'s capital lookahead untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/as_asked.py:149` — the `(?=[A-Z])` after of/and/& (:136) is never asserted. (review 2026-10-13 round 7 #16, deferred)
 
 **Suggested fix:** ("what's my margin on the City of austin job?", company) — or fold into #1002.
 
-### 1011. [MEDIUM] `_RATE_SAID_RE` and the avg-pay arm untested
+**Resolved 2026-10-14:** ("what's my margin on the City of austin job?", company) in `test_planner_as_asked.py::test_round_6_whose_margin`. Each test fails with its arm broken (mutation-checked).
+
+### 1011. ~~[MEDIUM] `_RATE_SAID_RE` and the avg-pay arm untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/said.py:164` — charged/charges, billed/bills, priciest, pricey, "earns me", "earns the company" with the wage planned, and `avg` pay (:150), are never driven. (review 2026-10-13 round 7 #17, deferred)
 
 **Suggested fix:** One case each in `test_round_6_the_rate_said_is_the_rate`; "what's the avg pay?" (Rate planned) → wage.
 
-### 1012. [MEDIUM] `_POLITE_RE`: "how about we look / think" untested
+**Resolved 2026-10-14:** eight cases in `test_planner_said_corrections.py::test_round_6_the_rate_said_is_the_rate` and "what's the avg pay?" in `test_round_3_a_roles_rate_unless_its_wage_is_said`. Each test fails with its arm broken (mutation-checked).
+
+### 1012. ~~[MEDIUM] `_POLITE_RE`: "how about we look / think" untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/question_writes.py:20` — the look and think exclusions are never driven. (review 2026-10-13 round 7 #18, deferred)
 
 **Suggested fix:** ("How about we look, is the fence task due Friday?", True), ("How about we think about it, is the fence task due Friday?", True).
 
-### 1013. [MEDIUM] `figure_status_said`: `as_followup`'s `all` untested
+**Resolved 2026-10-14:** two cases in `test_planner_question_writes.py::test_round_6_a_request_in_other_words`. Each test fails with its arm broken (mutation-checked).
+
+### 1013. ~~[MEDIUM] `figure_status_said`: `as_followup`'s `all` untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/followups.py:272` — `all` → `any` (:286) survives. (review 2026-10-13 round 7 #19, deferred)
 
 **Suggested fix:** A mixed `[metric, list_estimates]` plan after a figure for "and the lost ones?" stays as planned.
 
-### 1014. [MEDIUM] `_line_label`: the fallback with no labelled work item untested
+**Resolved 2026-10-14:** `test_planner_followups.py::test_a_status_after_a_win_rate_planned_as_a_figure_and_a_list_stands`. Each test fails with its arm broken (mutation-checked).
+
+### 1014. ~~[MEDIUM] `_line_label`: the fallback with no labelled work item untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/confirm.py:355` — a line ref with no `commands[i].target` (or one without a label) should be asked as the bare "material line 2"; untested. (review 2026-10-13 round 7 #23, deferred; its several-stale arm is now tested)
 
 **Suggested fix:** A `PlanCheck` with only `commands[0].line` → "Just to check — do you mean material line 2? (yes/no)".
+
+**Resolved 2026-10-14:** `test_planner_confirm.py::test_a_stale_line_with_no_work_item_is_asked_as_its_place`. Each test fails with its arm broken (mutation-checked).
 
 ### 1018. [LOW] A round-7 test pins the needless question #1000 tracks
 `platform/tests/test_planner_as_asked.py:640` — "add the fence to the new estimate, we need a quote out today" is asserted to be asked; fixing #1000 breaks it. (review 2026-10-13 round 8 #16, deferred)
 
 **Suggested fix:** Drop the message from the parametrize, or move it to a strict xfail tagged #1000.
 
-### 1021. [MEDIUM] `_NEW_OR_OPEN_ANSWERS`: "quote" in the open/current/existing arm untested
+### 1021. ~~[MEDIUM] `_NEW_OR_OPEN_ANSWERS`: "quote" in the open/current/existing arm untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/as_asked.py:113` — removing `quote` from `(?:open|current|existing)\s+(?:estimate|quote)` passes every test; without it "add it to the open quote" / "add it to the current quote" read as new requests while the new-or-open question waits (checked through `decide_turn`), so an answer in quote words would be dropped. (review 2026-10-13 round 11 #1, deferred)
 
 **Suggested fix:** Add "add it to the open quote" to `test_round_10_an_answer_that_reads_as_a_request_answers_the_question`.
 
-### 1022. [MEDIUM] `_refused_template_delete`: two guard arms untested
+**Resolved 2026-10-14:** "add it to the open quote" in `test_open_question.py::test_round_10_an_answer_that_reads_as_a_request_answers_the_question`. Each test fails with its arm broken (mutation-checked).
+
+### 1022. ~~[MEDIUM] `_refused_template_delete`: two guard arms untested~~ — RESOLVED 2026-10-14
 `platform/agents/planner/other_kinds.py:146` — mutants survive dropping `refused.reason != "template_edit"` (any refusal of "delete Driveway Maintenance" would become `delete_template`) and skipping the estimate check (`_template_named` in place of `_template_not_estimate`: a name an estimate and a template share would delete the template rather than keep the refusal). The `plan.actions` guard is defensive and the name's punctuation class is equivalent. (review 2026-10-13 round 12 #1, deferred)
 
 **Suggested fix:** In `test_a_refusal_that_is_no_templates_delete_stands`: an `out_of_chat` refusal of "delete Driveway Maintenance" stays refused; with an estimate also titled "Driveway Maintenance", the `template_edit` refusal stands.
+
+**Resolved 2026-10-14:** `test_planner_other_kinds.py::test_a_refusal_other_than_a_templates_edit_stands` and `test_a_refused_delete_of_a_name_an_estimate_shares_stands`. Each test fails with its arm broken (mutation-checked).
 
 ## Codebase hygiene (batchable)
 
