@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-13
+**Last updated:** 2026-10-14
 
 ### Recent changes
 
@@ -351,7 +351,12 @@ fails on a new row in the old format, and on any Plan row it can't read.
   (`platform/tests/maple_conversations/corpus.py`) as its plan.
 - **Plan** — what the planner should do: an op from
   `platform/agents/planner/schema.py` with the fields that are the point of
-  the row (a nested field as a dotted path, a bare name for a flag);
+  the row (a nested field as a dotted path, a bare name for a flag; an
+  estimate edit's command by its op, `edit_estimate` commands=set_title). The
+  live run scores the op exactly — another op of the same kind is a
+  difference. Two ops that make the same write (a task's note as `add_note`
+  or `update_task` fields.notes_append) agree only when the row names the
+  record's kind (`add_note` parent.domain=task);
   `refuse` with its reason (`out_of_chat` also names the capability); `ask`;
   `conversation` with its id; or `—` for a gap with no plan yet.
 - **Status** — ✅ supported, 🛑 refused by design, ⚠️ gap (with its
@@ -423,7 +428,7 @@ estimate".
 | `set the profit margin on the patio work item to 20%` [est] | `edit_estimate` | ✅ grammar entry set_gross_margin |
 | `set the total on work item 1 to $1,000` [est] | `edit_estimate` | ✅ grammar entry set_total |
 | `leave a note on this estimate that says: check the gate code` / `add a note: call Bob` / `add a note to that estimate saying check the gate code` / `add a note to our estimate saying check the gate code` / `drop a note on {EST} saying check the gate code` / `new note for this estimate saying check the gate code` [est] | `add_note` | ✅ grammar entry add_note — "add a note: call Bob" is the record in focus; "about drainage" keeps "about …" in the body; "On work item 1, …" names the target first |
-| `add a note to work item 2: check drainage` / `add a note to work item 2 about drainage` / `On work item 1, add a note: check drainage` [est] | `edit_estimate` | ✅ a work-item note (`add_work_item_note`) |
+| `add a note to work item 2: check drainage` / `add a note to work item 2 about drainage` / `On work item 1, add a note: check drainage` [est] | `edit_estimate` commands=add_work_item_note | ✅ a work-item note (`add_work_item_note`) |
 | `add 20 concrete blocks to work item 2` / `add 10 bags of mulch to the front patio work item` / `remove concrete blocks from work item 2` / `change the quantity of mulch in work item 1 to 12` / `update the price of mulch in work item 1 to $5` [est] | `edit_estimate` | ✅ grammar entries add_material / remove_material / update_material *(2026-09-27)* — a plural finds the singular catalog item or line |
 | `add activity Grading with role Foreman for 4 hours to work item 2` / `add an activity to work item 2` / `remove the Grading activity from work item 2` [est] | `edit_estimate` | ✅ grammar entries add_activity / add_activity_prompt / remove_activity *(2026-09-27)* — "add an activity to work item 2" asks its name, then adds it |
 | `make the excavation activity 8 hours` / `change the role on the Excavation activity to Landscaper` / `assign the Landscaper role to the cleanup activity` / `update the rate for the Planting activity to $45/hr` [wi] | `edit_estimate` | ✅ grammar entry update_activity *(2026-09-27)* |
@@ -1036,9 +1041,11 @@ Added in the May 2026 expansion. Routed via `_match_analytics_query` in the orch
 | `pipeline by status` / `estimates by status` [est] | `metric` shape=by_status | ✅ a status breakdown, §1.12 *(2026-10-06, decision 2)* |
 | `estimate value by division` [est] | `dashboard` card=by_division | ✅ the breakdown by division *(2026-09-27 — "by division" was unknown)* |
 | `what is my pipeline worth` / `hey maple, what's in the pipeline?` / `can I see my pipeline?` / `pipeline` / `whats my pipeline` [est] | `dashboard` card=pipeline | ✅ *(2026-09-30, #721 — a pipeline/backlog question opens with a question or show word after at most a lead, or is the bare noun. Review 2026-09-30 #4: "whats", "which", "is/are my/our" and "I'd like to see" open one too — "whats my pipeline" went to the Material agent. "is the pipeline trench on the estimate?" / "are the pipeline fittings included?" are not metrics — second review #6)* |
-| `how big is my backlog?` / `backlog?` / `which estimates are in my backlog?` / `i'd like to see my backlog` [est] | `dashboard` card=backlog | ✅ *(2026-09-30, #721 — as above)* |
+| `how big is my backlog?` / `backlog?` / `i'd like to see my backlog` [est] | `dashboard` card=backlog | ✅ *(2026-09-30, #721 — as above)* |
+| `which estimates are in my backlog?` [est] | `list_estimates` filter.statuses | ✅ the backlog's estimates — Won and Scheduled, the card's statuses *(2026-10-14, review round 13 #39 — it was the card, which gives a count and a value but not which; the planner listed the pipeline's statuses until the prompt named the backlog's)* |
 | `is my pipeline growing?` [est] | `metric` shape=comparison | ✅ this month against the last *(2026-09-30, #721 — as above)* |
-| `rename work item 2 to the pipeline trench` / `add a note to this estimate: locate the pipeline before digging` / `remove the pipeline flush activity from work item 2` [est] | `edit_estimate` | ✅ the command — never analytics *(2026-09-30, #721 — they routed to `analytics_estimates` and nothing was written. A message the estimate grammar parses is never a metric, and "pipeline"/"backlog" mid-sentence is an ordinary word)* |
+| `rename work item 2 to the pipeline trench` / `remove the pipeline flush activity from work item 2` [est] | `edit_estimate` | ✅ the command — never analytics *(2026-09-30, #721 — they routed to `analytics_estimates` and nothing was written. A message the estimate grammar parses is never a metric, and "pipeline"/"backlog" mid-sentence is an ordinary word)* |
+| `add a note to this estimate: locate the pipeline before digging` [est] | `add_note` | ✅ the note — never analytics *(as above; an estimate's note is `add_note`, review round 13 #39)* |
 | `what are my recent estimates?` / `show me my most recent estimates` [est] | `list_estimates` sort=latest | ✅ the newest 8 — the dashboard's Recent Estimates *(2026-09-27 — help, or one row for a plural ask)* |
 | `show me recent draft estimates` [est] | `list_estimates` sort=latest filter.statuses=Draft | ✅ the same, with that status *(2026-10-02, #724 — a word or two between "recent" and the noun cut the list to one row, "Your latest estimate:")* |
 | `my latest sent quotes` [est] | `list_estimates` sort=latest filter.statuses=Sent | ✅ the same, with that status *(2026-10-02, #724)* |
@@ -1088,7 +1095,7 @@ These edit **top-level `Estimate` fields** (`title`, `description`) — distinct
 | `jot down on the {title} estimate: "{text}"` / `remember on this estimate that the gate code is 4411` / `FYI on the {title} job: "{text}"` [est] | `add_note` | ✅ with an estimate/quote token *(2026-06-06 — informal cues `jot`/`fyi`/`remember`/`write down` in `_NOTE_UPDATE_CUES` + value extractors (`_NOTE_WITH_COLON_SEP` broadened, new `_NOTE_REMEMBER_TAIL`); routed end-to-end by the orchestrator's value-bearing `_informal_note` arm. 2026-09-23 — always **adds** a `Note` to the estimate's Notes feed; `Estimate.notes` is untouched. Note: the phrase still needs an estimate/quote/EST token — "the Smith job" alone doesn't reference an estimate.)* |
 | `create a note for this estimate: {text}` / `create a note on {EST}: {text}` / `make a note on this estimate that the gate code is 4411` / `new note for this quote: {text}` [est] | `add_note` | ✅ an estimate-level Note *(2026-09-24 — was `create_estimate`. `create a note for this work item: …` files a work-item Note.)* |
 | `Add a note that says: {text}` / `add a note: {text}` / `create a note: {text}` / `leave a note that the gate code is 4411` / `add note - {text}` [est] | `add_note` | ✅ **no target at all**, estimate in play: an estimate-level Note, even with a work item anchored *(2026-09-24 — was `create_estimate`: "add" plus the borrowed estimate domain read as a create)* |
-| `write down on the {title} estimate that the gate code is 4411` [est] | `edit_estimate` | ✅ the planner handles it — was a gap: *(`write down` is a cue, but only `remember` has a `... that ...` tail extractor; needs the tail generalized)* |
+| `write down on the {title} estimate that the gate code is 4411` [est] | `add_note` | ✅ the planner handles it — an estimate's note (review round 13 #39) — was a gap: *(`write down` is a cue, but only `remember` has a `... that ...` tail extractor; needs the tail generalized)* |
 
 *Not yet in the Plan format — a refusal that depends on the estimate's status (phase 3):*
 
@@ -1114,9 +1121,9 @@ showed, and the question it last asked.
 
 | Phrasing | Plan | Status |
 |---|---|---|
-| `add a note to work item 2: check drainage` / `note on this work item: check drainage` [wi] | `edit_estimate` | ✅ files a work-item Note (outside the edit lock) |
-| `add a note to work item 2 about drainage` / `add a note to work item 2 regarding the gate` [wi] | `edit_estimate` | ✅ files "about drainage" on work item 2 *(2026-09-27, #684 — it filed "to work item 2 about drainage" on the estimate)* |
-| `On work item 1, add a note: check drainage` [wi] | `edit_estimate` | ✅ files it on work item 1 *(2026-09-27, #665)* |
+| `add a note to work item 2: check drainage` / `note on this work item: check drainage` [wi] | `edit_estimate` commands=add_work_item_note | ✅ files a work-item Note (outside the edit lock) |
+| `add a note to work item 2 about drainage` / `add a note to work item 2 regarding the gate` [wi] | `edit_estimate` commands=add_work_item_note | ✅ files "about drainage" on work item 2 *(2026-09-27, #684 — it filed "to work item 2 about drainage" on the estimate)* |
+| `On work item 1, add a note: check drainage` [wi] | `edit_estimate` commands=add_work_item_note | ✅ files it on work item 1 *(2026-09-27, #665)* |
 | `add a note to that estimate saying call the client` / `drop a note on {EST} saying call the client` / `new note for this estimate saying call the client` [wi] | `add_note` | ✅ files the estimate note *(2026-09-27, #664 — these asked where the note should go)* |
 | `set the markup on all work items to 20%` / `set the markup for work items 1 and 2 to 20%` [wi] | `edit_estimate` | ✅ not a listed command: the edit planner's. Without it, Maple asks what to change ("… What would you like to change?") and writes nothing *(corrected 2026-09-27 — the "one work item at a time" reply no longer exists)* |
 | `remove work item 1 and set the markup on work item 2 to 20%` [wi] | `edit_estimate` | ✅ the edit planner types both; without it, Maple asks what to change and writes nothing *(corrected 2026-09-27 — the "one change at a time" reply no longer exists)* |
@@ -2306,7 +2313,7 @@ Additive is the default, matching estimate notes (§5.x) — a drive-by note nev
 | `Add to the Task: {text}` / `add this to the task: {text}` [task_focus] | `update_task` fields.notes_append | ✅ **no field word at all** *(2026-07-25 smoke-test fix — the colon carries the meaning: everything after it is content, and notes are the only free-text field a task has. A separator is REQUIRED, so `add a photo to the task` isn't claimed.)* |
 | `add to the {task} task: {text}` | `update_task` fields.notes_append | ✅ **no field word at all** *(2026-07-25 smoke-test fix)* |
 | `Add to the tasks to {text}` / `add to the task to {text}` / `add to the tasks about {text}` / `add to the task that {text}` [task_focus] | `update_task` fields.notes_append | ✅ **plural noun and/or a connector word instead of a colon** *(2026-07-30 — reported: "Add to the tasks to buy more milk." landed on `create_task` and asked "What should the task be called?". Two gaps: `task\b` never matched the plural, and the colon was the only separator. `to` / `about` / `that` now count as separators, and the noun may be plural. `add a photo to the task(s)` still isn't claimed — the verb must be followed immediately by to/on/onto, which was always the real guard.)* |
-| `add a note to the task: {text}` [task_focus] | `add_note` | ✅ the task in focus; with none, Maple asks which |
+| `add a note to the task: {text}` [task_focus] | `add_note` parent.domain=task | ✅ the task in focus; with none, Maple asks which |
 | `append to the task notes: {text}` | ask | ✅ |
 | `add notes to the {task} task: {text}` | `update_task` fields.notes_append | ✅ |
 | `add a note to it: {text}` [task_focus] | `add_note` | ✅ with a task anchor *(2026-09-27 review)* |

@@ -132,9 +132,13 @@ The parser becomes strict and the test asserts:
   unchecked;
 - every op is one the planner's schema defines (`schema.INTENT_OF_OP`), every
   refusal reason an `UnsupportedReason`, every state a known state;
-- every `conversation <id>` names a conversation in the corpus, and every
-  conversation's `reference` section exists;
-- no phrasing appears twice with different plans.
+- every `conversation <id>` names a conversation in the corpus (corpus
+  conversations carry no `reference` section, so that link isn't checked —
+  dropped 2026-10-14, review round 13 #33);
+- no phrasing appears twice with different plans;
+- no row goes missing unnoticed: a table split by a blank line, a row without
+  its leading `|` and a ``` never closed are errors, and the number of rows in
+  §1–§11 has a floor (`TABLE_ROWS_AT_LEAST`, review round 13 #12).
 
 This is what keeps the reference a test source rather than a document that
 drifts: an edit that breaks the format fails in the normal suite.

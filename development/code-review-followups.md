@@ -19,7 +19,7 @@ kept its number and its body.
 entries about code only today's pipeline runs dropped there too (the planner never
 runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
 
-- **Entries are numbered and permanent.** Next free number: **1023**. Never
+- **Entries are numbered and permanent.** Next free number: **1064**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -137,7 +137,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,163 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | +48 over the 2026-09-24 review passes; +15 by 2026-09-27 |
 | 1,195 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases; +65 on 2026-09-28 for the target-first field shapes and `restated_field_value`. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46) |
 | 1,176 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27; 1,102 on 2026-10-05 (+14 for the save failure's outage/bug split, #619); 1,176 on 2026-10-13 (+74: the nameless-line helpers — `_nameless_line`, `_current_index` / `_original_index`, `_batch_line`, `_removed_line`, `_forget_shifted_lines`; review 2026-10-13 rounds 4–5) |
-| 1,060 | [platform/agents/estimate/command_grammar.py](../../platform/agents/estimate/command_grammar.py) | the written command list (design 2026-09-25), first measured 2026-10-06; +23 that day (tax: `_M_TAX`, the "of my estimates" and bare-total lookaheads, the "how much are my estimates worth" and headless total-value entries). **Next step:** move each family of entries (metric, line, ranking / by month / comparison, ratio) into `grammar_metrics.py` and keep `_CORE` here as their concatenation |
+| 1,108 | [platform/agents/estimate/command_grammar.py](../../platform/agents/estimate/command_grammar.py) | the written command list (design 2026-09-25), first measured 2026-10-06 at 1,060 (1,108 re-measured 2026-10-14, review round 13 #35); +23 that day (tax: `_M_TAX`, the "of my estimates" and bare-total lookaheads, the "how much are my estimates worth" and headless total-value entries). **Next step:** move each family of entries (metric, line, ranking / by month / comparison, ratio) into `grammar_metrics.py` and keep `_CORE` here as their concatenation |
 | 1,031 | [platform/agents/task/service.py](../../platform/agents/task/service.py) | **crossed the line 2026-09-27** (was 688); 1,048 by 2026-10-08, then −43 when `_handle_task_due_change` moved into operations.py (switchover phase 4b, done); +26 on 2026-10-13 (planner gap fixes; review 2026-10-13 round 3 #45). **Next step:** a `TaskListBase` layer in `agents/task/listing.py` holding `_handle_list_tasks`, `_due_note`, `_resolve_list_ask` and `_FINISHED_STATUS_NAMES`; split `_handle_update_subop` into a detector table plus a named-target helper — about 600 lines left (review 2026-09-27 #47) |
 | 818 | [platform/agents/task/operations.py](../../platform/agents/task/operations.py) | **crossed the line 2026-10-08** (was 774): `_handle_task_due_change` moved in beside the other sub-handlers (switchover phase 4b). **Next step:** the convert flow (`_handle_convert_task`, `_perform_conversion`, `_convert_error_copy`, about 175 lines) into `agents/task/convert.py` as a `TaskConvertBase` layer (review 2026-10-08 (4b) #22, deferred) |
 | 973 | [platform/services/maple_metrics.py](../../platform/services/maple_metrics.py) | the metrics engine, first measured 2026-10-06; +7 that day (`pre_tax_total`); +113 by 2026-10-13 (`priced_work_items`, `_count_and_value`, `ItemDollars` / `PricedItem` for the ratio shapes; review 2026-10-13 round 3 #45). **Next step:** the Phase 3 ratios (`run_win_rate`, `run_margin`, `priced_work_items` and their helpers) into `maple_ratios.py` beside `maple_ratio_shapes.py`, which already holds the shapes |
@@ -146,6 +146,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 860 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
 | 854 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements); then `ResizeWorkItem` (+16, 2026-10-11); +21 on 2026-10-13 (`Metric.year` / `since` / `excluding`, `win_rate_by_value`; round 3 #45). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
+| 818 | [platform/agents/planner/policy.py](../../platform/agents/planner/policy.py) | **crossed the line 2026-10-13** (792 → 818) in the planner gap-fixing change (`_nameless_checked`, `_typed_nameless_line`). **Next split:** `_nameless_checked`, `_typed_nameless_line`, `_line_kind` and `resolve_work_items` into `policy_lines.py`, as `policy_subject.py` was — review round 13 #20 |
 | ~~1,027~~ 322 | [platform/agents/planner/execute.py](../../platform/agents/planner/execute.py) | **RESOLVED 2026-10-08** — split before switchover phase 5, no behavior change: the handlers moved to `execute_records.py` (contacts, properties, materials, roles, templates, tasks; 404), `execute_estimates.py` (estimate reads joined its writes; 309), `execute_links.py` (the notes feed joined links and notes; 142) and `execute_figures.py` (catalog figures, dashboard, metric; 94). `execute.py` keeps the meta replies, the gate and the run, and builds `COVERED` from each module's `HANDLERS`; `test_each_op_has_one_handler_across_the_executors_modules` fails on an op two modules register. Move to the archive in the next cleanup |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
@@ -184,16 +185,19 @@ fixtures — but these are past the point of scanning.
 | 1,174 | platform/tests/test_cross_resource_joins.py |
 | 1,138 | platform/tests/test_maple_work_item_context.py |
 | 965 | platform/tests/test_planner_said.py (553 before 2026-10-13; the review's said.py split moved new cases to `test_planner_said_corrections.py` — split the rest along `said_metrics` / `said_tasks` / `said_resize` / `said_guards`, review 2026-10-13 #141, deferred) |
-| 1,091 | platform/tests/test_estimate_gathering.py (823 when listed; +268 on 2026-10-12 for the created reply's property follow-up and every finalize branch — the seam is `TestFinalizeGatheringStashedProperty` + the helper classes → `tests/test_estimate_gathering_finalize.py`) |
+| 1,167 | platform/tests/test_estimate_gathering.py (823 when listed; +76 on 2026-10-14 for the property-gone reply and its 404 match, review rounds 13 #3 / 14 #8–#9, #17, #23; +268 on 2026-10-12 for the created reply's property follow-up and every finalize branch — the seam is `TestFinalizeGatheringStashedProperty` + the helper classes → `tests/test_estimate_gathering_finalize.py`) |
+| 1,025 | platform/tests/test_planner_confirm.py (563 → 1,025 in the planner gap-fixing change; split the round-7/8 line-label tests from the question-write tests — review round 13 #23) |
 | 957 | platform/tests/test_user_api.py |
 | 926 | portal/tests/TasksPage.test.tsx |
 | 925 | platform/tests/test_task_convert_api.py |
 | 923 | platform/tests/test_labour_agent.py |
 | 922 | platform/tests/test_maple_estimate_targeting.py |
 | 907 | platform/tests/test_maple_work_item_edits.py |
-| 890 | platform/tests/test_estimate_edit_executor.py |
+| 1,170 | platform/tests/test_estimate_edit_executor.py (890 when listed; +204 in the planner gap-fixing change, review round 13 #26) |
 | 883 | platform/tests/test_maple_listed_positional_reference.py |
+| 880 | platform/tests/test_planner_said_corrections.py (new in the planner gap-fixing change; split along `said_metrics` / `said_tasks` / `said_resize` — review round 13 #24) |
 | 862 | platform/tests/test_company_api.py |
+| 857 | platform/tests/test_planner_execute_figures.py (543 → 857 in the planner gap-fixing change — review round 13 #25) |
 | 822 | platform/tests/conftest.py |
 | 818 | platform/tests/test_agents_api.py |
 | 808 | platform/tests/test_llm_usage_tracking.py |
@@ -254,8 +258,8 @@ seams that already exist as separate classes.
 | 53 | `_match_listed_positional_follow_up` — agents/orchestrator/service.py:1058 (47 at HEAD; extract the scope check into `_list_pick_scope_matches` — fourth pass #33) |
 | 61 | `_resolve_intent_with_history` — agents/orchestrator/service.py:3230 (55 at HEAD, grew with the bare-reply and no-inferred-delete guards; extract `_history_action_allowed(message, action)` — fourth pass #34) |
 | 84 | `handle_estimate_fuzzy_confirmation` — routers/agent_helpers/fuzzy_confirmation.py:167 (79 at HEAD — fourth pass #35) |
-| 265 | `create_estimate_reply` — routers/agent_helpers/delegate_create_estimate.py:198 (was `delegate_create_estimate` at 316; its body moved here when the planner began sharing it, leaving `delegate_create_estimate` at 92. Extract the follow-up stash block — fourth pass #36 — and the generate/save/audit core, as `_finalize_gathering` did on 2026-10-12) |
-| 66 | `_finalize_gathering` — routers/agent_helpers/estimate_gathering.py:478 (158 before 2026-10-12, when review #3 moved out the property pick, generation, the failure reply and the created reply; the rest is the company guard, the quota claim and the request — next cut `_claim_slot(company_ctx, ...)`) |
+| 273 | `create_estimate_reply` — routers/agent_helpers/delegate_create_estimate.py:201 (+8 on 2026-10-14: a property deleted before the save hands the slot back and says so, review round 13 #3; was `delegate_create_estimate` at 316; its body moved here when the planner began sharing it, leaving `delegate_create_estimate` at 92. Extract the follow-up stash block — fourth pass #36 — and the generate/save/audit core, as `_finalize_gathering` did on 2026-10-12) |
+| 73 | `_finalize_gathering` — routers/agent_helpers/estimate_gathering.py:491 (+7 on 2026-10-14 for the same, review round 13 #3; 158 before 2026-10-12, when review #3 moved out the property pick, generation, the failure reply and the created reply; the rest is the company guard, the quota claim and the request — next cut `_claim_slot(company_ctx, ...)`) |
 | ~167 | `MarkdownDescriptionEditor` component body — portal/src/components/common/MarkdownDescriptionEditor.tsx:252 |
 | 153 | `_handle_update_estimate` — agents/estimate/crud_handlers.py:2378 (+14 on 2026-09-24; extract the work-item dispatch into `_dispatch_work_item_op(...)`, review #68) |
 | ~120 | `install()` — website/contact-modal/install.js |
@@ -289,19 +293,22 @@ seams that already exist as separate classes.
 | — | seven functions in `platform/agents/task/` (see archive for the list) |
 | — | four functions in `agents/estimate/assumption_handlers.py` (measured 2026-10-09, after the detector moved to `assumption_detect.py` in switchover phase 6c): `_handle_assumption_material_swap` :400 (92), `_handle_assumption_size_adjustment` :680 (63), `_find_size_assumption` :497 (62), `_resolve_swap_material` :280 (58; +7 in 6c for the planner's "Which material?" — extract the two `ask_to_rewrite` clarifies into `_ask_material(...)`) |
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
-| 125 | `_finalize_template_estimate` — routers/agent_helpers/template_estimate.py:119 (first measured 2026-10-05, +16 that day logging the failure, splitting the outage/bug reply and removing an estimate inserted before the failure, #318; extract the create/scale/save block into `_instantiate(processor, company_oid, template, factor, context_payload)`, leaving the gate, audit and envelope here — review 2026-10-05 #4) |
+| 111 | `_finalize_template_estimate` — routers/agent_helpers/template_estimate.py:119 (re-measured 111 on 2026-10-14, review round 15 #22; first measured 2026-10-05, +16 that day logging the failure, splitting the outage/bug reply and removing an estimate inserted before the failure, #318; extract the create/scale/save block into `_instantiate(processor, company_oid, template, factor, context_payload)`, leaving the gate, audit and envelope here — review 2026-10-05 #4) |
 | 51 | `_compare` — services/maple_compare.py:240 (first measured 2026-10-07, review of the planner parity run #1, deferred: the decline check, the both-answered branch and the item matching in one body. Extract the matching loop — from `unsure: List[str] = []` to the leftover-items loop — into `_match(current, current_items, planner_items) -> Tuple[List[str], List[str]]` returning `(why, unsure)`; `_compare` keeps the readings and the verdict. No behaviour change; tests/test_maple_compare.py must pass unchanged.) |
 | 62 | `list_contacts_reply` — agents/contact/service.py:2034 (new 2026-10-08, switchover phase 2a: the body of `_handle_list_contacts`, which shrank by as much, as the reply the planner's executor shares; split the row rendering into `_contact_list_items(serialized)` — review 2026-10-08 #10, deferred) |
 | 64 | `list_properties_reply` — agents/property/service.py:2458 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_property_list_items(serialized)` — review 2026-10-08 #11, deferred) |
 | 63 | `list_labours_reply` — agents/labour/service.py:1253 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_labour_list_items(serialized)` — review 2026-10-08 #12, deferred) |
 | 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
 | 63 | `execute` — platform/agents/planner/execute.py:463 (was 46; phase 8 added step pointing and the policy refusal; +4 on 2026-10-11 for the work items of an estimate a create of the plan made, #864. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
-| 58 | `run_planner_turn` — platform/agents/planner/turn.py:390 (new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
+| 53 | `run_planner_turn` — platform/agents/planner/turn.py:465 (58 at :390 until re-measured 2026-10-14, review round 13 #35; new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
 | 51 | `list_reply` — platform/agents/conversation/record_lists.py:99 (new 2026-10-11: the `within` filter, #845. Move the query building into `_rows(ask, company)` — review 2026-10-11 #11, deferred) |
-| 75 | `_redo` — platform/agents/planner/followups.py:152 (was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; +11 on 2026-10-13 (a status a win rate can't take, the exclusion dropped on a subject swap; round 3 #45); a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
-| 54 | `_refine` — platform/agents/planner/followups.py:198 (was 41; +2 on 2026-10-13; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
+| 73 | `_redo` — platform/agents/planner/followups.py:157 (75 at :152 until re-measured 2026-10-14, review round 13 #35; was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; +11 on 2026-10-13 (a status a win rate can't take, the exclusion dropped on a subject swap; round 3 #45); a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
+| 54 | `_refine` — platform/agents/planner/followups.py:317 (:198 until re-measured 2026-10-14, review round 13 #35; was 41; +2 on 2026-10-13; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
 | 54 | `resolve_work_item` — platform/agents/planner/resolve.py:386 (was 49; move the `by == "name"` arm and its retry into `_work_item_by_name` — review 2026-10-11 #76) |
-| 74 | `_reply_rules` — platform/services/maple_outcomes.py:80 (was 60; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
+| 76 | `_reply_rules` — platform/services/maple_outcomes.py:80 (was 60; +2 on 2026-10-14 for the property-gone reply, review round 13 #3; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
+| 53 | `_created_reply` — routers/agent_helpers/estimate_gathering.py:436 (new 2026-10-12 in the property-link fix; move the legacy follow-up stash (`PENDING_ESTIMATE_FOLLOW_UP_KEY`) into `_stash_follow_up(...)`, which `create_estimate_reply` can share — review round 13 #4) |
+| 53 | `ask_to_rewrite` — platform/agents/conversation/record_names.py:211 (50 → 53 in the planner gap-fixing change, `answers=`; build the record in a `_rewrite_record(...)` helper beside `_rewrite_flags` — review round 13 #21) |
+| 51 | `_seed_mixed` — platform/tests/test_metric_ratio_shapes.py:267 (new in the planner gap-fixing change; split into `_seed_sold_side` / `_seed_lost_side` — review round 13 #22) |
 
 #### Watch
 
@@ -2227,7 +2234,7 @@ negation. Recorded only, not to be worked unless it shows up in use.
 **Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3 in both states ([est] delete_estimate, [wi] the work item's removal).
 
 ### 952. [MEDIUM] Reference row fails 2 runs in 3: "create a task for the fence work item, which is late" [wi]
-`documentation/development/maple-phrasing-reference.md:767` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as an acted create_task where the row asks first (still failing 3 in 3 on the re-runs after the 2026-10-13 fixes) in two of three runs — intermittent, so it answers it right only some of the time.
+`documentation/development/maple-phrasing-reference.md:769` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as an acted create_task where the row asks first in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
@@ -2283,7 +2290,7 @@ Re-run 3× on 2026-10-13: asked 1 of 3; the other two acted (create_task). Still
 **Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
 
 ### 960. [MEDIUM] Reference row fails 2 runs in 3: "don't forget to call Bob Lee tomorrow" [none]
-`documentation/development/maple-phrasing-reference.md:2990` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as a clarify instead of create_task in two of three runs — intermittent, so it answers it right only some of the time.
+`documentation/development/maple-phrasing-reference.md:2994` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as a clarify instead of create_task in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
 
@@ -2396,6 +2403,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Quote the scope (`for "{scope}"`) instead of prefixing "the".
 
+**Partly done 2026-10-14:** the model's own article no longer doubles ("the a new cedar fence" → "the new cedar fence", `as_asked._ARTICLE_RE`, review round 13). A scope that isn't a noun phrase ("the installing 200 sq ft of pavers") is still open.
+
 ### 1019. [LOW] Stale line citations after `estimate_asked` was removed
 `documentation/development/code-review-followups.md` — #1002 cites `as_asked.py:137` (the regex is now at :152–156), #1010 ":136" (now :149), #986 / #987 / #988 :77 / :105 / :201 (now :124 / :162 / :285). (review 2026-10-13 round 8 #17, deferred)
 
@@ -2405,6 +2414,21 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 `documentation/development/maple-phrasing-reference.md:586` — they read `create_estimate` ✅ (right as raw plans), but with an estimate open and the work planned onto it several of their phrasings get the new-or-open question (row 594). (review 2026-10-13 round 8 #18, deferred)
 
 **Suggested fix:** Note on both rows: "with an estimate open and the work planned onto it, asked as row 594".
+
+### 1036. [LOW] The property-gone handler also wraps code after the insert
+`platform/routers/agent_helpers/delegate_create_estimate.py:385` — The `except HTTPException` arm (and its twin at `estimate_gathering.py:552`) covers `create_audit_log` and, in the gathering, the code after `save_generated_estimate`. An HTTPException there would release the slot for a saved estimate. Unreachable today: the audit log never raises, the insert raises only DuplicateKeyError/RuntimeError, and the Brevo hook swallows its errors. (review round 14 #18, deferred)
+
+**Suggested fix:** Wrap only `prepare_generated_estimate` and `save_generated_estimate` in this arm, or release only while `created_estimate` is unset — best done with #4's planned extraction of the generate/save/audit core.
+
+### 1057. [LOW] "status won" said on a follow-up with no statuses planned is no longer read
+`platform/agents/planner/said.py:229` — HEAD's executor read `WON_STATUS_SAID_RE` from every turn's words. Since `won_alone` (review round 15 #1) the flag changes only when the refinement carries statuses or sold, so `refine_last{above: 50}` with "… with status won" after a bare-won list stays the sold set. It needs the model to leave out statuses while the words say one, so it is rare. (review round 16 #7, deferred)
+
+**Suggested fix:** In `_refine`, set the flag when the stored read has Won and `said.won_alone(stored statuses, words)` holds; or accept and note it (the suggestion: accept, it is rare).
+
+### 1058. [LOW] "just the won ones" after the backlog lists more than the backlog — needs Simon's decision
+`platform/agents/planner/followups.py:360` — A refinement's statuses replace the list's, so "just the won ones" after the backlog lists Won + Scheduled + Completed — wider than what was shown. Consistent with #784 ("won" alone is the sold set), but "just" reads as narrowing; `test_won_said_bare_is_still_the_sold_set_and_a_new_status_drops_the_backlogs_reading` pins today's behavior. (review round 16 #9, deferred — a product decision)
+
+**Suggested fix:** Simon's call: (a) keep it, as #784 says; or (b) intersect a "just …" refinement's statuses with the list shown (here Won + Scheduled). The suggestion is (b): "just" never widens.
 
 ## Platform — API, models and data
 
@@ -4839,6 +4863,172 @@ total row count rather than blank-row count.
 
 **Resolved 2026-10-14:** `test_planner_other_kinds.py::test_a_refusal_other_than_a_templates_edit_stands` and `test_a_refused_delete_of_a_name_an_estimate_shares_stands`. Each test fails with its arm broken (mutation-checked).
 
+### 1023. [MEDIUM] `follow_up_for_created`: edge arms untested
+`platform/routers/agent_helpers/estimate_gathering.py:309` — Edge case. These mutants survive: dropping `.lower()` (M3) or `.strip()` (M4) on `field`, and the non-dict `follow_up` guard (M5; a string would raise AttributeError). (review round 13 #5, deferred)
+
+**Suggested fix:** `follow_up_for_created({"optional_follow_up": {"field": " Property ", …}}, {"property": "p"}) is None`; a non-dict follow-up → None.
+
+### 1024. [MEDIUM] `name_linked_property`: edge arms untested
+`platform/routers/agent_helpers/estimate_gathering.py:324` — Edge case. The final `.strip()` (M12) and the failed-lookup warning are never asserted (the `is_valid` guard, M7, is equivalent). (review round 13 #6, deferred)
+
+**Suggested fix:** A padded name → stripped label; a raising `find_one` → "" with the warning logged.
+
+### 1025. [MEDIUM] `_gathering_property`: precedence and stripping untested
+`platform/routers/agent_helpers/estimate_gathering.py:347` — Edge case. A request's `property_id` beating the stash (M13) survives: "named in the message beats the request's property" is never tested with both set. An unstripped label or id (M14, M15) also survives. (review round 13 #7, deferred)
+
+**Suggested fix:** A finalize with both a stash and `property_id`, asserting the stash wins; a padded label/id.
+
+### 1026. [MEDIUM] `_generation_failed`: the non-dict detail fallback untested
+`platform/routers/agent_helpers/estimate_gathering.py:399` — Edge case, M21: `{"error": exc.detail}` → `{}` survives. (review round 13 #8, deferred)
+
+**Suggested fix:** An `EstimateGenerationError` with a string detail different from its message → the result carries `{"error": detail}`.
+
+### 1027. [MEDIUM] `_created_reply`: the kept follow-up untested
+`platform/routers/agent_helpers/estimate_gathering.py:430` — Edge case. Dropping `estimate_id` from the legacy follow-up stash (M23, read by `pending_estimate_follow_up.py:179`) and forcing `optional_follow_up` to None (M24) survive. (review round 13 #9, deferred)
+
+**Suggested fix:** A create with an unlinked description follow-up asserting the stash's `estimate_id` and the kept `optional_follow_up`.
+
+### 1028. [MEDIUM] `_finalize_template_estimate`: "the label skips the lookup" untested
+`platform/routers/agent_helpers/template_estimate.py:213` — Edge case, M33: passing "" instead of the caller's `property_label` survives, because the lookup returns the same name. (review round 13 #10, deferred)
+
+**Suggested fix:** A template finalize with `property_label="X"` and a `find_one` that must not be awaited.
+
+### 1029. [MEDIUM] `_plan_phrasings`: the "..." arm untested
+`platform/scripts/phrasing_reference_rows.py:233` — Edge case: the ellipsis arm's mutant survives. (review round 13 #13, deferred)
+
+**Suggested fix:** A Plan row with an ellipsis phrasing → read as written (or unchecked), asserted.
+
+### 1030. [MEDIUM] `plan_row`: three arms untested
+`platform/scripts/phrasing_reference_rows.py:359` — Edge case: de-duplicating alternates in one cell, appending unreadable rows to `rows`, and the `expect or "gap"` fallback (was "supported" until review round 13 #34) all survive. (review round 13 #14, deferred)
+
+**Suggested fix:** One parser test per arm on a sample table.
+
+### 1031. [MEDIUM] `heading`: two arms untested
+`platform/scripts/phrasing_reference_rows.py:290` — Edge case: the table reset on a heading, and a level-3 heading inheriting its parent's default (legacy), survive. (review round 13 #15, deferred)
+
+**Suggested fix:** Two sample-table tests.
+
+### 1032. [MEDIUM] `problems`: two arms untested
+`platform/scripts/phrasing_reference_rows.py:474` — Edge case: skipping unchecked rows (without it, unreadable rows share the key ("", state) and report false "two plans"), and the message de-duplication. (review round 13 #16, deferred)
+
+**Suggested fix:** Two unreadable rows → no "two plans" problem; a repeated problem → reported once.
+
+### 1033. [MEDIUM] `main`: the not-checked listing untested
+`platform/scripts/phrasing_reference_rows.py:489` — Edge case: both mutants of its loop survive. (review round 13 #17, deferred)
+
+**Suggested fix:** Run `main` on a sample file with an unchecked row and assert it is listed.
+
+### 1034. [MEDIUM] `reference_cases` / `_scored_on_its_plan`: legacy rows and two fields untested
+`platform/tests/planner_parity/cases.py:116` — Edge case: dropping every legacy row (plan None, 53 live cases) survives, and `expect_agent` / `note` are never asserted. (review round 13 #18, deferred)
+
+**Suggested fix:** A sample with a legacy checked row → one Case with its agent and note.
+
+### 1035. [MEDIUM] legacy reader arms untested (`_state`, `_mark`, `_phrases`, `add`, `table_row`)
+`platform/scripts/phrasing_reference_rows.py:164` — Edge case, pre-existing: the §1 → est and §1.5/§1.11 → wi rules (:164), first-marker order (:148), the "..." arm and separator stripping (:179), de-duplication (:304), and the 🛑-cancel rule (:374). `test_a_cancel_marked_with_the_refusal_sign_is_not_a_refusal_row` can never fail, because its row is unchecked anyway. (review round 13 #19, deferred)
+
+**Suggested fix:** One sample-table test per arm; rewrite the cancel test with a checked row.
+
+### 1037. [LOW] The property-gone tests leave the summary, `error` and `success` unpinned
+`platform/tests/test_estimate_gathering.py` — Mutants survive: the summary before the message dropped (the gathering test checks `endswith`), the `error` field dropped (both files), `success=False`. The envelope says `success=True` for a create that didn't happen, as the generation-failure arm already does. (review round 14 #19, deferred)
+
+**Suggested fix:** Assert the whole response (`f"{summary}\n\n{PROPERTY_GONE_MESSAGE}"`) and `error == "Property not found"` in both files. Whether `success` should be False is the user's call — keeping True, as the generation-failure reply does, and pinning it is the suggestion.
+
+### 1038. [LOW] "Phrasing (turn by turn)" holds standalone rows
+`platform/scripts/phrasing_reference_rows.py:62` — That table (reference :1150) marks every row as a reply to the turn before, including the standalone "add Bob as the contact on E0042" (:1169) and "lower the tax on Patio by 15%" (:1161); so is the material table's first turn (:1880). They lose only a "ran" check, and their `why` is wrong. (review round 14 #21, deferred)
+
+**Suggested fix:** Move those rows out of the turn table (as Plan rows of their section), or tag turn rows per row.
+
+### 1039. [LOW] #1030, #1031 and #1034 are partly stale
+`documentation/development/code-review-followups.md` — #1034 says "53 live cases" of legacy rows; after the turn-table change only 3 remain (:604, :954, :2624). #1030's `expect or "gap"` and unreadable-row arms are now killed by `test_an_unreadable_plan_row_without_a_status_is_not_called_supported` — only the de-dup arm is left. #1031's reset on a heading is now done in `read()` too (now tested, round 14 #15). (review round 14 #24, deferred)
+
+**Suggested fix:** Reword the three entries to what is still untested.
+
+### 1040. [LOW] The 2026-10-12 plan doesn't mark "Equivalent plans" done
+`documentation/development/plans/2026-10-12-phrasing-reference-as-test-source-design.md:253` — Phase 6's equivalent plans are now `tests/planner_parity/score._SAME_WRITE` (six pairs since review round 14 #5), but the plan doesn't say so. (review round 14 #25, deferred)
+
+**Suggested fix:** Note it done (2026-10-14) with the pairs.
+
+### 1041. [LOW] The reference's how-to doesn't say named fields aren't scored
+`documentation/development/maple-phrasing-reference.md:353` — It says the live run scores the op exactly; the fields a row names (`commands=set_title`, `filter.sold`) are only checked against the schema, not yet against the plan (phase 6) — except `commands=add_work_item_note` / `fields.*`, which the same-write checks read. (review round 14 #26, deferred)
+
+**Suggested fix:** Add "the fields named are checked against the schema; scoring them is phase 6".
+
+### 1042. [LOW] The second "total for Smith" row needs a state the tests can't build
+`documentation/development/maple-phrasing-reference.md:1354` — Rows 1353 and 1354 have the same phrasing, state and plan but different data (one estimate titled Smith vs two); the second is silently merged into the first case instead of listed as not checked. (review round 14 #28, deferred)
+
+**Suggested fix:** Write the data as a state the case can't build (e.g. "(two estimates titled Smith)", which the reader sets aside), or make it a conversation row.
+
+### 1045. ~~[MEDIUM] `_about`: two noun arms untested~~ — RESOLVED 2026-10-14
+`platform/tests/planner_parity/score.py:54` — Edge case: mutants S5 ("quotes?" dropped) and S6 ("line items" dropped) survive. (review round 15 #8, deferred)
+
+**Suggested fix:** [wi] "add a note to this quote: x" against `add_estimate_note` → agree; "add a note to the line item: x" against `add_work_item_note` → agree.
+
+**Resolved 2026-10-14:** moot — `_about` is gone. Review round 16 #2/#3: a same write now agrees only on a record kind both sides name outright (the row's `parent.domain=…`, the plan's ref domain); nothing is read from the row's words or state.
+
+### 1046. ~~[MEDIUM] `_kind`: the `by == "focus"` guard untested~~ — RESOLVED 2026-10-14
+`platform/tests/planner_parity/score.py:64` — Edge case, S8: a listed or step ref with no domain would be taken as the record in focus. (review round 15 #9, deferred; still surviving after round 15's `_STATE_KINDS` fallback)
+
+**Suggested fix:** `link{a: {by: listed, n: 1}, b: property}` against a task_focus `fields.property` row → differ.
+
+**Resolved 2026-10-14:** moot — `_kind` is now the ref's own domain only (review round 16 #2); an unlabelled "it" never makes a same write (`test_a_ref_the_plan_leaves_unnamed_is_never_guessed`).
+
+### 1047. ~~[MEDIUM] `_task_property`: the task gate untested~~ — RESOLVED 2026-10-14
+`platform/tests/planner_parity/score.py:88` — Edge case, S14. (review round 15 #11, deferred)
+
+**Suggested fix:** A contact–property link row ("link Ana Reyes to 14 Birch Rd") against `update_task{fields.property}` → differ.
+
+**Resolved 2026-10-14:** `test_a_task_linked_to_a_property_agrees_with_setting_its_property` — a link row naming `a.domain=contact` against `update_task{fields.property}` differs; the gate's mutant is killed (review round 16).
+
+### 1048. [MEDIUM] `_note_commands`: `len(ops) == 1` untested
+`platform/tests/planner_parity/score.py:63` — Edge case, S10: an edit holding both note kinds. (review round 15 #12, deferred)
+
+**Suggested fix:** `[add_estimate_note, add_work_item_note]` against an add_note row → differ.
+
+### 1049. [MEDIUM] `_op_said`: the differ path's `intent_match` never asserted
+`platform/tests/planner_parity/score.py:110` — Edge case, S27. (review round 15 #13, deferred)
+
+**Suggested fix:** Assert `intent_match is True` for the cancel/start_over case (same intent, different op).
+
+### 1050. [MEDIUM] `reference_cases`: first row wins untested
+`platform/tests/planner_parity/cases.py:124` — Edge case, C3: last-wins would cite the later line in the case id. (review round 15 #14, deferred)
+
+**Suggested fix:** In `test_a_phrasing_listed_twice_with_one_plan_is_one_case`, assert the case id starts with the first row's line.
+
+### 1051. [MEDIUM] `table_line`: a separator inside the table untested
+`platform/scripts/phrasing_reference_rows.py:351` — Edge case, P7. (review round 15 #15, deferred)
+
+**Suggested fix:** A Plan table with a second `|---|` mid-table → no error and no row.
+
+### 1052. [MEDIUM] `read()`: the `" | "` condition untested
+`platform/scripts/phrasing_reference_rows.py:420` — Edge case, P12. (review round 15 #16, deferred)
+
+**Suggested fix:** Prose with a backtick but no " | ", right after a table → no error.
+
+### 1053. [LOW] An extra write beside the row's op is always a difference
+`platform/tests/planner_parity/score.py:121` — A legitimate two-write plan would differ, e.g. a create planned `[create_estimate, apply_template{estimate: step 1}]`. No row in the 2026-10-13 live run is affected: every multi-write plan was on a row with no op. (review round 15 #17, deferred)
+
+**Suggested fix:** Accept it and explain any such row in `explained.py` if one flips (no such row exists yet); or let an extra write whose ref is `by: step` to the matched action pass.
+
+### 1054. [LOW] `_TURN_HEADER` misses "Turns"
+`platform/scripts/phrasing_reference_rows.py:64` — The plural header at reference :2934 isn't matched. Its rows are unchecked anyway (arrows), so it is harmless today. (review round 15 #21, deferred)
+
+**Suggested fix:** `turns?`.
+
+### 1059. [LOW] The same-write checks match bare field names only
+`platform/tests/planner_parity/score.py:80` — `"fields.property" in case.expect_fields` and `"fields.notes_append"` match only a bare name, but rows now carry values (`fields.status=Done` already exists). A future `fields.property=Elm House` row would silently stop matching. No current row is affected. (review round 16 #10, deferred)
+
+**Suggested fix:** A `_names(case)` helper that strips "=…", used by the field-name checks.
+
+### 1062. [LOW] Task-note rows that can agree only through their own op
+`documentation/development/maple-phrasing-reference.md:2319` — [task_focus] `add_note` rows naming no kind — :2319 "add a note to it: …", :2320 "Add another note: …" / "add a note: …", :2325 "add a note to it: don't park on the lawn" — score differ against `update_task{notes_append}`, the same write (their sibling :2316 was planned that way live). The est/wi estimate-note `add_note` rows (:430, :444, :1048, :1082–1098, :1127, :2340) likewise can't agree with `edit_estimate{add_estimate_note}`, though the prompt never names that command. A false "differ" only, never a false agree. (review round 17 #5, deferred)
+
+**Suggested fix:** Add `parent.domain=task` to :2319, :2320 and :2325; optionally `parent.domain=estimate` to the estimate-note rows.
+
+### 1063. [LOW] A kind's value isn't checked, and the how-to covers only the row's side
+`platform/scripts/phrasing_reference_rows.py:449` — `_field_problems` checks values only for `commands=`-style paths, so `parent.domain=tsak` passes `problems()` and its equivalence silently becomes unreachable (a false differ, never a false agree) — and since review round 17 #3 a row's named kind also binds its own op, so a misspelling there makes the row differ on every plan. The how-to (reference :356–359) doesn't say the plan must name its kind too, and the plan's §6 "Equivalent plans" still says the two estimate-note ops count "as one" with no condition (related to #1040). (review round 17 #6, deferred)
+
+**Suggested fix:** In `reference_vocabulary`, add `<path>.domain=<kind>` for each `RefDomain` value (agents/planner/refs.py:16) so values are checked; in the how-to, add "… and the plan names it too: an unlabelled 'it' never agrees"; fold the condition into #1040.
+
 ## Codebase hygiene (batchable)
 
 Small, low-risk cleanups. Safe to batch into a single `chore: code hygiene`
@@ -5657,3 +5847,33 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `platform/agents/planner/said.py:1` — said.py's list omits `_role_field`, `_jobs_are_properties`, `_no_pronoun_record`, `_without_material_name`; followups.py still says a turn "falls back to today's" (MAPLE_PLANNER_ONLY no longer does) and omits `figure_status_said`, `asked_about_tax`, `sold_word_kept`, `tax_lead`. (review 2026-10-13 round 5 #31, deferred)
 
 **Suggested fix:** One bullet per missing correction or reader; say what planner-only does instead of the fallback.
+
+### 1043. [LOW] "Said back" comments beside the updated ratio comment
+`platform/agents/estimate/command_grammar.py:370` — Lines 370, 371 and 376 still say ranked and by-month ratios are said back, just below line 349, which round 13 updated to "answered". (review round 14 #20, deferred)
+
+**Suggested fix:** Reword them to "answered (Simon 2026-10-13)".
+
+### 1044. [LOW] #952 and #960 cite the old reference lines again
+`documentation/development/code-review-followups.md` — Lines shifted with round 13's how-to edit: #952's row is now :772 (cited :769), #960's :2997 (cited :2994) — and round 14 moved nothing above them. (review round 14 #22, deferred)
+
+**Suggested fix:** Cite the rows by phrasing as well as line, so the next shift doesn't stale them; :772 and :2997 today.
+
+### 1055. [LOW] #1023–#1027 cite stale lines
+`documentation/development/code-review-followups.md` — The estimate_gathering.py citations (:309, :324, :347, :399, :430) moved with round 14's `property_gone`: the defs are now at :315, :330, :353, :405 and :436. (review round 15 #18, deferred)
+
+**Suggested fix:** Cite the def lines.
+
+### 1056. [LOW] #1038 is off by one
+`documentation/development/code-review-followups.md` — The table is at reference :1151 (cited :1150), and `_TURN_HEADER` at script :64 (cited :62). (review round 15 #19, deferred)
+
+**Suggested fix:** Correct both.
+
+### 1060. [LOW] CLAUDE.md doesn't name the backlog as a second "Won status alone" reading
+`CLAUDE.md:576` — CLAUDE.md says only "status won" said outright is the Won status alone ("one pattern for both, WON_STATUS_SAID_RE", and :784's "the Won status alone only when said"). Lists now also read it when the backlog is planned as Won + Scheduled. (review round 16 #8, deferred)
+
+**Suggested fix:** One clause at both places: "… or, in a list, the backlog planned as Won + Scheduled (`said.won_alone`); the reading rides on the read (`EstimateFilter.won_alone`, planner-internal)".
+
+### 1061. [LOW] #1041 overclaims which fields the same-write checks read
+`documentation/development/code-review-followups.md` — It says "`commands=add_work_item_note` / `fields.*`, which the same-write checks read"; they read `commands=add_work_item_note`, `fields.property`, `fields.notes_append` and, since review round 16, the row's `parent.domain` / `a.domain` / `b.domain`. (review round 16 #11, deferred)
+
+**Suggested fix:** Name them.
