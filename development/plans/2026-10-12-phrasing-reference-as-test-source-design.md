@@ -1,6 +1,6 @@
 # The phrasing reference as Maple's test source — design (2026-10-12)
 
-**Status:** approved 2026-10-12 — Simon took every recommendation in §8. Phase 1 done 2026-10-12.
+**Status:** approved 2026-10-12 — Simon took every recommendation in §8. Phases 1 and 2 done 2026-10-12; the reference's gaps closed 2026-10-13 (phase 2 note).
 **Supersedes, once built:** the parity run's four-source design
 (`plans/2026-10-02-maple-planner-shadow-design.md` §4.5, step 11) and the
 parity half of follow-up #846.
@@ -189,6 +189,29 @@ Each phase is its own commit, failing test first where code changes.
    planner's plan agreed; Simon or the session reviews each section's
    proposals before they're written. Rows where the planner differed are read
    by hand.
+   *Done 2026-10-12:* every section drafted from the last run's plans
+   (rows that ran, read; rows that differed, decided for the right answer),
+   checked document-wide (no phrasing with two plans), and every row the run
+   never saw put to the planner live (466 rows, 51 mismatches: about 20 rows
+   corrected, the rest are planner gaps the rows now pin). 1,059 → 1,526
+   testable rows; old-format rows 983 → 199 (`LEGACY_ROWS_LEFT`). Estimate-level
+   notes are written `add_note`, work-item notes `edit_estimate`
+   (`add_work_item_note`).
+   *Gap campaign 2026-10-13* (Simon: "fix them instead of defer"): every ⚠️ row
+   that names no recorded decision was fixed on the planner and given a test —
+   32 Plan rows flipped earlier, then the 18 old-format multi-turn ⚠️ rows
+   became `conversation` rows with new corpus conversations (`REFERENCE_GAPS`,
+   `planner=True`, `gap=` for today's), plus "in 2025" / "since January" /
+   "excluding Elm House" and "which teammates have no tasks?". Old-format rows
+   199 → 180. The planner acceptance run's 14 counted failures were fixed the
+   same way (the overage asked before the work, a greeting while the work is
+   asked, a postal code after a create's offer, an estimate's title as a
+   figure's subject, a kind picked from a shared name, the sold word kept on a
+   follow-up). The four held by recorded decisions went to Simon the same day:
+   ratios ranked, by month and compared are answered (decision 18 reversed),
+   a win rate by value is given when asked (decision 14 kept for a plain win
+   rate), and a material's or role's figures stay quantities (decision 19
+   kept). No ⚠️ row is left but the format example.
 3. **Convert the 272 unreadable rows** (§4), writing the missing conversations.
 4. **Fold in the curated sources.** The CRUD matrix's 147 and the design rows'
    57 missing phrases become rows in their sections.
@@ -213,6 +236,20 @@ Each phase is its own commit, failing test first where code changes.
      fields, `plan.unsupported.reason` / `.capability` and `plan.clarify`. Until
      then `ask` rows are not scored (phase 1 skips them) and fields and reasons
      are read but not compared.
+   - **Score the plan that runs, not the model's raw plan** (found in phase 2).
+     The turn corrects the model's plan before anything runs —
+     `said.without_unsaid` keeps "won" vs "sold" and a window's unit as said,
+     `metric_ask._shaped` fills a comparison's shape, `other_kinds` turns a
+     template's edit into `template_edit`, `line_prices` refuses a line's cost.
+     Scored raw, rows that Maple answers right flake run to run and
+     `explained.py` fills with "the turn fixes it" entries. Run the same
+     correction steps in the harness (the turn's pure pre-execution steps,
+     no database) and score what comes out; keep the raw plan in the report
+     beside it.
+   - **Equivalent plans.** An estimate-level note is planned either
+     `add_note` (estimate parent) or `edit_estimate` with an
+     `add_estimate_note` command; both file the same note. The scorer treats
+     them as one, as it should "won" and "sold" before `said.py` runs.
 7. **Docs.** Rewrite the reference's "How to read this doc", "How to add new
    use cases" and §12 (tests, how to run, the live report's numbers in place of
    the Tier 1 / Tier 2 matrix score). Update `CLAUDE.md`'s Maple sections
