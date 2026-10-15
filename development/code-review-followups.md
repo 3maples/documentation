@@ -19,7 +19,7 @@ kept its number and its body.
 entries about code only today's pipeline runs dropped there too (the planner never
 runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
 
-- **Entries are numbered and permanent.** Next free number: **1089**. Never
+- **Entries are numbered and permanent.** Next free number: **1099**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2508,6 +2508,51 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 `platform/agents/planner/followups.py:492` — `followups._NOTHING_ASKED` is {acknowledge, social} only. `[answer, redo_last subject]` replies "I'm not waiting on an answer…" then asks "What would you like to know about Elm House?", which contradicts itself, and the question isn't kept; the same for cancel / start_over / repeat. The reason for not keeping it (writes made twice) doesn't apply to ops that write nothing. (review round 28 #8, deferred)
 
 **Suggested fix:** Needs Simon's call: (a) add `answer` and `repeat` to `followups._NOTHING_ASKED` (recommended; cancel and start_over are requests, per #1078's decision for figures), or (b) accept it. Test: parametrize `test_a_follow_ups_reply_alone_or_beside_thanks_is_the_turn` with the ops chosen.
+
+### 1089. [HIGH] "title: Call the supplier" plans a task search instead of the task's create
+`platform/prompts/maple_planner.py` — Reference row `title: Call the supplier` (`create_task` fields.title) is planned `list_tasks {filter: {search: "Call the supplier"}}` 3 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The task is never created; the user gets a search of their tasks instead. Likely a side effect of this batch's possessive-task-title line ("Call the supplier's description / details / due date" → `update_task` / `get_task` by name), which taught the model to read "Call the supplier" as a task's name. A regression, so fixed — not explained.
+
+**Suggested fix:** Narrow the prompt line to the possessive it was written for (a task named with "'s" and a field), or add the counter-case ("title: X" alone is a new task with that title → `create_task`). Probe the row and its neighbours live 3× (the possessive rows 2319/2320/2325, "show me Call the supplier's details", #1091) before and after.
+
+### 1090. [MEDIUM] "How much does Polymeric sand cost?" plans a material list instead of the material
+`platform/prompts/maple_planner.py` — Reference row (`get_material`) is planned `list_materials` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The reply is a list rather than the one material's prices — a different shape, not wrong data. Likely pulled by this batch's line "Asking what materials cost is a read, never material_cost … list_materials {filter: {related: E0042, price: …}}", which was meant for an estimate's lines.
+
+**Suggested fix:** Narrow that line to an estimate's materials ("which of E0042's materials cost over $10?") and say one material named is `get_material`. Probe live 3× with its neighbours (rows 468, 470, "how much is mulch?").
+
+### 1091. [MEDIUM] "show me the task at 14 Birch Rd" plans a task list instead of the task
+`platform/prompts/maple_planner.py` — Reference row (`get_task`) is planned `list_tasks` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. Read-only: the user sees the property's tasks rather than the one. Possibly the same pull as #1089.
+
+**Suggested fix:** Re-check after #1089's fix; if it still varies, a prompt example ("the task at <property>" is that property's one task, `get_task`) or explain it (a property's task list holds the task asked for).
+
+### 1092. [MEDIUM] "what's in my backlog?" plans an estimate list instead of the Backlog card
+`platform/prompts/maple_planner.py` — Reference row (`dashboard` card=backlog) is planned `list_estimates` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The list's estimates vs the card's figure — not wrong data, but the backlog question has one answer in the dashboard. Possibly nudged by the new amount line, which leads with `list_estimates` examples.
+
+**Suggested fix:** Check what `list_estimates` the model planned (the backlog reading of commit 1ad8dd0 — Won + Scheduled — must hold either way); then a prompt example or an `as_asked` correction like `pipeline_card` for "backlog", or explain it if the list answers it as the card does.
+
+### 1093. [LOW] "how's my pipeline looking?" is sometimes planned as a figure
+`platform/agents/planner/as_asked.py:151` — Planned `metric` 1 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×) where the row expects the Pipeline card. `as_asked.pipeline_card` turns a single total figure said with "pipeline" into the card before anything runs, so the user likely gets the card either way — unverified for the exact plan the model wrote.
+
+**Suggested fix:** Run the live plan through `turn._prepared`; if it becomes the card, add an `explained.py` entry citing `pipeline_card`; if not (another metric or shape), widen the correction narrowly and test.
+
+### 1094. [LOW] "add a scope to the last estimate" asks the scope's name instead of planning the edit
+`platform/prompts/maple_planner.py` — Asks "What would you like the new scope to be called?" 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); the row expects `edit_estimate`. A question, never a wrong write; the row says no name, so asking is defensible.
+
+**Suggested fix:** Decide the row's intent: if a nameless scope should be asked (as `missing.unnamed_work_item` does for a line item), change the row's plan to `ask`; else explain it.
+
+### 1095. [LOW] "what about mulch materials?" with nothing before it asks instead of listing
+`platform/prompts/maple_planner.py` — Asks "What would you like to know or do with mulch materials?" 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); the row expects `list_materials`. A question only.
+
+**Suggested fix:** A prompt example ("what about <materials>?" with no read before is that list), or change the row's plan to `ask` if a question is the better answer.
+
+### 1096. [LOW] Units and divisions questions are refused by the model, then made help by the turn
+`platform/tests/planner_parity/explained.py` — "what are the labour units?" (3 of 3), "what are the material units?" (2 of 3) and "which divisions can an estimate have?" (varies) are planned `out_of_chat` refusals (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); the rows expect `help`. The turn already corrects them (`said.asked_which_there_are`; seen live for the labour units), so the user gets help — the run scores the raw plan.
+
+**Suggested fix:** Verify each through `turn._prepared` with the live plan, then add `explained.py` entries citing `said.asked_which_there_are`, as the other "which … are there" rows have.
+
+### 1097. [LOW] "what's the total estimates with status approved?" plans the list's total, not the figure
+`platform/tests/planner_parity/explained.py` — Planned `list_estimates {filter: {statuses: [Approved]}, total}` 3 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); the row expects `metric` total. Both read the same engine (`list_core` on `maple_metrics`) and give the same approved value; only the reply's wording differs.
+
+**Suggested fix:** Confirm the two replies' value match on a seeded world, then add an `explained.py` entry; or move the row's plan to the list's total if that reply reads better.
 
 ## Platform — API, models and data
 
@@ -5162,6 +5207,11 @@ total row count rather than blank-row count.
 `platform/agents/material/text_helpers.py:132` — Edge cases: (a) `sizes` not a list → False (:136); (b) a size that isn't a dict is skipped (:143); (c) empty `price_filters` → `all([])` True, so any material matches — only `list_materials_reply`'s `if price_filters:` prevents that. M24 and M25 survive but are equivalent (the single-bound helper rejects these too). (review round 28 #6, deferred)
 
 **Suggested fix:** One unit test in tests/test_material_agent.py: `({"sizes": "x"}, [("gt", 1)])` → False; `({"sizes": ["x", {"price": 5}]}, [("gt", 1), ("lt", 10)])` → True; and return False for empty filters, with an assert.
+
+### 1098. [MEDIUM] The live parity suite hangs after writing its report
+`platform/tests/test_planner_parity_live.py:94` — The 2026-10-14 full run wrote `tests/reports/planner_parity.json` (5,284 rows) and then sat idle at ~0% CPU for 13+ minutes without exiting, so pytest never reported the blockers assertion; it had to be killed (exit 144). Likely the planner's async model client or an open connection left on the loop `asyncio.run` closes, or a fixture teardown (`rules_tier`). A run that never returns hides whether it passed.
+
+**Suggested fix:** Reproduce with `PARITY_SOURCES=reference PARITY_LIMIT=20`; close the planner client at the end of `test_corpora_parity` (or `await` its `aclose`) and check `rules_tier`'s teardown; add a timeout around the teardown, so the run always ends with its verdict.
 
 ## Codebase hygiene (batchable)
 
