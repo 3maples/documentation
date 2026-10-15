@@ -19,7 +19,7 @@ kept its number and its body.
 entries about code only today's pipeline runs dropped there too (the planner never
 runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
 
-- **Entries are numbered and permanent.** Next free number: **1099**. Never
+- **Entries are numbered and permanent.** Next free number: **1100**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2553,6 +2553,11 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 `platform/tests/planner_parity/explained.py` — Planned `list_estimates {filter: {statuses: [Approved]}, total}` 3 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); the row expects `metric` total. Both read the same engine (`list_core` on `maple_metrics`) and give the same approved value; only the reply's wording differs.
 
 **Suggested fix:** Confirm the two replies' value match on a seeded world, then add an `explained.py` entry; or move the row's plan to the list's total if that reply reads better.
+
+### 1099. [LOW] Pseudo-operation key in `_SUGGESTION_MAP`
+`platform/agents/orchestrator/suggestions.py:64` — `("Estimate Agent", "create_estimate_with_property")` is not an operation any agent or planner emits; the map is otherwise keyed by real (agent, operation) pairs, so a reader (or a future test walking the map against the agents' operations) would take it for one. No behavioural consequence.
+
+**Suggested fix:** Hold the two chips in a module constant `_CREATE_ESTIMATE_LINKED_SUGGESTIONS: List[str]` beside `_HELP_SUGGESTIONS`, and in `get_suggestions` return `list(_CREATE_ESTIMATE_LINKED_SUGGESTIONS)` from the `_created_estimate_has_property` branch instead of rewriting `key`; drop the map entry.
 
 ## Platform — API, models and data
 
