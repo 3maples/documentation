@@ -463,11 +463,11 @@ a note to a material or role. **Refused by the planner:** labor burden
 | `count my draft quotes` [est] | `list_estimates` count filter.statuses=Draft | ✅ quotes = synonym |
 | `what is the total value of the open estimates` [est] | `metric` status=open | ✅ aggregated across the open estimates *(closed in xfail-wave-3 Workstream C — `_AGGREGATE_VALUE_QUERY_PATTERN` + `_OPEN_ESTIMATE_QUERY_PATTERN` short-circuit `_handle_list_estimates` to a single dollar figure)* |
 | `show me draft estimates from last week` [est] | `list_estimates` filter.statuses=Draft filter.period=last_week | ✅ *(closed in xfail-wave-3 Workstream C — `_parse_estimate_date_filter` adds a `$gte/$lte` constraint on `created_at`)* |
-| `approved quotes over $10k` [est] | `list_estimates` filter.statuses=Approved filter.total_above=10000 | ✅ *(closed in xfail-wave-3 Workstream C — verbless plural-domain inference + `_parse_estimate_amount_filter` adds a `$gt`/`$lt` constraint on `grand_total`; `k`/`m` suffixes supported)* |
+| `approved quotes over $10k` [est] | `list_estimates` filter.statuses=Approved filter.amount.over=10000 | ✅ *(closed in xfail-wave-3 Workstream C — verbless plural-domain inference + `_parse_estimate_amount_filter` adds a `$gt`/`$lt` constraint on `grand_total`; `k`/`m` suffixes supported)* |
 | `what materials does {EST} use?` [est] | `list_materials` filter.related | ✅ filtered to one estimate's lines *(routes via `_CROSS_RESOURCE_QUERY_PATTERNS` with `filter_by={type=estimate, name=E0042}`; since 2026-09-27 (#682) it reads the materials of every work item — it read a top-level list `Estimate` doesn't have and always said "doesn't list any materials yet")* |
-| `which of {EST}'s materials cost over $10?` [est] | `list_materials` filter.related filter.price_above=10 | ✅ the estimate's own lines by unit price — *"Estimate E0001's materials priced over $10.00: Polymeric sand ($20.00)."* *(2026-10-11, #845 — fell back)* · today's pipeline: ⚠️ |
+| `which of {EST}'s materials cost over $10?` [est] | `list_materials` filter.related filter.price.over=10 | ✅ the estimate's own lines by unit price — *"Estimate E0001's materials priced over $10.00: Polymeric sand ($20.00)."* *(2026-10-11, #845 — fell back)* · today's pipeline: ⚠️ |
 | `the Stone materials on {EST}` [est] | `list_materials` filter.related filter.category=Stone | ✅ the estimate's own lines by catalog category *(2026-10-11, #845 — fell back)* · today's pipeline: ⚠️ |
-| `how many materials on {EST} are under $10?` [est] | `list_materials` count filter.related filter.price_below=10 | ✅ the estimate's own lines by unit price *(2026-10-11, #845 — fell back)* · today's pipeline: ⚠️ |
+| `how many materials on {EST} are under $10?` [est] | `list_materials` count filter.related filter.price.under=10 | ✅ the estimate's own lines by unit price *(2026-10-11, #845 — fell back)* · today's pipeline: ⚠️ |
 | `what roles are on {EST}?` / `which roles are on {EST}?` [est] | `list_labours` filter.related | ✅ *(symmetric Labour-agent drilldown; since 2026-09-27 (#682) it reads the activities' and labour lines' roles in every work item, and "which roles …" is delegated — it showed "Intent identified: …")* |
 | `how many estimates did I win this month?` [est] | `list_estimates` count filter.sold filter.period=month | ✅ *(May expansion — "win" added as a verb-form alias for EstimateStatus.WON in `_estimate_status_from_text`; since #784 "win" is the sold set)* |
 | `show only estimates with Won status this month` [est] | `list_estimates` filter.statuses=Won filter.period=month | ✅ *(status + date qualifiers already compose; no new code needed)* |
@@ -480,7 +480,7 @@ a note to a material or role. **Refused by the planner:** labor burden
 | `list estimates for Bob Lee` [est] | `list_estimates` filter.customer | ✅ that customer's (contacts → their properties); a name that is neither a customer nor a property is answered ("I couldn't find a customer or a property called …") *(2026-09-27, #687 — the name was dropped and every estimate listed)* |
 | `show estimates for Elm House` [est] | `list_estimates` filter.property | ✅ that property's *(2026-09-27, #687 — the name was dropped and every estimate listed)* |
 | `show me estimates from last month` [est] | `list_estimates` filter.period=last_month | ✅ the calendar month, as every figure and the dashboard read it *(Simon, 2026-10-10, switchover phase 7e)*; today's pipeline: the past 30 days *(2026-09-27, #687 — "last" was read as "the latest one" and returned a single row)* |
-| `what's the total value of my draft estimates over $1000 before tax?` [est] | `list_estimates` total before_tax filter.total_above=1000 | ✅ the list's total before tax — *"The combined value of your 2 draft estimates over $1,000 is $1,500.00, before tax."*; every list total says which (*"…, including tax."*) *(2026-10-05 — a list's total was tax-inclusive whatever was asked, and said nothing about tax. `… of my sold estimates before tax` stays the list's too: the metric dates a period differently, so tax said must not change which estimates count — review 2026-10-05 #1)* |
+| `what's the total value of my draft estimates over $1000 before tax?` [est] | `list_estimates` total before_tax filter.amount.over=1000 | ✅ the list's total before tax — *"The combined value of your 2 draft estimates over $1,000 is $1,500.00, before tax."*; every list total says which (*"…, including tax."*) *(2026-10-05 — a list's total was tax-inclusive whatever was asked, and said nothing about tax. `… of my sold estimates before tax` stays the list's too: the metric dates a period differently, so tax said must not change which estimates count — review 2026-10-05 #1)* |
 | `how many Lawn Care estimates do I have?` [est] | `list_estimates` count filter.division | ✅ the company's own divisions — *"You have 1 estimate in Lawn Care right now."*; the built-in names still match a company with none of that name *(2026-10-06 — counts and lists knew only the built-in names; the figures read the company's own. `agents/estimate/work_scope.py`)* |
 | `list my Maintenance estimates` [est] | `list_estimates` filter.division=Maintenance | ✅ the company's own divisions *(2026-10-06)* |
 | `how many Maintenance estimates for Bob Lee?` [est] | `list_estimates` count filter.division=Maintenance filter.customer | ✅ both scopes — *"You have 3 estimates in Maintenance for Bob Lee."* *(review 2026-10-06 #1 — any division said dropped the customer, and a word before "estimates" hid "for Bob Lee" from the list reader)* |
@@ -500,7 +500,7 @@ a note to a material or role. **Refused by the planner:** labor burden
 | `how many won estimates for Bob Lee?` / `how many estimates for Bob Lee that are won?` [est] | `list_estimates` count filter.customer filter.sold | ✅ *(2026-09-29; "won" is the sold set since #784)* |
 | `how many sold estimates for Bob Lee this year?` [est] | `list_estimates` count filter.customer filter.sold filter.period=year | ✅ *(2026-09-29)* |
 | `how many estimates for Bob Lee in draft status?` / `how many estimates for Bob Lee in review?` / `how many estimates for Bob Lee on hold?` [est] | `list_estimates` count filter.customer filter.statuses | ✅ *(2026-09-29)* |
-| `how many estimates for Bob Lee over $1000?` [est] | `list_estimates` count filter.customer filter.total_above=1000 | ✅ *(2026-09-29)* |
+| `how many estimates for Bob Lee over $1000?` [est] | `list_estimates` count filter.customer filter.amount.over=1000 | ✅ *(2026-09-29)* |
 | `show me draft estimates for Bob Lee` [est] | `list_estimates` filter.customer filter.statuses=Draft | ✅ *(2026-09-29)* |
 | `how many estimates for Min Won?` / `how many estimates for Min Won this year?` [est] | `list_estimates` count filter.customer | ✅ a surname (or property name) that ends in a status word is that customer's estimates *(2026-09-30, #779 — "Won" was read off the name as a status and "Min" substring-matched other contacts. The whole name is looked up exactly first; the status is read off it only when the whole name is no one's. Review 2026-09-30 #3: also with a period or status after it, and when the orchestrator's contact rule hands over the whole name)* |
 | `show me estimates for Min Won` [est] | `list_estimates` filter.customer | ✅ *(2026-09-30, #779)* |
@@ -1261,6 +1261,21 @@ never by the LLM, and every reply names what it counted.
   only those work items, every visit of a recurring one (decision 3), like a
   division and with one (`MetricQuery.recurring`, `maple_metrics.work_clause`).
   Counts and lists give the estimates that have such work.
+- **An amount** (reference run 2026-10-14): the model writes it as said —
+  *over*, *at least*, *under*, *at most* (`schema_fields.Amount`), *between
+  $1k and $5k* as over and under, *five grand* as 5000 — on the action it
+  belongs to: a list's total or a material's price, a refinement (*only the
+  ones over $1000*), a follow-up (*what about Elm House over 2000?*, which
+  replaces the list's amount), a figure or a card. No amount is read from the
+  words by a pattern (Simon 2026-10-14). A figure has none, so *the total of
+  my draft estimates over $1000* or *how many … under $500* is the estimate
+  list's total or count over it, with its status, kind of work, period and
+  tax (`as_asked.amount_is_a_lists_total`); on what no list holds — an
+  average, a win rate, a card, a customer's, property's or division's
+  figure, a year, *since*, *excluding* — it is said back, never summed over:
+  *"I can't narrow that figure by an amount yet. …"*
+  (`unread_scope.amount_unread`). Beside another request, that request runs
+  and the figure is said back above its reply.
 - **By status** (user 2026-10-06, decision 2): *Maintenance estimates by
   status for the last six months*, *draft vs sent vs won vs lost for
   Maintenance*, *won vs lost status*, *how many estimates are in each
@@ -1434,6 +1449,21 @@ never by the LLM, and every reply names what it counted.
 | `what's the gross margin with tax?` | `metric` metric=margin | ✅ nothing open: the company's margin, always pre-tax *(Phase 3 review #4 — "tax" was looked up as a name. `… after tax` is said back, not read as either: it usually means with the tax taken off — review round 2 #1)* |
 | `what's our revenue with tax?` [est] | `metric` metric=total status=sold | ✅ its tax-inclusive total *(Phase 3 review #4 — "tax" was looked up as a name)* |
 | `win rate by value` / `what share of my quoted dollars did I win?` [est] | `metric` metric=win_rate_by_value | ✅ sold dollars against Lost dollars, by their totals including tax — only when asked so; a plain win rate still counts estimates *(Simon 2026-10-13; decision 14)* |
+| `what's the total value of my draft estimates over $1000?` [est] | `list_estimates` total filter.statuses=Draft filter.amount.over=1000 | ✅ the list's total over the amount — a figure has none *(reference run 2026-10-14; review rounds 20–23)* |
+| `total of my open estimates above $2k` [est] | `list_estimates` total filter.open_only filter.amount.over=2000 | ✅ the open estimates' list, "$2k" read as $2,000 *(2026-10-14)* |
+| `how many of my sent estimates are under $500?` [est] | `list_estimates` count filter.statuses=Sent filter.amount.under=500 | ✅ the list's count under the amount *(2026-10-14)* |
+| `what's the value of my sold estimates over $1,250.50 this month?` [est] | `list_estimates` total filter.sold filter.amount.over=1250.5 filter.period=month | ✅ the sold set's list, its period kept *(2026-10-14)* |
+| `total of my estimates between $1k and $5k` / `total of my estimates over $1000 and under $5000` [est] | `list_estimates` total filter.amount.over=1000 filter.amount.under=5000 | ✅ both bounds *(2026-10-14)* |
+| `total of my Maintenance estimates over $1000` [est] | `list_estimates` total filter.division filter.amount.over=1000 | ✅ that kind of work's estimates *(2026-10-14)* |
+| `what's my average estimate over $1000?` [est] | `metric` metric=average amount.over=1000 | ✅ said back — *"I can't narrow that figure by an amount yet. I can list those estimates with their total instead — for example, "list my estimates over $1,000 with their total"."* — never the average of every estimate *(2026-10-14)* |
+| `what's my win rate on jobs over $5,000?` [est] | `metric` metric=win_rate amount.over=5000 | ✅ said back, as above *(2026-10-14)* |
+| `what's Bob Lee's total over $1000?` [est] | `metric` metric=total subject amount.over=1000 | ✅ said back: a subject may be a customer, a property or a division, and only the run can tell *(review round 21 #4)* |
+| `total of my estimates of at least $1000` [est] | `list_estimates` total filter.amount.at_least=1000 | ✅ "at least" takes an estimate of exactly $1,000 — *"… at least $1,000 …"* *(2026-10-14: the model writes the amount as said — over, at least, under, at most; it was said back while a pattern read the words)* |
+| `total of my estimates up to $5000` [est] | `list_estimates` total filter.amount.at_most=5000 | ✅ *(2026-10-14)* |
+| `total of my estimates over $1M` [est] | `list_estimates` total filter.amount.over=1000000 | ✅ *(2026-10-14)* |
+| `total of my estimates over five grand` [est] | `list_estimates` total filter.amount.over=5000 | ✅ *(2026-10-14)* |
+| `my pipeline over $1000` [est] | `dashboard` card=pipeline amount.over=1000 | ✅ said back, as a figure's — a card has no amount *(2026-10-14)* |
+| `mark it won, and what's my average estimate over $1000 now?` [est] | `set_status` status=Won | ✅ the status changes; the figure is left out and said back above the reply *(review round 23 #1)* |
 
 *Not yet in the Plan format — several turns (phase 3):*
 
@@ -1457,6 +1487,7 @@ never by the LLM, and every reply names what it counted.
 | Phrasing | Plan | Status |
 |---|---|---|
 | `just the won ones` | conversation `ref-ranking-then-just-the-won-ones` | ✅ the planner handles it — was a gap: after a figure or a ranking, a status said is that figure for the status — "Your customers by won value" *(decision 13 left it unsupported, 2026-09-30; 2026-10-13)* |
+| `what about Elm House under $1000?` | conversation `ref-list-then-an-amount-for-another-place` | ✅ the planner handles it — was a gap: after a list, the amount said is that list's amount (`redo_last` amount), the old one replaced (`followups._redo`; #1080, 2026-10-14) |
 
 *Not yet in the Plan format — a reply rather than a phrasing, the public widget, or right after a count or a gross margin (no state in the reader fits):*
 
@@ -1840,7 +1871,7 @@ A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft b
 | Phrasing | Plan | Status |
 |---|---|---|
 | `How much does {material} cost?` | `get_material` field=price | ✅ *(closed in xfail-wave-3 Workstream B — non-possessive cost-query rule in orchestrator)* |
-| `list materials under $10` | `list_materials` filter.price_below=10 | ✅ *(closed in xfail-wave-3 Workstream B — `_parse_price_range_filter` in `agents/material/text_helpers.py` filters the list response by `under/over/below/above $N`)* |
+| `list materials under $10` | `list_materials` filter.price.under=10 | ✅ *(closed in xfail-wave-3 Workstream B — `_parse_price_range_filter` in `agents/material/text_helpers.py` filters the list response by `under/over/below/above $N`)* |
 | `rename size {size} to 1 cubic yard for {material}` | `update_material` fields.size fields.rename_size_to | ✅ *(closed in xfail-wave-3 Workstream B — orchestrator `_match_size_scoped_material_op` rule routes the rename verb)* |
 | `show all sizes for {material}` | `get_material` field=sizes | ✅ lists every size *(2026-09-27; see §4.8)* |
 | `how much does {size} of {material} cost?` / `what is the price of {size} of {material}?` | `get_material` size field=price | ✅ *(May expansion — "of" form cost query pattern)* |
@@ -2316,13 +2347,13 @@ Additive is the default, matching estimate notes (§5.x) — a drive-by note nev
 | `add a note to the task: {text}` [task_focus] | `add_note` parent.domain=task | ✅ the task in focus; with none, Maple asks which |
 | `append to the task notes: {text}` | ask | ✅ |
 | `add notes to the {task} task: {text}` | `update_task` fields.notes_append | ✅ |
-| `add a note to it: {text}` [task_focus] | `add_note` | ✅ with a task anchor *(2026-09-27 review)* |
-| `Add another note: {text}` / `add a note: {text}` [task_focus] | `add_note` | ✅ **no target at all** — the record in focus, the freshest — never a contact by default *(2026-07-25 smoke-test fix — the active task is implied, same as the pronoun forms. 2026-09-24 — routing is now rule-tier: `is_note_add_request` sends a targetless note to whichever domain was touched most recently; before, the borrowed domain plus `add` resolved to `create_task`. 2026-10-12)* |
+| `add a note to it: {text}` [task_focus] | `add_note` parent.domain=task | ✅ with a task anchor *(2026-09-27 review)* |
+| `Add another note: {text}` / `add a note: {text}` [task_focus] | `add_note` parent.domain=task | ✅ **no target at all** — the record in focus, the freshest — never a contact by default *(2026-07-25 smoke-test fix — the active task is implied, same as the pronoun forms. 2026-09-24 — routing is now rule-tier: `is_note_add_request` sends a targetless note to whichever domain was touched most recently; before, the borrowed domain plus `add` resolved to `create_task`. 2026-10-12)* |
 | `replace the notes on the task with: {text}` / `set the notes on the task to: {text}` [task_focus] | `update_task` fields.notes_replace | ✅ the task in focus; with none, Maple asks which |
 | `add a task with the notes: {text}` | `create_task` fields.notes_append | ✅ *(create shape — the notes-update rule explicitly excludes it)* |
 | `don't add a note to it: call Bob` [task_focus] | `acknowledge` | ✅ nothing changes — *"Okay — I'll leave it as it is."* *(2026-09-30, #762 — they appended or replaced the notes. The notes shapes are anchored with `agents.text_utils.COMMAND_LEAD`, and so are the router's copies of them — review 2026-09-30 #13: they still routed to `update_task`, which asked what to change)* *(2026-10-11, #847 — it added the note. Not "don't forget to …", nor with what to do instead)* |
 | `we shouldn't set the notes on the fence task to foo` / `please don't add to the task: call Bob` / `don't add to T0042 bring the contract` | `acknowledge` | ✅ nothing changes *(2026-09-30, #762; 2026-10-11, #847 — as above)* |
-| `add a note to it: don't park on the lawn` [task_focus] | `add_note` | ✅ the note's own words are content, never a negated command *(2026-09-30, #762 — the anchor sits before the verb, so the note body is untouched)* |
+| `add a note to it: don't park on the lawn` [task_focus] | `add_note` parent.domain=task | ✅ the note's own words are content, never a negated command *(2026-09-30, #762 — the anchor sits before the verb, so the note body is untouched)* |
 | `add to the fence task: we shouldn't dig here` | `update_task` fields.notes_append | ✅ the note's own words are content, never a negated command *(2026-09-30, #762)* |
 
 ### 7.6.1.1 Dictated payloads — the first intent wins

@@ -19,7 +19,7 @@ kept its number and its body.
 entries about code only today's pipeline runs dropped there too (the planner never
 runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
 
-- **Entries are numbered and permanent.** Next free number: **1064**. Never
+- **Entries are numbered and permanent.** Next free number: **1089**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -300,10 +300,10 @@ seams that already exist as separate classes.
 | 63 | `list_labours_reply` — agents/labour/service.py:1253 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_labour_list_items(serialized)` — review 2026-10-08 #12, deferred) |
 | 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
 | 63 | `execute` — platform/agents/planner/execute.py:463 (was 46; phase 8 added step pointing and the policy refusal; +4 on 2026-10-11 for the work items of an estimate a create of the plan made, #864. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
-| 53 | `run_planner_turn` — platform/agents/planner/turn.py:465 (58 at :390 until re-measured 2026-10-14, review round 13 #35; new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
+| 53 | `run_planner_turn` — platform/agents/planner/turn.py:521 (:507 until 2026-10-14, #906; :465 until re-measured 2026-10-14, review round 27 #9; 58 at :390 until re-measured 2026-10-14, review round 13 #35; new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
 | 51 | `list_reply` — platform/agents/conversation/record_lists.py:99 (new 2026-10-11: the `within` filter, #845. Move the query building into `_rows(ask, company)` — review 2026-10-11 #11, deferred) |
-| 73 | `_redo` — platform/agents/planner/followups.py:157 (75 at :152 until re-measured 2026-10-14, review round 13 #35; was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; +11 on 2026-10-13 (a status a win rate can't take, the exclusion dropped on a subject swap; round 3 #45); a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
-| 54 | `_refine` — platform/agents/planner/followups.py:317 (:198 until re-measured 2026-10-14, review round 13 #35; was 41; +2 on 2026-10-13; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
+| 76 | `_redo_read` — platform/agents/planner/followups.py:187 (the old `_redo` body, renamed when `_redo` became its amount wrapper — review round 26 #4, 2026-10-14; 73 at :157 and 75 at :152 before, review round 13 #35; was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; +11 on 2026-10-13 (a status a win rate can't take, the exclusion dropped on a subject swap; round 3 #45); a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
+| 60 | `_refine` — platform/agents/planner/followups.py:368 (+6 on 2026-10-14 for an amount and a card's amount — review round 26 #4; 54 at :317, :198 until re-measured 2026-10-14, review round 13 #35; was 41; +2 on 2026-10-13; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
 | 54 | `resolve_work_item` — platform/agents/planner/resolve.py:386 (was 49; move the `by == "name"` arm and its retry into `_work_item_by_name` — review 2026-10-11 #76) |
 | 76 | `_reply_rules` — platform/services/maple_outcomes.py:80 (was 60; +2 on 2026-10-14 for the property-gone reply, review round 13 #3; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
 | 53 | `_created_reply` — routers/agent_helpers/estimate_gathering.py:436 (new 2026-10-12 in the property-link fix; move the legacy follow-up stash (`PENDING_ESTIMATE_FOLLOW_UP_KEY`) into `_stash_follow_up(...)`, which `create_estimate_reply` can share — review round 13 #4) |
@@ -2049,10 +2049,14 @@ negation. Recorded only, not to be worked unless it shows up in use.
 
 **Resolved 2026-10-12:** `followups._redo` re-runs a list's total the other way (`before_tax`) instead of falling back (planner audit 2026-10-12). Test: `test_tax_on_an_estimate_lists_total_is_that_total_the_other_way`.
 
-### 906. [LOW] With nothing before it, the follow-up's reply drops the plan's other actions
+### 906. ~~[HIGH] A follow-up's reply drops the plan's other actions, writes included~~ — RESOLVED 2026-10-14
 `platform/agents/planner/followups.py:321` — "thanks — and last month?" never runs the acknowledge. Only a pleasantry is lost. (review 2026-10-11 #86, deferred)
 
 **Suggested fix:** Return the Reply only when the follow-up is the plan's only action; otherwise note it in the docstring.
+
+**Raised to HIGH 2026-10-14** (review round 27): the same cause — `followups.expand` returns a follow-up's Reply (NO_FIGURE, `_nothing_before`) or fallback for the whole turn — drops a write too, with nothing said: "mark it won, and is that before tax?" after a count replies only NO_FIGURE and the status never changes; "mark it won, and what about Elm House?" with no read before gives only the follow-up's question. The amount cases of this were fixed in round 27 (#1: a card carries its amount, so only the card is left out; #5: a figure left out is said above the follow-up's reply). **Suggested fix (needs Simon's call):** (a) when the plan has other actions, run them and say the follow-up's reply above or below theirs, as `turn._said_above` does — one `_prepared` test per Reply kind; or (b) accept it.
+
+**Resolved 2026-10-14** (Simon, option a): `followups.expand_beside` leaves a follow-up that can only reply out of a plan with a request in it and returns its reply as text; `turn._said_above` says it below the request's reply (above it when that reply is a question, which stays last and is the `clarifying_question`). The follow-up's question isn't kept open — its answer, planned again whole, could make the request's writes twice; the answer is a new request. Alone, or beside only a thanks or a greeting (`_NOTHING_ASKED`), the follow-up's reply is the turn and its question is kept, as before; a follow-up that made a read counts as a request beside it (review round 28 #1); a fallback (`followup:<why>`) still falls back whole. Pinned by the #906 tests in `tests/test_planner_followups.py`, `test_a_follow_ups_reply_is_said_below_the_request_it_stood_beside` / `…above_a_question_the_request_asks` (test_planner_turn.py) and `test_a_figure_and_a_follow_up_beside_a_request_are_each_said` (test_planner_amounts.py).
 
 ### 907. [LOW] `unsaid_period` is dead code and its new arm breaks its contract
 `platform/agents/planner/said.py:216` — Only tests call it. The `_sold_beside` arm returns a sentence, not `unsaid:<op>.<what>`. (review 2026-10-11 #87, deferred)
@@ -2303,6 +2307,36 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
 
+### 1064. [MEDIUM] Reference row asks or reads another way: "add mulch to the front patio work item" [wi]
+`documentation/development/maple-phrasing-reference.md:814` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner asked which estimate to add the mulch to ("I don't see a front patio work item") instead of edit_estimate; it agreed 1 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
+
+**Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
+
+### 1065. [MEDIUM] Reference row asks or reads another way: "this month vs last month" [est]
+`documentation/development/maple-phrasing-reference.md:1371` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner planned a follow-up (redo_last) with nothing before it, so it asked "What would you like to see for this month?" instead of the metric comparison; it agreed 1 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
+
+**Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
+
+### 1066. [MEDIUM] Reference row asks or reads another way: "tasks by person" [none]
+`documentation/development/maple-phrasing-reference.md:2209` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner asked whether to count tasks by person or list one person's instead of task_count by assignee; it agreed 1 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
+
+**Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
+
+### 1067. [MEDIUM] Reference row asks or reads another way: "rename the fence task to edging by property" [none]
+`documentation/development/maple-phrasing-reference.md:2218` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner asked whether "by property" is part of the new name instead of the update_task rename; it agreed 1 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
+
+**Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
+
+### 1068. [MEDIUM] Reference row asks or reads another way: "and mulch materials?" [none]
+`documentation/development/maple-phrasing-reference.md:1868` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner planned a follow-up (redo_last) with nothing before it, so it asked what to know about mulch instead of list_materials; it agreed 2 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
+
+**Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
+
+### 1069. [MEDIUM] Reference row asks or reads another way: "what properties does {contact} own?" [none]
+`documentation/development/maple-phrasing-reference.md:2499` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner planned get_contact instead of list_properties filter.owner; it agreed 2 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
+
+**Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
+
 ### 962. [LOW] A placeholder task title is quoted as if it were a name
 `platform/agents/planner/confirm.py:299` — The question-write confirmation quotes the fallback too: "Should I move the due date of “the task” to …".
 
@@ -2429,6 +2463,51 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 `platform/agents/planner/followups.py:360` — A refinement's statuses replace the list's, so "just the won ones" after the backlog lists Won + Scheduled + Completed — wider than what was shown. Consistent with #784 ("won" alone is the sold set), but "just" reads as narrowing; `test_won_said_bare_is_still_the_sold_set_and_a_new_status_drops_the_backlogs_reading` pins today's behavior. (review round 16 #9, deferred — a product decision)
 
 **Suggested fix:** Simon's call: (a) keep it, as #784 says; or (b) intersect a "just …" refinement's statuses with the list shown (here Won + Scheduled). The suggestion is (b): "just" never widens.
+
+### 1070. ~~[MEDIUM] `amount_is_a_lists_total` / `amount_said`: rare-case branches untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:343` — Edge case: the one-action check, the work / recurring / year / since / excluding scope checks, `recurring=False` as a scope, the statuses copy, days / window_unit kept, on_hold → "On Hold"; and in `amount_said`, "less than", "more than" / "greater than", the required money sign. (review round 20 #8, deferred)
+
+**Suggested fix:** One parametrized case per arm.
+
+**Resolved 2026-10-14:** covered by round 20's rework of the amount reading (`test_an_amount_said_of_a_total_is_the_lists_total`, `test_an_amount_the_list_cant_take_is_left_for_the_say_back`, `test_only_one_figure_is_converted`); each arm's mutant is killed.
+
+*(Superseded 2026-10-14: no amount is read from the words; the model fills `schema_fields.Amount` and the tests are `tests/test_planner_amounts.py` — review round 26 #10.)*
+
+### 1071. [LOW] The unanswered tracker can't see an amount said back
+`platform/agents/planner/unread_scope.py:40` — `AMOUNT_UNREAD` ("I can't narrow that figure by an amount yet …") is a "can't yet" reply, but `services/maple_outcomes._reply_rules` has no entry for it, so the gap won't show as `cant_narrow` in `maple_unanswered`. (review round 20 #10, deferred — since round 20 #1 it is a said-back reply, not a kept question, so it can be classified)
+
+**Suggested fix:** A `_reply_rules` entry (`cant_narrow`, "amount") and a CONSTANT_CASES row in `tests/test_maple_outcomes.py`.
+
+### 1078. ~~[LOW] REST_NOT_DONE is added when the other action does nothing~~ — RESOLVED 2026-10-14
+`platform/agents/planner/unread_scope.py:122` — "hi Maple! what's my average estimate over $1000?" (`[social, metric]`) replies "…I haven't done the rest of what you asked either". The same happens beside acknowledge, cancel or start_over. (review round 22 #7, deferred)
+
+**Suggested fix:** Leave social, acknowledge and similar conversational ops out of `rest`, and add a test.
+
+**Resolved 2026-10-14** (review round 23 #1, option b): REST_NOT_DONE is gone. Beside another request the figure is left out and the request runs, with the say-back above its reply (`unread_scope.without_figures`, `turn._figure_left_out`); beside a greeting or a thanks (`_NOTHING_ASKED`) only the say-back is given. Pinned by `test_a_figure_beside_nothing_asked_is_only_said_back`. Cancel and start_over are requests and run.
+
+### 1080. ~~[MEDIUM] An amount said in a follow-up to an estimate list is dropped silently~~ — RESOLVED 2026-10-14
+`platform/agents/planner/turn.py:445` — `redo_last` has no amount field, and the say-back after `followups.expand` (review rounds 22 #2, 23 #5) reads only a figure or a card. After a list, "what about Elm House over $1000?" lists Elm House's estimates with no amount; after a list read over $1000, "and last month, over $2000?" keeps the old $1000. Nothing is said. (found in review round 22, outside its findings)
+
+**Suggested fix:** When an amount is said with a `redo_last` whose last read is `list_estimates`, set `total_above` / `total_below` from `amount_said` on the expanded list (readable), or say it back (unreadable); a `_prepared` test with a stored list `last_plan_read` for each.
+
+**Resolved 2026-10-14** (reworded after review rounds 24–25 and the move to the model's amounts): `redo_last` carries the amount said with it (`amount`, `schema_fields.Amount`), which `followups._redo` makes the list's — an estimate list's `filter.amount` or a material list's `filter.price` — the old one replaced ("under $1000" after "over $1000" is no empty list), a limit said with it kept; after a figure it is the figure's (converted or said back); after a card it is said back; after any other read, a fallback. A list asked beside it keeps its own. No amount is read from the words.
+
+### 1081. ~~[LOW] An amount over $10,000,000 raises ValidationError~~ — RESOLVED 2026-10-14
+`platform/agents/planner/followups.py:548` — `_Money` is capped at `le=10_000_000` (schema_fields.py:21). "what about Elm House over $20,000,000?" raises from `amount_on_redo`, and "total of my estimates over $20,000,000" from `as_asked.amount_is_a_lists_total` (as_asked.py:379). Either becomes `turn_error`: words said, nothing written. Rare, hence LOW. (review round 24 #10, deferred — the model's own `above` / `below` are capped too, so it can't plan one: the plan is invalid and asked again)
+
+**Suggested fix:** In `amount_said`, read an amount over the cap as unreadable, so it is said back. Test both messages.
+
+**Resolved 2026-10-14** (superseded): no amount is read from the words, so none can exceed the cap after planning. The model's own amount is `_Money` (capped) in `schema_fields.Amount`, so a plan with one over it is invalid and asked again, as any invalid plan is.
+
+### 1087. [LOW] A follow-up's reply goes below a kept question that isn't flagged `needs_clarification`
+`platform/agents/planner/turn.py:493` — `_said_above` reads only `needs_clarification`. A policy-refusal offer ("…archive it instead?", execute.py:465, kept with `ask_again(yes_no=True)`) and an offer after a create ("Would you like to add an email…?") end on a kept question without the flag. So `[create_contact, redo_last subject]` with no read before reads "…Would you like to add an email address?\n\nWhat would you like to know about Elm House?": the kept yes/no question isn't last, and the last question isn't kept. Wording and order only. (review round 28 #7, deferred)
+
+**Suggested fix:** Always put `after` above the request's reply (simplest; the request's own question always stays last), or check for a question this turn opened (`open_question.open_questions(result["context"])`). Test: `_said_above(PlannerTurn({"response": "Done. Archive it instead?", "needs_clarification": False, "context": {…}}), None, "x")` ends with "Archive it instead?".
+
+### 1088. [LOW] Beside a meta op, the follow-up's question is said but not kept
+`platform/agents/planner/followups.py:492` — `followups._NOTHING_ASKED` is {acknowledge, social} only. `[answer, redo_last subject]` replies "I'm not waiting on an answer…" then asks "What would you like to know about Elm House?", which contradicts itself, and the question isn't kept; the same for cancel / start_over / repeat. The reason for not keeping it (writes made twice) doesn't apply to ops that write nothing. (review round 28 #8, deferred)
+
+**Suggested fix:** Needs Simon's call: (a) add `answer` and `repeat` to `followups._NOTHING_ASKED` (recommended; cancel and start_over are requests, per #1078's decision for figures), or (b) accept it. Test: parametrize `test_a_follow_ups_reply_alone_or_beside_thanks_is_the_turn` with the ops chosen.
 
 ## Platform — API, models and data
 
@@ -5019,15 +5098,70 @@ total row count rather than blank-row count.
 
 **Suggested fix:** A `_names(case)` helper that strips "=…", used by the field-name checks.
 
-### 1062. [LOW] Task-note rows that can agree only through their own op
+### 1062. ~~[LOW] Task-note rows that can agree only through their own op~~ — RESOLVED 2026-10-14
 `documentation/development/maple-phrasing-reference.md:2319` — [task_focus] `add_note` rows naming no kind — :2319 "add a note to it: …", :2320 "Add another note: …" / "add a note: …", :2325 "add a note to it: don't park on the lawn" — score differ against `update_task{notes_append}`, the same write (their sibling :2316 was planned that way live). The est/wi estimate-note `add_note` rows (:430, :444, :1048, :1082–1098, :1127, :2340) likewise can't agree with `edit_estimate{add_estimate_note}`, though the prompt never names that command. A false "differ" only, never a false agree. (review round 17 #5, deferred)
 
 **Suggested fix:** Add `parent.domain=task` to :2319, :2320 and :2325; optionally `parent.domain=estimate` to the estimate-note rows.
+
+**Resolved 2026-10-14:** :2319, :2320 and :2325 name `parent.domain=task` (the reference run of 2026-10-14 planned all three as `update_task{notes_append}`, the same write). The estimate-note rows are left: no plan named `add_estimate_note` there.
 
 ### 1063. [LOW] A kind's value isn't checked, and the how-to covers only the row's side
 `platform/scripts/phrasing_reference_rows.py:449` — `_field_problems` checks values only for `commands=`-style paths, so `parent.domain=tsak` passes `problems()` and its equivalence silently becomes unreachable (a false differ, never a false agree) — and since review round 17 #3 a row's named kind also binds its own op, so a misspelling there makes the row differ on every plan. The how-to (reference :356–359) doesn't say the plan must name its kind too, and the plan's §6 "Equivalent plans" still says the two estimate-note ops count "as one" with no condition (related to #1040). (review round 17 #6, deferred)
 
 **Suggested fix:** In `reference_vocabulary`, add `<path>.domain=<kind>` for each `RefDomain` value (agents/planner/refs.py:16) so values are checked; in the how-to, add "… and the plan names it too: an unlabelled 'it' never agrees"; fold the condition into #1040.
+
+### 1072. ~~[MEDIUM] No reference rows for the amount readings~~ — RESOLVED 2026-10-14
+`documentation/development/maple-phrasing-reference.md` — CLAUDE.md requires a reference update in the same change. Only row 483 covers the conversion of a figure with an amount to the list's total; nothing records its other forms (a count, a period, a customer, a division, "between", both bounds) or the said-back reply for what no list holds ("what's my average estimate over $1000?", "what's my win rate on jobs over $5,000?", "… at least $1000"). (review round 20 #9, deferred)
+
+**Suggested fix:** Plan-format rows in §1.12: the conversions as `list_estimates` total_above / total_below (with count), the said-back ones as `conversation` or the reply's plan, per the reference's how-to.
+
+**Resolved 2026-10-14:** Plan-format rows in §1.12 after `win rate by value`, and an "An amount" bullet under "How it reads a question": the conversions as `list_estimates` total / count with total_above / total_below (status, sold, period, division, both bounds, "$2k"); the said-back ones on the model's own plan (`metric` average, win_rate, a subject's total, "at least" / "up to" / "$1M" / "five grand") with the reply; a request beside a figure (`set_status`). The live parity run (owed for the prompt lines) scores them — a row flagged because the model plans the figure `as_asked` converts is explained, not silenced.
+
+*(Superseded 2026-10-14: no amount is read from the words; the model fills `schema_fields.Amount` and the tests are `tests/test_planner_amounts.py` — review round 26 #10.)*
+
+### 1073. [LOW] Three told_not_to explanations rest on a test pinned on another plan shape
+`platform/tests/planner_parity/explained.py` — `test_a_write_said_not_to_be_made_is_left_however_it_is_said` pins `update_task` plans, but the live plans for three of the rows were `clarify` (and "don't add a description to it" planned `fields.title`). `told_not_to` reads the words, and all five live plans give "Okay — I'll leave it as it is." through `turn._prepared`, so the explanations are true but not pinned for that shape. (review round 20 #11, deferred)
+
+**Suggested fix:** Add a `clarify`-plan case to that test.
+
+### 1074. ~~[MEDIUM] `amount_said` / `amount_unread`: rare-case branches untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/unread_scope.py:107` — Edge case, mutants surviving every offline planner test: in `amount_said`, two "over"s or two "under"s counted readable, "greater than" and "below" dropped, "$ 500" with a space, "at most" / "no more than" / "no less than"; in `amount_unread`, the `action.filter is not None` guard (without it a filterless `list_estimates` beside a figure with an amount raises and becomes `turn_error`) and `total_below` in the listed check. (review round 21 #5, deferred)
+
+**Suggested fix:** One parametrized case per arm; for the guard, a `[list_estimates (no filter), metric total]` case.
+
+**Resolved 2026-10-14** (superseded, Simon): no amount is read from the words any more. The model fills one shape, `schema_fields.Amount` (over, at_least, under, at_most), on the action the amount belongs to — a list's `filter.amount`, a material list's `filter.price`, `refine_last` / `redo_last` / `metric` / `dashboard` `amount` — and code only maps the fields (`as_asked._as_list`, `unread_scope.amount_unread`, `followups._redo` / `_narrowed`). `amount_said` and every amount pattern are gone; the engine takes inclusive bounds (`MetricQuery.amount`, `$gte` / `$lte`). Pinned by `tests/test_planner_amounts.py`.
+
+### 1075. ~~[MEDIUM] `amount_is_a_lists_total`: two branches covered only from afar~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:345` — Edge case: dropping `window_unit` from the period copy survives everywhere; dropping the `op != "metric"` check survives test_planner_as_asked.py, yet without it the commonest phrasing ("show me estimates over $1000", one list action) would crash the turn — only a DB-backed test in test_planner_execute_estimate_list.py catches it. (review round 21 #6, deferred)
+
+**Suggested fix:** In test_planner_as_asked.py: a single `list_estimates {total_above}` plan with "show me estimates over $1000" → `is planned`; a `last_n_days` case with `window_unit`.
+
+**Resolved 2026-10-14:** `as_asked._as_list` (the conversion, now per action and from the model's `Metric.amount`) is pinned directly: the window copy with its unit (`test_a_total_carrying_an_amount_is_the_lists`, the last-6-months case) and the op check beside other actions (`test_each_figure_carrying_an_amount_is_converted_whatever_is_beside_it`; a `set_status` beside a figure once raised on it).
+
+### 1082. [MEDIUM] `expand_beside`: edge arms untested
+`platform/agents/planner/followups.py:495` — Edge cases: (a) `social` as the only other action — the parametrize covers `[]` and acknowledge only; mutant M8 (social removed) survives. (b) Two follow-up Replies beside a request, joined with "\n\n" (:534); mutant M10 (only the first said) survives. (review round 28 #2, deferred)
+
+**Suggested fix:** (a) Add `[{"op": "social"}]` to `test_a_follow_ups_reply_alone_or_beside_thanks_is_the_turn`. (b) `_plan(_WON, {"op": "redo_last", "before_tax": True}, {"op": "show_more"})` with a stored count list → `said == NO_FIGURE + "\n\n" + NOTHING_MORE`.
+
+### 1083. [MEDIUM] `_said_above`: the arm where `clarifying_question` differs from `response` is untested
+`platform/agents/planner/turn.py:487` — Edge case. At :496, a multi-action reply (`execute._combined`) sets `clarifying_question` to one sub-reply's question, not the whole response, and it must be left as is. Mutant M14 (always replaced) survives. (review round 28 #3, deferred)
+
+**Suggested fix:** `_said_above(PlannerTurn({"response": "Done.\n\nWhich property?", "needs_clarification": True, "clarifying_question": "Which property?"}), None, "x")` keeps `clarifying_question == "Which property?"`, and the response starts "x\n\n".
+
+### 1084. [MEDIUM] `_expanded_amounts`: the Reply path's `after` join looks unreachable
+`platform/agents/planner/turn.py:458` — Edge case (a defensive guard). At :473, `_joined(note, left.text, after)`: `after` is set only beside an action that isn't a follow-up or a thanks, and the first `_figure_left_out` already removed every planned figure carrying an amount, so `rest` can't be None while `after` is set. Mutant M16 survives. (review round 28 #4, deferred)
+
+**Suggested fix:** Drop `after` from that join, with a comment that it can't be set there (simpler), or add a test if a path reaches it. (Since review round 28 #1, a follow-up that made a read also counts as something that runs — re-check reachability with that.)
+
+### 1085. [MEDIUM] `_changes_besides_amount`: the `won_alone` exclusion is untested
+`platform/agents/planner/followups.py:364` — Edge case. `won_alone` is excluded; it matters only if the model sets it without statuses. Mutant M5 survives. (review round 28 #5, deferred)
+
+**Suggested fix:** Test `_prepared("only the ones over $1000", {"op": "refine_last", "won_alone": True, "amount": {"over": 1000}}, last=_CARD)` → `Reply(AMOUNT_UNREAD)`, or drop `won_alone` from the exclusion if it can't occur alone.
+
+### 1086. [MEDIUM] `_material_matches_price_filters`: guard arms untested
+`platform/agents/material/text_helpers.py:132` — Edge cases: (a) `sizes` not a list → False (:136); (b) a size that isn't a dict is skipped (:143); (c) empty `price_filters` → `all([])` True, so any material matches — only `list_materials_reply`'s `if price_filters:` prevents that. M24 and M25 survive but are equivalent (the single-bound helper rejects these too). (review round 28 #6, deferred)
+
+**Suggested fix:** One unit test in tests/test_material_agent.py: `({"sizes": "x"}, [("gt", 1)])` → False; `({"sizes": ["x", {"price": 5}]}, [("gt", 1), ("lt", 10)])` → True; and return False for empty filters, with an assert.
 
 ## Codebase hygiene (batchable)
 
@@ -5877,3 +6011,20 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `documentation/development/code-review-followups.md` — It says "`commands=add_work_item_note` / `fields.*`, which the same-write checks read"; they read `commands=add_work_item_note`, `fields.property`, `fields.notes_append` and, since review round 16, the row's `parent.domain` / `a.domain` / `b.domain`. (review round 16 #11, deferred)
 
 **Suggested fix:** Name them.
+
+### 1076. [LOW] #1071's suggested fix can't work
+`documentation/development/code-review-followups.md` — #1071 suggests a `_reply_rules` entry for AMOUNT_UNREAD, but the say-back goes out as a `social` meta envelope (as told_not_to's reply does), and `services/maple_outcomes._classify` returns None for `intent == "social"` before reaching `_reply_rules`, so that entry would never be read. (review round 21 #7, deferred)
+
+**Suggested fix:** Rewrite #1071: give the say-back its own intent or envelope, or pass a planned `Outcome("cant_narrow", "amount")` through `PlannerTurn` to `_planned_outcome`; then the CONSTANT_CASES row.
+
+### 1077. ~~[LOW] #1070's resolution overclaims~~ — RESOLVED 2026-10-14
+`documentation/development/code-review-followups.md` — It says each arm's mutant is killed, but "greater than" and the window_unit copy still survive (#1074, #1075). (review round 21 #8, deferred)
+
+**Suggested fix:** Reword it, or close the gap with #1074 and #1075.
+
+**Resolved 2026-10-14** (superseded): the code it overclaimed about is gone — `amount_said` and its patterns were removed when the model took over reading amounts (#1074), and the conversion's window copy and op check are pinned (#1075). #1070 now says so.
+
+### 1079. [LOW] Stale and missing locations in #1071, #1076, #1077
+`documentation/development/code-review-followups.md:2471` — #1071 still cites `unread_scope.py:40`; AMOUNT_UNREAD is now at :30. #1076 and #1077 name the followups file with no line (#1071 is at :2470, #1070 at :2463). (review round 22 #8, deferred)
+
+**Suggested fix:** Change #1071 to `unread_scope.py:30`, and add `:2470` and `:2463` to #1076 and #1077.
