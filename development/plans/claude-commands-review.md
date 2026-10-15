@@ -1,5 +1,12 @@
 # Review of `.claude/commands/` — Improvements and New Command Proposals
 
+> **Superseded 2026-10-15.** The command set was consolidated to five: `/code-review`,
+> `/fix-issues`, `/commit`, `/release`, `/update-docs`. `/commit-prep` became `/commit`;
+> `/pr-description`, `/agent-prompt-review`, `/build-fix`, `/changelog`, `/coverage`,
+> `/dead-code` and `/security-review` were removed, their checks folded into `/code-review`
+> and `/release`. See [`development-process.md`](../development-process.md) §2–§3.1 for the
+> current flow. This file is kept as the April 2026 decision record.
+
 **Date:** 19 April 2026 (updated after user decisions)
 **Scope:** All 7 files in `.claude/commands/` plus `.claude/agents/tdd-guide.md` (for dependency tracing). Settings file and agents beyond `tdd-guide` were out of scope.
 **Reviewer posture:** This is a report only — no file changes have been made. All proposals below are suggestions awaiting your approval.

@@ -1,6 +1,6 @@
 # Development Process
 
-_Last updated: 2026-06-13_
+_Last updated: 2026-10-15_
 
 This document is the canonical, human-readable description of how work flows
 through the 3maples project — from idea to merged code. It complements the
@@ -18,15 +18,17 @@ calling out where the process can be improved.
 ## 1. Repository layout
 
 The working directory is **not** a single git repo. It is a workspace holding
-four independent repositories plus AI tooling:
+five independent repositories: the root config repo and the four product repos
+it gitignores:
 
 | Path | Repo | Contents |
 |---|---|---|
+| `./` (root) | `3maples/claude-config` | `CLAUDE.md`, `.claude/` (commands, rules, agents), `.agents/`, `bootstrap.sh` |
 | `platform/` | `3maples/fieldservice-platform` | FastAPI backend (estimates, agents, AI) |
 | `portal/` | `3maples/fieldservice-portal` | React 18 + Vite frontend |
 | `website/` | `3maples/website` | Marketing site (auto-deploys via GitHub Actions) |
 | `documentation/` | `3maples/documentation` | Plans, changelog, design, dev process (this file) |
-| `.claude/`, `.remember/`, `.agents/` | — | AI memory, session handoff, agent config (not versioned product code) |
+| `.remember/`, `.claude/settings.local.json` | — | Session handoff and machine-local settings (untracked) |
 
 Consequences worth remembering:
 - A change that spans backend + frontend touches **two repos** and needs two
@@ -73,20 +75,25 @@ Work one phase at a time. Repeat this loop for each phase:
    exercise the change end-to-end.
 3. **Fix any issues** that manual testing surfaces.
 4. **`/code-review`** once it works as expected (`/code-review ultra` for larger
-   work). It reviews logic, security, and quality — it does **not** run ruff or
-   mypy (the pre-push hook does); it may run `bandit`. It produces a **numbered**
-   findings list (`#N [SEVERITY] file:line — title`) and writes them to a ledger;
-   it does **not** decide what to fix.
+   work). One pass covers logic, quality, security, coverage (a branch audit of
+   every changed function), dead code the change leaves behind, and LLM agent
+   and prompt checks when an agent or prompt changed. It does **not** run ruff
+   or mypy (the pre-push hook does); it runs `./run_bandit.sh` scoped. It
+   produces a **numbered** findings list (`#N [SEVERITY] file:line — title`) and
+   writes them to a ledger; it does **not** decide what to fix.
 5. **You decide which findings to fix now** and run
    `/fix-issues <numbers | all | none>` (e.g. `/fix-issues 1, 2, 5`). It applies
    the fixes you chose and **auto-logs every unselected finding** to
    `code-review-followups.md` — nothing is silently dropped. The fix-vs-defer
-   call is always explicitly yours, not the reviewer's.
+   call is always explicitly yours, not the reviewer's. It then runs scoped
+   gates on the touched files and clears any red gate one error at a time.
 6. **Manual test again** if `/fix-issues` applied any fixes.
-7. **Commit the phase.** Use `commit-prep` to draft the `<type>: <description>`
-   message (it doesn't re-run platform/portal gates — the hook does; it runs the
-   `website/` build + tests only). Commit needs fresh explicit approval; never
-   `--amend` without checking `HEAD` first (main moves mid-session).
+7. **Commit the phase with `/commit`.** It runs scoped checks on what changed
+   (`platform`: ruff + mypy + related tests; `portal`: related vitest + eslint +
+   typecheck; `website`: tests + build) and, only if every check passes, commits
+   each repo with changes to `main` with a `<type>: <description>` message —
+   all or nothing. It never pushes and never amends. Commit needs fresh explicit
+   approval, and typing `/commit` is that approval.
 8. **Decide: push now, or continue to the next phase.** Commits accumulate
    locally until you push.
 
@@ -95,14 +102,14 @@ When all phases are done (or you decide to push mid-way):
 
 - **The pre-push hook runs automatically and aborts the push on any failure**
   (§3.1, §7.1) — `platform`: **ruff + mypy** (fast, no DB); `portal`: lint +
-  typecheck + tests. The platform **full pytest suite is not in the hook** (too
-  slow + needs the Dev MongoDB) — run it separately (`./run_tests.sh`) when you
+  typecheck + tests. The platform **full pytest suite is not in the hook** (~20
+  min) — run it separately (`./run_tests.sh`, local test MongoDB, §4) when you
   want full-suite confidence; it is not gated at push.
 - On green, **push to `main`**. Push needs its own fresh explicit approval,
   separate from commit — never chained off a prior "proceed with X". Don't
   auto-pivot to a feature branch if a push is blocked; ask first.
-- Changelog entries (`documentation/changelog/`, non-technical, version-
-  incremented) are written **only when explicitly asked**.
+- No changelog at push. Changelog entries (`documentation/changelog/`,
+  non-technical, version-incremented) are written by `/release` (§2.4).
 
 ### 2.4 Promote to production (`/release`)
 Promotion is a **separate, deliberate** event — not every push. Production ships
@@ -112,10 +119,16 @@ command:
 - `/release portal` · `/release platform` · `/release website` · `/release app`
   (`app` = platform + portal, promoted atomically — if either fails its gate,
   neither is promoted).
-- `/release` runs the **full production gate first** — `platform`: ruff + mypy +
-  the **full pytest suite** (vs the Dev MongoDB); `portal`: lint + typecheck +
-  tests; `website`: build + widget tests — then fast-forwards `release` to `main`
-  and pushes it. This is where the full test suite runs (§3.1).
+- `/release` runs the **full production gate first**: the platform **full
+  pytest suite** (against the local test MongoDB, §4) and the `website` build +
+  widget tests — the checks no hook covers. It then fast-forwards `release` to
+  `main` and pushes it, and that push fires each repo's pre-push hook for
+  ruff + mypy (`platform`) and lint + typecheck + tests (`portal`), so nothing
+  runs twice. This is where the full test suite runs (§3.1).
+- For `platform`, `portal` and `app` it also writes the **customer changelog
+  entry** for the promoted commits before pushing (`/release <target>
+  [major|minor|patch]`, minor by default). A `website` release gets none.
+  Committing the entry to `documentation/` is a separate step.
 - **Fast-forward only**; if `release` has diverged it aborts (never force-push).
 - **Pushing `release` triggers the production deploy** (website → GitHub Actions,
   platform → Render, portal → Firebase). So `/release` ships to prod, and per the
@@ -134,7 +147,7 @@ many times each gate runs** — see §3.1.
 |---|---|---|---|
 | Lint (backend) | `./run_ruff.sh` (`--fix` for safe fixes) | **Zero errors** (since 2026-06-04) | **Yes** — platform hook |
 | Type-check (backend) | `./run_mypy.sh` | **Zero errors** (since 2026-05-22) | **Yes** — platform hook |
-| Tests (backend) | `./run_tests.sh` (scoped `tests/test_<module>.py` during impl) | All pass | No — runs separately vs Dev MongoDB (§4) |
+| Tests (backend) | `./run_tests.sh` (scoped `tests/test_<module>.py` during impl) | All pass | No — related tests at `/commit`; full suite in `/release` (§4) |
 | Lint (frontend) | `npm run lint` | Clean | **Yes** — portal hook |
 | Type-check (frontend) | `npm run typecheck` | Clean | **Yes** — portal hook |
 | Tests (frontend) | `npm test` (scoped `-- <file>` during impl) | All pass | **Yes** — portal hook (~15s, no DB) |
@@ -151,32 +164,33 @@ Rules:
 ### 3.1 Where each gate runs — run once, not four times
 
 A change passes through implementation → manual test → `/code-review` →
-`/fix-issues` → `/commit-prep` → commit → push. To avoid running the same gate at
+`/fix-issues` → `/commit` → push. To avoid running the same gate at
 every step, each gate runs at exactly one authoritative point, with only
 *scoped* checks before it:
 
 | Step | ruff | mypy | tests | Notes |
 |---|---|---|---|---|
 | Implementation | **scoped** | **scoped** | **related** | Fast feedback on touched files only — not the gate |
-| `/code-review` | — | — | — | Logic/security/quality only (may run `bandit`); reports numbered findings, fixes nothing |
-| `/fix-issues` | **scoped** | **scoped** | **related** | Only on the files its fixes touched; auto-logs unselected findings to follow-ups |
-| `/commit-prep` | — | — | — | Changed-file detection + message draft; runs `website/` build/tests only (no hook there) |
+| `/code-review` | — | — | — | Logic, quality, security (runs `bandit` scoped), coverage branch audit, dead code, LLM prompts; reports numbered findings, fixes nothing |
+| `/fix-issues` | **scoped** | **scoped** | **related** | Only on the files its fixes touched; clears a red gate one error at a time; auto-logs unselected findings to follow-ups |
+| `/commit` | **scoped** | **scoped** | **related** | Changed files only (portal: related vitest + eslint + typecheck; `website/`: tests + build, no hook there). Commits to `main` only if all pass; never pushes |
 | **Pre-push hook** | **full** | **full** | **portal only** | The push gate (§7.1). Platform: ruff + mypy. Portal: lint + typecheck + tests (~15s, no DB). Aborts the push on failure. |
-| `/release` (production gate) | **full** | **full** | **full** | The full suite's home: ruff + mypy + full pytest (`platform`, vs Dev MongoDB) / lint + typecheck + tests (`portal`) / build + tests (`website`) before fast-forwarding `release` to `main`. Runs only when you invoke `/release` (§2.4). |
+| `/release` (production gate) | **full** (hook) | **full** (hook) | **full** | The full suite's home: full pytest (`platform`, local test MongoDB) and build + tests (`website`) before fast-forwarding `release` to `main`; the release push then fires the hooks for ruff + mypy and the portal gate. Runs only when you invoke `/release` (§2.4). |
 
 So ruff and mypy run **once at full scope** in the pre-push hook; before that
 they're scoped, so they aren't re-run redundantly. The platform **test suite is
-deliberately out of the hook** — it's ~20 min and needs the Dev MongoDB, too
-heavy for a per-push gate — so it's a separate on-demand run. The trade-off: a
+deliberately out of the hook** — it's ~20 min and needs the local test
+MongoDB running, too heavy for a per-push gate — so it's a separate on-demand
+run. The trade-off: a
 backend regression that the scoped/related tests missed isn't caught at push;
 it's caught by the **full suite that `/release` runs before promoting to
-production** (§2.4) — the natural home for the slow, DB-dependent suite. Lint
+production** (§2.4) — the natural home for the slow suite. Lint
 and type errors *are* still gated at every push, and nothing reaches `main`
 without passing them. Net: two tiers — fast gate on every push (hook), full
 gate before prod (`/release`).
 
 `website/` and `documentation/` have **no** pre-push hook: `website/`'s build +
-widget tests run in `/commit-prep`; `documentation/` has no gates.
+widget tests run in `/commit` and `/release`; `documentation/` has no gates.
 
 ---
 
@@ -184,13 +198,20 @@ widget tests run in `/commit-prep`; `documentation/` has no gates.
 
 - Backend: pytest + FastAPI `TestClient`, fixtures in `tests/conftest.py`,
   always inside the activated venv (`run_tests.sh` handles this).
-- **Backend test database: the Dev MongoDB cluster.** The connection URL lives in
-  `.env.local` (which `config.py` loads with precedence over `.env`); no local
-  container needed. Running the full suite requires the machine's IP in the Atlas
-  allowlist. **Because the suite shares the Dev cluster, every test must be
-  self-sufficient — set up the data it needs and clean up everything it creates.**
-  Never depend on pre-existing data; never leave residue. (This is also why the
-  full suite is out-of-band, not in the pre-push hook — see §3.1.)
+- **Backend test database: a local MongoDB container** (`mongodb/mongodb-atlas-local`,
+  a single-node replica set with Atlas Search / Vector Search, so it keeps
+  parity with Dev for `$vectorSearch` and transactions). Start it with
+  `cd platform && ./scripts/start_test_mongo.sh` (idempotent; `stop` / `logs`
+  subcommands); `./run_tests.sh` preflights the connection and prints that hint
+  if it's down. `tests/conftest.py` forces `MONGODB_URL` to `TEST_MONGODB_URL`
+  (default `mongodb://localhost:27017/?directConnection=true`) before
+  `config.Settings()` is instantiated, so tests never touch the Dev cluster.
+  **Manual FE/BE runs are unchanged** — `uvicorn main:app` still reads the Dev
+  cluster from `.env.local`. Targeting a remote cluster on purpose takes both
+  `TEST_MONGODB_URL=<srv url>` and `ALLOW_TEST_AGAINST_REMOTE=1`.
+  **Every test must be self-sufficient — set up the data it needs and clean up
+  everything it creates.** Never depend on pre-existing data; never leave
+  residue (this also keeps the suite runnable against Dev when opted in).
 - Frontend: `npm test`, component behavior + interactions + API integration.
 - Maple has a dedicated coverage matrix (`test_maple_crud_coverage.py`, 117
   phrasings) with a two-tier model: Tier 1 rules-only (default, free), Tier 2
@@ -242,8 +263,8 @@ and, below, exactly where a given piece of information belongs.
 | A rule every contributor/AI must obey ("run mypy before done") | `CLAUDE.md` | memory (it's team-wide, must be versioned) |
 | How the process works as a whole | this `development-process.md` | `CLAUDE.md` (which is rules, not narrative) |
 | The plan/approach for a specific piece of work | `documentation/development/plans/` | `.remember/` (plans must survive + be shareable) |
-| A user-facing summary of shipped work | `documentation/changelog/` (only when asked) | memory or `.remember/` |
-| A durable preference or non-obvious fact about *this user/project* ("commits authored as 3maples", "root isn't a git repo") | auto-memory (`memory/` + `MEMORY.md` line) | `.remember/` (which rolls off) |
+| A user-facing summary of shipped work | `documentation/changelog/` (written by `/release`) | memory or `.remember/` |
+| A durable preference or non-obvious fact about *this user/project* ("commits authored as 3maples") | auto-memory (`memory/` + `MEMORY.md` line) | `.remember/` (which rolls off) |
 | What I did this session, for next-session pickup | `.remember/` | auto-memory (not a durable fact) or changelog |
 | A fact already recorded in code, git history, or `CLAUDE.md` | nowhere — don't duplicate it | memory (redundant, goes stale) |
 
@@ -253,7 +274,7 @@ and, below, exactly where a given piece of information belongs.
   durable user/project context, in auto-memory; if it's session continuity, in
   `.remember/`. Don't copy across stores — link instead (`[[name]]` in memory).
 - **Changelog vs. `.remember/recent.md`** overlap is the most common trap: the
-  changelog is the *curated, user-facing* record (written only when asked);
+  changelog is the *curated, user-facing* record (written by `/release`);
   `.remember/recent.md` is the *raw, internal* session log. Keep the narrative
   detail in `.remember/`, not the changelog.
 - Run the `consolidate-memory` skill periodically to merge duplicate memories,
@@ -273,8 +294,9 @@ The process is mature and well-documented. The biggest weaknesses are all about
 > backlog, standardized plan filenames, and the §8 checklist. The platform hook
 > was **revised 2026-06-14** to ruff + mypy only after a real push showed the
 > full suite is ~20 min + Dev-MongoDB-dependent (§7.1). §7.2 (CI backstop) was
-> evaluated and **deliberately not built**. Remaining open items — §7.5
-> (coverage) and §7.8 (security-review cadence).
+> evaluated and **deliberately not built**. §7.8 was settled 2026-10-15 (security
+> checks run inside every `/code-review`). Remaining open item — §7.5 (coverage
+> trend).
 
 ### 7.1 Local pre-push hook (the chosen gate) — ✅ DONE 2026-06-13
 Tests / mypy / ruff used to be enforced only by remembering to run them — a
@@ -297,9 +319,11 @@ stance):
 first real push attempt showed the full backend suite takes ~20 min and needs
 the Dev MongoDB — far too heavy for a gate that fires on every push in a
 frequent direct-to-`main` flow. So the platform hook runs only the fast,
-DB-free gates (ruff + mypy); the full suite is an on-demand run against the Dev
-cluster (§4). Portal's suite stays in its hook because it's ~15s with no
-external dependency.
+DB-free gates (ruff + mypy); the full suite is an on-demand run, and the
+`/release` gate. (It has since moved off the Dev cluster to a local test
+MongoDB container, §4, but at ~20 min it still doesn't belong in a per-push
+hook.) Portal's suite stays in its hook because it's ~15s with no external
+dependency.
 
 Any failing gate aborts the push; emergency bypass is `git push --no-verify`.
 Because the hook is committed (not a hand-rolled `.git/hooks/` file) every
@@ -350,9 +374,12 @@ Repeat the archive pass for any future RESOLVED items that accumulate.
 
 ### 7.5 Make TDD and coverage observable
 TDD is mandatory but unverifiable after the fact, and the `tdd-guide`'s "80%+
-coverage" target isn't measured anywhere in the gate. Consider a coverage report
-in CI (`./run_tests.sh --cov`) — not necessarily a hard gate, but a visible
-trend so coverage can't silently erode.
+coverage" target isn't measured anywhere in the gate. **Partly addressed
+2026-10-15:** `/code-review` runs a branch audit over every changed function
+and grades each untested branch (key flow HIGH, edge case MEDIUM), so new gaps
+surface at review. Still open: a measured trend. `pytest-cov` and
+`@vitest/coverage-v8` aren't standing dependencies; a periodic
+`./run_tests.sh --cov` report would make erosion across untouched code visible.
 
 ### 7.6 Standardize plan filenames — ✅ DONE 2026-06-13
 The plans `README.md` already flagged that random-word slugs are unscannable.
@@ -364,10 +391,14 @@ The definition of done was spread across several `CLAUDE.md` sections (tests,
 mypy, ruff, docs sync, changelog policy, approval rules).
 **Addressed:** §8 is now the canonical, copy-pasteable pre-handoff checklist.
 
-### 7.8 Clarify when security-review runs
-`security-review` exists as a skill but has no defined trigger in the standard
-flow. Decide a cadence — e.g. on any change touching auth, billing, file
-storage, or external API surfaces — and write it into the lifecycle.
+### 7.8 Clarify when security-review runs — ✅ DONE 2026-10-15
+`security-review` existed as a separate command with no defined trigger in the
+standard flow.
+**Addressed:** the security checks were folded into `/code-review`, so they run
+on every change at §2.2 step 4 — secrets, tracked `.env` files, CORS, tenant
+scope of referenced ids, injection, auth gates, and `./run_bandit.sh` scoped.
+`/code-review <directory>` audits a whole area as it is on disk. The standalone
+command was removed.
 
 ---
 
@@ -381,8 +412,8 @@ is the pre-push hook's job (run once at push), so the per-phase boxes use only
 - [ ] Plan written/reviewed (if multi-step); broken into phases if large
 - [ ] Failing test written first, now passing (TDD)
 - [ ] Scoped `./run_mypy.sh <subtree>` + `./run_ruff.sh <subtree>` + related
-      tests green on the touched files (`platform/`); for `portal/`, the scoped
-      `npm test -- <file>`
+      tests green on the touched files (`platform/`, local test MongoDB up); for
+      `portal/`, the scoped `npm test -- <file>`
 - [ ] Self-review done (async, bounds, N+1, exceptions); pre-existing errors
       surfaced this session fixed + reported
 - [ ] Manual testing passed
@@ -391,13 +422,14 @@ is the pre-push hook's job (run once at push), so the per-phase boxes use only
       auto-logged to `code-review-followups.md`
 - [ ] Re-tested manually if `/fix-issues` applied fixes
 - [ ] Docs synced in the same change (CLAUDE.md / maple-phrasing-reference / etc.)
-- [ ] Phase committed via `commit-prep` draft (`<type>: <description>`), with
-      fresh explicit approval
+- [ ] Phase committed with `/commit` — its scoped checks green, `<type>:
+      <description>` message; typing `/commit` is the approval
 
 **Before push (once — after the last phase, or when you decide to push):**
 - [ ] Pre-push hook green — ruff + mypy (`platform`) / lint + typecheck + tests (`portal`)
-- [ ] Full backend suite (`./run_tests.sh` vs Dev MongoDB) run on demand if the
-      change warrants full-suite confidence — it is **not** gated by the hook
+- [ ] Full backend suite (`./run_tests.sh`, local test MongoDB) run on demand
+      if the change warrants full-suite confidence — it is **not** gated by the
+      hook; `/release` runs it before production
 - [ ] Fresh explicit approval to push to `main` (separate from commit approval)
-- [ ] Changelog entry only if explicitly requested
-- [ ] `main → release` promotion only on explicit instruction
+- [ ] No changelog at push — `/release` writes it
+- [ ] `main → release` promotion only on explicit instruction (`/release`)
