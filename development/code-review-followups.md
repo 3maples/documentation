@@ -19,7 +19,7 @@ kept its number and its body.
 entries about code only today's pipeline runs dropped there too (the planner never
 runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
 
-- **Entries are numbered and permanent.** Next free number: **1100**. Never
+- **Entries are numbered and permanent.** Next free number: **1289**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -117,16 +117,16 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 |------:|------|------|
 | 3,797 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push); 4,022 on 2026-10-05 (+5 that day: `_create_estimate_from_template(audit=)`); 4,089 on 2026-10-06 (+67: tax in the dashboard's figures and a list's total); 4,144 on 2026-10-08 (+55, switchover phase 4d: the property link's write and reply split out as `_apply_estimate_property` for the planner); 4,163 on 2026-10-09 (+19, switchover phase 6b: today's template apply's tail split out as `_add_template_work_item`); +4 on 2026-10-10 (phase 7d: the dashboard's summary card in `dashboard_reply`) |
 | 3,577 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net); +70 by 2026-09-27 — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py`; +155 on 2026-09-27 (multi-turn push: cross-record joins, dashboard, named creates) |
-| 3,483 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | 3,483 on 2026-10-10 (+27 over 3,456, switchover phase 7d: `material_sizes_reply` shared with today's size command, `materials_on_estimate_reply` and `_estimate_materials_reply`); +366 on 2026-09-27 (multi-turn push: size commands, one-question creates); +123 in the 2026-09-27/28 review fixes (3,087 at `main` then) — the material in focus, size-label refusals, "which material?". `_handle_size_command` is 105 lines — split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` (review 2026-09-27 #29) |
+| 3,611 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | 3,611 on 2026-10-17 (review rounds 4–5: size-label refusals and the planner's size read); 3,565 on 2026-10-16 (shared material catalog: reads through `services/material_catalog`, Owner/Admin gates, standard hides; −108 in the review fixes as the standard price write moved to `agents/material/catalog_writes.py`); 3,483 on 2026-10-10 (+27 over 3,456, switchover phase 7d: `material_sizes_reply` shared with today's size command, `materials_on_estimate_reply` and `_estimate_materials_reply`); +366 on 2026-09-27 (multi-turn push: size commands, one-question creates); +123 in the 2026-09-27/28 review fixes (3,087 at `main` then) — the material in focus, size-label refusals, "which material?". `_handle_size_command` is 107 lines — split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` (review 2026-09-27 #29) |
 | 2,823 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug; +70 on 2026-09-27; 2,823 on 2026-10-10 (switchover phase 7d part 2: `properties_using_reply`, the cross list's words split out as `_cross_response`, and `_estimate_linked_reply` and `_joined_properties_reply` split out of `_list_properties_by_cross_resource`, which is now under 50 lines) |
 | 2,561 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
 | 2,498 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | +123 on 2026-09-27 |
-| 2,282 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam |
+| 2,268 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam; 2,268 on 2026-10-16 (shared material catalog: `useMaterialCatalog` replaces the loaded list, and the gap-name lookup was removed in review) |
 | 2,227 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. was `orchestrate_agent_endpoint` at 607 lines; +221 on 2026-09-27 (open question, conversation store, page signals); the endpoint body is now `_orchestrate_turn` (#689), 729 lines (functions table); re-measured 2,227 on 2026-10-07 (+63 that day, from 2,164: the turn id and the unanswered tracker's hooks on the finalize closure, the early exits and the 500 path — review 2026-10-07 #4, deferred) |
 | 1,720 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24, +156 by 2026-09-27. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73); +89 on 2026-09-27 |
 | 1,644 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
 | 1,712 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | +42 on 2026-09-27; 1,712 on 2026-10-10 (+27, switchover phase 7d: `roles_on_estimate_reply`, the per-estimate list's reply split out as `_estimate_labours_reply` so the planner passes its own estimate) |
-| 1,565 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | |
+| 1,696 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | 1,696 on 2026-10-17 (+18 in review round 2's fixes; component ~1,540); 1,678 on 2026-10-16 (shared material catalog stage 2: server paging, filters, standard pricing and the page/row menus; −41 in the review fixes when the result notices moved to `lib/materialNotices.ts`). The component function is ~1,450 lines — **next step:** move the toolbar (search, filters, sort) and the page menu with its three modals into `components/materials/` |
 | 1,284 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
 | 1,274 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
 | 1,246 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | −153 by 2026-09-27 |
@@ -146,7 +146,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 860 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
 | 854 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements); then `ResizeWorkItem` (+16, 2026-10-11); +21 on 2026-10-13 (`Metric.year` / `since` / `excluding`, `win_rate_by_value`; round 3 #45). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
-| 818 | [platform/agents/planner/policy.py](../../platform/agents/planner/policy.py) | **crossed the line 2026-10-13** (792 → 818) in the planner gap-fixing change (`_nameless_checked`, `_typed_nameless_line`). **Next split:** `_nameless_checked`, `_typed_nameless_line`, `_line_kind` and `resolve_work_items` into `policy_lines.py`, as `policy_subject.py` was — review round 13 #20 |
+| 846 | [platform/agents/planner/policy.py](../../platform/agents/planner/policy.py) | 846 on 2026-10-16 (+28: material sizes and the Owner/Admin price check for the shared catalog); **crossed the line 2026-10-13** (792 → 818) in the planner gap-fixing change (`_nameless_checked`, `_typed_nameless_line`). **Next split:** `_nameless_checked`, `_typed_nameless_line`, `_line_kind` and `resolve_work_items` into `policy_lines.py`, as `policy_subject.py` was — review round 13 #20 |
 | ~~1,027~~ 322 | [platform/agents/planner/execute.py](../../platform/agents/planner/execute.py) | **RESOLVED 2026-10-08** — split before switchover phase 5, no behavior change: the handlers moved to `execute_records.py` (contacts, properties, materials, roles, templates, tasks; 404), `execute_estimates.py` (estimate reads joined its writes; 309), `execute_links.py` (the notes feed joined links and notes; 142) and `execute_figures.py` (catalog figures, dashboard, metric; 94). `execute.py` keeps the meta replies, the gate and the run, and builds `COVERED` from each module's `HANDLERS`; `test_each_op_has_one_handler_across_the_executors_modules` fails on an op two modules register. Move to the archive in the next cleanup |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
@@ -168,6 +168,7 @@ fixtures — but these are past the point of scanning.
 
 | Lines | File |
 |------:|------|
+| 851 | [platform/tests/test_material_overrides_api.py](../../platform/tests/test_material_overrides_api.py) | new 2026-10-16 with the shared material catalog; crossed 800 in review round 3. **Next step:** move the reset/load-standard and upload sections into `test_material_standard_bulk_api.py` (review 2026-10-17 round 3 #13) |
 | 6,194 | platform/tests/test_estimate_agent.py |
 | 5,565 | platform/tests/test_estimate_api.py |
 | 4,329 | platform/tests/test_orchestrator_endpoint.py |
@@ -215,6 +216,22 @@ seams that already exist as separate classes.
 | Lines | Function |
 |------:|----------|
 | 965 | `_orchestrate_turn` — routers/agents.py:1057 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) Re-measured 822 on 2026-10-07; +28 that day (794 → 822) for the unanswered tracker's `_track_unanswered` closure and the crash-record hand-off. Re-measured 965 on 2026-10-13 (+7 in the planner gap-fixing change for the request as typed and the overage carry; the rest is older drift — review 2026-10-13 round 5 #32). |
+| 53 | `update_material` — platform/routers/materials.py:345 (2026-10-17; the rename-unhide pushed it over. Extract `_validate_patch(existing, patch, user)` — review round 4 #16) |
+| 124 | `_build_sizes_from_fields` — platform/agents/material/text_helpers.py:379 (edited 2026-10-17; +8 in review rounds 5–6 for the unit said with a price or cost. Split per op: `_remove_size`, `_rename_size`, `_set_size_unit`, `_set_size_price`, `_set_size_cost` — round 4 #17) |
+| 74 | `_handle_get_material_size_scoped` — platform/agents/material/service.py:2714 (edited 2026-10-17. Split into `_size_row_reply(matched)` / `_missing_size_reply(...)` — round 5 #9) |
+| 66 | `_check_add_size_guard` — platform/agents/material/service.py:2396 (edited 2026-10-17. Extract the missing-field reply — round 4 #18) |
+| 210 | `StandardMaterialDialog` — portal/src/components/materials/StandardMaterialDialog.tsx:42 (new 2026-10-16. Split out `StandardDialogFooter` and `StandardPriceRow` — review 2026-10-16 round 2 #60) |
+| ~455 | `MaterialCategoriesTab` — portal/src/components/settings/MaterialCategoriesTab.tsx:26 (+~80 on 2026-10-16 for the standard opt-in. Move the opt-in into a `useStandardOptIn(companyId)` hook plus a small component — round 2 #61) |
+| 53 | `upload_materials_csv` — platform/routers/materials.py:225 (2026-10-16; move the audit and reply-building out of the handler — round 2 #62) |
+| ~70 | `create_company_with_bootstrap` — platform/services/company_service.py:92 (grew 2026-10-16; pull the step list into `_bootstrap_steps(include_materials, include_roles)` — round 2 #63) |
+| 187 | `MaterialSearchDropdown` — portal/src/components/common/MaterialSearchDropdown.tsx:43 (new 2026-10-16, shared material catalog. Move the search effect and its state into a `useMaterialSearch(catalog, isOpen, text)` hook and the option list into `MaterialOptionList` — review 2026-10-16 #123) |
+| 99 | `useMaterialCatalog` — portal/src/hooks/useMaterialCatalog.ts:44 (new 2026-10-16. Move the resolve effect's body into a `resolveInBatches(companyId, ids)` helper — review 2026-10-16 #123) |
+| ~271 | `AiPanel` — portal/src/components/Layout/AiPanel.tsx:105 (2026-10-16, Maple chat UI branch `claude/maple-chat-ui-707776`: ~700 → ~258 after the header, composer, messages, new-session dialog and FAB long-press came out — review 2026-10-16 #12; +13 in round 2 for the "Opening chat…" state and Clear closing history. **Next step:** move the voice auto-send countdown (state, refs, both effects) into a `useVoiceAutoSend(onSubmit, isOpen, isSubmitting)` hook) |
+| ~200 | `MapleComposer` — portal/src/components/Layout/MapleComposer.tsx:54 (new 2026-10-16, split out of AiPanel — review 2026-10-16 #11/#12. **Next step:** move the four strips above and below the bar into a `ComposerNotices` component and the mic into `MicButton`) |
+| ~244 | `useMapleAgent` — portal/src/components/Layout/useMapleAgent.ts:107 (2026-10-16: session history moved out into `useMapleSessions` — review 2026-10-16 #13. **Next step:** move the two page-signal listeners into a `useViewedPageSignals()` hook and the orchestrate call and reply handling out of `submitDirectMessage`) |
+| 116 | `create_estimate_tools` — platform/agents/estimate/tools.py:84 (the factory holding the tool closures; 171 → 116 on 2026-10-16 when `_best_by_name` / `_match_entry` / `_material_row` came out — review 2026-10-16 #117) |
+| 63 | `_handle_create_material` — platform/agents/material/service.py:1328 (107 → 63 on 2026-10-16, review #117; the category/unit resolution is the next cut) |
+| 53 | `_finalize_update_material` — platform/agents/material/service.py:2615 (79 → 53 on 2026-10-16, review #117) |
 | 381 | `update_estimate` — routers/estimates.py:959 (grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation, +5 on 2026-10-01 for the tenant checks; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
 | 124 | `create_estimate` — routers/estimates.py:299 (first measured 2026-10-01: 118 before, +6 for the property and line checks before the slot claim. Extract `_assert_create_refs(company_obj_id, payload)` — tenant batch 1 review #2) |
 | 99 | `duplicate_estimate` — routers/estimates.py:790 (first measured 2026-10-01: 93 before, +6 to drop another company's property from the copy; extract the clone into `_clone_estimate(source, user_email)`) |
@@ -285,7 +302,7 @@ seams that already exist as separate classes.
 | 132 | `list_tasks_reply` — agents/task/service.py:345 (was `_handle_list_tasks`, 104 lines; its body moved here 2026-10-08 as the reply the planner's executor shares, +25 for the signature and docstring; +3 on 2026-10-13; `_handle_list_tasks` is now 14 lines. Moves with `TaskListBase`, #47) |
 | 67 | `_create_task_core` — agents/task/create.py:145 (new 2026-10-08: the body of `_handle_create_task`, about 110 lines, split into its reading and this core both pipelines call — switchover phase 4b. Split into the insert and a `_task_created_reply(task, resolved, unapplied, …)` for the lead and details — review 2026-10-08 (4b) #23, deferred) |
 | 89 | `_resolve_list_ask` — agents/task/service.py:399 (new 2026-09-27; make its `teammate()` closure a method, #47) |
-| 105 | `_handle_size_command` — agents/material/service.py:1693 (new 2026-09-27; +30 on 2026-09-28 for the material in focus and its "which material?" question; split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` — review 2026-09-27 #29) |
+| 107 | `_handle_size_command` — agents/material/service.py:1938 (+2 on 2026-10-17 for the shared-size-label refusal; new 2026-09-27; +30 on 2026-09-28 for the material in focus and its "which material?" question; split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` — review 2026-09-27 #29) |
 | 70 | `parse_task_list_ask` — agents/task/list_filters.py:139 (new 2026-09-27; one reader per filter phrase) |
 | 63 | `open_questions` — routers/agent_helpers/open_question.py:235 (new 2026-09-27; one small reader per question kind — pending intents, delete records, router flows — concatenated — review 2026-09-27 #56) |
 | 132 | `_handle_awaited_field_value` — agents/task/field_flow.py:117 (about 120 before 2026-09-28; +6 then for replies that restate the command. Extract `_read_awaited_value(field, message)` for the cancel check and restated value, and turn the per-field if-chain into a dispatch dict of `_apply_awaited_<field>` coroutines — review 2026-09-28 #4) |
@@ -305,7 +322,7 @@ seams that already exist as separate classes.
 | 76 | `_redo_read` — platform/agents/planner/followups.py:187 (the old `_redo` body, renamed when `_redo` became its amount wrapper — review round 26 #4, 2026-10-14; 73 at :157 and 75 at :152 before, review round 13 #35; was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; +11 on 2026-10-13 (a status a win rate can't take, the exclusion dropped on a subject swap; round 3 #45); a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
 | 60 | `_refine` — platform/agents/planner/followups.py:368 (+6 on 2026-10-14 for an amount and a card's amount — review round 26 #4; 54 at :317, :198 until re-measured 2026-10-14, review round 13 #35; was 41; +2 on 2026-10-13; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
 | 54 | `resolve_work_item` — platform/agents/planner/resolve.py:386 (was 49; move the `by == "name"` arm and its retry into `_work_item_by_name` — review 2026-10-11 #76) |
-| 76 | `_reply_rules` — platform/services/maple_outcomes.py:80 (was 60; +2 on 2026-10-14 for the property-gone reply, review round 13 #3; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
+| 89 | `_reply_rules` — platform/services/maple_outcomes.py:80 (re-measured 2026-10-17; was 60; +2 on 2026-10-14 for the property-gone reply, review round 13 #3; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
 | 53 | `_created_reply` — routers/agent_helpers/estimate_gathering.py:436 (new 2026-10-12 in the property-link fix; move the legacy follow-up stash (`PENDING_ESTIMATE_FOLLOW_UP_KEY`) into `_stash_follow_up(...)`, which `create_estimate_reply` can share — review round 13 #4) |
 | 53 | `ask_to_rewrite` — platform/agents/conversation/record_names.py:211 (50 → 53 in the planner gap-fixing change, `answers=`; build the record in a `_rewrite_record(...)` helper beside `_rewrite_flags` — review round 13 #21) |
 | 51 | `_seed_mixed` — platform/tests/test_metric_ratio_shapes.py:267 (new in the planner gap-fixing change; split into `_seed_sold_side` / `_seed_lost_side` — review round 13 #22) |
@@ -580,6 +597,11 @@ now.
 `platform/scripts/export_unanswered.py:112` — `collect()` reads every `MapleUnanswered` row between `--since` and `--until` with `.to_list()`. With the 180-day TTL and an early `--since`, that is every unanswered turn for six months held in memory at once. LOW: a manual review script; two weeks of traffic is small. (review 2026-10-07 #9)
 
 **Suggested fix:** Accept it for now; if the collection grows, render per reason with an aggregation (`$group` by reason/detail for the counts) and iterate the rows with an async cursor instead of `.to_list()`.
+
+### 1285. [LOW] `release_name_hides_for` scans every tenant, then ~4 round trips per company
+`platform/services/material_catalog_writes.py:629` — The first find has no `company` prefix (no index serves it), then each company reads all its names plus find/update/prune. (review 2026-10-17 round 5 #21, deferred)
+
+**Suggested fix:** Add an index `{standard: 1, hidden_for_name: 1}` (or reuse #1206's slot) and batch the per-company work as `hide_name_clashes_for` does.
 
 ## Silently swallowed errors
 
@@ -1340,6 +1362,16 @@ happens on the phone (where the image is genuinely secondary) rather than on des
 `portal/src/components/Layout/AiPanel.tsx:432` — `{openQuestion && <div role="status">…}` mounts the region with its text in one render; NVDA/JAWS generally don't announce a region that appears already filled. (review 2026-09-27 #87)
 
 **Suggested fix:** Always render an empty `<div role="status" aria-live="polite">` and toggle only its contents.
+
+### 1105. [LOW] The shared Toast's live region is mounted already holding its text
+`portal/src/components/common/Toast.tsx:30` — `role="status"` inserted together with its content is often not announced by NVDA/JAWS — the #757 pattern, now in the component every page uses.
+
+**Suggested fix:** Render an empty status container from `useToast` at all times and put only the toast inside it.
+
+### 1180. [LOW] A disabled item's reason exists only as a title
+`portal/src/components/common/ActionsMenu.tsx:141` — A disabled menuitem can't be focused and its title isn't announced. (review 2026-10-16 round 2 #115, deferred)
+
+**Suggested fix:** `aria-disabled` plus a guarded onClick with `aria-describedby`, or visible secondary text.
 
 ## Responsive and breakpoint drift
 
@@ -2559,6 +2591,171 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Hold the two chips in a module constant `_CREATE_ESTIMATE_LINKED_SUGGESTIONS: List[str]` beside `_HELP_SUGGESTIONS`, and in `get_suggestions` return `list(_CREATE_ESTIMATE_LINKED_SUGGESTIONS)` from the `_created_estimate_has_property` branch instead of rewriting `key`; drop the map entry.
 
+### 1123. [LOW] Material price filters disagree for sizes with no recorded price
+`platform/agents/material/service.py:1635` — The database filter treats an unrecorded price as cost (`$ifNull: [price, cost]`); the name-hint branch filters `_material_to_dict`'s `price: None` and skips the size, so "materials under $20" and "gravel materials under $20" can disagree.
+
+**Suggested fix:** Filter on `EffectiveSize.price` (already falls back to cost) in the name-hint branch. Related: #1086.
+
+### 1124. [LOW] The estimate agent builds an unused materials JSON every generation
+`platform/agents/estimate/service.py:511` — `inventory["materials"]` is a `json.dumps(indent=2)` of the whole visible catalog (~400 rows) built every generation; the generation prompt has no placeholder for it.
+
+**Suggested fix:** Drop `materials_str` and the `available_materials=` kwarg at service.py:1031.
+
+### 1125. [LOW] Material name matches silently capped at 200
+`platform/agents/material/service.py:103` — "How many materials named 'a'" with a name hint counts a capped list (also cross_resource.py:88, work_item_field_handlers.py:120).
+
+**Suggested fix:** Use `count_effective(search=name_hint)` for counts, or say "200+" at the cap.
+
+### 1127. [LOW] New material outcomes in the phrasing reference are prose, not Plan rows
+`documentation/development/maple-phrasing-reference.md:1783` — The Member refusals for material prices and creates, the hide on deleting a standard, the in-use refusal and the standard-rename refusal are paragraphs in §4.1/§4.6, so the reference-as-test-source doesn't drive them.
+
+**Suggested fix:** Add Plan-format rows, e.g. `change the price of {material} to $5` [Member] → refuse `not_permitted`; `delete the material {standard}` → `delete_material` (hides); `rename {standard} to X` → refused.
+
+### 1165. [MEDIUM] Untested edge cases in `price_standard`
+`platform/agents/material/catalog_writes.py:113` — 404 for not found / not a standard (124); `MaterialNotFound` race → 404 (131); `CatalogError`/`ValueError` → 422 (133). (review 2026-10-16 round 2 #100, deferred)
+
+**Suggested fix:** Unit tests over stubbed `get_effective`/`set_sizes_pricing`.
+
+### 1166. [MEDIUM] Untested edge cases in `standard_pricing_changes`
+`platform/agents/material/catalog_writes.py:78` — Price None on an overridden size clears it (103); a unit given while the size's unit is unmapped passes (95). (review 2026-10-16 round 2 #101, deferred)
+
+**Suggested fix:** One test each.
+
+### 1167. [MEDIUM] Untested edge cases in `_material_to_dict`
+`platform/agents/material/service.py:548` — The dict branch (561); `price_recorded` False → None (558). (review 2026-10-16 round 2 #102, deferred)
+
+**Suggested fix:** Two unit tests.
+
+### 1168. [MEDIUM] Untested edge case in `_resolve_target_material`: invalid company id
+`platform/agents/material/service.py:859` — "No material found for id"; untested. (review 2026-10-16 round 2 #103, deferred)
+
+**Suggested fix:** One test.
+
+### 1169. [MEDIUM] Untested edge cases in `_ask_delete_confirmation`
+`platform/agents/material/service.py:1779` — Empty target id / name (1779/1781). (review 2026-10-16 round 2 #104, deferred)
+
+**Suggested fix:** One test each.
+
+### 1170. [MEDIUM] Untested edge case in `_delete_material_via_api`: an id that resolves to nothing
+`platform/agents/material/service.py:751` — Falls through to the route's 404; untested. (review 2026-10-16 round 2 #105, deferred)
+
+**Suggested fix:** `get_effective` → None and the route raising 404 → `MaterialWriteRefused` 404.
+
+### 1171. [MEDIUM] Untested edge case in `_finish_material_delete`: refused with no name
+`platform/agents/material/service.py:2011` — "that material"; untested. (review 2026-10-16 round 2 #106, deferred)
+
+**Suggested fix:** `_finish_material_delete(id, "")` refused → "…'that material'…".
+
+### 1172. [MEDIUM] Untested edge cases in `lookup_materials`
+`platform/agents/estimate/tools.py:129` — Empty catalog note (129); exception → error key (138). (review 2026-10-16 round 2 #107, deferred)
+
+**Suggested fix:** Empty and raising `iter_effective` cases in test_estimate_tools.py.
+
+### 1173. [MEDIUM] Untested edge case in `_fetch_materials_inventory`: a material with no sizes
+`platform/agents/estimate/service.py:492` — `if m.sizes` false; untested. (review 2026-10-16 round 2 #108, deferred)
+
+**Suggested fix:** A sizeless row gets no default size and price 0.
+
+### 1220. [LOW] A Member who renames a standard via Maple is told about prices
+`platform/agents/material/catalog_writes.py:121` — The role check runs before the structural refusal. (review 2026-10-16 round 2 #155, deferred)
+
+**Suggested fix:** Run the structural checks first; drop "You can still change its cost and price." for non-managers.
+
+### 1221. [LOW] A concurrent portal edit to another size is reverted
+`platform/agents/material/catalog_writes.py:96` — Every size from the turn's snapshot is diffed against a fresh read, so a stale value is written back. (review 2026-10-16 round 2 #156, deferred)
+
+**Suggested fix:** Diff against the loaded material's sizes; only sizes the turn changed become writes.
+
+### 1222. [LOW] Maple's hide-on-delete has no Owner/Admin check of its own
+`platform/agents/material/service.py:751` — Relies on upstream gates only; a new caller would hide without the gate. (review 2026-10-16 round 2 #158, deferred)
+
+**Suggested fix:** Check the role before `set_hidden` and raise `MaterialWriteRefused(403, …)`.
+
+### 1223. [LOW] The prefilter's premise is miscounted (needs your call)
+`platform/agents/estimate/catalog_prefilter.py:4` — Docstrings say 376 rows; the seed is 369 size rows grouping into 150 materials, so with a 200 threshold a migrated company with <50 own materials never prefilters. (review 2026-10-16 round 2 #159, deferred)
+
+**Suggested fix:** Needs your call: (a) correct the docstrings to 150 and keep 200 — my pick, a 150-row scan was fine; (b) lower the threshold to ~120.
+
+### 1225. [LOW] The 200 name-match cap is defined three times
+`platform/agents/material/service.py:63` — Also cross_resource.py:88 and work_item_field_handlers.py:120. (review 2026-10-16 round 2 #161, deferred)
+
+**Suggested fix:** One `NAME_MATCH_LIMIT` in services/material_catalog, imported by all three.
+
+### 1242. [LOW] A 404 refusal is tracked as error/agent_failure, not not_found
+`platform/agents/material/catalog_writes.py:64` — `refusal_reason` returns None for 404 and the bare "Material not found" matches no reply rule. (review 2026-10-17 round 3 #27, deferred)
+
+**Suggested fix:** Say a 404 as "I couldn't find the material '{name}'." (classifies as not_found/material); add a test_maple_outcomes row.
+
+### 1243. [LOW] `_NOT_EDITABLE` copies the route's refusal text
+`platform/agents/material/catalog_writes.py:31` — The string is typed in both places (also routers/material_helpers/standard.py:38). (review 2026-10-17 round 3 #28, deferred)
+
+**Suggested fix:** Make it a public constant beside `_SIZES_FIXED` in services/material_catalog_writes.py and import it in both.
+
+### 1249. [LOW] `assert_manager_role` hard-codes the Owner/Admin set
+`platform/agents/role_utils.py:63` — `MANAGER_ROLES` now defines it once. (review 2026-10-17 round 3 #34, deferred)
+
+**Suggested fix:** `if not user or user.role not in MANAGER_ROLES:`.
+
+### 1252. [MEDIUM] Maple's size rebuild fills an unrecorded price with the cost, so a Member's description edit can be refused
+`platform/agents/material/service.py` `_material_payload_from_fields` — For a company material whose size has no recorded price, the rebuilt sizes fall back to the cost, so they differ from the stored snapshot and every edit carries `sizes`. A Member's rename or description edit is then refused as a price change ("Only owners and admins can change material prices and sizes."). Only affects materials saved without a price. Found while fixing review 2026-10-17 round 3 #1.
+
+**Suggested fix:** Rebuild existing sizes with their stored price as-is (keep `None`), so an edit that doesn't touch sizes carries no `sizes`. Test: a Member describes a company material whose size has no price.
+
+### 1256. [MEDIUM] Untested edge case in `_check_add_size_guard`: a cost given as a string
+`platform/agents/material/service.py:2432` — `_parse_cost`'s string arm. (review 2026-10-17 round 4 #21, deferred)
+
+**Suggested fix:** One test.
+
+### 1257. [MEDIUM] Untested edge cases in `_build_sizes_from_fields`: price or cost given as strings
+`platform/agents/material/text_helpers.py:395` — Lines 395, 397. (review 2026-10-17 round 4 #22, deferred)
+
+**Suggested fix:** Dict-in/dict-out tests.
+
+### 1258. [MEDIUM] Untested edge cases in `_material_payload_from_fields`
+`platform/agents/material/service.py:591` — A non-dict size skipped (591); an empty `sizes` popped (614); a stored size with a price but no cost (604 else). (review 2026-10-17 round 4 #23, deferred)
+
+**Suggested fix:** Dict-in/dict-out tests.
+
+### 1259. [MEDIUM] Untested edge case in `_handle_size_command`: material not found
+`platform/agents/material/service.py:1943` — Untested. (review 2026-10-17 round 4 #24, deferred)
+
+**Suggested fix:** One test.
+
+### 1270. [MEDIUM] Untested edge cases in `_remove_or_rename_refusal`
+`platform/agents/material/service.py:155` — A rename onto the same label in another case ("bag" → "Bag") returns None; a remove or rename with no size words returns None. Neither is tested. (review 2026-10-17 round 5 #5, deferred)
+
+**Suggested fix:** One test each.
+
+### 1271. [MEDIUM] Untested edge case in `_size_already_there`: no size words
+`platform/agents/material/service.py:2170` — Returns None; untested. (review 2026-10-17 round 5 #6, deferred)
+
+**Suggested fix:** One test.
+
+### 1272. [MEDIUM] Untested edge cases in `_handle_get_material_size_scoped`
+`platform/agents/material/service.py:2714` — A material with no sizes ("Available sizes: none"); a cost or price that isn't a number, shown as "—" (a size with no recorded price); a missing unit, shown as "—". (review 2026-10-17 round 5 #7, deferred)
+
+**Suggested fix:** One test each.
+
+### 1273. [MEDIUM] Untested edge case in `_build_sizes_from_fields`: an added size without `unit_oid`
+`platform/agents/material/text_helpers.py:458` — Today's LLM path resolves the unit only when no price or cost is given, so this case can occur; untested. (review 2026-10-17 round 5 #8, deferred)
+
+**Suggested fix:** A dict-in/dict-out test.
+
+### 1280. [LOW] An edit that names a shared size only to say which material is refused
+`platform/agents/material/service.py:2562` — `_check_size_label_refusal` runs for any fields carrying `size`, so `{size: "4", description: "screened"}` on a material with `4` and `4"` is refused with "change them on the Materials page" though no size would change. (review 2026-10-17 round 5 #16, deferred)
+
+**Suggested fix:** Run the shared check only when the op touches the size (`size_op`, price, cost, unit, add); otherwise drop `size` from the fields.
+
+### 1281. [LOW] An exact stored label — even Maple's own "which size?" choice — is still refused (needs Simon's call)
+`platform/agents/material/service.py:2591` — With `4` and `4"` stored, a price without a size asks "which size — 4 or 4\"?" and then refuses either answer; `Bag`/`bag` and `4'`/`4"` collide the same way. (review 2026-10-17 round 5 #17, deferred)
+
+**Suggested fix:** Needs Simon's call: (a) keep it; (b) match the exact stored label first (keep the raw size before normalizing) and refuse only when nothing matches exactly but two match normalized — the reviewer's pick; (c) refuse up front instead of asking which size.
+
+### 1282. [LOW] A size read gives the write refusal "so I don't touch the wrong one"
+`platform/agents/material/service.py:2001` — Both the size command's read and the planner's size read (2738) refuse a read, though nothing is touched. (review 2026-10-17 round 5 #18, deferred)
+
+**Suggested fix:** For reads, list each matching size ("Topsoil in 4 is $1.50; in 4\" is $3.00.").
+
 ## Platform — API, models and data
 
 **Resolved 2026-09-27** (platform `2c2e5d0`): `agents/conversation/out_of_chat.py` answers company default percentages, team/invitations, billing/plan/credits, Load Standard, CSV import, units, divisions, unlink, duplicate, the estimate document and photos with the place in the app where each is done (user-guide wording), as a policy refusal read on the command head only. Pinned by `tests/test_out_of_chat_redirects.py` (including false-positive guards: work-item markup, "the duplicate contact", "the invoice task", note bodies) and corpus rows `boundary-*`. Snapshot: "duplicate it" and "set the company's default markup for work items to 20%" now redirect.
@@ -2687,7 +2884,9 @@ gating recalculation on change-detection would risk stale totals if the
 change-detector missed a case. Leave alone unless profiling shows latency.
 Filed so we don't re-litigate.
 
-### 35. [LOW] `names` list in materials bulk-fetch may contain casing duplicates
+### 35. ~~[LOW] `names` list in materials bulk-fetch may contain casing duplicates~~ — RESOLVED 2026-10-16
+
+**Resolved 2026-10-16** (shared material catalog): the upload now fetches the company's materials in one query keyed by `norm_name`, so casing duplicates collapse.
 **File**: `routers/materials.py:295`
 **Severity**: LOW
 
@@ -2927,6 +3126,158 @@ geocode and note it in the comment.
 `platform/routers/billing.py:440` — `sync-payment-method` retrieves `body.payment_method_id` and sets it as the default without checking `pm.customer == company.stripe_customer_id`. Stripe should refuse a card not attached to the customer, so likely not exploitable. (tenant audit 2026-10-01, A10)
 
 **Suggested fix:** Refuse (404) when `pm.customer` isn't the company's Stripe customer, before the update call.
+
+### 1100. [MEDIUM] Dead route: POST /materials/load-standard (keep until the new portal ships)
+`platform/routers/materials.py:362` — The new portal no longer calls it — only tests do (review 2026-10-16 #69). Deferred, not deleted: the portal on `release` still calls it, and the platform deploys first, so removing it now would break the live Materials page until the portal ships.
+
+**Suggested fix:** Delete it with its tests (test_material_overrides_api.py, test_material_bootstrap.py's load-standard cases) in the stage-6 cleanup, once the stage-2 portal is on `release`.
+
+### 1101. [MEDIUM] Dead branch: GET /materials bare-array response, unbounded (keep until the new portal ships)
+`platform/routers/materials.py:293` — The new portal always sends page and page_size; the no-parameter branch streams the whole effective catalog (376+ standards plus the company's own) with no cap (review 2026-10-16 #70). Deferred: the portal on `release` still calls `materialsApi.list` without paging.
+
+**Suggested fix:** Once the stage-2 portal is on `release`, make paging the only shape and update test_material_api.py, test_material_bootstrap.py and test_resources_rbac.py.
+
+### 1110. [LOW] Standard-category delete refusal advice leads nowhere
+`platform/routers/material_categories.py:149` — A keyed category is refused while live standards use it even when `include_standard` is already off; "turn its standard materials off instead" doesn't unblock the delete, and it answers 409 while the in-use check above answers 400.
+
+**Suggested fix:** Reword: "Standard categories can't be deleted; turn their standard materials off to hide them." and align the status code.
+
+### 1111. [LOW] NaN and Infinity accepted as a material cost or price
+`platform/routers/materials.py:105` — JSON/pydantic floats and `_to_float("nan")` accept them in PATCH /pricing, PUT, create and CSV cells; NaN passes the `< 0` check and is stored (Owner/Admin, own company only).
+
+**Suggested fix:** `Field(allow_inf_nan=False)` on SizePricing / MaterialSizeCost / the PUT model, and `math.isfinite` in `_to_float`.
+
+### 1112. [LOW] PUT /materials/{id} lost response_model and answers two shapes
+`platform/routers/materials.py:767` — Returns a raw Material document for a company material and `to_api()` for a standard; PATCH /material-categories/{id} (:272) also returns a document dump with no model.
+
+**Suggested fix:** Return `(await get_effective(...)).to_api()` for both, or declare a response model.
+
+### 1113. [LOW] PATCH /materials/{id}/pricing writes and audits no-op entries
+`platform/routers/materials.py:865` — An entry carrying only `size` makes `changes == {}`, yet the write cycle runs and a MATERIAL_OVERRIDE audit entry is logged.
+
+**Suggested fix:** Skip entries with empty changes; audit only when something was written.
+
+### 1114. [LOW] Removing unused materials audits differently by path
+`platform/routers/materials.py:353` — `_remove_unused_custom` (reset-standard) writes one MATERIAL_DELETE with before-state per material, awaited in sequence; DELETE /materials writes one bulk entry without before-states.
+
+**Suggested fix:** Pick one shape for both — per-item before-states via a batch insert, or one bulk entry listing the removed ids.
+
+### 1115. [LOW] A Member's rename of a standard material is told to duplicate it
+`platform/routers/materials.py:725` — The non-size refusal (409, `action: "duplicate"`) runs before `_require_manager`; duplicate is Owner/Admin and answers 403.
+
+**Suggested fix:** Call `_require_manager` first, or drop `action` from the reply for non-managers.
+
+### 1128. [MEDIUM] Dead route: POST /billing/enterprise-contact has no caller
+`platform/routers/billing.py` — The portal's EnterpriseContactModal was unreachable (its last caller went in 53c6072) and was deleted on 2026-10-16 with `billingApi.enterpriseContact` (review 2026-10-16 #52). The platform route and its Brevo send remain with no caller; a route may still have external callers, so it wasn't deleted with the portal side.
+
+**Suggested fix:** Decide whether Enterprise inquiries come back (wire a contact form into the plan picker's Enterprise option) or go for good — then delete the route, its request model and its tests.
+
+### 1141. ~~[MEDIUM] Untested edge case in `_size_writes`: a size listed twice~~ — RESOLVED 2026-10-17
+
+**Resolved 2026-10-17:** `_size_writes` was replaced by `services.material_catalog.standard_size_changes`; `test_material_catalog_size_changes.py::test_any_change_to_the_size_list_is_refused[a size twice]` covers it.
+`platform/routers/material_helpers/standard.py:18` — The `len(incoming) != len(current)` arm (same set, one duplicated) is never driven. (review 2026-10-16 round 2 #76, deferred)
+
+**Suggested fix:** PUT [yard, yard, bag] → 409.
+
+### 1142. [MEDIUM] Untested edge case in `price_standard_rows`: a failed write
+`platform/routers/material_helpers/upload.py:190` — `except (CatalogError, ValueError)` making every row of that standard an error is never driven. (review 2026-10-16 round 2 #77, deferred)
+
+**Suggested fix:** Monkeypatch `set_sizes_pricing` to raise `MaterialNotFound` for one standard; its rows are errors, the other standard is priced, custom rows written.
+
+### 1143. [MEDIUM] Untested edge case in `_checked_amount`: non-finite
+`platform/routers/material_helpers/upload.py:121` — "nan"/"inf" should give "Cost must be a number"; untested. (review 2026-10-16 round 2 #78, deferred)
+
+**Suggested fix:** Add nan and inf rows to the row-error parametrize.
+
+### 1144. [MEDIUM] Untested edge case in `to_float`: a cell holding only "$"
+`platform/routers/material_helpers/common.py:53` — Untested. (review 2026-10-16 round 2 #79, deferred)
+
+**Suggested fix:** Add a custom row with cost "$".
+
+### 1145. [MEDIUM] Untested edge case in `set_material_pricing`: two entries for one size
+`platform/routers/material_overrides.py:187` — The `setdefault(...).update(...)` merge is never driven. (review 2026-10-16 round 2 #80, deferred)
+
+**Suggested fix:** PATCH [{yard, cost 20}, {YARD, price 30}] → yard is (20, 30) in one write.
+
+### 1146. [MEDIUM] Untested edge case in `duplicate_material`: no body
+`platform/routers/material_overrides.py:218` — `body is None` is never driven. (review 2026-10-16 round 2 #81, deferred)
+
+**Suggested fix:** POST /duplicate with no body → "<name> copy".
+
+### 1147. [MEDIUM] Untested edge case: deleting a keyed unit no live standard uses
+`platform/routers/material_units.py:139` — The category side has this test; units don't. (review 2026-10-16 round 2 #82, deferred)
+
+**Suggested fix:** Mirror the category test for units.
+
+### 1148. [MEDIUM] Untested edge case: a unit PUT can't set `standard_key`
+`platform/routers/material_units.py:110` — Server-ownership is only tested on create. (review 2026-10-16 round 2 #83, deferred)
+
+**Suggested fix:** PUT `standard_key: "tons"` on an unkeyed unit; it stays None.
+
+### 1149. [MEDIUM] Untested edge case in `catalog_http`: the generic 422
+`platform/routers/material_helpers/common.py:36` — Only `UnknownSize` reaches it, via a race. (review 2026-10-16 round 2 #84, deferred)
+
+**Suggested fix:** Unit-test `catalog_http(UnknownSize("x"))` → 422 "x", or map it explicitly.
+
+### 1186. [LOW] A blank price leaves a pin that equals the current markup price
+`platform/routers/material_helpers/upload.py:146` — Pins are detected as `price != markup_price(cost)`; a pin equal to it stays and won't follow a later markup change. (review 2026-10-16 round 2 #121, deferred)
+
+**Suggested fix:** Expose `EffectiveSize.price_overridden` and clear whenever pinned.
+
+### 1187. [LOW] PUT `price: null` on a cost-only override writes and audits a no-op
+`platform/routers/material_helpers/standard.py:39` — Writes {"price": None} and audits it. (review 2026-10-16 round 2 #122, deferred)
+
+**Suggested fix:** Clear a price only when it is pinned.
+
+### 1188. [LOW] DELETE /overrides with no override still audits
+`platform/routers/material_overrides.py:270` — An audit entry for nothing. (review 2026-10-16 round 2 #123, deferred)
+
+**Suggested fix:** Skip the audit when before equals after.
+
+### 1189. [LOW] PATCH /visibility to the current state still audits
+`platform/routers/material_overrides.py:250` — An audit entry for nothing. (review 2026-10-16 round 2 #124, deferred)
+
+**Suggested fix:** Skip the audit when before equals after.
+
+### 1190. [LOW] Reset-to-standard on a company material answers 404; pricing answers 409
+`platform/routers/material_overrides.py:267` — `_standard_doc` raises MaterialNotFound for a company material. (review 2026-10-16 round 2 #125, deferred)
+
+**Suggested fix:** Raise `NotStandard` for the company's own material; update the test.
+
+### 1191. [LOW] A compare-and-set give-up mid-upload is a bare 500 after a partial write
+`platform/routers/material_helpers/upload.py:188` — `RuntimeError` from `set_sizes_pricing` isn't caught here, at material_overrides.py:190 or standard.py:70. (review 2026-10-16 round 2 #126, deferred)
+
+**Suggested fix:** Catch it: a row error in the upload, 409 "changed underneath, try again" in PATCH/PUT.
+
+### 1192. [LOW] PUT on another company's material answers 403; GET and DELETE answer 404
+`platform/routers/materials.py:355` — `Material.get(oid)` isn't company-filtered; the 403 confirms the id exists. (review 2026-10-16 round 2 #127, deferred)
+
+**Suggested fix:** `Material.find_one({"_id": oid, "company": current_user.company})` → 404.
+
+### 1193. [LOW] `toggle_all_standard_categories` re-implements `company_param`
+`platform/routers/material_categories.py:264` — A copy of the ObjectId check. (review 2026-10-16 round 2 #128, deferred)
+
+**Suggested fix:** Use `company_param`.
+
+### 1194. [LOW] load-standard writes the toggle audit inline
+`platform/routers/material_overrides.py:98` — Twin of `_audit_toggle`. (review 2026-10-16 round 2 #129, deferred)
+
+**Suggested fix:** Move `_audit_toggle` into common (with optional `via`) and call it.
+
+### 1195. [LOW] Dead `or before_state.get("id")`
+`platform/routers/material_overrides.py:76` — `by_alias=True` always yields `_id`. (review 2026-10-16 round 2 #130, deferred)
+
+**Suggested fix:** `str(before_state["_id"])`.
+
+### 1196. [LOW] Unreachable `except ValueError → 422` in get_materials
+`platform/routers/materials.py:196` — Inputs are validated before it. (review 2026-10-16 round 2 #131, deferred)
+
+**Suggested fix:** Drop it or comment it as defensive.
+
+### 1206. [LOW] The `company_hidden` index serves no query
+`platform/models/material_override.py:52` — Every query is served by `company_standard_unique`. (review 2026-10-16 round 2 #141, deferred)
+
+**Suggested fix:** Drop it, or add the query it was meant for.
 
 ## Platform — services, scripts and integrations
 
@@ -3357,6 +3708,216 @@ row count first — this may be years away.
 
 **Suggested fix:** Type it as `Literal["sent", "archive"]` (and `status_change_role_refusal`'s return), with an explicit archive arm.
 
+### 1118. [LOW] Seed-template name fallback can bind to a category holding another key
+`platform/services/bootstrap_helpers.py:59` — `existing_by_name.get(tpl["name"])` also returns docs whose `standard_key` is another key; a renamed seeded category can capture another key's template, leaving that key unmapped so `ensure_standard_vocabulary` and "enable all" skip its standards.
+
+**Suggested fix:** When the template has a key, fall back by name only to keyless docs.
+
+### 1119. [LOW] Duplicating a material records a price the source never had
+`platform/services/material_catalog.py:878` — `price=size.price` copies the cost fallback when `price_recorded` is False; the copy then reports a recorded price and catalog_metrics counts it.
+
+**Suggested fix:** `price=size.price if size.price_recorded else None`.
+
+### 1120. [LOW] Own materials and standard materials sort by different name keys
+`platform/services/material_catalog.py:402` — Custom items sort by `$toLower: "$name"`, standards by `norm_name` (trimmed, inner whitespace collapsed); names with leading or doubled spaces sort out of order in the merged list.
+
+**Suggested fix:** Trim/collapse in the pipeline, or store `name_norm` on Material at write time.
+
+### 1150. [MEDIUM] Untested edge cases in `_validate`
+`platform/services/material_catalog.py:437` — Bad `source` (439), `visibility` (441), price direction (444) — the router's Literals stop them first. (review 2026-10-16 round 2 #85, deferred)
+
+**Suggested fix:** Three `pytest.raises(ValueError)` on `list_effective`.
+
+### 1151. [MEDIUM] Untested edge case in `list_effective`: no enabled category with source standard
+`platform/services/material_catalog.py:499` — Untested. (review 2026-10-16 round 2 #86, deferred)
+
+**Suggested fix:** Disable every category; `list_effective(source="standard")` is an empty page.
+
+### 1152. [MEDIUM] Untested edge case in `count_effective`: no enabled category with source standard
+`platform/services/material_catalog.py:526` — Untested. (review 2026-10-16 round 2 #87, deferred)
+
+**Suggested fix:** Same setup; `count_effective` returns 0.
+
+### 1153. [MEDIUM] Untested edge cases in `_category_ids`
+`platform/services/material_catalog.py:447` — A blank string means no filter (450); a duplicate id is folded (458). (review 2026-10-16 round 2 #88, deferred)
+
+**Suggested fix:** Assert `category=""` equals no filter and `[id, id]` equals `[id]`.
+
+### 1154. [MEDIUM] Untested edge cases in `_hide_standards`
+`platform/services/material_catalog_writes.py:410` — Every clash already hidden → `[]` (421); the `BulkWriteError` retry (434). (review 2026-10-16 round 2 #89, deferred)
+
+**Suggested fix:** A pre-hidden test and a monkeypatched `bulk_write` raising once.
+
+### 1155. [MEDIUM] Untested edge cases in `hide_name_clashes_for`
+`platform/services/material_catalog_writes.py:455` — Blank names (465); names only retired standards hold (469); a twin already hidden (482). (review 2026-10-16 round 2 #90, deferred)
+
+**Suggested fix:** Direct tests of all three.
+
+### 1156. [MEDIUM] Untested edge case in `set_standard_categories`: a malformed category id
+`platform/services/material_catalog_writes.py:507` — Raises `MaterialNotFound`; the router screens it first. (review 2026-10-16 round 2 #91, deferred)
+
+**Suggested fix:** `set_standard_categories(company, enable=True, category_ids=["nope"])` raises.
+
+### 1157. [MEDIUM] Untested edge case in `_parse_row`: negative cost
+`platform/services/standard_material_seed.py:113` — Untested. (review 2026-10-16 round 2 #92, deferred)
+
+**Suggested fix:** Add the row to `test_bad_rows_are_errors_not_skips` (needle "negative").
+
+### 1158. [MEDIUM] Untested edge case in `_add_to_group`: one name with two keys
+`platform/services/standard_material_seed.py:134` — Untested. (review 2026-10-16 round 2 #93, deferred)
+
+**Suggested fix:** Add the rows to the same parametrize (needle "has key").
+
+### 1159. [MEDIUM] Untested edge case in `_vocabulary_keys`: an unkeyed doc whose key another doc holds
+`platform/services/material_migration.py:136` — (151) untested. (review 2026-10-16 round 2 #94, deferred)
+
+**Suggested fix:** A keyed and an unkeyed "Aggregates"; `keys_to_backfill == 0`.
+
+### 1160. [MEDIUM] Untested edge cases in `_backfill_keys`
+`platform/services/material_migration.py:244` — `key in held` skip (257); `modified_count == 0` race, no audit (262). (review 2026-10-16 round 2 #95, deferred)
+
+**Suggested fix:** Same setup; no audit for the second doc.
+
+### 1161. [MEDIUM] Untested edge cases in `_recheck_identical`
+`platform/services/material_migration.py:301` — Standard missing, or the copy given `derived_from` between plan and apply (318). (review 2026-10-16 round 2 #96, deferred)
+
+**Suggested fix:** Set `derived_from` on a planned identical copy before apply; it's neither deleted nor counted.
+
+### 1162. [MEDIUM] Untested edge case in `_mark_detached`: nothing left unmarked
+`platform/services/material_migration.py:341` — Returns 0 (350); untested. (review 2026-10-16 round 2 #97, deferred)
+
+**Suggested fix:** Assert `detached_marked == 0` in the test above.
+
+### 1163. [MEDIUM] Untested edge cases in `main`
+`platform/scripts/db/load_default_templates.py:30` — Unknown company → 1 (39); non-default template skipped (58); unmatched vs resolved status (62). (review 2026-10-16 round 2 #98, deferred)
+
+**Suggested fix:** Call `main` with `init_db` patched: an unknown id, then a seeded company.
+
+### 1164. [MEDIUM] Untested edge case in `_load_catalog`: an id `resolve_many` drops
+`platform/services/template_bootstrap.py:268` — A race; untested. (review 2026-10-16 round 2 #99, deferred)
+
+**Suggested fix:** Monkeypatch `resolve_many` to drop one id; that line lands in `unmatched_materials`.
+
+### 1201. [LOW] `hide_name_clashes_for` scans every tenant's materials with regexes
+`platform/services/material_catalog_writes.py:472` — No company filter or index prefix on each applied seed. (review 2026-10-16 round 2 #136, deferred)
+
+**Suggested fix:** Store `name_norm` on Material (also fixes #1120) and query `{"name_norm": {"$in": wanted}}`.
+
+### 1202. [LOW] Any BulkWriteError is treated as a lost upsert race
+`platform/services/material_catalog_writes.py:434` — A non-duplicate-key error falls through; names are still reported hidden. (review 2026-10-16 round 2 #137, deferred)
+
+**Suggested fix:** Re-raise unless every write error is code 11000.
+
+### 1203. [LOW] The migration's estimate audit lacks `audit_metadata`
+`platform/services/material_migration.py:283` — Later conflicts degrade to document level. (review 2026-10-16 round 2 #138, deferred)
+
+**Suggested fix:** Add `audit_metadata(written, {"job_items": ...})`.
+
+### 1204. [LOW] Before-states are built after the delete
+`platform/services/material_migration.py:332` — A mid-loop failure loses the rest. (review 2026-10-16 round 2 #139, deferred)
+
+**Suggested fix:** Build them first and `insert_many` the audits before `delete_many`.
+
+### 1205. [LOW] The seed accepts NaN and ±Infinity as a cost
+`platform/services/standard_material_seed.py:110` — `float("nan")` passes `< 0`. (review 2026-10-16 round 2 #140, deferred)
+
+**Suggested fix:** `if not math.isfinite(cost)` → row error.
+
+### 1208. [LOW] `_next_copy_name` costs ~5 queries per probe, up to 999
+`platform/services/material_catalog_writes.py:355` — Each probe calls `_name_conflict`. (review 2026-10-16 round 2 #143, deferred)
+
+**Suggested fix:** Fetch names matching `^<base>( \d+)?$` once and pick the suffix in Python.
+
+### 1209. [LOW] Every toggle re-reads the seed CSVs from disk (also material_vocabulary.py:89)
+`platform/services/material_catalog_writes.py:502` — Two or three reads per call. (review 2026-10-16 round 2 #144, deferred)
+
+**Suggested fix:** `functools.lru_cache` on the template loaders.
+
+### 1235. [MEDIUM] Untested edge case in `_run`: no live standards → exit 1
+`platform/scripts/migrate_materials_to_standard.py:71` — The "run the seed first" refusal is never exercised. (review 2026-10-17 round 3 #20, deferred)
+
+**Suggested fix:** Monkeypatch the standards count to 0; assert 1 and the message.
+
+### 1236. [MEDIUM] Untested edge case in `plan_company`: the company document is missing
+`platform/services/material_migration.py:200` — `company_doc or {}` paths never driven. (review 2026-10-17 round 3 #21, deferred)
+
+**Suggested fix:** Plan a fresh `PydanticObjectId()`; empty plan, not migrated, no opt-in.
+
+### 1237. [MEDIUM] Untested edge case: "New or renamed: N name(s)." is printed but never asserted
+`platform/scripts/seed_standard_materials.py:65` — The branch runs in a test but isn't checked. (review 2026-10-17 round 3 #22, deferred)
+
+**Suggested fix:** Assert `"New or renamed: 1 name(s)."` in the applied output.
+
+### 1246. [LOW] The migration's estimate/template audit names no material ids
+`platform/services/material_migration.py:321` — Only `lines_rewritten` is recorded, so a rewrite can't be traced or undone from the log. (review 2026-10-17 round 3 #31, deferred)
+
+**Suggested fix:** Carry `{old_id: [new_id, count]}` per document into the metadata.
+
+### 1247. [LOW] Rewrite counts and audits come from the read, not the write
+`platform/services/material_migration.py:295` — A line removed between the find and the update is still audited and counted. (review 2026-10-17 round 3 #32, deferred)
+
+**Suggested fix:** Re-check matched ids after the write, or compare `modified_count` and log a mismatch.
+
+### 1248. [LOW] `--company <unknown id>` reports success
+`platform/scripts/migrate_materials_to_standard.py:78` — A typo prints "Applied across 1 company(ies): 0 replaced…" and exits 0. (review 2026-10-17 round 3 #33, deferred)
+
+**Suggested fix:** Check the company exists; print an error and return 1.
+
+### 1254. [MEDIUM] Untested edge cases in `unhide_for_removed_names`
+`platform/services/material_catalog_writes.py:531` — (a) A freed name only a retired standard holds stays hidden; (b) another company's flagged override of the same standard is untouched by the update and prune; (c) a name no live standard holds returns `[]`. (review 2026-10-17 round 4 #19, deferred)
+
+**Suggested fix:** One service test per case (b needs a second company).
+
+### 1255. [MEDIUM] Untested edge cases in `_lines_naming`
+`platform/services/material_migration.py:285` — `job_items: None`; a None job item or line. (review 2026-10-17 round 4 #20, deferred)
+
+**Suggested fix:** Unit-test `_lines_naming` with `{"job_items": None}` and `{"job_items": [None, {"materials": [None, {"material": id}]}]}`.
+
+### 1261. [LOW] An unhide can race a create or rename that takes the freed name
+`platform/services/material_catalog_writes.py:546` — The held-names check and the write are separate; a concurrent create of "Gravel" can pass while the standard is still hidden, then the unhide shows it — two rows named "Gravel". (review 2026-10-17 round 4 #26, deferred)
+
+**Suggested fix:** After the update, re-read company names for the shown standards and re-hide (flagged) any now held — one extra query only when something was shown.
+
+### 1262. [LOW] An estimate's version moves once per replaced copy but gets one audit
+`platform/services/material_migration.py:332` — One `UpdateMany` per pair, each `$inc: {version: 1}`; an estimate naming two copies moves by 2 with one ESTIMATE_UPDATE, so a stale tab's conflict degrades to document level. (review 2026-10-17 round 4 #27, deferred)
+
+**Suggested fix:** One `UpdateOne` per document with every pair it names (distinct array-filter ids) and a single `$inc`, still one bulk_write.
+
+### 1263. [LOW] The applied line never reports what was shown again
+`platform/scripts/migrate_materials_to_standard.py:58` — `_report_line` prints the hides but not `shown_for_name`. (review 2026-10-17 round 4 #28, deferred)
+
+**Suggested fix:** Append ", showed N again" and assert it in test_material_scripts.py.
+
+### 1264. [LOW] Every delete or rename reads all of the company's material names
+`platform/services/material_catalog_writes.py:546` — `held` is a full company scan though only the freed names matter. (review 2026-10-17 round 4 #29, deferred)
+
+**Suggested fix:** Filter with whole-name regexes for the freed names, or use `name_norm` once #1120/#1201 add it.
+
+### 1274. [MEDIUM] Untested edge cases in `release_name_hides_for`
+`platform/services/material_catalog_writes.py:617` — (a) A company whose every renamed standard now has a held name is left out of the report; (b) two companies — each released on its own, scoped to that company; (c) a renamed standard that is retired; (d) an invalid id dropped. (review 2026-10-17 round 5 #10, deferred)
+
+**Suggested fix:** One service test with two companies (A holds the new name → hidden and absent; B shown), a retired renamed standard that stays hidden, and a garbage id.
+
+### 1275. [MEDIUM] Untested edge case in `_live_standards` / `release_freed_name_hides`: a retired standard
+`platform/services/material_catalog_writes.py:573` — `retired_at: None` keeps the migration from showing a retired standard's flagged hide; no test has one. (review 2026-10-17 round 5 #11, deferred)
+
+**Suggested fix:** Retire a standard with a flagged hide and a free name; it stays `hidden`/`hidden_for_name` and isn't returned.
+
+### 1276. [MEDIUM] Untested edge case: the seed's "showed … again" output
+`platform/scripts/seed_standard_materials.py:68` — No script test has a non-empty `shown_for_name`. (review 2026-10-17 round 5 #12, deferred)
+
+**Suggested fix:** Seed with hides, apply a seed renaming the standard to a free name, assert the "showed … again" line.
+
+### 1277. [MEDIUM] Dead fallback `or norm_name(str(doc.get("name") or ""))`
+`platform/services/material_catalog_writes.py:558` — Every caller passes docs with `name_norm`, a required field. (review 2026-10-17 round 5 #13, deferred)
+
+**Suggested fix:** Use `doc["name_norm"]`.
+
+### 1284. [LOW] The migration's name-hide releases go unaudited when nothing is turned on
+`platform/services/material_migration.py:440` — `release_freed_name_hides` runs for every unmarked company, but its writes are recorded only in the toggle audit, written only when `plan.enable_standard`. A stale flagged hide shown in a no-match company leaves no audit. (review 2026-10-17 round 5 #20, deferred)
+
+**Suggested fix:** When `shown_for_name` is non-empty and `enable_standard` is False, write an audit entry with `shown_for_name`.
+
 ## Portal — estimate builder
 
 **Update 2026-09-27** (platform `a612723`, `3526a08`): the server half is fixed — the conversation remembers its language (`conversation_lang`), a short reply in a non-English conversation is detected and translated, a code/email/number reply is answered in the conversation's language, and "No."/"No, thanks." read as a no. Still open (portal, design §8): the restored transcript shows the English history.
@@ -3729,6 +4290,71 @@ test that breaks on every MDXEditor upgrade.
 
 **Suggested fix (decided 2026-10-04, user):** fix the cause, not this one race. The hook survives a record switch (the detail panes are reconciled in place), so every async step can land on the wrong record; three review rounds in a row found narrower versions of that. Key the notes panel by its parent — `<NotesPanel key={`${parentType}:${parentId}:${workItemId ?? ""}`} …/>` wherever it renders — so a switch mounts a fresh hook and the old one's late responses are dropped by its own unmounted guard. That closes this finding and the whole class, and lets the defensive code (the parent-switch clearing in `load`, `loadRef`) be simplified afterwards. Cost: an open note draft is discarded on a switch. Test: create on A with `create` pending, switch to B, resolve → B's list unchanged. (The narrower alternative — compare the parent in `createNote` before prepending — was considered and not chosen.)
 
+### 1102. [LOW] A failed material resolve isn't retried while the ids stay the same
+`portal/src/hooks/useMaterialCatalog.ts:85` — The failure clears `askedRef`, but the effect re-runs only when the id list changes; after one dropped request lines stay untagged with no size options until a line is added or the screen reopened.
+
+**Suggested fix:** A retry counter bumped after a backoff (or on window `online`) in the effect's deps.
+
+### 1104. [LOW] A unit id can be stored as a line's unit label
+`portal/src/components/estimates/WorkItemInlineContent.tsx:328` — `unit_name ?? unit` (also :339) falls back to the unit ObjectId when the vocabulary has no name; the server keeps an incoming unit when the catalog's is null (snapshots.py:301).
+
+**Suggested fix:** `unit_name ?? ""` (and `?? row.unit` for a size change).
+
+### 1106. [LOW] Reopening the material picker briefly shows the previous search's results
+`portal/src/components/common/MaterialSearchDropdown.tsx:73` — `close()` clears `searchText`, but `debouncedText`, `options` and `answeredQuery` persist for 300 ms; the old search can even re-run under an empty box.
+
+**Suggested fix:** On close reset `options`/`answeredQuery`; compute the query from `searchText` directly when it's "".
+
+### 1130. [MEDIUM] Untested edge cases in useMaterialCatalog
+`portal/src/hooks/useMaterialCatalog.ts:116` — Untested arms: `remember` right after a company switch (empty base); `remember` with only `_id`; `search` when `page` returns null; a resolve that throws synchronously. (review 2026-10-16 round 2 #65, deferred)
+
+**Suggested fix:** One renderHook test per arm.
+
+### 1131. [MEDIUM] Untested edge cases in MaterialSearchDropdown
+`portal/src/components/common/MaterialSearchDropdown.tsx:107` — Untested arms: a non-Escape key leaves it open; mousedown inside doesn't close; read-only with no label shows "—"; drop-up placement. (review 2026-10-16 round 2 #66, deferred)
+
+**Suggested fix:** One test per arm.
+
+### 1132. [MEDIUM] Untested edge cases in handleMaterialGapResolved
+`portal/src/pages/NewEstimateWithActivityPage.tsx:921` — Untested arms: the `else if (gap.workItemIndex < workItems.length)` arm (dialog editing another item); the no-op when neither applies; the `!estimate` guard. (review 2026-10-16 round 2 #67, deferred)
+
+**Suggested fix:** Call the handler with `workItemEditIndex` on another item; one case each for the no-op and the guard.
+
+### 1133. [MEDIUM] Untested edge cases in gapMaterialLine
+`portal/src/lib/estimateInventoryGaps.ts:87` — Untested arms: a record with only `_id`; an empty name. (review 2026-10-16 round 2 #68, deferred)
+
+**Suggested fix:** `gapMaterialLine({...effective([]), id: "", _id: "m2", name: ""}, {})` → `material: "m2", name: ""`.
+
+### 1174. [LOW] Two builders of a line from an effective material
+`portal/src/components/estimates/WorkItemInlineContent.tsx:329` — The picker handlers build lines by hand while the gap path uses `gapMaterialLine`; already diverged on unit (#1104's symptom). (review 2026-10-16 round 2 #109, deferred)
+
+**Suggested fix:** Extract `materialLineFromSize(material, size)` used by all three; fix #1104 there once.
+
+### 1175. [LOW] handleSelectExisting has an unreachable arm and a dead try/catch
+`portal/src/components/estimates/AddMaterialGapDialog.tsx:608` — Submit is disabled while no size is chosen; the body is synchronous, so `isSubmitting`, `async` and try/catch do nothing. (review 2026-10-16 round 2 #110, deferred)
+
+**Suggested fix:** Return early when no size; drop async, try/catch and isSubmitting writes.
+
+### 1176. [LOW] `catalog` is optional though its only caller always passes it
+`portal/src/components/estimates/WorkItemDialog.tsx:21` — A future host forgetting it silently gets a second catalog. (review 2026-10-16 round 2 #111, deferred)
+
+**Suggested fix:** Make it required on WorkItemDialog; keep it optional on WorkItemInlineContent.
+
+### 1178. [LOW] Export nothing imports: `GapMaterialLine`
+`portal/src/lib/estimateInventoryGaps.ts:70` — Only its own module uses it. (review 2026-10-16 round 2 #113, deferred)
+
+**Suggested fix:** Un-export it.
+
+### 1229. [MEDIUM] Untested edge case: the company answers without a numeric `material_markup`
+`portal/src/pages/NewEstimateWithActivityPage.tsx:302` — The pending and rejected fetches and markup 25 are tested; a reply lacking the field isn't. (review 2026-10-17 round 3 #14, deferred)
+
+**Suggested fix:** Add `companyMock.mockResolvedValue({})` to the `test.each` table → Price stays blank after blurring Cost.
+
+### 1238. [LOW] A blank-looking Size gets an error about the cost
+`portal/src/components/estimates/AddMaterialGapDialog.tsx:567` — A Size of only spaces passes `required`, is trimmed away, and the user is told "At least one size with a cost is required." (review 2026-10-17 round 3 #23, deferred)
+
+**Suggested fix:** "At least one size with a name and a cost is required.", or check the size first.
+
 ## Portal — layout, navigation and Maple panel
 
 ### 118. [MEDIUM] Hand-rolled `import.meta` cast in widget API client
@@ -3936,6 +4562,11 @@ oversight.
 
 **Suggested fix:** Set a ref when any local turn completes, and skip the restored `open_question` once it is set.
 
+### 1253. [MEDIUM] Maple's and Support's composers now differ, one tab apart
+`portal/src/lib/composerStyles.ts:2` — Maple's composer became a single pill-shaped bar (`components/Layout/MapleComposer.tsx`, Maple chat UI branch `claude/maple-chat-ui-707776`, 2026-10-16), while Support keeps the textbox with a column of three buttons (new conversation, attach, send) styled by `composerStyles`. The file existed to stop drift between the two, which sit one tab apart. The comment now says these styles are Support's and that the design question is open. Fixing it means redesigning Support's input bar, including where its new-conversation and attach buttons go and its Cmd/Ctrl+Return send, which is bigger than the review fix described. (review 2026-10-16 #18)
+
+**Suggested fix:** Decision for Simon. Either give Support the same pill bar (my pick: the two panels sit one tab apart), moving the pill classes into `composerStyles` for both and putting Support's new-conversation button in its panel header as Maple's now is, or accept the difference and keep the comment as it is.
+
 ## Portal — settings, billing, onboarding and ops
 
 ### 206. [MEDIUM] Generalize `PlanPickerGrid` button label
@@ -4012,6 +4643,26 @@ and will be resolved as part of the planned onboarding-flow overhaul.
 `portal/src/components/settings/TemplatesTab.tsx:50` — Same defect as #728 in the templates loader (49-62); the tab stays on `<ErrorState>` (183). (review 2026-09-27 #62)
 
 **Suggested fix:** Clear the error after a successful load regardless of `quiet`.
+
+### 1129. [MEDIUM] Hand-rolled copy of useToast
+`portal/src/components/settings/MaterialCategoriesTab.tsx:50` — The tab keeps its own `standardNotice` and renders `<Toast key={text}>`, relying on a null-reset to restart the timer. (review 2026-10-16 round 2 #64, deferred)
+
+**Suggested fix:** `const { showToast, toast } = useToast()`; keep only a `standardError` string for the alert banner.
+
+### 1135. [MEDIUM] Untested edge case: turnOnStandardMaterials failing
+`portal/src/pages/OnboardingPage.tsx:128` — When `setAllStandard` rejects, the flag must stay false, the step show the error, and the last screen not claim the materials are on. (review 2026-10-16 round 2 #70, deferred)
+
+**Suggested fix:** Reject `setAllStandardMock` once; assert the error, then after Skip the completion screen lacks "turned on for you".
+
+### 1184. [LOW] Markup help text is ambiguous for a cost-only override
+`portal/src/components/settings/FinancialTab.tsx:82` — "Applies to every standard material you haven't priced yourself" — a cost you set still gets the markup. (review 2026-10-16 round 2 #119, deferred)
+
+**Suggested fix:** "Applies to every standard material size you haven't set a price for (a cost you set gets the markup too)."
+
+### 1233. [MEDIUM] Untested edge cases in applyStandardToggle
+`portal/src/components/settings/MaterialCategoriesTab.tsx:176` — (a) The `togglingStandardRef` early return (the busy test is stopped by the switch's own `if (!busy)`); (b) `result?.hidden_for_name ?? []` when the toggle answers null. (review 2026-10-17 round 3 #18, deferred)
+
+**Suggested fix:** (a) Pending PATCH, then "Turn on all" in the same tick → one write; (b) PATCH resolves null → switch applied, no toast, list refreshed.
 
 ## Portal — tasks, properties, contacts and materials
 
@@ -4159,6 +4810,136 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 **Decision (user, 2026-09-28):** deferred with #771 (same note).
 
 **Suggested fix (if wanted):** as #771.
+
+### 1103. [LOW] A null CSV upload result throws
+`portal/src/lib/csvUploadToast.ts:22` — `apiRequest` can return null (empty body / 204); `result.errors` throws a TypeError shown as the upload error and the list reload is skipped.
+
+**Suggested fix:** Accept `T | null` and treat null as a clean run.
+
+### 1108. [LOW] Materials page highlight never clears when its row isn't on the page
+`portal/src/pages/MaterialsPage.tsx:293` — `pendingHighlightId` stays set when a duplicate's copy sorts onto another page, a deep link names a standard whose category is off, or a search returns >50 matches; paging onto it later flashes the row.
+
+**Suggested fix:** Clear it after the first `pageData` that arrives after it was set.
+
+### 1109. [LOW] StandardMaterialDialog copies props into state with an effect
+`portal/src/components/materials/StandardMaterialDialog.tsx:54` — `shown` and `rows` are copied from `material` in an effect: an extra render, briefly stale state, and react-hooks v7 `set-state-in-effect`.
+
+**Suggested fix:** Mount it with `key={standardMaterial.id}` and initialise state from props; drop the effect.
+
+### 1134. [MEDIUM] Untested edge cases in write/changes
+`portal/src/components/materials/StandardMaterialDialog.tsx:60` — Untested arms: a negative price; `if (!row) return []`; `onClose` ignored while busy; the "Standard $x" hint hidden when equal or null; no description/category_name. (review 2026-10-16 round 2 #69, deferred)
+
+**Suggested fix:** One test per arm.
+
+### 1136. [MEDIUM] Untested edge cases in getCategoryName
+`portal/src/pages/MaterialsPage.tsx:343` — Untested arms: no category and an unknown id → "Unknown". (review 2026-10-16 round 2 #71, deferred)
+
+**Suggested fix:** One test each.
+
+### 1137. [MEDIUM] Untested edge cases in the deep-link effect
+`portal/src/pages/MaterialsPage.tsx:262` — Untested arms: unmount while `get` is pending (`cancelled`); `found.name ?? ""`. (review 2026-10-16 round 2 #72, deferred)
+
+**Suggested fix:** One test each.
+
+### 1138. [MEDIUM] Untested edge case in duplicateMaterial: a null copy
+`portal/src/pages/MaterialsPage.tsx:640` — Untested. (review 2026-10-16 round 2 #73, deferred)
+
+**Suggested fix:** `duplicateMock` → null; no highlight, no error.
+
+### 1139. [MEDIUM] Untested edge case in runRowAction: clearing an earlier refusal banner
+`portal/src/pages/MaterialsPage.tsx:625` — Untested. (review 2026-10-16 round 2 #74, deferred)
+
+**Suggested fix:** Refuse one action, run another; the old banner is gone.
+
+### 1140. [MEDIUM] Untested edge case in loadMaterials: a filter change clears an earlier error
+`portal/src/pages/MaterialsPage.tsx:175` — Untested. (review 2026-10-16 round 2 #75, deferred)
+
+**Suggested fix:** Fail a load, change a filter, succeed; no ErrorState.
+
+### 1177. [LOW] Exports nothing imports: `TOAST_DURATION_MS`, `ToastTone`, `ToastPosition`
+`portal/src/components/common/Toast.tsx:4` — Speculative surface. (review 2026-10-16 round 2 #112, deferred)
+
+**Suggested fix:** Un-export them.
+
+### 1179. [LOW] `csvUploadSummary` is exported only for its tests
+`portal/src/lib/csvUploadToast.ts:13` — Production code calls it only through `finishCsvUpload`. (review 2026-10-16 round 2 #114, deferred)
+
+**Suggested fix:** Test it through `finishCsvUpload` and un-export it, or keep it deliberately.
+
+### 1181. [LOW] `getUnitName`'s `!size.unit` branch can't be reached
+`portal/src/pages/MaterialsPage.tsx:351` — Both callers render it only when `size.unit` is set. (review 2026-10-16 round 2 #116, deferred)
+
+**Suggested fix:** Drop the branch or render it unconditionally.
+
+### 1182. [LOW] A stale category id in the URL shows "All Categories" while filtering by it
+`portal/src/pages/MaterialsPage.tsx:785` — `?category=<deleted id>` matches no option; the list says "No materials match" with nothing to clear. (review 2026-10-16 round 2 #117, deferred)
+
+**Suggested fix:** Once categories load, clear an unknown `query.category` with replace.
+
+### 1183. [LOW] `min_price` / `max_price` in MaterialPageParams have no caller
+`portal/src/api/resources.ts:108` — Only materialsApi.test.ts uses them. (review 2026-10-16 round 2 #118, deferred)
+
+**Suggested fix:** Remove until a price filter ships, or keep with a note.
+
+### 1230. [MEDIUM] A rejecting reload shows as an upload error; the arm is untested
+`portal/src/hooks/useCsvUpload.ts:53` — `await reload()` sits inside the upload's try: a rejection after a clean run sets an error the user never sees (dialog closed), or after a row-error run looks like the upload failed. Every caller now passes a quiet loader, so nothing reaches it. (review 2026-10-17 round 3 #15, deferred)
+
+**Suggested fix:** `await Promise.resolve(reload()).catch((e) => console.error("Quiet refresh failed:", e))`; test with a rejecting reload (dialog closed, toast shown, error "").
+
+### 1231. [MEDIUM] Untested edge cases in loadMaterials
+`portal/src/pages/MaterialsPage.tsx:199` — (a) `!movedPage` in `finally` (214): a first load past the end should keep the spinner until the redirected load lands; (b) `lastPage >= 1` false with page > 1 (total 0 on page 3): no redirect, empty message. (review 2026-10-17 round 3 #16, deferred)
+
+**Suggested fix:** (a) Hold the redirected load pending and assert "Loading materials..."; (b) `?page=3` with `envelope([], 0, 3)` → one request, no redirect, empty message.
+
+### 1232. [MEDIUM] Untested edge case in runRowAction: the same-tick `rowBusyRef` guard
+`portal/src/pages/MaterialsPage.tsx:650` — The test clicks a disabled item, which proves `disabled` works, not the ref. (review 2026-10-17 round 3 #17, deferred)
+
+**Suggested fix:** Two `fireEvent.click`s on Duplicate in one synchronous block; `duplicateMock` called once.
+
+### 1234. [MEDIUM] Untested edge cases in setField/changes/write
+`portal/src/components/materials/StandardMaterialDialog.tsx:74` — `priceBad` (83); Infinity without badInput (90); `input.validity` missing (`?.`). (review 2026-10-17 round 3 #19, deferred)
+
+**Suggested fix:** One test each.
+
+### 1239. [LOW] A failed quiet refresh still logs "Refresh after a Maple change failed:"
+`portal/src/pages/MaterialsPage.tsx:211` — Uploads and row actions reload quietly too; the three sibling pages were renamed. (review 2026-10-17 round 3 #24, deferred)
+
+**Suggested fix:** "Quiet refresh failed:".
+
+### 1245. [LOW] The badInput flag can go stale because React skips onChange while the value stays ""
+`portal/src/components/materials/StandardMaterialDialog.tsx:76` — Typing "1e" then clearing leaves the flag set (Save refuses a blank); a lone "-" in a cleared field never sets it (sent as a clear). (review 2026-10-17 round 3 #30, deferred)
+
+**Suggested fix:** Record the flag from `onInput` too, or read `validity.badInput` from refs when Save is pressed.
+
+### 1251. [MEDIUM] Materials page sends the price as the cost when Cost is blank
+`portal/src/pages/MaterialsPage.tsx` — `cost = costProvided ? parsedCost : (price ?? NaN)`: unlike the gap dialog, the page's Cost field isn't `required`, so a size row with a label and a price but no cost stores the price as the catalog cost — the coercion `.claude/rules/pricing.md` forbids. Removing the fallback alone would silently drop the row (and on edit delete the size). Found while fixing review 2026-10-17 round 3 #7/#8.
+
+**Suggested fix:** Refuse the save with a per-row "Cost is required" error (and mark the Cost input `required`), then use `cost: parsedCost`. Test: a row with a price and no cost is refused and nothing is sent.
+
+### 1260. [LOW] Cost-fill rounding can be a cent off the server's markup price
+`portal/src/lib/materials.ts:25` — `Math.round(x*100)/100` rounds halves up; the server's `round(x, 2)` rounds half-even (cost 2.10 at 25%: portal 2.63, server 2.62). (review 2026-10-17 round 4 #25, deferred)
+
+**Suggested fix:** Show the markup price as a placeholder and send null so the server's `markup_price` is the only rounding.
+
+### 1278. [MEDIUM] Dead arms: `"price_recorded" in size` and `"source" in material`
+`portal/src/pages/MaterialsPage.tsx:741` — `openEditMaterial` widened to `Material | EffectiveMaterial`, but both callers pass an `EffectiveMaterial`, so the `in` checks' false arms can't run. (review 2026-10-17 round 5 #14, deferred)
+
+**Suggested fix:** Narrow the signature to `(material: EffectiveMaterial)` and test the fields directly.
+
+### 1279. [MEDIUM] Untested edge case in the render-time search sync: a pending push the URL didn't take
+`portal/src/pages/MaterialsPage.tsx:299` — `fromBox` false while a push is recorded (the push is cleared and the box overwritten) — the arm that stops a stale push sticking — isn't driven. (review 2026-10-17 round 5 #15, deferred)
+
+**Suggested fix:** Type "abc" and navigate to `?q=other` in the same act as the debounce firing → box "other"; Back to q=abc → box "abc".
+
+### 1287. [LOW] A recorded search push can stick when another navigation in the same tick wins
+`portal/src/pages/MaterialsPage.tsx:288` — If a pager/filter click or a past-the-end move commits over the box's push in the same tick, the push stays recorded; a later Back to an entry with that search is then treated as the box's own and doesn't overwrite the box. A millisecond window. (review 2026-10-17 round 5 #23, deferred)
+
+**Suggested fix:** Clear the push on the early return: `if (typed === queryRef.current.search) { setBoxPushedSearch(null); return; }`; test with #1279's test.
+
+### 1288. [LOW] "Not set (sells at cost)" probably clips in the 140px Price column
+`portal/src/pages/MaterialsPage.tsx:1369` — About 106px of text space at text-xs vs ~120–135px needed (estimate, not seen in a browser). Screen readers get the full text. (review 2026-10-17 round 5 #24, deferred)
+
+**Suggested fix:** A short placeholder ("At cost") with `title="Not set — sells at its cost"`; check it in the app at 820px.
 
 ## Website
 
@@ -5218,6 +5999,16 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Reproduce with `PARITY_SOURCES=reference PARITY_LIMIT=20`; close the planner client at the end of `test_corpora_parity` (or `await` its `aclose`) and check `rules_tier`'s teardown; add a timeout around the teardown, so the run always ends with its verdict.
 
+### 1240. [LOW] `console.error` spy never restored
+`portal/tests/NewEstimateWithActivityPage.materialGaps.test.tsx:196` — Later tests run with console.error muted. (review 2026-10-17 round 3 #25, deferred)
+
+**Suggested fix:** `afterEach(() => vi.restoreAllMocks())`, or `.mockRestore()` in the test.
+
+### 1269. [LOW] Conversation `estimate-delete-listed-row-not-the-open-one` fails on a reused second test container
+`platform/tests/maple_conversations/corpus.py:1284` — Twice (2026-10-16 and 2026-10-17) the row failed on a second local test container (port 27018, used to run two fixers in parallel): "delete the first one" picked E0001 instead of E0002. It passes alone and in the full file on the main container (27017). Likely leftover estimates in the reused container change the list order, so the row depends on data it didn't create.
+
+**Suggested fix:** Make the row's list order independent of other estimates in the company (scope the seeded world to a fresh company, or sort by a field the row sets), and confirm by running it on a container with leftover data.
+
 ## Codebase hygiene (batchable)
 
 Small, low-risk cleanups. Safe to batch into a single `chore: code hygiene`
@@ -5817,7 +6608,9 @@ carries a positional-ordering fix the estimate side does not.
 keeps the two halves of the file symmetrical. Worth doing next time the estimate
 half of that file is touched.
 
-### 531. [LOW] portal/src/pages/MaterialsPage.tsx:60 — `onDuplicate` is optional with no caller that omits it
+### 531. ~~[LOW] portal/src/pages/MaterialsPage.tsx:60 — `onDuplicate` is optional with no caller that omits it~~ — RESOLVED 2026-10-16
+
+**Resolved 2026-10-16** (shared material catalog stage 2): `MaterialsActionsMenu` is gone; rows use the shared `ActionsMenu`.
 Removing the mobile card's `<MaterialsActionsMenu>` (phones are now a read-only catalog) left
 exactly one call site, at line 678, which always passes `onDuplicate`. The `onDuplicate?: () =>
 void` optionality and the `action?.()` no-op it enables are now unreachable. Worth noting that the
@@ -6083,3 +6876,182 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `documentation/development/code-review-followups.md:2471` — #1071 still cites `unread_scope.py:40`; AMOUNT_UNREAD is now at :30. #1076 and #1077 name the followups file with no line (#1071 is at :2470, #1070 at :2463). (review round 22 #8, deferred)
 
 **Suggested fix:** Change #1071 to `unread_scope.py:30`, and add `:2470` and `:2463` to #1076 and #1077.
+
+### 1107. [LOW] TemplateDialog indentation slip
+`portal/src/components/estimates/TemplateDialog.tsx:192` — `people={people}` is indented four spaces deeper than its sibling props, left over from removing the `materials` prop.
+
+**Suggested fix:** Re-indent it.
+
+### 1116. [LOW] routers/materials.py style
+`platform/routers/materials.py:181` — `_MANAGER_ROLES` re-declares the set in `dependencies.assert_is_manager`; `"standard"` is a bare literal at :534/:785/:857/:993; `_company_param`, `_same_amount`, `_remove_unused_custom`, `_standard_refusal`, `_audit`, `_audit_toggle` and the new request models lack docstrings.
+
+**Suggested fix:** Export one `MANAGER_ROLES` from dependencies, add `SOURCE_STANDARD` to material_catalog, add one-line docstrings.
+
+### 1117. [LOW] Unreachable `"material": Material` entry in viewed_record
+`platform/routers/agent_helpers/viewed_record.py:44` — `kind == "material"` now returns early, so the map entry and the `Material` import are dead.
+
+**Suggested fix:** Remove both.
+
+### 1121. [LOW] Missing annotations and docstrings in the material vocabulary and migration script
+`platform/services/material_vocabulary.py:101` — `_ensure(model, …, templates: list, …)` has an unannotated model and a bare list; scripts/migrate_materials_to_standard.py:45,52 `_plan_line(plan)` / `_report_line(report)` are unannotated; `standard_unit_keys` has no docstring.
+
+**Suggested fix:** `model: Type[Document]`, `templates: List[Dict[str, Any]]`, typed plan/report, one-line docstring.
+
+### 1122. [LOW] Unused re-export of norm_name from material_catalog
+`platform/services/material_catalog.py:1023` — Every caller imports `norm_name` from `services.material_keys`.
+
+**Suggested fix:** Drop it from `__all__`.
+
+### 1126. [LOW] Missing docstrings and a bare set in catalog matching
+`platform/agents/estimate/catalog_matching.py:475` — `_best_scored`, catalog_names.py:122 `named` and record_names.py:88 `_find` have no docstrings; `_word_keys` returns a bare `set`.
+
+**Suggested fix:** One-line docstrings; `Set[str]`.
+
+### 1185. [LOW] Stray second blank line
+`portal/src/pages/OnboardingPage.tsx:58` — Added by this change. (review 2026-10-16 round 2 #120, deferred)
+
+**Suggested fix:** Delete it.
+
+### 1197. [LOW] Missing docstrings in upload.py
+`platform/routers/material_helpers/upload.py:88` — `_parse_row`, `_add_custom_row` (221), `cell`. (review 2026-10-16 round 2 #132, deferred)
+
+**Suggested fix:** One-line docstrings.
+
+### 1198. [LOW] `to_float` has no docstring
+`platform/routers/material_helpers/common.py:53` — Missing docstring. (review 2026-10-16 round 2 #133, deferred)
+
+**Suggested fix:** Add one.
+
+### 1199. [LOW] `LineItemSnapshots.material` lacks a docstring; `_fetch_material_snapshots` takes a bare set
+`platform/routers/estimate_helpers/snapshots.py:60` — Style. (review 2026-10-16 round 2 #134, deferred)
+
+**Suggested fix:** Docstring; `Set[str]`.
+
+### 1200. [LOW] Follow-ups #1100, #1101, #1111–#1116 cite pre-split line numbers
+`documentation/development/code-review-followups.md:2964` — E.g. #1100 cites materials.py:362 (now material_overrides.py:78). (review 2026-10-16 round 2 #135, deferred)
+
+**Suggested fix:** Re-point each to its new file and line.
+
+### 1207. [LOW] Function-local imports no cycle needs (also standard_material_seed.py:303)
+`platform/services/material_catalog_writes.py:497` — Style. (review 2026-10-16 round 2 #142, deferred)
+
+**Suggested fix:** Move them to the module top.
+
+### 1210. [LOW] Type hints widened to Any
+`platform/services/template_bootstrap.py:65` — At :65, :77, :125, :217. (review 2026-10-16 round 2 #145, deferred)
+
+**Suggested fix:** `EffectiveMaterial`, `EffectiveSize`, `Mapping[str, EffectiveMaterial]`.
+
+### 1211. [LOW] Missing docstrings in material_catalog.py
+`platform/services/material_catalog.py:1` — EffectiveSize, EffectiveMaterial, Page, `_context`, `_oid`, `_latest`, `_from_standard`, `_from_custom`, `_build`, `_literal`, `_text_conditions`, `_standard_branch`, `_custom_branch`, `_sort_stages`, `_validate`, `_filters`. (review 2026-10-16 round 2 #146, deferred)
+
+**Suggested fix:** One-line docstrings.
+
+### 1212. [LOW] Missing docstrings in material_catalog_writes.py
+`platform/services/material_catalog_writes.py:1` — ToggleResult, `_Unset`, `_company_oid`, `_standard_doc`, `_effective`, `_assert_standard_showable`, `_next_copy_name`. (review 2026-10-16 round 2 #147, deferred)
+
+**Suggested fix:** One-line docstrings.
+
+### 1213. [LOW] Missing docstrings in standard_material_seed.py
+`platform/services/standard_material_seed.py:1` — `_cell`, `_content`, `_stored_content`, `_new_standard`. (review 2026-10-16 round 2 #148, deferred)
+
+**Suggested fix:** One-line docstrings.
+
+### 1214. [LOW] Missing docstrings in material_migration.py
+`platform/services/material_migration.py:1` — `_same`, `_backfill_keys`. (review 2026-10-16 round 2 #149, deferred)
+
+**Suggested fix:** One-line docstrings.
+
+### 1215. [LOW] `_opt_into_standard_materials` has no docstring
+`platform/services/company_service.py:88` — Style. (review 2026-10-16 round 2 #150, deferred)
+
+**Suggested fix:** Add one.
+
+### 1216. [LOW] `Vocabulary` has no docstring
+`platform/services/material_vocabulary.py:32` — Style. (review 2026-10-16 round 2 #151, deferred)
+
+**Suggested fix:** Add one.
+
+### 1217. [LOW] Magic strings "standard"/"custom"/"detached" in the reader
+`platform/services/material_catalog.py:111` — At :111, :211, :243, :251, :397. (review 2026-10-16 round 2 #152, deferred)
+
+**Suggested fix:** Module constants (`SOURCE_STANDARD` …) used everywhere, incl. `SOURCES`.
+
+### 1218. [LOW] Magic strings "standard"/"custom"/"detached" in the writer
+`platform/services/material_catalog_writes.py:271` — At :271, :279, :375, :401. (review 2026-10-16 round 2 #153, deferred)
+
+**Suggested fix:** Use the reader's constants.
+
+### 1219. [LOW] `_whole_name` is a needless alias
+`platform/services/material_catalog.py:302` — Of `whole_name_pattern`. (review 2026-10-16 round 2 #154, deferred)
+
+**Suggested fix:** Call it directly.
+
+### 1224. [LOW] Extra blank lines
+`platform/agents/estimate/work_item_field_handlers.py:116` — Three before the constant, one before `class`. (review 2026-10-16 round 2 #160, deferred)
+
+**Suggested fix:** Normalise to two.
+
+### 1226. ~~[LOW] `_duplicate_refusal` and `_amount` have no docstrings~~ — OBSOLETE 2026-10-17
+
+**Obsolete 2026-10-17:** both functions were removed when the agent moved to `standard_size_changes`.
+`platform/agents/material/catalog_writes.py:65` — Style. (review 2026-10-16 round 2 #162, deferred)
+
+**Suggested fix:** Add them.
+
+### 1227. [LOW] `_best_by_name(agent, …)` has no type on `agent`
+`platform/agents/estimate/tools.py:50` — Style. (review 2026-10-16 round 2 #163, deferred)
+
+**Suggested fix:** `agent: Any`.
+
+### 1228. [LOW] `_exact`'s docstring is garbled
+`platform/agents/conversation/record_names.py:121` — "the first of candidates that names any names exactly". (review 2026-10-16 round 2 #164, deferred)
+
+**Suggested fix:** Reword it.
+
+### 1241. [LOW] Stale comment: "at the 10% default markup"
+`portal/tests/AddMaterialGapDialogSizeFields.test.tsx:165` — The dialog has no default now. (review 2026-10-17 round 3 #26, deferred)
+
+**Suggested fix:** "at the company's markup (10% here)".
+
+### 1244. [LOW] The new reply models have no docstrings
+`platform/routers/material_helpers/common.py:95` — `MaterialPageOut`, `ResetStandardOut`, `UploadRowError`, `UploadOut` (and `StandardToggleOut`, material_categories.py:237). (review 2026-10-17 round 3 #29, deferred)
+
+**Suggested fix:** One-line docstrings naming the route each answers.
+
+### 1250. [LOW] One blank line before `class User`
+`platform/models/user.py:17` — PEP 8 wants two. (review 2026-10-17 round 3 #35, deferred)
+
+**Suggested fix:** Add a blank line.
+
+### 1265. [LOW] `unhide_for_removed_names`' docstring miscounts the round trips
+`platform/services/material_catalog_writes.py:539` — Says four, lists five. (review 2026-10-17 round 4 #30, deferred)
+
+**Suggested fix:** "At most five round trips".
+
+### 1266. [LOW] `_material_payload_from_fields` has no docstring
+`platform/agents/material/service.py:574` — The stored-labels-stay rule lives only in a comment. (review 2026-10-17 round 4 #31, deferred)
+
+**Suggested fix:** A one-paragraph docstring.
+
+### 1267. [LOW] `_build_sizes_from_fields` has no docstring
+`platform/agents/material/text_helpers.py:379` — Same. (review 2026-10-17 round 4 #32, deferred)
+
+**Suggested fix:** A one-paragraph docstring.
+
+### 1268. [LOW] `_normalize_size_text` has no docstring
+`platform/agents/material/text_helpers.py:199` — It should say it's for the user's words and matching, never written back over a stored label. (review 2026-10-17 round 4 #33, deferred)
+
+**Suggested fix:** Add it.
+
+### 1283. [LOW] maple-phrasing-reference.md's "Last updated" is older than the §4.8 note
+`documentation/development/maple-phrasing-reference.md:3` — Header 2026-10-16; the note is 2026-10-17. (review 2026-10-17 round 5 #19, deferred)
+
+**Suggested fix:** Bump it.
+
+**RESOLVED 2026-10-17** — bumped with round 6 #4's §4.8 row. Move to the archive in the next cleanup.
+
+### 1286. [LOW] The seed module docstring omits the release step
+`platform/services/standard_material_seed.py:19` — The function docstring and materials.md were updated; the module docstring wasn't. (review 2026-10-17 round 5 #22, deferred)
+
+**Suggested fix:** Append the renamed-standards release sentence.

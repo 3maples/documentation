@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-14
+**Last updated:** 2026-10-17
 
 ### Recent changes
 
@@ -1781,6 +1781,17 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `list all materials` | `list_materials` | ✅ |
 | `delete the material {material}` | `delete_material` | ✅ |
 
+**Standard materials** (shared material catalog, 2026-10-15). Maple sees the
+company's own materials and the standard ones it opted into, never a hidden
+or category-disabled one. Deleting a standard material **hides** it, after the
+usual yes: *"I've hidden the standard material 'Black Mulch' from your
+materials."* A company material that an estimate or template uses is not
+deleted: *"I can't delete 'Edging' because it's used on estimates or
+templates. You can hide it on the Materials page instead."* Creating a
+material whose name a visible material already has is refused: *"A material
+named 'Black Mulch' already exists."* Asking Maple to hide, show or reset a
+material comes in stage 4 of the plan.
+
 ## 4.2 Casual phrasings
 
 | Phrasing | Plan | Status |
@@ -1825,6 +1836,19 @@ The "different" / "types of" modifiers don't change the routing — `how many` a
 
 Closed by Phase 2 of xfail-wave-1 — `_match_possessive_or_field_targeted` resolves the missing material domain via `FIELD_TO_DOMAIN["price"] → material` plus the material-shape residual on the captured entity name.
 
+**Prices and sizes are Owner/Admin** (decision §11.4, 2026-10-15). A cost,
+price, unit or size change from a Member is refused before anything is
+written — *"Only owners and admins can change material prices and sizes."* —
+and so is a create (*"Only owners and admins can add materials."*). A Member
+can still rename, describe or re-categorize one of the company's own
+materials. On a **standard** material a cost or price becomes the company's
+own (a price pins it over the markup); its name, description, category and
+sizes — a size's unit included, even one the company has no unit for — are
+refused, with nothing written: *"Black Mulch is a standard material, so its
+name, description, category and sizes can't change. You can still change its
+cost and price."* *(2026-10-16 — a unit given for a standard size whose unit
+the company doesn't carry was said as updated, with nothing changed.)*
+
 ## 4.7 Verbless (Phase 2b material-shape residual)
 
 | Phrasing | Plan | Status |
@@ -1841,6 +1865,7 @@ A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft b
 | `delete size {size} for {material}` / `remove the {size} size from {material}` | `update_material` fields.remove_size fields.size | ✅ that size removed |
 | `update the price for {material} with size {size} to $5` | `update_material` fields.size fields.price=5 | ✅ that size only |
 | `change the cost of the {size} size of {material} to 4.50` | `update_material` fields.size fields.cost=4.50 | ✅ that size only |
+| `Topsoil 1 yd is $6 per bag` / `Mulch is $6 per bag` | `update_material` fields.size fields.price=6 fields.unit | ✅ that size's price and unit (with no size said, a one-size material's only size); a standard material's unit can't change — refused, nothing written, but its own unit said beside the price is just the price *(2026-10-17 — the unit was dropped while Maple said it updated; a standard's own unit refused the price)* |
 | `rename size {size} of {material} to 1 cubic yard` | `update_material` fields.size fields.rename_size_to | ✅ |
 | `delete size 1 cu yd for Topsoil` | `update_material` fields.remove_size fields.size | ✅ Topsoil has no such size: *"Topsoil doesn't come in 1 cu yd — it comes in 1 yd, 2 cu ft, Bag."* — nothing changed *(2026-10-02, #700 — replied "I've updated the material" and changed nothing. Sizes match whatever their case)* |
 | `rename size 1 cu yd of Topsoil to 2 cu yd` | `update_material` fields.size fields.rename_size_to | ✅ Topsoil has no such size: the same reply — nothing changed *(2026-10-02, #700)* |
@@ -1865,6 +1890,7 @@ A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft b
 - **Last-size delete refusal** — cannot remove the only remaining size on a material. Copy: *"I can't remove the last size from this material — it needs at least one size. Add another size first, or delete the material entirely if that's what you mean."*
 - **Add-size requires BOTH cost and unit** — `add size {size} to {material} with cost $8` (no unit) refuses and prompts for the unit. Same if cost is missing. A unit is resolved to one of the company's units; a name it doesn't have is answered, never created (#681).
 - A message that names an estimate or work item is never a size command — those have their own grammar (§1.5.5).
+- **A size is found however its stored label ends** — the user's `60 in` finds `60 in.`, `4` finds `4"` — and the label stays as stored; replies say the stored label. When size words name **more than one** stored label (`4` and `4"`), every size-named op — price, cost, unit, add, a size read (today's and the planner's `get_material` with a size), remove, rename — is refused with nothing written: *"Topsoil has 2 sizes called 4 — change them on the Materials page, so I don't touch the wrong one."* *(2026-10-17, review #11 — a price on `4"` repriced `4`; only remove and rename refused. #12 — the planner's size read needed the exact label)*
 
 ## 4.9 Material gaps
 
@@ -2707,7 +2733,7 @@ Detectors are narrow on purpose — a false positive refuses something Maple can
 
 ## 9.9 Deletes — a plain yes, from someone allowed to *(2026-09-27)*
 
-Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A request about a record's links ("remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8); a request about its notes deletes the note you name, after asking (§3.9).
+Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A standard material is hidden rather than deleted, and a company material an estimate or template uses is refused (§4.1, 2026-10-15). A request about a record's links ("remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8); a request about its notes deletes the note you name, after asking (§3.9).
 
 ---
 

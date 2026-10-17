@@ -22,6 +22,8 @@ Plans are versioned alongside the code so they stay discoverable, shareable, and
 | [snappy-riding-pie.md](snappy-riding-pie.md) | Field extraction fixes (Contact, Property, Material agents) |
 | [2026-06-24-in-app-customer-support.md](2026-06-24-in-app-customer-support.md) | In-app customer support (async + live chat via Slack/Firestore) |
 | [2026-10-15-shared-material-catalog-design.md](2026-10-15-shared-material-catalog-design.md) | Shared standard material catalog: overrides, hide/duplicate, category opt-in, paged search |
+| [2026-10-15-shared-material-catalog-stage1-plan.md](2026-10-15-shared-material-catalog-stage1-plan.md) | Shared material catalog stage 1: platform models, catalog service, API, readers, migration |
+| [2026-10-15-shared-material-catalog-stage2-plan.md](2026-10-15-shared-material-catalog-stage2-plan.md) | Shared material catalog stage 2: portal materials page, category opt-in, onboarding, server-searched pickers |
 
 ## Naming convention
 

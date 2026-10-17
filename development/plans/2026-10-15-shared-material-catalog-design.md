@@ -1,7 +1,7 @@
 # Shared Standard Material Catalog — Design
 
 **Date:** 2026-10-15
-**Status:** Proposed — awaiting decisions in §11
+**Status:** Decided 2026-10-15 (§11). Stage 1 (platform) implemented 2026-10-15 — plan and as-built notes: [2026-10-15-shared-material-catalog-stage1-plan.md](2026-10-15-shared-material-catalog-stage1-plan.md). Stages 2–6 not started.
 **Scope:** `platform/` + `portal/` + `documentation/`
 **Related:** [`2026-06-06-settings-materials-actions-menus.md`](2026-06-06-settings-materials-actions-menus.md)
 (load-standard / reload endpoints this design retires),
@@ -238,6 +238,21 @@ Why not a global category collection: the effective catalog has to answer
 Mapping `standard_key ↔ company category id` is a ≤30-row in-memory table per
 request; two id spaces in the UI would be a permanent source of bugs.
 
+**Two levels of opt-in, and how they compose (decision §11.2):**
+
+| Level | Where | Who | Effect |
+|---|---|---|---|
+| Category opt-in | `MaterialCategory.include_standard` | Owner/Admin | The category's standard materials appear in the company's list, search, pickers and Maple. Off = none of them do. |
+| Item opt-out | `MaterialOverride.hidden` | Owner/Admin | One standard material drops out of list, search, pickers and Maple while its category stays on. |
+
+A standard item is **visible** iff its category is enabled **and** it is not
+hidden. The two flags never write each other: turning a category off leaves
+every per-item hide in place, so turning it back on restores exactly the
+previous view. Hidden and category-disabled items both still **resolve** on
+existing estimate and template lines (§5), and a hidden item is listed under
+*Show hidden* so it can be shown again. "Reset standard materials" (§6.3) is
+the only thing that clears per-item hides in bulk.
+
 Consequences:
 - Enabling a category whose seeded doc the company deleted (or that was added
   to the standard after they signed up) **re-creates** the doc from the seed —
@@ -302,7 +317,7 @@ async def count_effective(company, **filters) -> int
 # writes
 async def set_size_pricing(company, standard_id, size, *, cost=None, price=None)   # override; prunes empty docs
 async def set_hidden(company, material_id, hidden)                                 # override or Material.hidden
-async def duplicate(company, material_id, *, name=None, hide_source=False) -> Material
+async def duplicate(company, material_id, *, name=None) -> Material          # "<name> copy" unless name given
 async def reset_to_standard(company, standard_id)                                  # delete override
 ```
 
@@ -391,9 +406,9 @@ GET  /material-categories            + standard_key, include_standard on each ro
 
 | Endpoint | Standard item | Company item | Role |
 |---|---|---|---|
-| `POST /materials/` | — | create custom (unchanged; name must not collide with a *visible* standard, §6.5) | any |
-| `PUT /materials/{id}` | only `sizes[].cost` / `sizes[].price` accepted → override; any other field → `409 {detail: "standard material; duplicate it to edit", action: "duplicate"}` | unchanged sparse patch | any |
-| `POST /materials/{id}/duplicate` `{ name?, hide_source? }` | copy → company material with `derived_from`; optional hide of the source in the same call | plain copy (replaces the portal's client-side duplicate) | any |
+| `POST /materials/` | — | create custom (name must not collide with a *visible* standard, §6.5) | Owner/Admin when sizes carry cost/price (always, on create) |
+| `PUT /materials/{id}` | only `sizes[].cost` / `sizes[].price` accepted → override; any other field → `409 {detail: "standard material; duplicate it to edit", action: "duplicate"}` | sparse patch as today | `sizes` in the patch → Owner/Admin; name/description/category only → any role |
+| `POST /materials/{id}/duplicate` `{ name? }` | copy → company material named **"<name> copy"** (or `name` if given and unique), `derived_from` set | plain copy, same naming (replaces the portal's client-side duplicate) | Owner/Admin (it writes cost/price) |
 | `PATCH /materials/{id}/visibility` `{ hidden }` | override.hidden | Material.hidden | Owner/Admin |
 | `DELETE /materials/{id}/overrides` ("reset to standard") | delete override | — | Owner/Admin |
 | `DELETE /materials/{id}` | `409` → use visibility | refuse with `409` when any estimate or template line references it (new in-use check); suggest hide | Owner/Admin |
@@ -402,6 +417,14 @@ GET  /material-categories            + standard_key, include_standard on each ro
 | `POST /material-categories/standard` `{ include_standard: bool }` | enable/disable all | Owner/Admin |
 | `POST /materials/load-standard` | **retired**. Replaced by: enable-all categories + `POST /materials/reset-standard { clear_overrides, remove_unused_custom }` | Owner/Admin |
 | `POST /materials/upload` | rows whose name exactly matches an **enabled, visible standard** write a size override (cost/price) instead of creating a duplicate; all other rows create/update custom materials as today | Owner/Admin (was: any) |
+
+**Role rule (decision §11.4):** any write that sets a size's cost or price is
+Owner/Admin — overrides, custom sizes, duplicate, CSV upload, and Maple's
+cost/price commands. Today any role can edit a material; this tightens it,
+and the portal hides the cost/price inputs (and Duplicate) from Members
+rather than letting the server refuse. Enforcement is one dependency on the
+server, `assert_is_manager`, applied per endpoint or, for `PUT`, when the
+patch contains `sizes`.
 
 Every write is audit-logged with the existing `MATERIAL_*` actions plus three
 new ones: `MATERIAL_OVERRIDE` (price/cost/reset), `MATERIAL_VISIBILITY`,
@@ -425,13 +448,23 @@ and by the first deploy) and the ops import accepts the same columns.
 
 A company's visible list must not show two "Black Mulch" rows, or Maple's
 "update black mulch cost" becomes a which-one question for every company that
-duplicated. Rule: creating or renaming a company material to a name that
-case-insensitively matches a **visible, enabled standard** returns `409`
-unless the request hides the standard in the same call (`duplicate` with
-`hide_source`, or a rename with `hide_standard: true`). Hidden standards and
-disabled categories don't count, so re-showing a standard whose name a custom
-item took is refused with the same `409` the other way. Templates already
-enforce unique `(company, name)`; this extends the idea to the merged view.
+duplicated. Rules (decision §11.8):
+
+- Names are unique, case-insensitively, across the company's **effective**
+  list: its own materials plus the visible standard ones.
+- `duplicate` names the copy **"<name> copy"** (then "<name> copy 2", …), so a
+  duplicate never collides. The user renames it afterwards if they like.
+- Creating, renaming or uploading a custom material to a name that matches a
+  visible standard, or another custom material, returns `409` with the
+  colliding record. Hidden standards and disabled categories don't count, so
+  re-showing a standard whose name a custom item took is refused with the
+  same `409` the other way, naming the custom item.
+- Maple resolves names against the same effective list and nothing else: a
+  hidden or category-disabled standard is, to Maple, a material the company
+  doesn't have.
+
+Templates already enforce unique `(company, name)`; this extends the idea to
+the merged view.
 
 ---
 
@@ -449,8 +482,10 @@ enforce unique `(company, name)`; this extends the idea to the merged view.
   / **Copy of standard** / **Hidden**. A standard row's cost/price inputs
   show the standard cost as a hint and an "↺ standard" reset per size.
 - Edit dialog on a standard item: name, description, category and size list
-  read-only with one call-to-action, **Duplicate to edit** (which also offers
-  "hide the standard one").
+  read-only, cost/price editable (Owner/Admin), with one call-to-action,
+  **Duplicate to edit**, which creates "<name> copy" and opens it.
+- Members see every row read-only: no cost/price inputs, no Duplicate, no
+  Upload. They can still open a material and read it.
 - Row menu: Edit · Duplicate · Hide/Show · Reset to standard · Delete
   (custom only, disabled with a tooltip when in use).
 - Page menu: Upload CSV · Reset standard materials · Delete all my materials.
@@ -544,8 +579,8 @@ Writes change meaning on standard items:
 
 | Phrasing | Standard item | Custom item |
 |---|---|---|
-| "set black mulch cost to 22" / "price to 30" | override that size (any role) | as today |
-| "add a 2 yd size to black mulch", "rename X", "move X to Drainage", "describe X as …" | refuse with offer: *"Black Mulch is a standard material, so its sizes can't change. Want me to make your own copy and add the size there?"* → `duplicate` + the edit | as today |
+| "set black mulch cost to 22" / "price to 30" | override that size — **Owner/Admin**, via `assert_manager_role` like delete | write the size — **Owner/Admin** (was any role) |
+| "add a 2 yd size to black mulch", "rename X", "move X to Drainage", "describe X as …" | refuse with offer: *"Black Mulch is a standard material, so its sizes can't change. Want me to make you a copy — Black Mulch copy — and add the size there?"* → `duplicate` + the edit (Owner/Admin) | as today; size edits Owner/Admin |
 | "delete black mulch" | *"Black Mulch is standard, so I'll hide it from your list instead."* → hide, after the usual confirmation (Owner/Admin) | delete; refused with the in-use reason when estimates/templates use it |
 | new: "hide X", "show X again", "show hidden materials", "reset X to standard", "is X standard?", "turn on the Irrigation standard materials" | hide / unhide / list hidden / reset override / answer / toggle category | — |
 
@@ -613,26 +648,28 @@ line rewrite), ops import; portal: `MaterialsPage` paging/filters/URL state,
 
 ---
 
-## 11. Decisions needed
+## 11. Decisions (Simon, 2026-10-15)
 
-1. **Live markup for untouched standard items** (§4.5) — recommended **yes**;
-   it is what the requirement says, and the alternative (materialising a
-   price per company per size) recreates the copy problem in miniature.
-   Custom materials keep stored prices.
-2. **Opt-in lives on the company's category documents** (`include_standard`,
-   §4.4) rather than a list on `Company` — recommended; it reuses the
-   existing tab and id space.
-3. **Migration rule for edited copies** (§10.1): keep as detached + hide the
-   twin (recommended), vs. convert costs/prices into overrides and drop the
-   copy (loses user-added sizes and descriptions).
-4. **Role gates**: hide/show, category toggles, reset, upload = Owner/Admin;
-   cost/price overrides = any role (matches today's "anyone can edit a
-   material"). Tightening overrides to Owner/Admin is a one-line change.
-5. **Pagination envelope** `{items,total,page,page_size}` (§6.1) vs. the
-   `limit`/`X-Total-Count` header style — recommended envelope.
-6. **"Delete" on a standard item hides it** in both the portal and Maple
-   (§6.3, §9) — recommended; the alternative is a hard refusal.
-7. **Drop the seed's `price` column** — recommended; keeping it would mean
-   two sources of truth for price.
-8. **Name uniqueness across the merged list** (§6.5) — recommended; without it
-   Maple's name resolution degrades for every company that duplicates.
+1. **Live markup for untouched standard items** (§4.5) — **yes.** An
+   un-overridden standard size's price is computed from the company's
+   markup at read time. Custom materials keep stored prices.
+2. **Two levels of opt-in** (§4.4, §4.3) — **both.** A company opts **in** per
+   standard category (`MaterialCategory.include_standard`) and opts **out**
+   per standard item (`MaterialOverride.hidden`). Disabling a category hides
+   everything in it without touching per-item hides; re-enabling it brings
+   back exactly what was visible before.
+3. **Migration rule for edited copies** (§10.1) — keep the copy as a
+   detached custom material and hide its standard twin.
+4. **Role gates** — **every cost/price write is Owner/Admin**: standard
+   overrides, a custom material's size costs/prices, the CSV upload and
+   Maple's "set X cost to …". This tightens today's any-role material edit.
+   Name, description and category edits on custom materials stay any role,
+   as today. Hide/show, category toggles, reset and delete: Owner/Admin.
+5. **Pagination envelope** `{items, total, page, page_size}` (§6.1).
+6. **"Delete" on a standard item hides it** in the portal and in Maple
+   (§6.3, §9).
+7. **Drop the seed's `price` column** — the seed CSV is being updated.
+8. **Names are unique across the company's effective list** (§6.5). Maple
+   only ever sees materials accessible to the company (enabled categories,
+   not hidden). A duplicate is named **"<name> copy"**, which is what the
+   portal's `getDuplicateMaterialName` already does.
