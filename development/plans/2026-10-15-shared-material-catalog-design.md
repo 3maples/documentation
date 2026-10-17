@@ -478,8 +478,9 @@ the merged view.
   so the back button and `?open=<id>` deep links work; `?open=` now fetches
   `GET /materials/{id}` and opens the row's dialog instead of needing it on
   the page.
-- Row badges: **Standard** / **Standard · priced** (has override) / **Mine**
-  / **Copy of standard** / **Hidden**. A standard row's cost/price inputs
+- Row badges: **Standard** / **Standard · priced** (has override) /
+  **Hidden** — the company's own materials and copies of a standard carry
+  none (decision 2026-10-17). A standard row's cost/price inputs
   show the standard cost as a hint and an "↺ standard" reset per size.
 - Edit dialog on a standard item: name, description, category and size list
   read-only, cost/price editable (Owner/Admin), with one call-to-action,
