@@ -2,7 +2,8 @@
 
 **Status:** Phases 1–4 complete — backend `/agents/transcribe`, portal capture plumbing `useVoiceInput`, composer mic UI + auto-send countdown, and FAB long-press ("hold to talk"); all tested and feature-flagged (`VOICE_INPUT_ENABLED` / `VITE_VOICE_INPUT_ENABLED`), uncommitted. Remaining: manual on-device pass (iPhone Safari + Android Chrome via HTTPS tunnel), then commit + rollout.
 **Date:** 2026-07-04
-**Decisions confirmed with Simon:** Hybrid STT · Auto-send with undo · Mic button + long-press FAB
+**Decisions confirmed with Simon:** Hybrid STT · ~~Auto-send with undo~~ · Mic button + long-press FAB
+**Update 2026-10-17:** Simon removed auto-send. A finished transcript goes into the input box (added after anything already there) and is sent only when the arrow is tapped, or with Cmd/Ctrl+Enter; the countdown strip, its Cancel and `AUTO_SEND_DELAY_MS` are gone (portal branch `claude/maple-voice-no-autosend`). The auto-send design below is history.
 
 ## Context
 
