@@ -19,7 +19,7 @@ kept its number and its body.
 entries about code only today's pipeline runs dropped there too (the planner never
 runs it, and it goes at the switchover). The archive's 2026-10-11 section lists both.
 
-- **Entries are numbered and permanent.** Next free number: **1289**. Never
+- **Entries are numbered and permanent.** Next free number: **1300**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -130,7 +130,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,284 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
 | 1,274 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
 | 1,246 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | −153 by 2026-09-27 |
-| 1,210 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below |
+| 1,224 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below. 1,224 on 2026-10-17 (+14: the Firebase throttle → 429 on the verification and password-reset routes, PYTHON-W) |
 | 1,206 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | +11 on 2026-09-27 |
 | 1,201 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
 | 1,177 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
@@ -326,6 +326,11 @@ seams that already exist as separate classes.
 | 53 | `_created_reply` — routers/agent_helpers/estimate_gathering.py:436 (new 2026-10-12 in the property-link fix; move the legacy follow-up stash (`PENDING_ESTIMATE_FOLLOW_UP_KEY`) into `_stash_follow_up(...)`, which `create_estimate_reply` can share — review round 13 #4) |
 | 53 | `ask_to_rewrite` — platform/agents/conversation/record_names.py:211 (50 → 53 in the planner gap-fixing change, `answers=`; build the record in a `_rewrite_record(...)` helper beside `_rewrite_flags` — review round 13 #21) |
 | 51 | `_seed_mixed` — platform/tests/test_metric_ratio_shapes.py:267 (new in the planner gap-fixing change; split into `_seed_sold_side` / `_seed_lost_side` — review round 13 #22) |
+| 177 | `upload_contacts_csv` — platform/routers/contacts.py:104 (first measured 2026-10-17, Sentry fixes review #38. Extract a `_header_or_400(reader, required, known)` shared by the four CSV uploads, and `_upsert_contact_row(normalized, company_id, user)`) |
+| 184 | `upload_properties_csv` — platform/routers/properties.py:140 (first measured 2026-10-17, review #39. The shared header check, then `_upsert_property_row(...)`) |
+| 148 | `upload_labours_csv` — platform/routers/labours.py:142 (first measured 2026-10-17 at 150, review #40; 148 after the Company read moved into the access check. The shared header check, then `_parse_labour_rows` / `_write_labours` for its two phases) |
+| 130 | `upload_equipments_csv` — platform/routers/equipments.py:63 (first measured 2026-10-17, review #41. The same split as `upload_labours_csv`) |
+| 76 | `delegate_generic` — platform/routers/agent_helpers/delegate_generic.py:31 (+6 on 2026-10-17 for the confidence fallback, PYTHON-V; review #42. Move the optional follow-up merge, L60-76, into `_merge_optional_follow_up(...)`) |
 
 #### Watch
 
@@ -3279,6 +3284,11 @@ geocode and note it in the comment.
 
 **Suggested fix:** Drop it, or add the query it was meant for.
 
+### 1298. [LOW] A throttled password reset answers differently from an unknown email
+`platform/routers/auth.py:621` — The route hides unknown emails behind a generic 200, but Firebase's TOO_MANY_ATTEMPTS_TRY_LATER can only arise for an account that exists, so the 429 added for PYTHON-W (like the 502 it replaced) tells a caller under throttle that the address has an account. Pre-existing (the 502 already differed), hence LOW. (Sentry fixes review 2026-10-17 #49, deferred)
+
+**Suggested fix:** Needs Simon's call. Either (a) answer the Firebase throttle with the generic 200 message and log the warning (hides the account; the real user gets no hint), or (b) keep the 429 but word it exactly like our own limiter ("Too many requests. Please try again later.") so it reads as the per-address limit any email can hit. Recommended: (b).
+
 ## Platform — services, scripts and integrations
 
 ### 350. [MEDIUM] Credential fields are plain `str`, not `SecretStr` — both known leak paths closed 2026-07-27
@@ -6010,6 +6020,46 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Make the row's list order independent of other estimates in the company (scope the seeded world to a fresh company, or sort by a field the row sets), and confirm by running it on a container with leftover data.
 
+### 1289. [MEDIUM] send_verification_email_route: missing email claim untested
+`platform/routers/auth.py:568` — Edge case: L573 — a token with no email claim → 401 "Missing email claim in token" is untested for this route (the 401 test covers POST /auth only). (Sentry fixes review 2026-10-17 #35, deferred)
+
+**Suggested fix:** Post to /auth/send-verification-email with `headers={"X-Test-Email": ""}`; assert 401 and the detail.
+
+### 1291. [MEDIUM] delegate_generic: untested edge-case arms
+`platform/routers/agent_helpers/delegate_generic.py:31` — Edge cases: L61-62 — an optional_follow_up with no question text (nothing appended); L66 — an empty delegated response, where the follow-up question becomes the whole reply; L69 — an allowlisted spec when the agent returned no context (falls back to context_payload); L79 — `completion_ready` already set on the result (setdefault keeps the agent's value). (Sentry fixes review 2026-10-17 #37, deferred)
+
+**Suggested fix:** One test per arm in tests/test_agent_helpers_delegate_generic.py: (a) optional_follow_up={} leaves the response unchanged; (b) response "" + a question → response == the question; (c) no "context" key + a stubbed spec → result["context"][PENDING_OPTIONAL_FOLLOW_UP_KEY] == spec and the context_payload keys kept; (d) result {"completion_ready": True} with needs_clarification=True → stays True.
+
+### 1292. [MEDIUM] upload_contacts_csv: untested edge-case arms
+`platform/routers/contacts.py:104` — Edge cases: L148 — a header-only CSV (the loop runs zero times); L246 — the note insert raising after the contact is saved ("Contact saved, but its note could not be saved"). (Sentry fixes review 2026-10-17 #43, deferred)
+
+**Suggested fix:** (a) Post "first_name,last_name\n"; assert 200, all lists empty, "Processed 0 contacts". (b) Monkeypatch routers.contacts.create_note_as to raise RuntimeError, post "first_name,last_name,notes\nNo,Note,hi\n", assert len(created) == 1 and errors[0]["error"].startswith("Contact saved, but its note could not be saved"); delete the contact.
+
+### 1293. [MEDIUM] upload_properties_csv: untested edge-case arms
+`platform/routers/properties.py:140` — Edge cases: L187/L311 — a header-only CSV (no rows, so no geocode backfill is scheduled); L229 — re-uploading the same contact against an existing address merges without duplicating; L279 — the note insert raising after save. (Sentry fixes review 2026-10-17 #44, deferred)
+
+**Suggested fix:** (a) Header-only CSV with backfill_property_coordinates spied: 200, empty lists, spy not called. (b) Upload contact1 twice for one address; assert len(contacts) == 1. (c) Monkeypatch create_note_as to raise; assert the "Property saved, but its note could not be saved" prefix.
+
+### 1294. [MEDIUM] upload_labours_csv: untested edge-case arms
+`platform/routers/labours.py:142` — Edge cases: L197 — a header-only CSV; L239 — a raw-string unit on a stored Labour (defensive); L264 — the same name+unit twice in one CSV (the second row updates the first); L265 — a write failing in phase 3 → row error. The review's fifth arm (a missing Company → 404) is gone: the same day's fix #2 runs `assert_user_company_access` first, which refuses a missing company with 403. (Sentry fixes review 2026-10-17 #45, deferred)
+
+**Suggested fix:** (a) "name,unit,cost\n" → 200, "Uploaded 0 labour entries". (b) L239: no test; mark it defensive with a comment. (c) Rows "Dup,Hourly,10" and "Dup,Hourly,20" → the same id twice, stored cost 20.0. (d) Monkeypatch Labour.insert to raise → errors[0]["row"] == 2.
+
+### 1295. [MEDIUM] upload_equipments_csv: untested edge-case arms
+`platform/routers/equipments.py:63` — Edge cases: L112 — a header-only CSV; L168 — a duplicate name+unit in one CSV upserts; L169 — a phase-3 write failure → row error. (The missing-Company 404 the review named was removed by fix #3: `assert_user_company_access` refuses it first.) (Sentry fixes review 2026-10-17 #46, deferred)
+
+**Suggested fix:** The same tests as #1294 (a), (c), (d), against /equipments/upload and Equipment.insert.
+
+### 1296. [MEDIUM] dropThirdPartyNoise: an exception value without a stacktrace is untested
+`portal/src/lib/sentryConfig.ts:42` — Edge case: an exception value with no `stacktrace` (the `?? []` fallback), common for unhandledrejection events with non-Error values, is untested; a regression there would throw inside beforeSend and Sentry drops the event silently. (Sentry fixes review 2026-10-17 #47, deferred)
+
+**Suggested fix:** In tests/sentryConfig.test.ts, an event whose `exception.values` = [{ type: "Error", value: "x" }] (no stacktrace); assert dropThirdPartyNoise(event) returns the event.
+
+### 1299. [LOW] The equipment empty-file test asserts only the status
+`platform/tests/test_equipment_upload_api.py:207` — test_upload_equipments_csv_empty_file checks 400 but not the detail, so the wrong 400 (e.g. the header check, or the new "Couldn't read this file as a CSV") would pass; labour's equivalent (test_labour_api.py:161) asserts the text. (Sentry fixes review 2026-10-17 #50, deferred)
+
+**Suggested fix:** `assert "empty" in response.json()["detail"].lower()`.
+
 ## Codebase hygiene (batchable)
 
 Small, low-risk cleanups. Safe to batch into a single `chore: code hygiene`
@@ -7056,3 +7106,13 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 `platform/services/standard_material_seed.py:19` — The function docstring and materials.md were updated; the module docstring wasn't. (review 2026-10-17 round 5 #22, deferred)
 
 **Suggested fix:** Append the renamed-standards release sentence.
+
+### 1290. [MEDIUM] `delegated_suggestions` in delegate_generic is computed and never read
+`platform/routers/agent_helpers/delegate_generic.py:47` — L47 builds `delegated_suggestions` and L57-58 refill it from the result, but nothing reads it afterwards; the suggestions that reach the envelope come from L85-86. Dead, pre-existing; found by the branch audit (its arm has no observable effect, so no test can cover it). (Sentry fixes review 2026-10-17 #36, deferred)
+
+**Suggested fix:** Delete L47 and L57-58; run tests/test_agent_helpers_delegate_generic.py.
+
+### 1297. [LOW] An unreachable `raise AssertionError` in decode_csv_upload
+`platform/services/csv_decode.py:31` — latin-1 decodes every byte, so the loop always returns and the raise can never run — a line no test can cover, kept only to satisfy the return type. (Sentry fixes review 2026-10-17 #48, deferred)
+
+**Suggested fix:** Loop over ("utf-8-sig", "cp1252") only and end with an unconditional `return content.decode("latin-1")` — same behaviour, no dead line.
