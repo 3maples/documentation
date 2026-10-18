@@ -8116,3 +8116,1377 @@ site source, but that is a judgment call.
 `platform/agents/task/base.py:466` — `_resume_pending_confirmation` uses it for any pending task confirmation, so the name and comment are wrong. (review 2026-10-11 #103, deferred)
 
 **Suggested fix:** Rename to `TASK_CONFIRMATION_DECLINED` and fix the comment.
+
+## Consolidation pass — 2026-10-18
+
+Every open entry was checked against the code on `main` (all four repos). Three groups moved here:
+entries already marked RESOLVED / CLOSED / OBSOLETE in the live list; entries the code now
+satisfies (RESOLVED 2026-10-18); and entries whose code is gone or rewritten so the finding no
+longer applies (OBSOLETE 2026-10-18). Each verified entry opens with the evidence checked.
+
+**Already marked closed (88)**
+
+### 328. ~~[MEDIUM] `_resolve_estimate_by_title` full-collection scan now on three more paths~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** with #669 — `_match_estimates_by_title` calls `title_reference.find_named_estimates`, which matches on titles alone and loads only the matches. No cap was added: a capped list matched the wrong estimate as an exact target (round 32 #2).
+
+The (pre-existing) resolver does `Estimate.find(company == oid).to_list()` and
+substring-matches titles in Python. The new `_resolve_estimate_code_or_title`
+wires it into notes/description/link updates, so every code-less update turn
+loads ALL of a tenant's estimates. Single company-scoped query (not N+1) and
+fine at typical tenant sizes, but unbounded. Fix: add a `.limit(...)` bound or
+a server-side case-insensitive regex match on `title`; `company` is already the
+indexed filter per the `Settings.indexes` convention.
+
+### 715. ~~[MEDIUM] No `company` index, so `_teammate_email` scans users across tenants on the chat path~~ — RESOLVED 2026-09-29
+
+**Resolved 2026-09-29** (name-answers plan phase 3): `User.Settings.indexes` has `company`.
+
+`platform/models/user.py:89` — `User.find(User.company == …)` in `_teammate_email` (operations.py:302) runs on every assignment or teammate filter, but `users` indexes only `email`, so each lookup scans the whole collection. (review 2026-09-27 #42)
+
+**Suggested fix:** Add `IndexModel([("company", ASCENDING)])` to `User.Settings.indexes`.
+
+### 716. ~~[MEDIUM] `due_date` is filtered and sorted with no index, and the docstring says otherwise~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `Task.Settings.indexes` has `(company, due_date, updated_at desc, _id)` — the due-date lists' filter and their whole sort (`+due_date, -updated_at, +_id`), so the sort and its limit stay index-served and `_list_conditions`' "all fields indexed" is true. Beanie builds it on boot; nothing to drop. Tests: `tests/test_task_due_index.py` (the index exists; the overdue query's winning plan uses it with no SORT stage).
+
+`platform/models/task.py:74` — The new `extra` conditions filter on `due_date` and sort by `+due_date` (agents/task/base.py:216-217, :259), but no index covers `(company, due_date)`, while `_list_conditions` says "All fields used here are indexed". MEDIUM rather than HIGH: the company-prefixed indexes keep the scan to one tenant. (review 2026-09-27 #43)
+
+**Suggested fix:** Add `IndexModel([("company", 1), ("due_date", 1)])`, or correct the docstring.
+
+### 812. ~~[MEDIUM] `find_properties_by_name_or_address` loads every property to match a name~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** the finder reads only the address fields of the company's properties, matches in Python exactly as before, and loads the matches in full — the #669 pattern. The match stays in Python on purpose: the reverse direction (a stored name inside the query, user option a) has no indexed form, and Mongo's `$toLower` would not fold "Île" / "École" the way `str.lower` does. It still reads every property's address row, but no longer every document. `PropertyAgent._find_properties_by_name_or_address` (its twin, over `_list_properties_via_api`) is unchanged. Tests: `tests/test_property_name_lookup.py`.
+
+`platform/agents/cross_resource.py:34` — The finder loads all the company's properties and matches in Python: the query inside the name, street or full address, or a stored name or street inside the query. It serves the estimate customer fallback (`title_reference.resolve_named_estimates`, after a title matches nothing) and the property agent's twin (`PropertyAgent._find_properties_by_name_or_address`). Left out of the slow-lookups batch (#709, #669, #328, #26) because the reverse containment ("Elm House" inside "the elm house job") has no indexed form, and Mongo's `$toLower` lowercases ASCII only, so moving it to `$expr` could miss accented names the Python match finds. (logged 2026-10-04)
+
+**Suggested fix:** Run the forward containment in Mongo (`$regexMatch` on name, street and the composed address, escaped, case-insensitive) and keep the reverse check, or drop it if no phrasing needs it — the customer fallback already re-checks whole words in `_names_whole`. Then project only the fields matched, and share one finder between `cross_resource` and the property agent.
+
+### 318. ~~[MEDIUM] Broad `except Exception` in template instantiation swallows the real failure~~ — RESOLVED 2026-10-05
+
+**Resolved 2026-10-05:** the create/scale/save block logs `Template estimate instantiation failed for company <id>: <type>` before releasing the slot: a `TRANSIENT_WRITE_ERRORS` hiccup (`services/sparse_update.py`, shared with the edit executor) at WARNING with "try again", anything else at ERROR with "Something went wrong on my side … You can create it on the Estimates page", since a retry would fail the same way. An estimate already inserted when the failure struck is deleted first (`_discard_unfinished`), so the reply's "couldn't create" is true and the released slot leaves no unbilled empty draft per attempt (review 2026-10-05 round 3). The router passes `_create_estimate_from_template(audit=False)` and keeps its own create audit, written only after a successful save, so a template estimate is audited as created once and a failed attempt leaves no audit trace (rounds 4–5). The design that makes the cleanup necessary is #818. The type only, no traceback: Sentry captures frame locals, and this frame holds the user's token claims and message (see #817). Pinned by `test_a_failed_instantiation_is_logged_and_frees_the_slot`.
+
+**Where:** `platform/routers/agent_helpers/template_estimate.py:156`
+
+**Issue:** The create/scale/save block catches bare `Exception`, releases the quota slot, and returns a generic "try again" with no logging. A genuine bug (scaling math, model validation) is invisible in logs and indistinguishable from a transient DB blip.
+
+**Fix:** `logger.exception("template instantiation failed for company %s", company_ctx)` before returning the friendly message, matching the pattern in `material/service.py:_load_categories`.
+
+### 336. ~~[MEDIUM] `load-standard` endpoints duplicate the audit-log loop (~55 lines each)~~ — RESOLVED 2026-10-17
+`POST /material-units/load-standard` was removed (standard units are locked, so the Units tab no longer reloads them), taking its twin and `remove_non_standard_material_units` with it. `POST /material-categories/load-standard` followed the same day (review 2026-10-17 #20), with `remove_non_standard_material_categories`. Move to the archive in the next cleanup.
+
+`routers/material_categories.py::load_standard_material_categories` and
+`routers/material_units.py::load_standard_material_units` are verbatim twins
+apart from the enum values, and each is marginally over the 50-line guideline
+(complexity is low — linear, max 2-level nesting). Fix: extract the
+removed-states audit-log loop into a small shared helper (e.g. in
+`routers/agent_helpers` or a `routers/_audit_helpers.py`), which also pulls
+both handlers under the line guideline.
+
+### 821. [MEDIUM] Shadow planner calls take global LLM slots with no cap of their own — WON'T FIX for the window
+`platform/services/maple_shadow.py:246` — The planner runs under a tenant-less context, so `services/llm/concurrency.llm_slot` gives it no per-company semaphore. It takes only a global slot (`OPENAI_MAX_CONCURRENCY`, 24). With shadow on for every company, each Maple turn adds a 3–20 s call that competes for the same 24 slots as users' live calls. Under a burst, users' estimate generations and Maple turns would queue behind shadow calls. That breaks the "never affects the user" guarantee (design 2026-10-02 §7.2) for latency, though not for errors. MEDIUM rather than HIGH: at today's traffic the queue is unlikely to form. (review 2026-10-07 #3)
+
+**Decision (Simon, 2026-10-07):** not an issue — shadow runs only for the limited two-week review window, then is turned off. Revisit only if shadow is kept on longer, or if the window shows LLM queueing.
+
+**Suggested fix (if revisited):** give shadow its own bound: a module-level `asyncio.Semaphore` (default 4) in `maple_shadow`, tried without waiting in `_plan_and_check`. When it's taken, skip planning and record `planner.error = "shadow_busy"` instead of queueing.
+
+### 840. ~~[HIGH] Public Maple widget never runs the planner — a decision before the switchover~~ — RESOLVED 2026-10-11
+
+**File**: [routers/public_maple.py](../../platform/routers/public_maple.py)
+**Severity**: HIGH
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P2h)
+
+`/public/maple/ask` answers on today's pipeline only. When today's pipeline is
+retired (switchover plan §10), the public widget has nothing to run on. Decide:
+move it onto the planner (with its own narrower op set — public Maple refuses
+metrics and every write), or keep a small public-only reader. Needs Simon's call
+before the switchover.
+
+**Resolved 2026-10-11:** Decided: keep the public widget as its own small reader — it already was one. `/public/maple/ask` never ran today's routing; `agents/maple_public` refuses actions and figures by rule and answers the rest from the user guide. Its one tie to code that goes, `HELP_INSTRUCTIONAL_PATTERNS`, moved from `agents/orchestrator/intents.py` to `agents/text_utils.py`; `tests/test_public_maple_boundary.py` fails if it imports anything but shared code. Moving it onto the planner remains open if a public planner is ever wanted.
+
+### 841. ~~[MEDIUM] Planner: tasks referred to by recency, date or place~~ — RESOLVED 2026-10-11
+
+**File**: [agents/planner/refs.py:13](../../platform/agents/planner/refs.py), [agents/conversation/record_names.py:98](../../platform/agents/conversation/record_names.py)
+**Severity**: MEDIUM
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P1, reference §7.11 rows 1963–1966)
+
+"the last task", "my latest task", "the task from yesterday / 3 days ago",
+"the task at Elm House", and fuzzy titles: `RefBy` has no recency, date or
+property kind, and name lookup is exact or word-start only. "add a description
+to the last task" was planned as a task named "last task" and found nothing. Fix:
+a `recent` (and date) ref for tasks, or route task names through today's
+`find_task_from_context_or_message`.
+
+**Resolved 2026-10-11:** A task named with words that match no title or code goes through today's task finder (`resolve._task_by_words` → `find_task_from_context_or_message`, no focus or newest-task fallback): recency ("my" = assigned to me), a date, a property, a loose title — the last marked stale, so a write asks "Just to check". Tests: `test_planner_resolve.py`.
+
+### 842. ~~[MEDIUM] Planner: task list and count filters it can't say~~ — RESOLVED 2026-10-11
+
+**File**: [agents/planner/schema_fields.py:185](../../platform/agents/planner/schema_fields.py), [agents/planner/execute_records.py](../../platform/agents/planner/execute_records.py) (`_task_ask`, `_task_count`)
+**Severity**: MEDIUM
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P1, reference §7.4–§7.5)
+
+- "tasks for Jordan": today tries a property, then a teammate
+  (`TaskListAsk.property_or_person`); the planner always picks the assignee.
+  Add `TaskFilter.for_name`.
+- "tasks due whenever", "what's due 10/3": no unread-date slot, so the planner
+  guesses (10/3 read the US way) where today says the date back. Add `due_unread`.
+- "all tasks by assignee": `_task_count` forces open tasks unless a status, due
+  window or archived is said. Add `TaskFilter.all`.
+- "who has the fewest tasks?": `TaskCount` has only `most`.
+
+Each adds schema characters (budget 58,000, at ~57,100): batch them, and check live.
+
+**Resolved 2026-10-11:** `TaskFilter.for_name` (a place, else a teammate, as today), `due_unread` (said back), `include_done` ("all tasks" counts finished ones), `TaskCount.fewest` (today's `group_counts_text` takes it too); prompt lines added. The schema fits the 58,500 budget at 58,469 by dropping the parameters' copy of the tool description and shorter unit wording. Tests: `test_planner_execute_figures.py`.
+
+### 843. ~~[MEDIUM] Planner: template names read as estimate titles~~ — RESOLVED 2026-10-11
+
+**File**: [agents/planner/resolve.py:352](../../platform/agents/planner/resolve.py)
+**Severity**: MEDIUM
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P3; parity `explained.py`)
+
+"tell me about Driveway Maintenance" was planned as `list_estimates
+{title_contains}`. "update Driveway Maintenance's description" was planned as an
+estimate edit, where it should be the `template_edit` refusal. The planner can't
+know a bare name's kind, and the resolver looks in one kind only. Fix: when a
+bare-name reference finds nothing in its kind, try the other named kinds by exact
+name (as today's `catalog_names.py` does). If a template matches an estimate
+edit, refuse `template_edit`. Then drop the two `EXPLAINED` rows.
+
+**Resolved 2026-10-11:** `agents/planner/other_kinds.py`, before the policy check: a name no estimate has that is exactly a template's is the template — a read `get_template`, a delete `delete_template`, an edit today's `template_edit` refusal. The two `EXPLAINED` rows are gone. Tests: `test_planner_other_kinds.py`.
+
+### 844. ~~[MEDIUM] Planner: turns that still fall back whole — errors, and today's old questions~~ — RESOLVED 2026-10-11
+
+**File**: [agents/planner/turn.py](../../platform/agents/planner/turn.py) (`run_planner_turn`, `_kept_turn`)
+**Severity**: MEDIUM
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md)
+
+After phase 8 (switchover plan §7.27), two kinds of turn still go to today's
+pipeline, and both need an answer before it is retired:
+- **A planner failure:** a timeout, the LLM down, a second invalid plan, or a
+  check or execute error before a write. It needs the planner's own "something
+  went wrong, try again" reply.
+- **A question today's pipeline asked in an earlier fallback turn**
+  (`open_question`). These shrink as fallbacks go. At the switchover, drop them
+  with `LOST_TRACK`, or convert them as `kept_questions` does.
+
+**Resolved 2026-10-11:** Behind `MAPLE_PLANNER_ONLY` (`settings.maple_planner_only`, off until the switchover): a planner failure says `PLANNER_TRY_AGAIN`, a turn it can't run `PLANNER_CANT_YET` (both still recorded as `planner_gap`), and a question today's pipeline asked before the switch is dropped — an answer gets `LOST_TRACK`, a cancel today's words, a new request is planned; today's rewrite question is still planned with its answer. Tests: `test_planner_pipeline_endpoint.py`.
+
+### 845. ~~[LOW] Planner: smaller shapes that still fall back~~ — RESOLVED 2026-10-11
+
+**File**: [agents/planner/confirm.py](../../platform/agents/planner/confirm.py), [agents/planner/execute.py](../../platform/agents/planner/execute.py), [agents/planner/execute_figures.py](../../platform/agents/planner/execute_figures.py)
+**Severity**: LOW
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md)
+
+- Two deletes in one plan (`confirm:several_deletes`). Ask about the first and
+  keep the second for the next turn, or refuse as a bulk delete.
+- A city or role beside another list filter ("contacts named Ana in Toronto"):
+  `record_lists.list_reply` takes city and role alone.
+- An estimate's lines by category or price ("which of E0001's materials cost
+  over $10?"): `_lines_beyond`.
+- A dashboard breakdown over a period it doesn't take, or "all time" on a
+  windowed card (`_dashboard_uncovered`).
+- A kept handler question in a multi-action plan where another action wrote
+  (`kept_questions._wrote_beside`).
+- A relative percentage that lands out of bounds raises before the write
+  (`execute_estimates._changed_by`; `edit_estimate` is a write, so the reply is WRITE_FAILED — "part of the change may already be saved" — though nothing was written). It should be said
+  ("that would make the markup −3%").
+- "who owns 12 Oak St?": `get_property {field: owner}` lists every contact
+  there, not the owners.
+
+**Resolved 2026-10-11:** Every shape: two or more deletes are one question naming each (`confirm._ask_delete`); a name, words or an owner beside a city or role (`ListAsk.within`; a related record beside them stays today's); an estimate's materials by unit price or catalog category (`_materials_priced_on_estimate`); a breakdown over another period is the metric engine's, "all time" on a windowed card is every estimate, "the last N days" with no count is asked; a handler's question beside a write is kept with the writes that ran (`kept_questions.DONE_KEY`), which the plan made again drops — never run whole; a relative change out of bounds is said (`execute_estimates.OutOfBounds`); "who owns 12 Oak St?" is its Home Owners.
+
+### 847. ~~[LOW] Planner: negated commands write~~ — RESOLVED 2026-10-11
+
+**File**: [prompts/maple_planner.py](../../platform/prompts/maple_planner.py), [agents/planner/said.py](../../platform/agents/planner/said.py)
+**Severity**: LOW *(Simon 2026-10-11: users say what to do; a delete always asks)*
+**Filed**: 2026-10-11, from the planner [gap review](plans/2026-10-11-planner-phrasing-gap-review.md) (P0, deprioritised)
+
+"don't drop the markup on work item 2" was planned as markup 0, and "don't add a
+note to it: call Bob" appended the note. Nothing on the planner path reads
+negation. Recorded only, not to be worked unless it shows up in use.
+
+**Resolved 2026-10-11:** Done after all (Simon, 2026-10-11): `said.told_not_to` — a message opening "don't / do not / never" + a write verb, with a plan that writes, is "Okay — I'll leave it as it is." Not "don't forget to …", nor a message that says what to do instead. Tests: `test_planner_said.py`.
+
+### 848. ~~[MEDIUM] An unknown stored status gives a blank refusal~~ — RESOLVED 2026-10-12
+`platform/agents/planner/policy.py:593` — Edge case. `_locked()` refuses any status outside Draft/Review, but `locked_edit_text` returns None for an unknown one, so the refusal text is `""` and the reply is empty. Today's handler fails open and allows the edit. (review 2026-10-11 #22, deferred)
+
+**Suggested fix:** Refuse only when `locked_edit_text(...)` returns text. Test: an estimate stored with status "Pending" → the edit runs.
+
+**Resolved 2026-10-12:** The planner's `_locked` fails open on a status it doesn't know (planner audit 2026-10-12). Unreachable through a Beanie load — `Estimate.status` is validated — so `test_an_estimate_with_a_status_maple_doesnt_know_stays_editable` pins the rule itself.
+
+### 864. ~~[MEDIUM] A create followed by a work-item edit of the new estimate reports "Something went wrong"~~ — RESOLVED 2026-10-11
+`platform/agents/planner/execute.py:355` — `_made_by_a_step` lets `edit_estimate{estimate: step(create_estimate)}` through. But the policy skips work-item picks unless the estimate resolved to one, so `_commands` raises RecordNotLoaded after the create wrote, and the reply is WRITE_FAILED. MEDIUM, not HIGH: an unusual combination, and the create itself is saved and reported. (review 2026-10-11 #38, deferred)
+
+**Suggested fix:** In `uncovered`, return `ref:…step` when a step-made estimate is the `estimate` of an op that needs work-item refs. Test: `[create_estimate, edit_estimate{estimate: step 1, commands:[… target position 1]}]` → uncovered is not None.
+
+**Resolved 2026-10-11:** Once the create has run, the work items are picked on the estimate it made (`policy.resolve_work_items`, from `execute._items_missing_on_made`); one not on it is said (`MADE_ITEM_MISSING`), never WRITE_FAILED. Tests: `test_planner_execute_estimate_writes.py`.
+
+### 867. ~~[MEDIUM] A relative change on the work item this edit adds writes the amount as the value~~ — RESOLVED 2026-10-11
+`platform/agents/planner/execute_estimates.py:297` — The "added" target is converted before `_changed_by`, so "add a work item Fence and raise its markup by 5%" sets 5%. A negative value raises ValidationError, giving WRITE_FAILED. (review 2026-10-11 #41, deferred)
+
+**Suggested fix:** For an added target with `relative=True`, ask or refuse ("set it to what?"), or add the company's default markup as the base. I'd refuse/ask: there's no current value yet. Test: `[add_work_item Fence, set_work_item_percentage{target: added, value:5, relative:true}]` → not written as 5.
+
+**Resolved 2026-10-11:** A change by an amount on the work item this edit adds starts from the company's default (`execute_estimates._new_item`), as today's add gives it. Test: `test_a_change_by_an_amount_on_the_work_item_just_added_starts_from_its_default`.
+
+### 871. ~~[MEDIUM] An estimate's lines by category or price falling back is untested~~ — RESOLVED 2026-10-11
+`platform/agents/planner/execute.py:313` — Edge case. The `_lines_beyond` True arm for an estimate isn't reached (the existing test uses a contact). (review 2026-10-11 #46, deferred)
+
+**Suggested fix:** `list_materials{filter:{related: estimate, category:"Mulch"}}` with an estimate ref → "filter:list_materials.related".
+
+**Resolved 2026-10-11:** Moot: an estimate's lines by category or price are answered now (#845), and tested in `test_planner_list_filters.py`.
+
+### 881. ~~[MEDIUM] A ranking by count is treated as money~~ — RESOLVED 2026-10-11
+`platform/agents/planner/followups.py:112` — Edge case. `metric {shape: ranking, measure: count}` re-runs on a tax question instead of answering NO_FIGURE. (review 2026-10-11 #56, deferred)
+
+**Suggested fix:** `_money` returns False when `last.get("measure") == "count"`. Test: a count ranking + before_tax → `Reply(NO_FIGURE)`.
+
+**Resolved 2026-10-11:** No change needed: a ranking by count prints each row's dollars and says the tax (`metric_shapes._ranking_text`), so tax is in it and the re-run is right. Pinned by `test_tax_on_a_ranking_by_count_is_the_ranking_the_other_way`.
+
+### 885. ~~[MEDIUM] `_the_note_itself` drops the record the user named~~ — RESOLVED 2026-10-11
+`platform/agents/planner/schema.py:416` — Edge case. "delete the first note on Bob Lee" while the notes listed are Ana's proposes Ana's first note. The confirmation names the record, which limits the harm. (review 2026-10-11 #60, deferred)
+
+**Suggested fix:** Drop `parent` only when the listed notes' parent matches it; otherwise keep both and let the policy check the note belongs to the parent (ask on a mismatch). Test: Ana's list + parent Bob → asks.
+
+**Resolved 2026-10-11:** The schema keeps both the row and the record; the policy takes the row only when the note is on the record named, else the record's own note (`note_pick.listed_or_record`); a record not found adds nothing to the row. Tests: `test_planner_deletes_estimates_notes.py`.
+
+### 905. ~~[LOW] A tax follow-up on a list's total still falls back~~ — RESOLVED 2026-10-12
+`platform/agents/planner/followups.py:175` — `ListEstimates.before_tax` now exists, but "does that include tax?" after a planner list total returns `followup:redo_last.list_estimates.before_tax`, which test_planner_followups.py:255 pins. Today's pipeline answers it correctly, so this is LOW. (review 2026-10-11 #85, deferred)
+
+**Suggested fix:** When `last.get("total")`, set `last["before_tax"] = change.before_tax` and return `last`; keep the fallback for a list or count. Update the test.
+
+**Resolved 2026-10-12:** `followups._redo` re-runs a list's total the other way (`before_tax`) instead of falling back (planner audit 2026-10-12). Test: `test_tax_on_an_estimate_lists_total_is_that_total_the_other_way`.
+
+### 906. ~~[HIGH] A follow-up's reply drops the plan's other actions, writes included~~ — RESOLVED 2026-10-14
+`platform/agents/planner/followups.py:321` — "thanks — and last month?" never runs the acknowledge. Only a pleasantry is lost. (review 2026-10-11 #86, deferred)
+
+**Suggested fix:** Return the Reply only when the follow-up is the plan's only action; otherwise note it in the docstring.
+
+**Raised to HIGH 2026-10-14** (review round 27): the same cause — `followups.expand` returns a follow-up's Reply (NO_FIGURE, `_nothing_before`) or fallback for the whole turn — drops a write too, with nothing said: "mark it won, and is that before tax?" after a count replies only NO_FIGURE and the status never changes; "mark it won, and what about Elm House?" with no read before gives only the follow-up's question. The amount cases of this were fixed in round 27 (#1: a card carries its amount, so only the card is left out; #5: a figure left out is said above the follow-up's reply). **Suggested fix (needs Simon's call):** (a) when the plan has other actions, run them and say the follow-up's reply above or below theirs, as `turn._said_above` does — one `_prepared` test per Reply kind; or (b) accept it.
+
+**Resolved 2026-10-14** (Simon, option a): `followups.expand_beside` leaves a follow-up that can only reply out of a plan with a request in it and returns its reply as text; `turn._said_above` says it below the request's reply (above it when that reply is a question, which stays last and is the `clarifying_question`). The follow-up's question isn't kept open — its answer, planned again whole, could make the request's writes twice; the answer is a new request. Alone, or beside only a thanks or a greeting (`_NOTHING_ASKED`), the follow-up's reply is the turn and its question is kept, as before; a follow-up that made a read counts as a request beside it (review round 28 #1); a fallback (`followup:<why>`) still falls back whole. Pinned by the #906 tests in `tests/test_planner_followups.py`, `test_a_follow_ups_reply_is_said_below_the_request_it_stood_beside` / `…above_a_question_the_request_asks` (test_planner_turn.py) and `test_a_figure_and_a_follow_up_beside_a_request_are_each_said` (test_planner_amounts.py).
+
+### 913. ~~[LOW] Four `_OFFERS` entries can't be reached from a planner turn~~ — RESOLVED 2026-10-12
+`platform/agents/planner/kept_questions.py:41` — Only `delegate_create_estimate` and calculate's `delegate_generic` arm offers. The contact, property, labour and material entries are dead. (review 2026-10-11 #93, deferred)
+
+**Suggested fix:** Drop them, or arm the offers on the planner's creates and cover them.
+
+**Resolved 2026-10-12:** The planner's contact, property, material and role creates arm today's follow-up (`execute_records._with_offer`, as `delegate_generic` does), which `kept_questions` keeps as the planner's offer (planner audit 2026-10-12). Test: `test_the_offer_after_a_contact_create_is_armed_as_today_arms_it`.
+
+### 951. ~~[MEDIUM] Reference row fails 2 runs in 3: "delete it" [est]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:414` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as edit_estimate (removing every work item) instead of delete_estimate in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3 in both states ([est] delete_estimate, [wi] the work item's removal).
+
+### 953. ~~[MEDIUM] Reference row fails 2 runs in 3: "create a task for the fence work item?" [wi]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:769` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as an acted create_task where the row asks first (failing 3 in 3 on the re-runs after the 2026-10-13 fixes) in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: asked 3 of 3.
+
+### 954. ~~[MEDIUM] Reference row fails 2 runs in 3: "which estimates are in my backlog?" [est]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:1037` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as list_estimates instead of the backlog card in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
+
+### 955. ~~[MEDIUM] Reference row fails 2 runs in 3: "what's the rate for Foreman?" [none]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:2969` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as get_labour with no field instead of field rate in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
+
+### 956. ~~[MEDIUM] Reference row fails 2 runs in 3: "overdue tasks by assignee" [none]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:2201` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as list_tasks + task_count instead of one count by assignee in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
+
+### 957. ~~[MEDIUM] Reference row fails 2 runs in 3: "tasks due marked done" [none]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:2240` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as a clarify instead of the list in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3 since the prompt line "a status after 'due' … is that status on the upcoming list" (platform `a477074`).
+
+### 958. ~~[MEDIUM] Reference row fails 2 runs in 3: "Add to it the following: check the drainage by the back gate" [est]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:2329` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as edit_estimate instead of the estimate's add_note in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3 [task_focus]; [est] planned add_note 3 of 3, which the parity scorer reports "unsure" only because it has no notes intent.
+
+### 959. ~~[MEDIUM] Reference row fails 2 runs in 3: "mark the task as done" [none]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:2436` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as an acted update_task where the row asks which task in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
+
+### 961. ~~[MEDIUM] Reference row fails 2 runs in 3: "what are the contact roles?" [none]~~ — RESOLVED 2026-10-13
+`documentation/development/maple-phrasing-reference.md:3040` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as a refusal (other) instead of help in two of three runs — intermittent, so it answers it right only some of the time.
+
+**Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
+
+**Resolved 2026-10-13:** re-run 3× live on the reference checker after the planner gap fixes: 3 of 3.
+
+### 1070. ~~[MEDIUM] `amount_is_a_lists_total` / `amount_said`: rare-case branches untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:343` — Edge case: the one-action check, the work / recurring / year / since / excluding scope checks, `recurring=False` as a scope, the statuses copy, days / window_unit kept, on_hold → "On Hold"; and in `amount_said`, "less than", "more than" / "greater than", the required money sign. (review round 20 #8, deferred)
+
+**Suggested fix:** One parametrized case per arm.
+
+**Resolved 2026-10-14:** covered by round 20's rework of the amount reading (`test_an_amount_said_of_a_total_is_the_lists_total`, `test_an_amount_the_list_cant_take_is_left_for_the_say_back`, `test_only_one_figure_is_converted`); each arm's mutant is killed.
+
+*(Superseded 2026-10-14: no amount is read from the words; the model fills `schema_fields.Amount` and the tests are `tests/test_planner_amounts.py` — review round 26 #10.)*
+
+### 1078. ~~[LOW] REST_NOT_DONE is added when the other action does nothing~~ — RESOLVED 2026-10-14
+`platform/agents/planner/unread_scope.py:122` — "hi Maple! what's my average estimate over $1000?" (`[social, metric]`) replies "…I haven't done the rest of what you asked either". The same happens beside acknowledge, cancel or start_over. (review round 22 #7, deferred)
+
+**Suggested fix:** Leave social, acknowledge and similar conversational ops out of `rest`, and add a test.
+
+**Resolved 2026-10-14** (review round 23 #1, option b): REST_NOT_DONE is gone. Beside another request the figure is left out and the request runs, with the say-back above its reply (`unread_scope.without_figures`, `turn._figure_left_out`); beside a greeting or a thanks (`_NOTHING_ASKED`) only the say-back is given. Pinned by `test_a_figure_beside_nothing_asked_is_only_said_back`. Cancel and start_over are requests and run.
+
+### 1080. ~~[MEDIUM] An amount said in a follow-up to an estimate list is dropped silently~~ — RESOLVED 2026-10-14
+`platform/agents/planner/turn.py:445` — `redo_last` has no amount field, and the say-back after `followups.expand` (review rounds 22 #2, 23 #5) reads only a figure or a card. After a list, "what about Elm House over $1000?" lists Elm House's estimates with no amount; after a list read over $1000, "and last month, over $2000?" keeps the old $1000. Nothing is said. (found in review round 22, outside its findings)
+
+**Suggested fix:** When an amount is said with a `redo_last` whose last read is `list_estimates`, set `total_above` / `total_below` from `amount_said` on the expanded list (readable), or say it back (unreadable); a `_prepared` test with a stored list `last_plan_read` for each.
+
+**Resolved 2026-10-14** (reworded after review rounds 24–25 and the move to the model's amounts): `redo_last` carries the amount said with it (`amount`, `schema_fields.Amount`), which `followups._redo` makes the list's — an estimate list's `filter.amount` or a material list's `filter.price` — the old one replaced ("under $1000" after "over $1000" is no empty list), a limit said with it kept; after a figure it is the figure's (converted or said back); after a card it is said back; after any other read, a fallback. A list asked beside it keeps its own. No amount is read from the words.
+
+### 1081. ~~[LOW] An amount over $10,000,000 raises ValidationError~~ — RESOLVED 2026-10-14
+`platform/agents/planner/followups.py:548` — `_Money` is capped at `le=10_000_000` (schema_fields.py:21). "what about Elm House over $20,000,000?" raises from `amount_on_redo`, and "total of my estimates over $20,000,000" from `as_asked.amount_is_a_lists_total` (as_asked.py:379). Either becomes `turn_error`: words said, nothing written. Rare, hence LOW. (review round 24 #10, deferred — the model's own `above` / `below` are capped too, so it can't plan one: the plan is invalid and asked again)
+
+**Suggested fix:** In `amount_said`, read an amount over the cap as unreadable, so it is said back. Test both messages.
+
+**Resolved 2026-10-14** (superseded): no amount is read from the words, so none can exceed the cap after planning. The model's own amount is `_Money` (capped) in `schema_fields.Amount`, so a plan with one over it is invalid and asked again, as any invalid plan is.
+
+### 35. ~~[LOW] `names` list in materials bulk-fetch may contain casing duplicates~~ — RESOLVED 2026-10-16
+
+**Resolved 2026-10-16** (shared material catalog): the upload now fetches the company's materials in one query keyed by `norm_name`, so casing duplicates collapse.
+**File**: `routers/materials.py:295`
+**Severity**: LOW
+
+`names = [md["name"] for md in grouped.values()]` — `grouped` is keyed by
+`name.lower()`, so names are unique by casefold but not by original
+casing. A CSV with both `"Patio Stone"` and `"patio stone"` would produce
+two `$in` entries that both resolve to the same Mongo row.
+
+Fix: `list({md["name"] for md in grouped.values()})`. Micro-optimization;
+skip unless already editing the file.
+
+### 631. ~~[MEDIUM] The estimates PUT still recomputes with the old formula~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03 (user: one formula):** The PUT prices each work item with `work_item_breakdown`, the server port of the portal's math, so the stored total is the one the estimate page and Maple show: 5 × 2.5 × $3.99 at 15% markup and 13% tax is $64.85, not $64.81. Legacy `labours` lines no longer price a work item (the portal never sends them); the two API tests that priced one now use an activity. A stored labor burden still prices, as before. Review rounds of that batch: AI generation, Maple's add-work-items path and the manual (`skip_generation`) create price the same way once an item has material or activity lines (`job_item_builders._price_as_the_page`) — an item with neither keeps its own figure — and a sized template stores its scaled lines' price, not its total times the factor. Tests: `test_estimate_api.py::test_update_estimate_prices_work_items_as_the_portal_does`, `test_build_job_items_from_parsed_prices_lines_as_the_portal_does`, `test_manual_create_prices_work_items_as_the_portal_does`, `test_template_create_routing.py::…test_a_sized_template_stores_the_price_of_its_scaled_lines`.
+
+`platform/routers/estimates.py:1296` — The PUT rounds once, half-even; Maple now rounds each line, half-up. Verified: 5 lines of 2.5 × $3.99 with 15% markup and 13% tax → PUT $64.81, Maple $64.85. A portal save restates a total Maple stored to the cent, and the assumption rescale's exact `line_derived` check (< 0.01) now flags portal-saved items as manual overrides.
+
+**Suggested fix:** Have the PUT use `work_item_breakdown` (the portal sends burden 0), or loosen `line_derived` to accept either formula. Needs your call because it changes the HTTP API's stored totals; I'd pick the former for one formula everywhere. **Awaiting Simon's decision** (changes the totals the HTTP API stores).
+
+*(Review 2026-09-24 fourth pass #17.)*
+
+### 790. ~~[LOW] An estimate's activity role and rate card are saved unchecked~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): `snapshots.assert_own_line_refs` now covers activity roles (Labour) and `effort_rate_card_id` (RateCard) on estimate create/update; ids already stored aren't re-checked.
+`platform/routers/estimates.py:1169` — `activities[].role` and `activities[].effort_rate_card_id` (and the create path in `job_item_builders.py` ~176) are stored with no company check, so an estimate can link another company's role or rate card. Nothing is shown from them unless the same id is also a labours line, which batch 1 now checks. (tenant audit 2026-10-01, A3)
+
+**Suggested fix:** Check new ids with `dependencies.assert_company_refs` (Labour, RateCard), skipping ids already on the estimate, as `snapshots.assert_own_line_refs` does for lines (CLAUDE.md "Tenant scope of referenced ids").
+
+### 792. ~~[LOW] Category and unit "in use" counts look across every company~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): Both deletes and both load-standard bootstraps count only the company's own materials.
+`platform/routers/material_categories.py` delete, `routers/material_units.py` delete, `services/material_category_bootstrap.py` ~63, `services/material_unit_bootstrap.py` ~66 — `Material.find(category == id)` / `{"sizes.unit": id}` have no company filter, so another company's materials pointing at X's category block X's delete and reveal a count. New links are refused since #702; old ones remain. (tenant audit 2026-10-01, A6)
+
+**Suggested fix:** Add `company` to each count query.
+
+### 793. ~~[LOW] Deleting a property clears the property on estimates of any company~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): The cascade filters on `Estimate.company == property.company`.
+`platform/routers/properties.py:539` — `Estimate.find(Estimate.property == property.id).update(property=None)` has no company filter, so a cross-company link written before batch 1 lets X's delete edit Z's estimate. (tenant audit 2026-10-01, A9)
+
+**Suggested fix:** Filter the cascade on `Estimate.company == property.company`.
+
+### 794. ~~[LOW] Setting the default card doesn't check the card is the company's~~ — RESOLVED 2026-10-01
+
+**Resolved 2026-10-01** (tenant batch 2): `sync-payment-method` refuses (404) a payment method whose `customer` isn't the company's Stripe customer, before setting it as default.
+`platform/routers/billing.py:440` — `sync-payment-method` retrieves `body.payment_method_id` and sets it as the default without checking `pm.customer == company.stripe_customer_id`. Stripe should refuse a card not attached to the customer, so likely not exploitable. (tenant audit 2026-10-01, A10)
+
+**Suggested fix:** Refuse (404) when `pm.customer` isn't the company's Stripe customer, before the update call.
+
+### 1141. ~~[MEDIUM] Untested edge case in `_size_writes`: a size listed twice~~ — RESOLVED 2026-10-17
+
+**Resolved 2026-10-17:** `_size_writes` was replaced by `services.material_catalog.standard_size_changes`; `test_material_catalog_size_changes.py::test_any_change_to_the_size_list_is_refused[a size twice]` covers it.
+`platform/routers/material_helpers/standard.py:18` — The `len(incoming) != len(current)` arm (same set, one duplicated) is never driven. (review 2026-10-16 round 2 #76, deferred)
+
+**Suggested fix:** PUT [yard, yard, bag] → 409.
+
+### 635. ~~[MEDIUM] A notes refresh wipes a note the user just created~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `useNotes` tracks the fetch in flight; a local create, delete, edit or attachment change while one is pending starts a fresh fetch that supersedes it (`supersedeInFlight`), so the older answer can't undo the change and the feed still picks up what Maple filed. The fresh fetch keeps the kind of the one it supersedes, so a superseded parent-switch load still clears on failure (review round 1), and it always runs the newest `load` (`loadRef`): a change that finishes after a record switch fetches the record on screen, never the one it was clicked on (review round 2). Tests: `tests/useNotes.test.tsx` › local changes during a refresh (create; delete), "a superseded parent-switch load still clears on failure", and "a note change that finishes after a parent switch never reloads the old parent".
+
+`portal/src/hooks/useNotes.ts:84` — When Maple files a note, `refreshKey` bumps and a fetch starts. If the user creates their own note before it lands, `createNote` prepends it and then the older fetch replaces the list without it. A probe went from ['created'] to []; in the partial-upload retry path `notes.find(pendingId)` then finds nothing.
+
+**Suggested fix:** After any local change to the list (create, delete, replace), start a fresh `load` (or bump the sequence), so the stale response is superseded. Add a test.
+
+*(Review 2026-09-24 fourth pass #22.)*
+
+### 655. ~~[MEDIUM] A failed refresh empties the feed and loses a note edit in progress~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** `load` takes a `refresh` flag (the refresh key and the manual reload set it). A failed refresh keeps the list and shows the error; only a failed load after a parent switch clears it, as before. A card being edited stays mounted and the badge keeps its count. Tests: `tests/useNotes.test.tsx` › refresh failure (refresh key; manual reload); the parent-switch clearing test is unchanged.
+
+`portal/src/hooks/useNotes.ts:103` — The `catch` clears notes on every failure. That was meant for a parent switch, but it now also runs on a Maple-triggered refetch of the same parent. Verified: `['n1']` → `[]` with the error "offline". Each `NoteCard` holds its edit composer in local state (NoteCard.tsx:61), so a card being edited unmounts and the typed text is lost. `onCountChange(0)` also resets the badge.
+
+**Suggested fix:** Pass a `refresh` flag to `load` and only `setNotes([])` when the parent changed. On a refresh failure keep the list and set `error` (or a light "couldn't refresh" message). Add a test.
+
+*(Review 2026-09-25 fifth pass #24.)*
+
+### 733. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `DashboardPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/DashboardPage.test.tsx` — "a successful reload after a failed first load leaves the error screen". The shared quiet-load helper this entry suggested was not extracted: the five loaders differ (one is an effect keyed on a reload token), and the fix is one line each.
+
+`portal/src/pages/DashboardPage.tsx:84` — Same defect as #728 in the dashboard list loader (81-108); the page stays on the error state (235). (review 2026-09-27 #63)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`. Consider one shared quiet-load helper, since the pattern is now pasted six times.
+
+### 734. ~~[MEDIUM] The question-strip Cancel button takes focus off the composer~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** The question strip's Cancel has `onMouseDown={keepComposerFocus}`, like the composer's other controls. Test: `tests/AiPanel.test.tsx` › "pressing Cancel keeps focus in the composer".
+
+`portal/src/components/Layout/AiPanel.tsx:435` — The button has no `onMouseDown={keepComposerFocus}`, against the file's own rule (336-347). On a phone, blur brings the tab bar back (PortalLayout 426), lifting the composer about 64px between press and click, so the tap misses. The strip appears right after a reply, when the textarea has just been refocused. (review 2026-09-27 #64)
+
+**Suggested fix:** Add `onMouseDown={keepComposerFocus}`, as the other composer controls do.
+
+### 735. ~~[MEDIUM] Cancel doesn't stop a pending voice auto-send~~ — RESOLVED 2026-10-04
+
+**Resolved 2026-10-04:** Cancel calls `cancelAutoSend()` before `onCancelQuestion`, so a counting-down voice transcript no longer sends itself after the cancel turn. Test: `tests/AiPanelVoice.test.tsx` › "cancelling the open question aborts the auto-send".
+
+`portal/src/components/Layout/AiPanel.tsx:437` — `onClick={() => onCancelQuestion?.()}` bypasses `cancelAutoSend()`. If a voice transcript is counting down ("Sending in 3…"), it can still fire after the "cancel" turn — the double-send `submitDirectMessageCancellingAutoSend` (187-190) exists to prevent. (review 2026-09-27 #65)
+
+**Suggested fix:** `onClick={() => { cancelAutoSend(); onCancelQuestion?.(); }}`.
+
+### 475. ~~[LOW] portal/src/pages/TasksPage.tsx:199 — taskId param never clears when the list is empty~~ — RESOLVED 2026-09-28
+Resolved: the deep-link effect now waits on `isLoading` rather than the row count, and clears
+`open`/`taskId` whatever the list holds (a task it lacks is fetched by id). Pinned by
+`tests/TasksPageDeepLink.test.tsx` ("the param clears even when the filtered list is empty").
+
+The effect returns early when `tasks.length === 0`, so `?taskId=` stays in the URL when
+the filtered list has no rows. A later filter change that produces rows can then open a
+dialog the user did not ask for.
+**Suggested fix:** clear the param whenever `requestedTaskId` is set and loading has
+completed, independent of the row count.
+
+### 728. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `ContactsPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/ContactsPageDiffSave.test.tsx` — "a successful reload after a failed first load leaves the error screen".
+
+`portal/src/pages/ContactsPage.tsx:251` — `setError("")` now runs only when `!quiet`. If the first load failed, the page shows `<ErrorState>` (671). A later Maple write triggers a quiet reload that succeeds, but the error stays and the page stays on the error screen. Before this diff, a Maple write reset the error and the page recovered. (review 2026-09-27 #58)
+
+**Suggested fix:** Call `setError("")` after the successful `set*` calls in `try`, as TasksPage.tsx:151 does.
+
+### 729. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `MaterialsPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/MaterialsPageDiffSave.test.tsx` — "a successful reload after a failed first load leaves the error screen".
+
+`portal/src/pages/MaterialsPage.tsx:121` — Same defect as #728 in the materials loader (120-134); the page stays on `<ErrorState>` (551) after a successful Maple-triggered reload. (review 2026-09-27 #59)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`.
+
+### 730. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `PeoplePage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/PeoplePageDiffSave.test.tsx` — "a successful reload after a failed first load leaves the error screen".
+
+`portal/src/pages/PeoplePage.tsx:101` — Same defect as #728 in the roles loader (100-114); the page stays on `<ErrorState>` (335). (review 2026-09-27 #60)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`.
+
+### 731. ~~[MEDIUM] A successful quiet reload never clears an earlier load error~~ — RESOLVED 2026-10-03
+
+**Resolved 2026-10-03:** `PropertiesPage`'s loader clears the error after every successful load, quiet or not, as TasksPage does; a Maple-triggered reload now lifts the error screen. Test: `tests/PropertiesPageMobileSheet.test.tsx` — "a successful reload after a failed first load leaves the error screen".
+
+`portal/src/pages/PropertiesPage.tsx:125` — Same defect as #728 in the properties loader (122-156); the page stays on `<ErrorState>` (394). (review 2026-09-27 #61)
+
+**Suggested fix:** Clear the error after a successful load regardless of `quiet`.
+
+### 973. ~~[MEDIUM] Untested: menu_labels' all-unique case and the menu end to end~~ — RESOLVED 2026-10-14
+`platform/agents/planner/resize.py:45` — edge case — no turn test answers the work-item menu with "2" after duplicate names and asserts the right item is resized. (review 2026-10-13 round 2 #73, deferred)
+
+**Suggested fix:** Estimate with two "Mowing" items, "make it 8000 sq ft" → menu → "2" → the second Mowing resized.
+
+**Resolved 2026-10-14:** `test_planner_resize_work_item.py::test_two_items_of_one_name_are_asked_by_position_and_the_second_is_resized`. Each test fails with its arm broken (mutation-checked).
+
+### 974. ~~[MEDIUM] Untested: `_decide_value` with no record (a value question on a router flow)~~ — RESOLVED 2026-10-14
+`platform/routers/agent_helpers/open_question.py:520` — edge case — the `record is None → None` arm isn't driven. (review 2026-10-13 round 2 #74, deferred)
+
+**Suggested fix:** A `_VALUE` AnyQuestion with record None and a bare email → decided by the common path (ANSWER).
+
+**Resolved 2026-10-14:** `test_open_question.py::test_a_value_question_on_a_router_flow_is_decided_as_any_question`. Each test fails with its arm broken (mutation-checked).
+
+### 975. ~~[MEDIUM] Untested: offers_field for a postal code~~ — RESOLVED 2026-10-14
+`platform/agents/planner/bare_value.py:56` — edge case — the postal_zip word set isn't driven. (review 2026-10-13 round 2 #75, deferred)
+
+**Suggested fix:** offer "set the postal code of 20 Birch Rd" with "M4B 1B3" → True.
+
+**Resolved 2026-10-14:** `test_planner_bare_value.py::test_an_offer_of_the_postal_code_takes_a_bare_postal_code`. Each test fails with its arm broken (mutation-checked).
+
+### 976. ~~[MEDIUM] Untested: the which-record "… you mean" form~~ — RESOLVED 2026-10-14
+`platform/agents/planner/planner.py:153` — edge case — the "what is the <kind> you mean" alternative isn't driven (the "'s name" form is). (review 2026-10-13 round 2 #76, deferred)
+
+**Suggested fix:** Add "What is the task you mean?" to the which-record parametrize.
+
+**Resolved 2026-10-14:** "What is the task you mean?" in `test_planner_call.py::test_a_clarify_asking_which_record_is_asked_for_once_more`. Each test fails with its arm broken (mutation-checked).
+
+### 983. ~~[MEDIUM] `_named_day`: three arms untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/said_metrics.py:225` — (a) :233 a unit without "start of" → None ("sales since the quarter" → question); (b) :233 the `beginning` word arm ("sales beginning the month" → 2026-10-01); (c) :182 the `previous` alternative ("since the previous quarter" → 2026-07-01). (review 2026-10-13 round 3 #29, deferred)
+
+**Suggested fix:** One case each in `test_a_day_said_is_read` / `test_a_day_said_that_cant_be_read_is_asked`.
+
+**Resolved 2026-10-14:** cases in `test_planner_said_corrections.py::test_a_day_said_is_read` / `test_a_day_said_that_cant_be_read_is_asked`. Each test fails with its arm broken (mutation-checked).
+
+### 984. ~~[MEDIUM] `_unit_start` across a year boundary untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/said_metrics.py:208` — the month/quarter index math and the week arm only run with now in October. (review 2026-10-13 round 3 #30, deferred)
+
+**Suggested fix:** now 2026-01-10: "since last month" → 2025-12-01, "since last quarter" → 2025-10-01, "since last week" → 2025-12-29.
+
+**Resolved 2026-10-14:** `test_planner_said_corrections.py::test_the_last_period_in_january_is_last_years`. Each test fails with its arm broken (mutation-checked).
+
+### 985. ~~[MEDIUM] `_since_found` / `_a_name_after` / `_since_said` edges untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/said_metrics.py:268` — (a) :273 since beating a readable "from" day ("how much from may johnson since june" → 2026-06-01); (b) :275 the loop stepping past an unreadable match ("sales since Feb 30 or rather since March 1" → 2026-03-01); (c) :263 `_a_name_after` True changing a result ("how much did we make from May Johnson?" → since None); (d) :193 "after tax" not a since word ("revenue after tax" → since left out). (review 2026-10-13 round 3 #31, deferred)
+
+**Suggested fix:** One test per message, asserting the result shown.
+
+**Resolved 2026-10-14:** four tests in `test_planner_said_corrections.py` (`test_since_beats_a_readable_day_from_names`, `test_a_day_that_cant_be_read_is_stepped_past_for_one_that_can`, `test_from_a_name_opening_with_a_month_is_no_day`, `test_after_tax_is_no_day_a_figure_runs_from`). Each test fails with its arm broken (mutation-checked).
+
+### 986. ~~[MEDIUM] `pipeline_card`: two guards untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:77` — :84 the metric guard ("what's my average pipeline estimate", average → stays metric); :88 the recurring operand ("what's my recurring pipeline worth", recurring True → stays). (review 2026-10-13 round 3 #32, deferred)
+
+**Suggested fix:** Add both to `test_a_pipeline_with_a_scope_said_stays_a_figure` → `is plan`.
+
+**Resolved 2026-10-14:** two cases in `test_planner_as_asked.py::test_a_pipeline_with_a_scope_said_stays_a_figure`. Each test fails with its arm broken (mutation-checked).
+
+### 987. ~~[MEDIUM] `company_margin`: two arms untested, one unreachable~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:105` — :113 the field guard (get_estimate focus field total, "what's my margin?" → stays); :100 the `work item` alternative ("what's my margin on work item 2?" → stays). `"margin"` in `("gross_margin", "margin")` is unreachable (GetEstimate.field has no "margin"). (review 2026-10-13 round 3 #33, deferred)
+
+**Suggested fix:** One `is plan` test per arm; drop "margin" from the tuple.
+
+**Resolved 2026-10-14:** `test_planner_as_asked.py::test_my_margin_planned_as_another_field_of_the_estimate_is_as_planned` and "what's my margin on work item 2?" in `test_one_estimates_margin_stays_the_estimates`; the unreachable "margin" dropped (`action.field != "gross_margin"`). Each test fails with its arm broken (mutation-checked).
+
+### 988. ~~[MEDIUM] `win_rate_said`: arms untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:201` — :196 the "are we" / "is (the) business" alternatives ("how are we doing compared to last year?", "how is the business doing this year?" → total); :210 no win rate planned (a total plan → `is plan`). (review 2026-10-13 round 3 #34, deferred)
+
+**Suggested fix:** Add both messages and the identity case to `test_a_win_rate_only_when_its_words_are_said`.
+
+**Resolved 2026-10-14:** two messages in `test_planner_as_asked.py::test_a_win_rate_only_when_its_words_are_said` and `test_no_win_rate_planned_is_as_planned`. Each test fails with its arm broken (mutation-checked).
+
+### 989. ~~[MEDIUM] `_NUMBER_RE` edge untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/said_resize.py:43` — (b) :108 `(?<!items )` never changes a tested result (size 1 from "make items 1 and 2 bigger" → RESIZE_QUESTION). (a), the mixed picks, was covered in round 3 (`test_round_3_a_said_position_beside_a_named_item_keeps_both`). (review 2026-10-13 round 3 #36, deferred)
+
+**Suggested fix:** One test asserting that result.
+
+**Resolved 2026-10-14:** already pinned: `test_planner_said_corrections.py::test_round_4_a_size_of_one_after_items_is_a_position` fails without the `(?<!items )` lookbehind — the entry's premise had gone; its comment now names this entry. Each test fails with its arm broken (mutation-checked).
+
+### 990. ~~[MEDIUM] `_kind_said`: kinds and forms untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/other_kinds.py:106` — only task/estimate/contact word lists are driven; property ("the site Driveway Maintenance"), material ("Driveway Maintenance material"), labour ("the role Driveway Maintenance"), the possessive "Name's task" and quoted `task "Name"` forms aren't. (review 2026-10-13 round 3 #37, deferred)
+
+**Suggested fix:** Parametrize `test_only_a_kind_said_of_the_name_keeps_that_kind` with get_property, get_material, get_labour and the two forms → op unchanged.
+
+**Resolved 2026-10-14:** five cases in `test_planner_other_kinds.py::test_only_a_kind_said_of_the_name_keeps_that_kind`. Each test fails with its arm broken (mutation-checked).
+
+### 991. ~~[MEDIUM] `onto_handler_question`: newest record without REPLAN_KEY untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/overage_ack.py:55` — :68 a delete confirm or a "pipeline": "planner" yes/no record with a matching original_message must not be stamped; the offer test carries REPLAN_KEY, so the arm isn't driven. (review 2026-10-13 round 3 #38, deferred)
+
+**Suggested fix:** `{"context": {"pending_intents": [{"original_message": "m"}]}}` with the yes carried → no OVERAGE_ACKNOWLEDGED_KEY.
+
+**Resolved 2026-10-14:** `test_planner_confirm.py::test_a_question_that_replans_nothing_never_takes_the_yes`. Each test fails with its arm broken (mutation-checked).
+
+### 992. ~~[MEDIUM] `_check_action`: invalid company id untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/policy.py:688` — :696 company None skips `note_on_record` and `_check_rules`; only `recheck` is tested that way. (review 2026-10-13 round 3 #39, deferred)
+
+**Suggested fix:** `check_plan(update_task plan, company_id="x", …)` → would_run with no rule reasons.
+
+**Resolved 2026-10-14:** `test_planner_policy.py::test_a_company_id_that_is_no_id_checks_no_rules` — with `create_task`, not the suggested `update_task`: an `update_task` with no company can't resolve its target and asks ("no record kind or company"), which is right. Each test fails with its arm broken (mutation-checked).
+
+### 993. ~~[MEDIUM] `unpriced_text` / `_ranking_text` / `_comparison_reply` edges untested~~ — RESOLVED 2026-10-14
+`platform/agents/estimate/metric_ratio_shapes.py:64` — (a) :67 the singular ("(1 work item)"); (b) :178 offset > 0 with total_rows 0 falls to `_nothing`; (c) :261 the change-None "." arm asserted only by substring; (d) :246 a margin side with nothing ("no sold work last month"). (review 2026-10-13 round 3 #40, deferred)
+
+**Suggested fix:** (a) margin ranking [], left_out 1 → endswith "(1 work item)."; (b) `_ranking([], offset=2, total=0)` → the "Nothing was sold or lost…" text; (c)+(d) `_compared(RatioRow("",200,1000,2), RatioRow("",0,0,0), "margin")` → endswith "against no sold work last month. Overhead is deducted; tax is left out."
+
+**Resolved 2026-10-14:** three tests in `test_metric_ratio_shapes_replies.py` (the singular, a page past an empty ranking, a side with nothing). Each test fails with its arm broken (mutation-checked).
+
+### 994. ~~[MEDIUM] `_labelled`: a shared property whose second contact is gone~~ — RESOLVED 2026-10-14
+`platform/services/maple_ratio_shapes.py:244` — :265/:267 a shared property with one deleted (or other-company) contact must give shared False and drop that row; untested. (review 2026-10-13 round 3 #41, deferred)
+
+**Suggested fix:** In the mixed world delete Dee Ng → by customer: only Cy Ng, shared False.
+
+**Resolved 2026-10-14:** `test_metric_ratio_shapes.py::test_a_shared_property_whose_second_customer_is_gone_is_shared_by_no_one`. Each test fails with its arm broken (mutation-checked).
+
+### 1008. ~~[MEDIUM] `work_item_division`: `_ABBREVIATION_STOP` arms untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:52` — the `(?=\s+[A-Z])` lookahead, the `(?-i:)` scope and the lookbehinds' `\b` (:37) are never driven. (review 2026-10-13 round 7 #14, deferred)
+
+**Suggested fix:** "move work item 2 to Tree Co. then price it", "… to Maintenance now. Then price it", "… to TreeCo. Then price it" → each refused.
+
+**Resolved 2026-10-14:** five cases in `test_planner_as_asked.py::test_round_6_a_sentence_after_is_no_division` (each lookbehind's `\b` too). Each test fails with its arm broken (mutation-checked).
+
+### 1009. ~~[MEDIUM] `new_estimate_said`: clause arms untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:91` — `_NEW_AFTER_A_CLAUSE_RE`'s "." / ";" separators, its 60-character bound and `_NEW_SAID_RE`'s "separate" are never driven. (review 2026-10-13 round 7 #15, deferred)
+
+**Suggested fix:** "Johnson called. Make a new estimate for a cedar fence" → said; a ~50-character clause → said; one over 60 → not; "I need a separate quote for a cedar fence on this job" → said.
+
+**Resolved 2026-10-14:** cases in `test_planner_as_asked.py::test_round_6_a_new_estimate_after_a_clause` (".", ";", a 53- and a 67-character clause, "separate"). The suggested "I need a separate quote for a cedar fence on this job" is not read as new today — `_ASKED_FOR` opens with a/new/another only; the word rules are frozen, so the model's plan stands for it — and "separate" is driven by "… on this job, a separate quote" instead. Each test fails with its arm broken (mutation-checked).
+
+### 1010. ~~[MEDIUM] `company_margin`: `_NAME_WORD`'s capital lookahead untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:149` — the `(?=[A-Z])` after of/and/& (:136) is never asserted. (review 2026-10-13 round 7 #16, deferred)
+
+**Suggested fix:** ("what's my margin on the City of austin job?", company) — or fold into #1002.
+
+**Resolved 2026-10-14:** ("what's my margin on the City of austin job?", company) in `test_planner_as_asked.py::test_round_6_whose_margin`. Each test fails with its arm broken (mutation-checked).
+
+### 1011. ~~[MEDIUM] `_RATE_SAID_RE` and the avg-pay arm untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/said.py:164` — charged/charges, billed/bills, priciest, pricey, "earns me", "earns the company" with the wage planned, and `avg` pay (:150), are never driven. (review 2026-10-13 round 7 #17, deferred)
+
+**Suggested fix:** One case each in `test_round_6_the_rate_said_is_the_rate`; "what's the avg pay?" (Rate planned) → wage.
+
+**Resolved 2026-10-14:** eight cases in `test_planner_said_corrections.py::test_round_6_the_rate_said_is_the_rate` and "what's the avg pay?" in `test_round_3_a_roles_rate_unless_its_wage_is_said`. Each test fails with its arm broken (mutation-checked).
+
+### 1012. ~~[MEDIUM] `_POLITE_RE`: "how about we look / think" untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/question_writes.py:20` — the look and think exclusions are never driven. (review 2026-10-13 round 7 #18, deferred)
+
+**Suggested fix:** ("How about we look, is the fence task due Friday?", True), ("How about we think about it, is the fence task due Friday?", True).
+
+**Resolved 2026-10-14:** two cases in `test_planner_question_writes.py::test_round_6_a_request_in_other_words`. Each test fails with its arm broken (mutation-checked).
+
+### 1013. ~~[MEDIUM] `figure_status_said`: `as_followup`'s `all` untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/followups.py:272` — `all` → `any` (:286) survives. (review 2026-10-13 round 7 #19, deferred)
+
+**Suggested fix:** A mixed `[metric, list_estimates]` plan after a figure for "and the lost ones?" stays as planned.
+
+**Resolved 2026-10-14:** `test_planner_followups.py::test_a_status_after_a_win_rate_planned_as_a_figure_and_a_list_stands`. Each test fails with its arm broken (mutation-checked).
+
+### 1014. ~~[MEDIUM] `_line_label`: the fallback with no labelled work item untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/confirm.py:355` — a line ref with no `commands[i].target` (or one without a label) should be asked as the bare "material line 2"; untested. (review 2026-10-13 round 7 #23, deferred; its several-stale arm is now tested)
+
+**Suggested fix:** A `PlanCheck` with only `commands[0].line` → "Just to check — do you mean material line 2? (yes/no)".
+
+**Resolved 2026-10-14:** `test_planner_confirm.py::test_a_stale_line_with_no_work_item_is_asked_as_its_place`. Each test fails with its arm broken (mutation-checked).
+
+### 1021. ~~[MEDIUM] `_NEW_OR_OPEN_ANSWERS`: "quote" in the open/current/existing arm untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:113` — removing `quote` from `(?:open|current|existing)\s+(?:estimate|quote)` passes every test; without it "add it to the open quote" / "add it to the current quote" read as new requests while the new-or-open question waits (checked through `decide_turn`), so an answer in quote words would be dropped. (review 2026-10-13 round 11 #1, deferred)
+
+**Suggested fix:** Add "add it to the open quote" to `test_round_10_an_answer_that_reads_as_a_request_answers_the_question`.
+
+**Resolved 2026-10-14:** "add it to the open quote" in `test_open_question.py::test_round_10_an_answer_that_reads_as_a_request_answers_the_question`. Each test fails with its arm broken (mutation-checked).
+
+### 1022. ~~[MEDIUM] `_refused_template_delete`: two guard arms untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/other_kinds.py:146` — mutants survive dropping `refused.reason != "template_edit"` (any refusal of "delete Driveway Maintenance" would become `delete_template`) and skipping the estimate check (`_template_named` in place of `_template_not_estimate`: a name an estimate and a template share would delete the template rather than keep the refusal). The `plan.actions` guard is defensive and the name's punctuation class is equivalent. (review 2026-10-13 round 12 #1, deferred)
+
+**Suggested fix:** In `test_a_refusal_that_is_no_templates_delete_stands`: an `out_of_chat` refusal of "delete Driveway Maintenance" stays refused; with an estimate also titled "Driveway Maintenance", the `template_edit` refusal stands.
+
+**Resolved 2026-10-14:** `test_planner_other_kinds.py::test_a_refusal_other_than_a_templates_edit_stands` and `test_a_refused_delete_of_a_name_an_estimate_shares_stands`. Each test fails with its arm broken (mutation-checked).
+
+### 1045. ~~[MEDIUM] `_about`: two noun arms untested~~ — RESOLVED 2026-10-14
+`platform/tests/planner_parity/score.py:54` — Edge case: mutants S5 ("quotes?" dropped) and S6 ("line items" dropped) survive. (review round 15 #8, deferred)
+
+**Suggested fix:** [wi] "add a note to this quote: x" against `add_estimate_note` → agree; "add a note to the line item: x" against `add_work_item_note` → agree.
+
+**Resolved 2026-10-14:** moot — `_about` is gone. Review round 16 #2/#3: a same write now agrees only on a record kind both sides name outright (the row's `parent.domain=…`, the plan's ref domain); nothing is read from the row's words or state.
+
+### 1046. ~~[MEDIUM] `_kind`: the `by == "focus"` guard untested~~ — RESOLVED 2026-10-14
+`platform/tests/planner_parity/score.py:64` — Edge case, S8: a listed or step ref with no domain would be taken as the record in focus. (review round 15 #9, deferred; still surviving after round 15's `_STATE_KINDS` fallback)
+
+**Suggested fix:** `link{a: {by: listed, n: 1}, b: property}` against a task_focus `fields.property` row → differ.
+
+**Resolved 2026-10-14:** moot — `_kind` is now the ref's own domain only (review round 16 #2); an unlabelled "it" never makes a same write (`test_a_ref_the_plan_leaves_unnamed_is_never_guessed`).
+
+### 1047. ~~[MEDIUM] `_task_property`: the task gate untested~~ — RESOLVED 2026-10-14
+`platform/tests/planner_parity/score.py:88` — Edge case, S14. (review round 15 #11, deferred)
+
+**Suggested fix:** A contact–property link row ("link Ana Reyes to 14 Birch Rd") against `update_task{fields.property}` → differ.
+
+**Resolved 2026-10-14:** `test_a_task_linked_to_a_property_agrees_with_setting_its_property` — a link row naming `a.domain=contact` against `update_task{fields.property}` differs; the gate's mutant is killed (review round 16).
+
+### 1062. ~~[LOW] Task-note rows that can agree only through their own op~~ — RESOLVED 2026-10-14
+`documentation/development/maple-phrasing-reference.md:2319` — [task_focus] `add_note` rows naming no kind — :2319 "add a note to it: …", :2320 "Add another note: …" / "add a note: …", :2325 "add a note to it: don't park on the lawn" — score differ against `update_task{notes_append}`, the same write (their sibling :2316 was planned that way live). The est/wi estimate-note `add_note` rows (:430, :444, :1048, :1082–1098, :1127, :2340) likewise can't agree with `edit_estimate{add_estimate_note}`, though the prompt never names that command. A false "differ" only, never a false agree. (review round 17 #5, deferred)
+
+**Suggested fix:** Add `parent.domain=task` to :2319, :2320 and :2325; optionally `parent.domain=estimate` to the estimate-note rows.
+
+**Resolved 2026-10-14:** :2319, :2320 and :2325 name `parent.domain=task` (the reference run of 2026-10-14 planned all three as `update_task{notes_append}`, the same write). The estimate-note rows are left: no plan named `add_estimate_note` there.
+
+### 1072. ~~[MEDIUM] No reference rows for the amount readings~~ — RESOLVED 2026-10-14
+`documentation/development/maple-phrasing-reference.md` — CLAUDE.md requires a reference update in the same change. Only row 483 covers the conversion of a figure with an amount to the list's total; nothing records its other forms (a count, a period, a customer, a division, "between", both bounds) or the said-back reply for what no list holds ("what's my average estimate over $1000?", "what's my win rate on jobs over $5,000?", "… at least $1000"). (review round 20 #9, deferred)
+
+**Suggested fix:** Plan-format rows in §1.12: the conversions as `list_estimates` total_above / total_below (with count), the said-back ones as `conversation` or the reply's plan, per the reference's how-to.
+
+**Resolved 2026-10-14:** Plan-format rows in §1.12 after `win rate by value`, and an "An amount" bullet under "How it reads a question": the conversions as `list_estimates` total / count with total_above / total_below (status, sold, period, division, both bounds, "$2k"); the said-back ones on the model's own plan (`metric` average, win_rate, a subject's total, "at least" / "up to" / "$1M" / "five grand") with the reply; a request beside a figure (`set_status`). The live parity run (owed for the prompt lines) scores them — a row flagged because the model plans the figure `as_asked` converts is explained, not silenced.
+
+*(Superseded 2026-10-14: no amount is read from the words; the model fills `schema_fields.Amount` and the tests are `tests/test_planner_amounts.py` — review round 26 #10.)*
+
+### 1074. ~~[MEDIUM] `amount_said` / `amount_unread`: rare-case branches untested~~ — RESOLVED 2026-10-14
+`platform/agents/planner/unread_scope.py:107` — Edge case, mutants surviving every offline planner test: in `amount_said`, two "over"s or two "under"s counted readable, "greater than" and "below" dropped, "$ 500" with a space, "at most" / "no more than" / "no less than"; in `amount_unread`, the `action.filter is not None` guard (without it a filterless `list_estimates` beside a figure with an amount raises and becomes `turn_error`) and `total_below` in the listed check. (review round 21 #5, deferred)
+
+**Suggested fix:** One parametrized case per arm; for the guard, a `[list_estimates (no filter), metric total]` case.
+
+**Resolved 2026-10-14** (superseded, Simon): no amount is read from the words any more. The model fills one shape, `schema_fields.Amount` (over, at_least, under, at_most), on the action the amount belongs to — a list's `filter.amount`, a material list's `filter.price`, `refine_last` / `redo_last` / `metric` / `dashboard` `amount` — and code only maps the fields (`as_asked._as_list`, `unread_scope.amount_unread`, `followups._redo` / `_narrowed`). `amount_said` and every amount pattern are gone; the engine takes inclusive bounds (`MetricQuery.amount`, `$gte` / `$lte`). Pinned by `tests/test_planner_amounts.py`.
+
+### 1075. ~~[MEDIUM] `amount_is_a_lists_total`: two branches covered only from afar~~ — RESOLVED 2026-10-14
+`platform/agents/planner/as_asked.py:345` — Edge case: dropping `window_unit` from the period copy survives everywhere; dropping the `op != "metric"` check survives test_planner_as_asked.py, yet without it the commonest phrasing ("show me estimates over $1000", one list action) would crash the turn — only a DB-backed test in test_planner_execute_estimate_list.py catches it. (review round 21 #6, deferred)
+
+**Suggested fix:** In test_planner_as_asked.py: a single `list_estimates {total_above}` plan with "show me estimates over $1000" → `is planned`; a `last_n_days` case with `window_unit`.
+
+**Resolved 2026-10-14:** `as_asked._as_list` (the conversion, now per action and from the model's `Metric.amount`) is pinned directly: the window copy with its unit (`test_a_total_carrying_an_amount_is_the_lists`, the last-6-months case) and the op check beside other actions (`test_each_figure_carrying_an_amount_is_converted_whatever_is_beside_it`; a `set_status` beside a figure once raised on it).
+
+### 531. ~~[LOW] portal/src/pages/MaterialsPage.tsx:60 — `onDuplicate` is optional with no caller that omits it~~ — RESOLVED 2026-10-16
+
+**Resolved 2026-10-16** (shared material catalog stage 2): `MaterialsActionsMenu` is gone; rows use the shared `ActionsMenu`.
+Removing the mobile card's `<MaterialsActionsMenu>` (phones are now a read-only catalog) left
+exactly one call site, at line 678, which always passes `onDuplicate`. The `onDuplicate?: () =>
+void` optionality and the `action?.()` no-op it enables are now unreachable. Worth noting that the
+same change silently FIXED a latent bug: the removed mobile instance omitted `onDuplicate`, so its
+always-rendered "Duplicate" menu item did nothing when tapped.
+
+**Suggested fix:** tighten the prop to `onDuplicate: () => void` so a future caller that forgets it
+is a type error rather than a dead menu item.
+
+### 1077. ~~[LOW] #1070's resolution overclaims~~ — RESOLVED 2026-10-14
+`documentation/development/code-review-followups.md` — It says each arm's mutant is killed, but "greater than" and the window_unit copy still survive (#1074, #1075). (review round 21 #8, deferred)
+
+**Suggested fix:** Reword it, or close the gap with #1074 and #1075.
+
+**Resolved 2026-10-14** (superseded): the code it overclaimed about is gone — `amount_said` and its patterns were removed when the model took over reading amounts (#1074), and the conversion's window copy and op check are pinned (#1075). #1070 now says so.
+
+### 1226. ~~[LOW] `_duplicate_refusal` and `_amount` have no docstrings~~ — OBSOLETE 2026-10-17
+
+**Obsolete 2026-10-17:** both functions were removed when the agent moved to `standard_size_changes`.
+`platform/agents/material/catalog_writes.py:65` — Style. (review 2026-10-16 round 2 #162, deferred)
+
+**Suggested fix:** Add them.
+
+**Resolved — verified against the code (31)**
+
+### 73. ~~[MEDIUM] N+1 `find_one` inside bootstrap loops~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `services/rate_card_bootstrap.py::bootstrap_company_rate_cards` preloads existing names with one `$in` query and uses `insert_many`.
+**File**: [platform/services/rate_card_bootstrap.py:48-54](../../platform/services/rate_card_bootstrap.py)
+**Severity**: MEDIUM
+**Why it's MEDIUM, not HIGH**: matches the existing pattern in
+`division_bootstrap.py`, `material_category_bootstrap.py`, and
+`material_unit_bootstrap.py`. Volume is small today (6 templates × 12
+companies = 72 queries during backfill), but the cost compounds as more
+bootstrappers join the chain.
+
+Fix: pre-load existing names with one query and check membership in the
+loop, e.g.
+```python
+existing_names = {
+    rc.name for rc in await RateCard.find({
+        "company": normalized_company_id,
+        "name": {"$in": [t["name"] for t in templates]},
+    }).to_list()
+}
+```
+Apply consistently across all `*_bootstrap.py` modules in one pass to keep
+them aligned.
+
+### 28. ~~[LOW] Unbounded `ChangeLogEntry.find_all()`~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `routers/change_logs.py::list_change_logs` takes `limit` (default 100, le=500) and `offset`.
+**File**: `routers/change_logs.py:23-26`
+**Severity**: LOW
+
+`ChangeLogEntry.find_all().sort(...).to_list()` with no `.limit()`. Current
+volume is small (curated changelog), so this is an anti-pattern waiting to
+bite rather than an active problem.
+
+Fix: add `.limit(100)` and accept an optional `?limit=` / `?offset=` query
+param. Cheap to do; reviewer should have filed as LOW, not WARNING.
+
+### 43. ~~[MEDIUM] Trash-icon-only buttons have no accessible name~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** Every icon-only `<Trash2>` button now has an `aria-label`; the rest sit inside text-labelled menu items.
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) — Preview version-row delete (~line 1017) and work-item row delete (~line 1147)
+**Severity**: MEDIUM (a11y)
+
+Both buttons render only `<Trash2 />` inside. Each is wrapped in a
+`<Tooltip content="Delete this version">` (or similar), but tooltip
+content is typically not announced by screen readers — the button has
+no accessible name. Same pattern appears on other icon-only trash
+buttons across the portal (EquipmentsPage, ContactsPage, PropertiesPage,
+RateCardsTab, etc.) — this is a portal-wide gap, not specific to this
+change.
+
+Fix: add `aria-label={`Delete version ${v.version}`}` (or equivalent
+row-specific label) on every icon-only trash button. Sweep-style PR;
+grep for `<Trash2 ` and audit each site.
+
+**Absorbed:** #258, #191 — duplicate findings on the same a11y gap (icon-only / decorative-icon accessible names) from later review passes. See `## Closed` for their original bodies.
+
+### 192. ~~[LOW] Plan-name `<h3>` visually outsizes the dialog `<h2>`~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** PlanPickerGrid's plan-name `<h3>` is `text-2xl`, the same as the dialog `<h2>`.
+**File**: [portal/src/components/billing/PlanPickerGrid.tsx](../../portal/src/components/billing/PlanPickerGrid.tsx) line 219
+**Severity**: LOW (visual hierarchy)
+
+Plan names are now `text-3xl uppercase` while the parent dialog
+heading "Choose Your Plan" is `text-2xl` (in both
+`PlanStep.tsx:38` and `ManagePlanModal.tsx:60`). Semantic hierarchy is
+still correct (h2 > h3), but visually the cards now hero over the
+section title.
+
+Fix (pick one): bump dialog `<h2>` to `text-3xl`, drop card `<h3>` to
+`text-2xl`, or accept as-is if the design intentionally hero's the
+plan name.
+
+### 414. ~~[LOW] portal/src/components/Layout/PortalLayout.tsx:509 — mobile drawer close button has no accessible name (pre-existing)~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** The mobile drawer close button has `aria-label="Close menu"`.
+The drawer's X close button renders only an aria-hidden lucide icon, so screen readers announce an unnamed button. Pre-existing (not introduced by the swipe change), but adjacent to the reviewed code; the sibling collapse/expand buttons do have aria-labels.
+**Suggested fix:** Add `aria-label="Close menu"` to the button.
+
+### 400. ~~[LOW] portal/src/components/Layout/OpsLayout.tsx — mobile nav not addressed~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** OpsLayout.tsx has a hamburger / `isMobileMenuOpen` mobile nav with focus handling.
+The ops layout's navigation hasn't been evaluated for small-viewport/mobile use; revisit if ops staff need mobile access.
+
+### 412. ~~[LOW] portal/src/components/Layout/useSwipeGesture.ts:72 — no touchcancel handling~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `useSwipeGesture.ts` defines and returns `onTouchCancel`.
+A gesture interrupted by the system (incoming call, browser takeover) fires touchcancel, not touchend, leaving startPoint set. Harmless today because every new sequence begins with touchstart (which recomputes it), but it is one browser quirk away from a phantom swipe.
+**Suggested fix:** Return an `onTouchCancel` handler that clears startPoint, and spread it with the others.
+
+### 854. ~~[MEDIUM] A work item's label in the several-stale-records question is untested~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_planner_confirm.py` asserts the work-item question text, so the work_item arm of `_stale_label` runs.
+`platform/agents/planner/confirm.py:226` — Edge case. The `work_item` arm of `_stale_label` isn't reached. (review 2026-10-11 #28, deferred)
+
+**Suggested fix:** Two stale refs, one a work item → the question contains `the "Patio" work item on E00xx 'Birch Patio'`.
+
+### 855. ~~[MEDIUM] The `confirm:overage_with_others` / `convert_with_others` fallbacks are untested~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_planner_convert_confirm.py` asserts `confirm:convert_with_others`; `test_planner_create_estimate.py` asserts `confirm:overage_with_others`.
+`platform/agents/planner/confirm.py:200` — Edge cases. An overage beside a stale ref, and a convert beside a stale ref or a second convert, reach no test. (review 2026-10-11 #29, deferred)
+
+**Suggested fix:** `confirm.ask` with OVERAGE_REASON + a stale ref → "confirm:overage_with_others"; the same for CONVERT_REASON.
+
+### 859. ~~[MEDIUM] A city/role count with no results is untested~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_planner_execute_reads.py` runs an owner count with no rows through `record_lists.list_reply` ("You don't have any properties owned by Bob Lee.").
+`platform/agents/conversation/record_lists.py:119` — Edge case. The `ask.count` arm with no rows isn't reached on either pipeline. (review 2026-10-11 #33, deferred)
+
+**Suggested fix:** `{list_properties, filter:{city:"Ottawa"}, count}` → "You don't have any properties in Ottawa."
+
+### 860. ~~[MEDIUM] A count of exactly one is untested~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_planner_list_filters.py` asserts "You have 1 home owner named Di." and "1 property owned by Ana Lee in Toronto" — the singular arm runs.
+`platform/agents/conversation/record_lists.py:121` — Edge case. The singular-noun arm isn't reached. (review 2026-10-11 #34, deferred)
+
+**Suggested fix:** Guelph count → "You have 1 property in Guelph."; Administrator count → "You have 1 administrator."
+
+### 862. ~~[MEDIUM] The task-delete archive offer's words are never asserted~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_planner_refusals.py` asserts the full `manager_denial` text, ending "You can archive it instead — want me to do that?".
+`platform/agents/role_utils.py:25` — Edge case. The arm is driven, but only "owners and admins" is asserted, never "You can archive it instead — want me to do that?". MEDIUM, not HIGH, because the arm is driven. (review 2026-10-11 #36, deferred)
+
+**Suggested fix:** Unit test: `manager_denial("delete tasks", DELETE_TASK_DENIAL_SUFFIX)` == the full sentence; tighten `test_delete_non_manager_refused`.
+
+### 879. ~~[MEDIUM] The singular "uses 1 material" is untested~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_planner_list_filters.py` asserts "Estimate {code} uses 1 material priced under $10.00." — the singular count arm.
+`platform/agents/planner/execute_records.py:261` — Edge case. (review 2026-10-11 #54, deferred)
+
+**Suggested fix:** Count on an estimate with one material → "Estimate X uses 1 material."
+
+### 894. ~~[MEDIUM] Ranking-of-nothing turning into "smallest" is untested~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_planner_said_corrections.py` asserts `metric_ask` on a smallest ranking with nothing ranked returns metric "smallest".
+`platform/agents/planner/metric_ask.py:94` — Edge case. (review 2026-10-11 #69, deferred)
+
+**Suggested fix:** `metric_ask(_metric(metric="smallest", shape="ranking"))` → ("figure", "smallest").
+
+### 1071. ~~[LOW] The unanswered tracker can't see an amount said back~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `services/maple_outcomes._reply_rules` has the `"I can't narrow "` → `cant_narrow` rule matching AMOUNT_UNREAD's lead. Pinned by the `_cannot_narrow` row in `tests/test_maple_outcomes.py`.
+`platform/agents/planner/unread_scope.py:40` — `AMOUNT_UNREAD` ("I can't narrow that figure by an amount yet …") is a "can't yet" reply, but `services/maple_outcomes._reply_rules` has no entry for it, so the gap won't show as `cant_narrow` in `maple_unanswered`. (review round 20 #10, deferred — since round 20 #1 it is a said-back reply, not a kept question, so it can be classified)
+
+**Suggested fix:** A `_reply_rules` entry (`cant_narrow`, "amount") and a CONSTANT_CASES row in `tests/test_maple_outcomes.py`.
+
+### 1096. ~~[LOW] Units and divisions questions are refused by the model, then made help by the turn~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `tests/planner_parity/explained.py` has an entry covering the labour-units, material-units and divisions questions (`said.asked_which_there_are`).
+`platform/tests/planner_parity/explained.py` — "what are the labour units?" (3 of 3), "what are the material units?" (2 of 3) and "which divisions can an estimate have?" (varies) are planned `out_of_chat` refusals (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); the rows expect `help`. The turn already corrects them (`said.asked_which_there_are`; seen live for the labour units), so the user gets help — the run scores the raw plan.
+
+**Suggested fix:** Verify each through `turn._prepared` with the live plan, then add `explained.py` entries citing `said.asked_which_there_are`, as the other "which … are there" rows have.
+
+### 321. ~~[LOW] `begin_template_estimate` divides by `template.size` without the zero-guard its sibling has~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `_has_baseline` is gone; `models/template.py::_validate_baseline` rejects size <= 0, so `template_factor`'s `/ template.size` is safe.
+**Where:** `platform/routers/agent_helpers/template_estimate.py:200-201,258-261`
+
+**Issue:** `_has_baseline` accepts `size == 0.0` (`is not None`), then `begin_template_estimate` computes `converted / template.size` → `ZeroDivisionError`. The pending-turn handler guards this (`not baseline_size`), so the two paths are inconsistent. A zero-size template is nonsensical/unlikely but the asymmetry is a latent trap.
+
+**Fix:** Make `_has_baseline` require `template.size` truthy, or guard the division and fall through to `_ask_size_envelope`.
+
+### 1147. ~~[MEDIUM] Untested edge case: deleting a keyed unit no live standard uses~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** Covered by `tests/test_material_units_api.py::test_delete_standard_unit_is_refused_even_when_unused` (standard units are fully locked).
+`platform/routers/material_units.py:139` — The category side has this test; units don't. (review 2026-10-16 round 2 #82, deferred)
+
+**Suggested fix:** Mirror the category test for units.
+
+### 261. ~~[LOW] Session-stored estimate filter can be the now-removed "Approved" value~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `lib/estimateStatusFilter.ts::parseStoredStatusSelection` drops unrecognised stored values and falls back to `DEFAULT_STATUS_SELECTION`.
+`portal/src/pages/EstimatesPage.tsx:96` —
+`sessionStorage.getItem("estimatesStatusFilter") ?? "Draft"` is read
+verbatim. Users who had `Approved` selected before the swap will see
+the `<select>` render an orphan value (not in `statusOptions`), which
+shows as a blank option in the dropdown. Defensive coerce:
+
+```tsx
+const saved = sessionStorage.getItem("estimatesStatusFilter");
+return saved && statusOptions.includes(saved) ? saved : "Draft";
+```
+
+Self-heals within a few days as users click a real option and overwrite
+the stale value, so LOW priority.
+
+### 389. ~~[LOW] portal/src/components/Layout/AiPanel.tsx — confirm dialog backdrop is full-viewport, unlike Support's panel-scoped one~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** The confirm dialog is gone from AiPanel.tsx (resolved 2026-10-16 with session history; `mapleClearConfirmPref` removed).
+**Resolved 2026-10-16:** the dialog is gone. With session history, New session starts fresh at once and the old chat is kept in Chat history, so there is nothing to confirm (Maple chat UI change; `mapleClearConfirmPref` removed with it).
+The Maple confirm uses `fixed inset-0` so its dark backdrop dims the entire app, whereas the Support confirm uses `absolute inset-0` and dims only the panel. Functionally identical; rendering once at the fragment level was a deliberate choice to avoid duplicating it across the mobile+desktop asides.
+**Suggested fix:** Accept the full-screen backdrop (common modal pattern), or scope it to the panel by rendering the dialog inside each aside's relative container like SupportPanel does.
+
+### 662. ~~[LOW] /code-review's bandit command bypasses the pinned config~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `.claude/commands/code-review.md` now runs `./run_bandit.sh <subtree>` and says why a bare `bandit -r` disagrees.
+`.claude/commands/code-review.md:69` — Step 3 runs `bandit -r . -x tests/`, which doesn't load `platform/bandit.yaml` (bandit reads it only with `-c`; `run_bandit.sh` passes it). A literal run therefore reports every B101 `assert … is not None` from the mypy playbook and scans `.claude` worktrees, while Step 3 says to number every hit and compare against the 11-B110 baseline — a comparison that can't hold on that output. CLAUDE.md says to run bandit via `./run_bandit.sh` and not to pass flags ad hoc. Predates the 2026-09-25/26 Maple routing work; review tooling, not user-facing.
+
+**Suggested fix:** Replace the code block with `cd platform && ./run_bandit.sh` (the script activates the venv and pins `-c bandit.yaml`).
+
+*(Review 2026-09-26 round 20 #2.)*
+
+### 1029. ~~[MEDIUM] `_plan_phrasings`: the "..." arm untested~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_a_plan_row_it_cant_read_is_an_error_with_its_line` and `test_an_ellipsis_is_not_a_phrasing` cover both arms.
+`platform/scripts/phrasing_reference_rows.py:233` — Edge case: the ellipsis arm's mutant survives. (review round 13 #13, deferred)
+
+**Suggested fix:** A Plan row with an ellipsis phrasing → read as written (or unchecked), asserted.
+
+### 1033. ~~[MEDIUM] `main`: the not-checked listing untested~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `test_the_script_reports_an_unreadable_plan_row_once` asserts the row is listed exactly once.
+`platform/scripts/phrasing_reference_rows.py:489` — Edge case: both mutants of its loop survive. (review round 13 #17, deferred)
+
+**Suggested fix:** Run `main` on a sample file with an unchecked row and assert it is listed.
+
+### 8. ~~[MEDIUM] `print()` → `logging`~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** No bare `print(` left in platform services / routers / agents / models.
+Any `print()` left in `services/`, `routers/`, `agents/`, or `models/`. Keep
+`print()` in `scripts/` (operator-facing CLIs) — that's appropriate there.
+
+### 44. ~~[MEDIUM] `(err as Error).message` fallback in catch blocks can render `undefined`~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** No `(err as Error).message` left in NewEstimateWithActivityPage.tsx; catches use `err instanceof Error ? err.message : …`.
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) — three catch blocks: `handleDelete` (~L427), `handleStatusChange` (~L458), `handleGenerateGoogleDoc` (~L481)
+**Severity**: MEDIUM
+
+If the rejected value isn't an `Error` instance (plain string from
+`ApiError`, JSON object, aborted fetch signal), `(err as Error).message`
+evaluates to `undefined` and `setFormError(undefined)` clears the banner
+instead of showing a useful message. Pre-existing pattern carried through
+the refactor; third catch (`handleGenerateGoogleDoc`) already has an
+OR-fallback, the first two do not.
+
+Fix: unify to `setFormError(err instanceof Error ? err.message :
+"Failed to update status")` (pick appropriate fallback copy per handler).
+One-line change per catch.
+
+### 190. ~~[MEDIUM] Typo "iintegrations" in Pro plan feature copy~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** The `iintegrations` typo is gone from `portal/src/lib/billing-plans.ts`.
+**File**: [portal/src/lib/billing-plans.ts](../../portal/src/lib/billing-plans.ts) line 111
+**Severity**: MEDIUM (user-visible copy)
+
+`PLAN_DETAILS.plan_pro.features` ships `"All systems iintegrations"` —
+double `i`. Visible in onboarding's PlanStep and the Manage Plan modal.
+Pre-existing in the uncommitted diff (not introduced this session) but
+flagged so it gets fixed before the next plan-cards commit lands.
+
+Fix: `"All systems integrations"` (or revisit phrasing entirely — the
+prior copy was `"Integrate with top accounting packages"`).
+
+### 39. ~~[LOW] `_RATE_LIMIT_DETAIL` constant is misplaced in `address_service.py`~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `_RATE_LIMIT_DETAIL` now sits directly above `_enforce_maps_rate_limit` in `services/address_service.py`.
+**File**: `services/address_service.py:15`
+**Severity**: LOW (code layout)
+
+The `_RATE_LIMIT_DETAIL` module-level constant sits between the import
+block and the unrelated `SUPPORTED_COUNTRY_CODES` set, separated from
+its only caller (`_enforce_maps_rate_limit`) by one line. Cohesion with
+the helper would read better.
+
+Fix: either inline the literal as `detail=` inside
+`_enforce_maps_rate_limit`, or move the constant to sit directly above
+the helper. Cosmetic; do when next touching the file.
+
+### 45. ~~[LOW] `.gitignore` widened from filename to directory without comment~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `platform/.gitignore` has a comment above `secrets/`.
+**File**: [platform/.gitignore](../../platform/.gitignore):145
+**Severity**: LOW
+
+`service-account-key.json` → `secrets/` is functionally fine (the
+`service-account-key*.json` and `*-key.json` sibling patterns still
+catch loose keys), but the diff reads as "why did a specific-file rule
+become a directory rule?" without context.
+
+Fix: add a one-line comment above the `secrets/` entry — e.g.
+`# local secrets directory (service-account keys, tokens, etc.)` — so
+the next reader understands the broadening.
+
+### 100. ~~[LOW] Defensive `|| canEdit` clause in estimate-page row visibility is dead today~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** `|| canEdit` no longer appears in NewEstimateWithActivityPage.tsx.
+File: `portal/src/pages/NewEstimateWithActivityPage.tsx:879`
+**Severity**: LOW
+
+```tsx
+{isEditMode && estimate && (allowedTransitions.length > 0 || canEdit) && (
+```
+
+`canEdit` is true only for `draft`/`review`. Both statuses have ≥2
+transitions even after the non-admin Approve filter, so
+`allowedTransitions.length > 0` is always true when `canEdit` is true.
+The `|| canEdit` clause is dead today.
+
+Keeping it is defensible — it documents intent ("show the row when we have
+either buttons or a Save to render") and the cost is one boolean OR. But
+if `isEditableStatus` or `TRANSITIONS_BY_STATUS` ever changes such that
+the implication breaks, the clause would silently start mattering, which
+is the kind of thing that surfaces only via a runtime regression.
+
+Fix: either drop `|| canEdit` or add a one-line comment noting the
+defensive intent. No runtime impact today.
+
+### 280. ~~[LOW] Redundant `readOnly` on disabled overage-notification checkbox~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** The checkbox moved to `components/settings/PreferencesCard.tsx`, which has no `readOnly`.
+
+`portal/src/pages/SettingsPage.tsx` (~line 1452, inside the Account-tab
+read-only view) renders the "Show estimate overage notification" checkbox
+with both `disabled` and `readOnly`. `disabled` already prevents interaction
+and excludes the input from form submission; `readOnly` has no defined effect
+on `<input type="checkbox">` per the HTML spec — it's a no-op there.
+
+Fix: drop `readOnly`. Cosmetic only; the rendered behavior is identical
+either way. Worth doing the next time anyone touches this block to keep
+the JSX honest about what the attributes actually do.
+
+### 1283. ~~[LOW] maple-phrasing-reference.md's "Last updated" is older than the §4.8 note~~ — RESOLVED 2026-10-18
+
+**Resolved (consolidation 2026-10-18):** maple-phrasing-reference.md reads "Last updated: 2026-10-17", matching the §4.8 note.
+`documentation/development/maple-phrasing-reference.md:3` — Header 2026-10-16; the note is 2026-10-17. (review 2026-10-17 round 5 #19, deferred)
+
+**Suggested fix:** Bump it.
+
+**RESOLVED 2026-10-17** — bumped with round 6 #4's §4.8 row. Move to the archive in the next cleanup.
+
+**Obsolete — code gone or rewritten (20)**
+
+### 135. ~~[MEDIUM] Description "button" wraps multi-line content~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** The `role="button"` description div is gone; the description uses `MarkdownDescriptionEditor`.
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM (accessibility)
+
+The read-only description div has `role="button"` and `tabIndex={0}`,
+so screen readers announce the entire description as the button's
+accessible name. Fine for short text, awkward for long ones.
+
+Fix: add `aria-label="Edit description"` so the announced label is
+concise; the visible text remains content.
+
+### 136. ~~[MEDIUM] Docs menu items missing `role="menuitem"`~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** The docs dropdown is gone; versions moved to DocVersionList, and the remaining menu's items have `role="menuitem"`.
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM (accessibility)
+
+The status dropdown items use `role="menuitem"`; the docs dropdown's
+`<a>` / `<button>` items inside `role="menu"` do not. Inconsistent
+ARIA.
+
+Fix: add `role="menuitem"` to each item inside the docs `<li>`.
+
+### 907. ~~[LOW] `unsaid_period` is dead code and its new arm breaks its contract~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `unsaid_period` no longer exists anywhere in platform.
+`platform/agents/planner/said.py:216` — Only tests call it. The `_sold_beside` arm returns a sentence, not `unsaid:<op>.<what>`. (review 2026-10-11 #87, deferred)
+
+**Suggested fix:** Delete it, port its tests to `without_unsaid`, and update the module docstring.
+
+### 342. ~~[LOW] Auto-create of missing categories/units has a find-then-insert race~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `services/material_bootstrap.py` and `_ensure_referenced_categories_and_units` are gone with the shared standard catalog.
+Added 2026-06-07 with the load-standard auto-create change.
+`services/material_bootstrap.py::_ensure_referenced_categories_and_units`
+checks the pre-loaded name→doc dict, then `await .insert()`s any missing
+`MaterialCategory` / `MaterialUnit`. `MaterialCategory`/`MaterialUnit` have a
+`(company, ASCENDING)` index but it is **not unique** and not on
+`(company, name)`, so two concurrent `load-standard` calls for the same company
+could each create the same category/unit → duplicates. This mirrors the
+identical race in `routers/materials.py::_find_or_create_category` /
+`_find_or_create_unit` (the upload path) — an accepted pattern, and bootstrap is
+effectively single-shot (onboarding / one button click), so practical risk is
+low. Fix (closes both call sites at once if ever wanted): add a unique
+`(company, name)` index to both models and catch `DuplicateKeyError` in the
+create helpers.
+
+### 1110. ~~[LOW] Standard-category delete refusal advice leads nowhere~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** The "turn its standard materials off instead" text is gone; `routers/material_categories.py` uses `STANDARD_CATEGORY_LOCKED`, and units are locked the same way.
+`platform/routers/material_categories.py:149` — A keyed category is refused while live standards use it even when `include_standard` is already off; "turn its standard materials off instead" doesn't unblock the delete, and it answers 409 while the in-use check above answers 400.
+
+**Suggested fix:** Reword: "Standard categories can't be deleted; turn their standard materials off to hide them." and align the status code.
+
+### 360. ~~[LOW] platform/services/material_bootstrap.py — insert_many is non-atomic on partial failure~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `services/material_bootstrap.py` is deleted; material `insert_many` is gone from services.
+`Material.insert_many(to_insert)` (and the labour equivalent) isn't transactional. A
+mid-batch failure (e.g. a duplicate-key race, validation) leaves some rows inserted, then
+raises up to the load-standard router as a 502 with `created` never set. The pre-existing
+one-insert-per-row loop had the same partial-state shape, so this isn't a regression, just
+worth being aware of now that it's a single bulk call.
+**Suggested fix:** Optional. If atomicity matters, wrap the bulk writes in a Motor
+transaction (the atlas-local replica set supports them), or pass `ordered=False` and
+surface a partial "imported N of M" result instead of a bare 502.
+
+### 374. ~~[LOW] platform/services/template_bootstrap.py:241 — duplicate catalog names collapse silently (last-wins)~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `template_bootstrap._load_catalog` resolves names through `material_catalog.ids_by_exact_names` against the effective catalog, where names are unique.
+`materials_by_name` / `labours_by_name` are dict comprehensions keyed by name. Material has a non-unique (company, name) index, so two same-name rows silently keep only the last — resolution could bind to an unexpected size/price with no signal.
+**Suggested fix:** Optional — log a warning when a name maps to >1 catalog doc.
+
+### 179. ~~[LOW] Inline `reduce` on `activityRows` recomputed every render~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** The "N.NN hours total" pill is gone from WorkItemInlineContent.tsx.
+**Severity**: LOW
+`portal/src/components/estimates/WorkItemInlineContent.tsx:701` —
+the "N.NN hours total" pill walks `activityRows` on every render via
+inline `.reduce(...)`. Cheap (<50 rows), but inconsistent with the
+surrounding `breakdown` value which is properly memoized via the
+`computeBreakdown(...)` hook.
+
+Fix: hoist into a `useMemo(() => activityRows.reduce(...), [activityRows])`
+to match the file's existing pattern. Defer until a perf complaint or
+the next time someone is in this code path.
+
+### 478. ~~[LOW] portal/src/components/estimates/AddMaterialGapDialog.tsx:315 — the read-only sizes table in the same dialog keeps a 160px Unit column~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** AddMaterialGapDialog.tsx no longer has the `w-[160px]` / `w-[240px]` columns; size columns use percentage widths (`SIZE_COL_UNIT`).
+When the resolve dialog shows an *existing* material, the Unit cell renders plain
+`text-sm` text (line 355) in a `w-[160px]` column with no `whitespace-nowrap`. At 14px,
+"Cubic yards (cu yd)" needs ~157px including the `px-3` padding, so the longest names wrap
+onto two lines and the row heights jump. Not a truncation, so lower severity than the
+editable select — but it is the same dialog the user was looking at, and it now disagrees
+with the editable table's 240px.
+**Suggested fix:** widen this header to match the editable table (`w-[240px]`) so unit
+names stay on one line and both tables in the dialog line up.
+
+### 289. ~~[MEDIUM] `useEffect` references function declared later in the same component~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** The MaterialsPage / PeoplePage `?open=` effects now only fetch and highlight (`requestedOpenId`); `openEditMaterial` / `openEditLabour` are no longer called from an effect.
+**Where:** `portal/src/pages/MaterialsPage.tsx` and `portal/src/pages/PeoplePage.tsx` — the `?open=<id>` effect calls `openEditMaterial` / `openEditLabour` declared further down. (Note: this was originally flagged when those effects opened the edit modal; the modal logic has since been removed, so the *symptom* is gone — but the pattern of effect-before-declaration may still apply if either page picks up a similar handler later.)
+
+**Issue:** Works at runtime because effects fire after the component body finishes evaluating, but it's brittle, future-hostile, and would silently fail eslint's `react-hooks/exhaustive-deps` rule.
+
+**Fix:** When adding any new effect in those files, declare its dependencies above the effect, or wrap helpers in `useCallback`.
+
+### 340. ~~[LOW] `alert()` used for the skipped-in-use report after reload~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** No `alert()` left in `portal/src/components/materials/`; the reload / "skipped in-use" flow is gone from the categories and units tabs.
+`MaterialCategoriesTab.tsx` / `MaterialUnitsTab.tsx` surface skipped in-use
+items via browser `alert()` — consistent with the tabs' existing error
+handling, but the weakest UX in the flow. Fix: inline banner or toast; natural
+to do together with #337.
+
+### 226. ~~[MEDIUM] `cm-waitlist` is used as both a CSS class and an element id~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `contact-modal.js` was removed; `contact-modal/install.js` and index.html have no `cm-waitlist`.
+**File**: [website/public/contact-modal.js:138, 252](../../website/public/contact-modal.js)
+**Severity**: MEDIUM
+
+The wrapper `<div class="cm-waitlist">` shares the literal string
+`cm-waitlist` with the `<input id="cm-waitlist">` it contains. CSS is
+unaffected (class vs id selectors don't collide), and
+`<label for="cm-waitlist">` correctly resolves to the input. But
+anyone who later writes `document.getElementById('cm-waitlist')`
+expecting the wrapper will instead get the checkbox — a quiet
+footgun, not a current bug.
+
+Fix: rename the wrapper class to `.cm-waitlist-block` (or rename the
+id to `cm-join-waitlist`), update the matching CSS selectors, and
+update the `<label for=…>` accordingly. ~5 line change. Roll into the
+next contact-modal touch.
+
+### 228. ~~[LOW] `form.joinWaitlist.checked` relies on the named-elements collection~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `form.joinWaitlist.checked` is gone with the waitlist checkbox (`install.test.js`).
+**File**: [website/public/contact-modal.js:331](../../website/public/contact-modal.js)
+**Severity**: LOW
+
+Works because HTML form elements are exposed by `name` on the form
+object. If another element were ever added to this form with
+`name="joinWaitlist"`, the lookup would return a `RadioNodeList` and
+`.checked` would be `undefined`. The pattern matches the rest of the
+file (`form.firstName.value` etc.), so this is consistent — just
+inherited fragility.
+
+Fix: optional. Switch to
+`form.querySelector('#cm-waitlist').checked` (or use a captured
+reference like the other inputs at module scope) for clarity. Skip if
+you prefer to stay consistent with the existing style.
+
+### 291. ~~[MEDIUM] `test_estimates_analytics.py` exclusion assertion is brittle~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `test_analytics_excludes_lost_and_archived_from_pipeline` was rewritten as per-bucket tests; the `777.0 not in (...)` assertion no longer exists.
+**Where:** `platform/tests/test_estimates_analytics.py:163-164` (`test_analytics_excludes_lost_and_archived_from_pipeline`)
+
+**Issue:** The assertion is `777.0 not in (pipeline, pipeline - 4000.0, pipeline - 3500.0)` against hand-computed offsets. A subtle inclusion-bug could pass the assertion. The test also relies on the test runner's wall-clock to align with the seeded `now`, which has caused at least one false alarm during development.
+
+**Fix:** Either (a) plumb `now` through `compute_analytics` as a hook for testing and pin it via the route, then assert exact totals, or (b) use `freezegun` to pin time. Simplest near-term: rebuild the assertion as `assert pipeline == <explicit_in_window_sum>` with no clock dependency.
+
+### 800. ~~[LOW] The CSV upload test leaves a "Hardscape" category in use~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** The test moved to `test_material_bootstrap.py`, which builds and tears down its own company.
+`platform/tests/test_material_upload_api.py:11` — its "Patio Stone" material stays in the test company, so `test_material_categories_api.py::test_load_standard_categories_removes_non_standard_when_requested` fails when it runs after the upload tests (`skipped_in_use == ['Hardscape']`). Fails on a clean checkout too; order-dependent.
+
+**Suggested fix:** Delete the uploaded materials (and their created categories/units) in the upload tests' teardown.
+
+### 872. ~~[MEDIUM] "a breakdown over N days falls back" is never really tested~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `_dashboard_uncovered` / `_as_metric` were rewritten in #845; a breakdown over N days goes to the metric engine, so the days-given fallback arm is gone.
+`platform/tests/test_planner_execute_figures.py:323` — The test strips `days`, so the new arm at execute_figures.py:50 (days given + a breakdown → fallback) isn't reached. (review 2026-10-11 #47, deferred)
+
+**Suggested fix:** Keep `days` for that case, or add one: `{card:"by_division", period:"last_n_days", days:7}` → "filter:dashboard.period".
+
+### 132. ~~[MEDIUM] Description read-only color is dead CSS~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** The description textarea was replaced by `MarkdownDescriptionEditor` (`readOnly={!canEdit}`); the className ternary is gone.
+**File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
+**Severity**: MEDIUM
+
+`className={'... ${canEdit ? "..." : "bg-gray-50 ... text-gray-500"} ${!description ? "text-gray-400" : "text-gray-900"}'}`.
+The trailing ternary always wins over the `!canEdit` `text-gray-500`
+because Tailwind utilities at the same specificity resolve by
+stylesheet source order, not className order. Read-only state ends up
+visually identical to editable.
+
+Fix: collapse to one expression:
+`canEdit ? (description ? "text-gray-900" : "text-gray-400") : "text-gray-500"`.
+
+### 301. ~~[MEDIUM] `messages: List[Any]` in `agents/estimate/service.py:1811` weakens type info~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `agents/estimate/service.py` was split (1,293 lines) and has no `List[Any]`.
+**Where:** `agents/estimate/service.py:1811` — `messages: List[Any] = [SystemMessage(content=formatted_prompt)]`.
+
+**Issue:** Annotated as `List[Any]` to allow appending `HumanMessage` to a list initialized with `SystemMessage`. Loses type safety on all subsequent `.append()` calls (4 sites in this function plus several elsewhere).
+
+**Fix:** use `List[BaseMessage]` from `langchain_core.messages` (or `langchain.schema.BaseMessage`) — that's the actual base class for `SystemMessage` / `HumanMessage` / `AIMessage`. Tighter and more honest. Same pattern likely needed at other langchain message-list sites in `service.py` that escaped this pass.
+
+### 215. ~~[LOW] Drop redundant 5000-char client check in EnterpriseContactModal~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `EnterpriseContactModal.tsx` no longer exists; `MESSAGE_MAX_LEN` gone from portal/src; enterprise UI now lives in `ManagePlanModal.tsx`.
+**File**: `portal/src/components/billing/EnterpriseContactModal.tsx:56-58`
+**Severity**: LOW
+
+`MESSAGE_MAX_LEN` is already enforced via `maxLength` on the textarea, making the explicit length check redundant defense.
+
+Fix: remove the duplicate check, or add a comment confirming it matches the BE `enterprise-contact` endpoint validation.
+
+### 348. ~~[LOW] Defensive `'Sent'` fallback in `_authorize_status_transition` is logically unreachable~~ — OBSOLETE 2026-10-18
+
+**Obsolete (consolidation 2026-10-18):** `_authorize_status_transition` now uses `status_change_role_refusal` / `status_role_refusal_text`; no `'Sent'` fallback remains.
+Added 2026-06-11. `agents/estimate/crud_handlers.py::_authorize_status_transition`:
+in the `involves_sent and not is_owner_or_admin` refusal, the
+`current_status.value if current_status else 'Sent'` else-branch can't be hit —
+when `target_status` isn't Sent-like, `involves_sent` can only be True via
+`current_status`, so it can't be `None` there. Kept deliberately because
+`current_status` is typed `Optional[EstimateStatus]` and mypy requires the
+guard (an inline comment marks it typing-only). Fix (optional): narrow the
+parameter type instead, e.g. split the gate so the unsend branch receives a
+non-Optional `EstimateStatus`. Not worth doing on its own — fold into #347's
+split if that happens.
+
+**Closed by decision or superseded (1)**
+
+### 59. ~~[LOW] Drive-filename filename-collision policy still implicit~~ — SUPERSEDED 2026-10-18
+
+**Superseded (consolidation 2026-10-18):** Superseded 2026-08-24 by #490 (conflict detection), as its body already said.
+**Severity**: LOW
+The 2026-04-23 fix put the estimate_id back into the Drive filename
+(`Estimate-{estimate_id}-V{n}`), which resolves traceability. However,
+Drive still permits duplicate filenames within a folder — there is no
+enforcement that `(estimate_id, version)` is globally unique *as a
+filename*. If two concurrent generate-doc requests race, they could
+produce two Drive files with the same name. The version-number
+computation in `routers/estimates.py:2376-2379` is also read-modify-
+write without a lock.
+
+Fix: add a unique index on `(estimate_id, version)` inside the
+`GoogleDocsVersion` embedded array, or wrap the version-bump + create
+in an optimistic-concurrency retry keyed on `estimate.updated_at`.
+Low priority — the user would need to double-click "New Version" within
+the Drive latency window to trigger the race.
+
+**Superseded 2026-08-24** by the conflict-detection plan
+(`plans/2026-08-24-concurrent-update-conflict-detection.md`), which puts a real
+`version` field on Estimate rather than keying on `updated_at`. See the
+2026-08-24 section at the end of this file.
+
+**Priority queue as it stood before the 2026-10-18 re-derive**
+
+Ranked by severity × value, originally derived 2026-09-20. Two items have been
+worked off and one declined since, so the order below is **maintained, not
+re-derived** — treat it as a to-do list, not a fresh ranking. A full re-derive
+is due.
+
+**2026-09-27:** the multi-turn push
+([design](plans/2026-09-27-maple-multi-turn-everywhere-design.md)) takes the
+Maple HIGH items #671–#681 as a batch — the one-HIGH-per-session rule is
+suspended for it (design decision 8); see its §4. The ranking below is
+unchanged.
+
+| # | Item | Why it's here |
+|---|------|---------------|
+| 1 | [#490](code-review-followups.md#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Concurrent edits to the same field resolve silently, last-write-wins. **In progress 2026-09-22:** the server mechanism and the TaskDialog are built; the estimate builder is the remaining surface — see the entry for what it still needs. |
+| 2 | [#546](code-review-followups.md#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
+| 3 | [#4](code-review-followups.md#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
+| 4 | [Query efficiency](code-review-followups.md#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](code-review-followups.md#25-medium-regex-email-lookup-in-_resolve_user), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths--resolved-2026-10-04), [#443](code-review-followups.md#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](code-review-followups.md#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
+| 5 | [Silently swallowed errors](code-review-followups.md#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](code-review-followups.md#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](code-review-followups.md#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](code-review-followups.md#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](code-review-followups.md#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
+| 6 | [Accessibility](code-review-followups.md#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name--resolved-2026-10-18), [#469](code-review-followups.md#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](code-review-followups.md#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](code-review-followups.md#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
+| 7 | [#60](code-review-followups.md#60-medium-no-unique-compound-index-on-material--contact) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
+
+**Closed from this queue:** #566 (local dev holds production credentials),
+closed 2026-09-22 as an owner decision — accepted risk, the laptop is not a leak
+path. #350 left the queue with it but stays open: its `SecretStr` half guards a
+future call site, which is a different question. #451 and #363, the two prompt-injection entries,
+both resolved 2026-09-22. Division and role catalogs are now fenced as data
+through one shared helper (`prompts/fencing.py`); the instruction-prefix
+blocklist both entries suggested was rejected, and they record why. The
+material catalog and unit list in the same prompts remain unfenced and
+unfiled — see the tail of #363. #557 and #563 (work-item summaries standalone
+corpus + the erasure its §4 left behind), resolved 2026-09-21. **#326**
+(duplicated delegation block) resolved 2026-09-22, taking #335 with it.
+**#535** (AI-accuracy disclaimer) closed 2026-09-22 as an owner decision —
+will not fix; the notice stays removed.
+
+**Demoted 2026-09-21:** #350 fell from slot 1 and from HIGH to MEDIUM. It held
+slot 1 because the 2026-07-27 credential exposure was unrotated; the owner
+confirmed the output never left the laptop, so rotation is withdrawn and both
+leak paths were already closed. What survives is #566 — the reason a laptop had
+production keys at all — plus #350's latent `SecretStr` gap.
