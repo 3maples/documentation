@@ -2720,9 +2720,9 @@ Requests Maple doesn't do from chat are refused with where to do them, in the us
 | `set the default markup to 20%` / `change our company tax rate` / `what's the material markup?` | refuse `out_of_chat` `settings_financial` | 🛑 redirected to Settings → Financial tab (Owners and Admins); work-item markup/overhead/tax stay Maple's (§1.5.7) |
 | `invite Sam to the team` / `add a new team member` / `remove a user` | refuse `out_of_chat` `team` | 🛑 redirected to Settings → Team Members tab |
 | `upgrade my plan` / `how many Maple credits do I have left?` / `change my credit card` / `show my invoices` | refuse `out_of_chat` `billing` | 🛑 redirected to Settings → Billing tab |
-| `load the standard materials` / `reload standard people` | refuse `out_of_chat` `load_standard` | 🛑 redirected to Load Standard in the Materials or People page's actions menu, or the matching Settings tab |
+| `load the standard materials` / `reload standard people` | refuse `out_of_chat` `load_standard` | 🛑 redirected to the Materials page's Categories tab (standard materials come in by category) or Load Standard in the People page's actions menu |
 | `import contacts from a CSV` / `upload a spreadsheet of materials` | refuse `out_of_chat` `csv_import` | 🛑 redirected to the CSV upload on the Properties, Contacts or Materials page |
-| `add a unit called pallet` / `rename the unit bag` | refuse `out_of_chat` `units` | 🛑 redirected to Settings → Materials Unit tab (categories: §9.3) |
+| `add a unit called pallet` / `rename the unit bag` | refuse `out_of_chat` `units` | 🛑 redirected to the Materials page's Units tab (categories: §9.3) |
 | `add a division called Snow Removal` | refuse `out_of_chat` `divisions` | 🛑 redirected to Settings → Divisions tab; setting a work item's division stays Maple's (§1.5.2) |
 | `unlink Carla Diaz from 12 Oak St` / `detach the contact` | refuse `out_of_chat` `unlink` | 🛑 redirected to the property or contact in the app; unlinking a task's property is Maple's (§7.6) |
 | `duplicate the patio estimate` / `clone this material` / `make a copy of {material}` | refuse `out_of_chat` `duplicate` | 🛑 redirected to Duplicate in the row's menu on the Estimates, Materials or People page |

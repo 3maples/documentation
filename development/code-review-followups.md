@@ -221,7 +221,8 @@ seams that already exist as separate classes.
 | 74 | `_handle_get_material_size_scoped` — platform/agents/material/service.py:2714 (edited 2026-10-17. Split into `_size_row_reply(matched)` / `_missing_size_reply(...)` — round 5 #9) |
 | 66 | `_check_add_size_guard` — platform/agents/material/service.py:2396 (edited 2026-10-17. Extract the missing-field reply — round 4 #18) |
 | 210 | `StandardMaterialDialog` — portal/src/components/materials/StandardMaterialDialog.tsx:42 (new 2026-10-16. Split out `StandardDialogFooter` and `StandardPriceRow` — review 2026-10-16 round 2 #60) |
-| ~455 | `MaterialCategoriesTab` — portal/src/components/settings/MaterialCategoriesTab.tsx:26 (+~80 on 2026-10-16 for the standard opt-in. Move the opt-in into a `useStandardOptIn(companyId)` hook plus a small component — round 2 #61) |
+| ~390 | `MaterialCategoriesTab` — portal/src/components/materials/MaterialCategoriesTab.tsx:24 (moved from Settings 2026-10-17, its reload and add/edit dialog taken out; +~80 on 2026-10-16 for the standard opt-in. Move the opt-in into a `useStandardOptIn(companyId)` hook plus a small component — round 2 #61) |
+| ~267 | `MaterialUnitsTab` — portal/src/components/materials/MaterialUnitsTab.tsx:25 (moved from Settings 2026-10-17; the reload and add/edit dialog came out. **Next step:** #337's shared `ResourceCatalogTab`, which both tabs collapse into — review 2026-10-17 round 2 #5) |
 | 53 | `upload_materials_csv` — platform/routers/materials.py:225 (2026-10-16; move the audit and reply-building out of the handler — round 2 #62) |
 | ~70 | `create_company_with_bootstrap` — platform/services/company_service.py:92 (grew 2026-10-16; pull the step list into `_bootstrap_steps(include_materials, include_roles)` — round 2 #63) |
 | 187 | `MaterialSearchDropdown` — portal/src/components/common/MaterialSearchDropdown.tsx:43 (new 2026-10-16, shared material catalog. Move the search effect and its state into a `useMaterialSearch(catalog, isOpen, text)` hook and the option list into `MaterialOptionList` — review 2026-10-16 #123) |
@@ -829,7 +830,9 @@ are deliberate and cross-referenced in comments, but the format string
 `"%Y-%m-%d %H:%M UTC"` is duplicated and will drift. Fix: share the constant
 (or one helper accepting both input types) from a neutral module.
 
-### 336. [MEDIUM] `load-standard` endpoints duplicate the audit-log loop (~55 lines each)
+### 336. ~~[MEDIUM] `load-standard` endpoints duplicate the audit-log loop (~55 lines each)~~ — RESOLVED 2026-10-17
+`POST /material-units/load-standard` was removed (standard units are locked, so the Units tab no longer reloads them), taking its twin and `remove_non_standard_material_units` with it. `POST /material-categories/load-standard` followed the same day (review 2026-10-17 #20), with `remove_non_standard_material_categories`. Move to the archive in the next cleanup.
+
 `routers/material_categories.py::load_standard_material_categories` and
 `routers/material_units.py::load_standard_material_units` are verbatim twins
 apart from the enum values, and each is marginally over the 50-line guideline
@@ -839,6 +842,8 @@ removed-states audit-log loop into a small shared helper (e.g. in
 both handlers under the line guideline.
 
 ### 337. [MEDIUM] Materials Categories/Units tabs are twin files, worsened by this change
+*Update 2026-10-17:* both moved to `portal/src/components/materials/`, and the Units tab lost its reload state, handler and modal, so the twins are now about half as large. The shared row/table/dialog code is still duplicated.
+
 `portal/src/components/settings/MaterialCategoriesTab.tsx` and
 `MaterialUnitsTab.tsx` were already near-identical; the reload state, handler,
 and modal added ~110 more duplicated lines each (differing only in wording and
@@ -4597,6 +4602,8 @@ If `companyId` is null when the user clicks Select, they see "Missing company co
 Fix: pass a `disabled` prop down to `PlanPickerGrid` when `!companyId`. Render an inline "Initializing your account…" notice instead of letting the user click and fail.
 
 ### 82. [LOW] `alert(...)` for save errors in 3 settings tab components
+*Update 2026-10-17:* the Materials Categories and Units tabs (now `portal/src/components/materials/`) show a save error under the Name field instead; only `DivisionsTab` still uses `alert`.
+
 **Files**: [portal/src/components/settings/DivisionsTab.tsx](../../portal/src/components/settings/DivisionsTab.tsx) (`handleSaveDivision`),
 [portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx) (`handleSaveUnit`),
 [portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx) (`handleSaveCategory`)
