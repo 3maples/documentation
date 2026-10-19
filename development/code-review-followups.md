@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1304**. Never
+- **Entries are numbered and permanent.** Next free number: **1344**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -154,6 +154,8 @@ fixtures — but these are past the point of scanning.
 | Lines | File |
 |------:|------|
 | 851 | [platform/tests/test_material_overrides_api.py](../../platform/tests/test_material_overrides_api.py) | new 2026-10-16 with the shared material catalog; crossed 800 in review round 3. **Next step:** move the reset/load-standard and upload sections into `test_material_standard_bulk_api.py` (review 2026-10-17 round 3 #13) |
+| 1,365 | [platform/tests/test_planner_execute_files.py](../../platform/tests/test_planner_execute_files.py) | new 2026-10-18 with Maple attachments; grew one review-round section at a time, so the file-memory tests sit in four sections by when they were found. **Next step:** move the file-memory tests (`keep_for_question`, `carry_kept_files`, `files_on_the_create`, `_files_planned_again`, `note_filed`, `files_for`) into `tests/test_planner_file_memory.py`, one section per helper; the handler tests stay — a pure move (Maple attachments review round 8 #1) |
+| 889 | [platform/tests/test_media_blobs.py](../../platform/tests/test_media_blobs.py) | 277 → 889 with Maple attachments (2026-10-19), from the pixel-cap and JPEG scan-walk tests of review rounds 4–6. **Next step:** move those sections and the image builders they share into `tests/test_media_blobs_pixel_caps.py` — a pure move (Maple attachments review round 8 #2) |
 | 6,194 | platform/tests/test_estimate_agent.py |
 | 5,565 | platform/tests/test_estimate_api.py |
 | 4,329 | platform/tests/test_orchestrator_endpoint.py |
@@ -200,7 +202,11 @@ seams that already exist as separate classes.
 
 | Lines | Function |
 |------:|----------|
-| 965 | `_orchestrate_turn` — routers/agents.py:1057 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) Re-measured 822 on 2026-10-07; +28 that day (794 → 822) for the unanswered tracker's `_track_unanswered` closure and the crash-record hand-off. Re-measured 965 on 2026-10-13 (+7 in the planner gap-fixing change for the request as typed and the overage carry; the rest is older drift — review 2026-10-13 round 5 #32). |
+| 995 | `_orchestrate_turn` — routers/agents.py:1152 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) Re-measured 822 on 2026-10-07; +28 that day (794 → 822) for the unanswered tracker's `_track_unanswered` closure and the crash-record hand-off. Re-measured 965 on 2026-10-13 (+7 in the planner gap-fixing change for the request as typed and the overage carry; the rest is older drift — review 2026-10-13 round 5 #32). Re-measured 995 at :1152 on 2026-10-19, Maple attachments round 3 (965 → 995). |
+| 82 | `PhotoViewer` — portal/src/components/tasks/TaskPhotoGrid.tsx:111 (2026-10-19, review round 2 #29 for Maple attachments: `ViewerMedia` and `ViewerNav` extracted, 136 → 82, below the 128 it started at. What's left is the dialog shell, the focus effect and its comments: next, lift the focus/keyboard effect into a `useViewerKeys` hook) |
+| 54 | `store_attachment` — platform/services/maple_attachments.py:263 (new 2026-10-19, over 50 since the round-2 reorder — Maple attachments round 3 #11. Extract the validate/decode branch into `_prepare_upload(content, content_type, filename)` returning (normalized, name, kind, to_read, read_type, thumbnail); `store_attachment` drops to ~30 lines) |
+| 87 | `upload_task_photo` — platform/routers/tasks.py:504 (first measured 2026-10-19: 74 → 87 for the PDF branch — Maple attachments round 3 #12. Extract the three per-type store branches into `_store_task_media(file, declared_type) -> (file_id, thumb_id, filename, normalized_type, size_bytes)`) |
+| 398 | `SupportPanel` — portal/src/components/common/SupportPanel.tsx:96 (first measured 2026-10-19 — it shrank in the Maple attachments change, ~420 → 398, but had no row; round 3 #13. Extract the composer block and its staging state into `SupportComposer`) |
 | 53 | `update_material` — platform/routers/materials.py:345 (2026-10-17; the rename-unhide pushed it over. Extract `_validate_patch(existing, patch, user)` — review round 4 #16) |
 | 124 | `_build_sizes_from_fields` — platform/agents/material/text_helpers.py:379 (edited 2026-10-17; +8 in review rounds 5–6 for the unit said with a price or cost. Split per op: `_remove_size`, `_rename_size`, `_set_size_unit`, `_set_size_price`, `_set_size_cost` — round 4 #17) |
 | 74 | `_handle_get_material_size_scoped` — platform/agents/material/service.py:2714 (edited 2026-10-17. Split into `_size_row_reply(matched)` / `_missing_size_reply(...)` — round 5 #9) |
@@ -213,8 +219,8 @@ seams that already exist as separate classes.
 | 187 | `MaterialSearchDropdown` — portal/src/components/common/MaterialSearchDropdown.tsx:43 (new 2026-10-16, shared material catalog. Move the search effect and its state into a `useMaterialSearch(catalog, isOpen, text)` hook and the option list into `MaterialOptionList` — review 2026-10-16 #123) |
 | 99 | `useMaterialCatalog` — portal/src/hooks/useMaterialCatalog.ts:44 (new 2026-10-16. Move the resolve effect's body into a `resolveInBatches(companyId, ids)` helper — review 2026-10-16 #123) |
 | ~254 | `AiPanel` — portal/src/components/Layout/AiPanel.tsx:100 (−17 on 2026-10-16 when the new-session confirm dialog went; 2026-10-16, Maple chat UI branch `claude/maple-chat-ui-707776`: ~700 → ~258 after the header, composer, messages, new-session dialog and FAB long-press came out — review 2026-10-16 #12; +13 in round 2 for the "Opening chat…" state and Clear closing history. **Next step:** move the voice auto-send countdown (state, refs, both effects) into a `useVoiceAutoSend(onSubmit, isOpen, isSubmitting)` hook) |
-| ~200 | `MapleComposer` — portal/src/components/Layout/MapleComposer.tsx:54 (new 2026-10-16, split out of AiPanel — review 2026-10-16 #11/#12. **Next step:** move the four strips above and below the bar into a `ComposerNotices` component and the mic into `MicButton`) |
-| ~244 | `useMapleAgent` — portal/src/components/Layout/useMapleAgent.ts:107 (2026-10-16: session history moved out into `useMapleSessions` — review 2026-10-16 #13. **Next step:** move the two page-signal listeners into a `useViewedPageSignals()` hook and the orchestrate call and reply handling out of `submitDirectMessage`) |
+| 139 | `MapleComposer` — portal/src/components/Layout/MapleComposer.tsx:42 (re-measured 139 on 2026-10-19, Maple attachments round 3 — the row said ~200; new 2026-10-16, split out of AiPanel — review 2026-10-16 #11/#12. **Next step:** move the four strips above and below the bar into a `ComposerNotices` component and the mic into `MicButton`) |
+| 273 | `useMapleAgent` — portal/src/components/Layout/useMapleAgent.ts:114 (re-measured 273 on 2026-10-19, Maple attachments round 3 (~244 → 273); its `submitDirectMessage` at :187 is 104 lines on its own. 2026-10-16: session history moved out into `useMapleSessions` — review 2026-10-16 #13. **Next step:** move the two page-signal listeners into a `useViewedPageSignals()` hook and the orchestrate call and reply handling out of `submitDirectMessage`) |
 | 116 | `create_estimate_tools` — platform/agents/estimate/tools.py:84 (the factory holding the tool closures; 171 → 116 on 2026-10-16 when `_best_by_name` / `_match_entry` / `_material_row` came out — review 2026-10-16 #117) |
 | 63 | `_handle_create_material` — platform/agents/material/service.py:1328 (107 → 63 on 2026-10-16, review #117; the category/unit resolution is the next cut) |
 | 53 | `_finalize_update_material` — platform/agents/material/service.py:2615 (79 → 53 on 2026-10-16, review #117) |
@@ -303,12 +309,12 @@ seams that already exist as separate classes.
 | 63 | `list_labours_reply` — agents/labour/service.py:1253 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_labour_list_items(serialized)` — review 2026-10-08 #12, deferred) |
 | 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
 | 63 | `execute` — platform/agents/planner/execute.py:463 (was 46; phase 8 added step pointing and the policy refusal; +4 on 2026-10-11 for the work items of an estimate a create of the plan made, #864. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
-| 53 | `run_planner_turn` — platform/agents/planner/turn.py:521 (:507 until 2026-10-14, #906; :465 until re-measured 2026-10-14, review round 27 #9; 58 at :390 until re-measured 2026-10-14, review round 13 #35; new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
+| 54 | `_planner_turn` — platform/agents/planner/turn.py:561 (re-measured 2026-10-19, review round 6 #7; +2 on 2026-10-19, review round 5 #1: records whether the plan that ran uses the files; 2026-10-19: the body moved here under a new 18-line `run_planner_turn` wrapper that keeps a question's files, review round 3 #8 / round 4 #11; was `run_planner_turn` at :521; :507 until 2026-10-14, #906; :465 until re-measured 2026-10-14, review round 27 #9; 58 at :390 until re-measured 2026-10-14, review round 13 #35; new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
 | 51 | `list_reply` — platform/agents/conversation/record_lists.py:99 (new 2026-10-11: the `within` filter, #845. Move the query building into `_rows(ask, company)` — review 2026-10-11 #11, deferred) |
 | 76 | `_redo_read` — platform/agents/planner/followups.py:187 (the old `_redo` body, renamed when `_redo` became its amount wrapper — review round 26 #4, 2026-10-14; 73 at :157 and 75 at :152 before, review round 13 #35; was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; +11 on 2026-10-13 (a status a win rate can't take, the exclusion dropped on a subject swap; round 3 #45); a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
 | 60 | `_refine` — platform/agents/planner/followups.py:368 (+6 on 2026-10-14 for an amount and a card's amount — review round 26 #4; 54 at :317, :198 until re-measured 2026-10-14, review round 13 #35; was 41; +2 on 2026-10-13; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
 | 54 | `resolve_work_item` — platform/agents/planner/resolve.py:386 (was 49; move the `by == "name"` arm and its retry into `_work_item_by_name` — review 2026-10-11 #76) |
-| 89 | `_reply_rules` — platform/services/maple_outcomes.py:80 (re-measured 2026-10-17; was 60; +2 on 2026-10-14 for the property-gone reply, review round 13 #3; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
+| 104 | `_reply_rules` — platform/services/maple_outcomes.py:80 (re-measured 104 on 2026-10-19, Maple attachments round 3 (89 → 104); re-measured 2026-10-17; was 60; +2 on 2026-10-14 for the property-gone reply, review round 13 #3; themed rule tuples — refusals, limits, errors, rewrites — concatenated — review 2026-10-11 #77) |
 | 53 | `_created_reply` — routers/agent_helpers/estimate_gathering.py:436 (new 2026-10-12 in the property-link fix; move the legacy follow-up stash (`PENDING_ESTIMATE_FOLLOW_UP_KEY`) into `_stash_follow_up(...)`, which `create_estimate_reply` can share — review round 13 #4) |
 | 53 | `ask_to_rewrite` — platform/agents/conversation/record_names.py:211 (50 → 53 in the planner gap-fixing change, `answers=`; build the record in a `_rewrite_record(...)` helper beside `_rewrite_flags` — review round 13 #21) |
 | 51 | `_seed_mixed` — platform/tests/test_metric_ratio_shapes.py:267 (new in the planner gap-fixing change; split into `_seed_sold_side` / `_seed_lost_side` — review round 13 #22) |
@@ -957,6 +963,12 @@ both tables' headers.
 `platform/agents/estimate/metric_ratio_shapes.py:97` — `_query` repeats the `MetricQuery` built in `metric_ratios.fetch`; the two can drift (both now pass before_tax).
 
 **Suggested fix:** One `ratio_query(ask, subject, period)` in `metric_ratio_shapes`, used by both.
+
+### 1335. [LOW] MapleComposer's session-error and voice-error strips copy `ComposerNotice`, and the voice strip isn't announced
+`portal/src/components/Layout/MapleComposer.tsx:82` — L82–109 repeat the helper's markup; the voice strip has no `role="alert"`, so a screen reader doesn't announce it. Older code, hence LOW. (Maple attachments review round 3, 2026-10-19, #44, deferred)
+
+**Suggested fix:** Use `ComposerNotice` for both (dismiss labels "Dismiss" and "Dismiss voice error").
+
 
 ## Accessibility
 
@@ -2281,6 +2293,64 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Add a dict-in/dict-out test next to the no-price-no-cost one: `existing_payload={"sizes": [{"size": "  ", "price": 4.0, "cost": 3.0}, {"size": "y", "price": 6.0, "cost": 5.0, "unit": "u1"}]}` with `{"size": "y", "price": 7.0}` → only "y" in the returned sizes.
 
+### 1306. [MEDIUM] Untested edge cases in `note_filed`
+`platform/agents/planner/execute_files.py:132` — Edge cases: L138 — `last_files` not a dict while turn files exist; and neither turn nor previous files (a stale `last_files`). Neither is asserted to leave `filed_on` unset. (Maple attachments review round 3, 2026-10-19, #15, deferred)
+
+**Suggested fix:** `note_filed(ctx, "x", "T1")` on `{TURN_ATTACHMENTS_KEY: [...]}` with no `last_files`, and on `_ctx(files="stale")` → the context is unchanged.
+
+### 1307. [MEDIUM] Untested edge case in `task_write_with_files`: a failed write with files missing
+`platform/agents/planner/execute_files.py:213` — Edge case: L231–233 — a failed write while `missing` is set returns the failure with the missing words appended; the failed-write test has files, so `missing` is empty. (Maple attachments review round 3, 2026-10-19, #16, deferred)
+
+**Suggested fix:** `update_task_reply` returns `{"success": False, "response": "no"}`, run with `_ctx(files="none")` → `"no\n\n" + NO_FILE_ON_MESSAGE_REFUSAL` (or keep a failure bare and assert that).
+
+### 1308. [MEDIUM] Untested edge case in `files_on_the_create`: the rebuilt plan doesn't validate
+`platform/agents/planner/execute_files.py:299` — Edge case: L346–347 — `except ValidationError: return plan` when the rebuilt plan doesn't validate. (Maple attachments review round 3, 2026-10-19, #17, deferred)
+
+**Suggested fix:** Make `schema.Plan.model_validate` raise on the rebuild → the original plan comes back unchanged.
+
+### 1309. [MEDIUM] Untested edge cases in `_ask_split_files`
+`platform/agents/planner/confirm.py:257` — Edge cases: L267 — the `stale` arm returning "confirm:files_with_others"; L269 and `files_on_several` L354 — the count taken from `previous_files`. (Maple attachments review round 3, 2026-10-19, #18, deferred)
+
+**Suggested fix:** Call with a non-empty stale list → "confirm:files_with_others"; with `_ctx(world, files="previous")` the question reads "all 2 files" and `files_on_several(plan, ctx) == [1]`.
+
+### 1310. [MEDIUM] Untested edge cases in `_discard_unless_saved` and `_create_task`'s label fallback
+`platform/agents/planner/execute_records.py:539` — Edge cases: L547 — no copies, or a bad company id, discards at once; `_create_task` L532 — the "the new task" label fallback when there is no readable id. (Maple attachments review round 3, 2026-10-19, #19, deferred)
+
+**Suggested fix:** `_discard_unless_saved([copy], {"company_id": "x"})` → the blob is gone; `_discard_unless_saved([], ctx)` returns quietly.
+
+### 1311. [MEDIUM] Untested edge case in `add_note`: no parent found
+`platform/agents/planner/execute_links.py:130` — Edge case: L144 — `found is None` passes `onto=None`. (Maple attachments review round 3, 2026-10-19, #20, deferred)
+
+**Suggested fix:** Run with no `parent` ref → RecordNotLoaded.
+
+### 1322. [LOW] `filed_on` is recorded for a note that was never written
+`platform/agents/planner/execute_links.py:178` — `record_notes._add`'s "I couldn't confirm who you are … can't sign the note" envelope is `success: True`, so the guard passes, the record is noted as holding the files, and a later attach there gets ALREADY_ON. LOW: needs an empty `current_user_email`. (Maple attachments review round 3, 2026-10-19, #31, deferred)
+
+**Suggested fix:** Have `_add` return `success=False` on that branch (or check a written marker). Test via `execute` with attach and no email → no note, no `filed_on`.
+
+### 1323. [LOW] The split-files question can hide another confirmation on the same action
+`platform/agents/planner/confirm.py:267` — The "with others" check skips any action carrying SPLIT_FILES_REASON, even if it also carries another confirm reason (e.g. QUESTION_WRITE_REASON for "could you move T1 to Friday and attach these to it and to T2?"); the recheck then runs it without asking. LOW: an unusual combination. (Maple attachments review round 3, 2026-10-19, #32, deferred)
+
+**Suggested fix:** Treat an action as "with others" when `set(a.reasons) - {SPLIT_FILES_REASON}` is non-empty.
+
+### 1324. [LOW] A kept plan carries files it never uses, and kept attaches skip the already-on guard
+`platform/agents/planner/execute_files.py:96` — `confirm.keep` stores files for every kept plan ("delete T3?" just after a photo), and the yes stretches their window a turn, dropping `filed_on`. Conversely `already_on` is False whenever kept files are set, so a kept attach to a record already holding them copies twice. (Maple attachments review round 3, 2026-10-19, #33, deferred)
+
+**Suggested fix:** Store files only when an action `wants_files`; store `filed_on` beside them in the record; `already_on` reads it when kept files are set; `carry_kept_files` carries it.
+
+*Partly resolved 2026-10-19 (Maple attachments review round 5 #5): `confirm.keep` now stores files only when the plan uses them (`execute_files.uses_files`). Still open: the kept record doesn't carry `filed_on`, so a kept attach to a record already holding the files copies them twice.*
+
+### 1325. [LOW] A files-only task update doesn't put the task in focus
+`platform/agents/planner/execute_files.py:243` — `attach_only_reply` returns no nested `"task"`, so "now mark it done" next resolves "it" against the old focus (at worst the stale-focus confirm asks). (Maple attachments review round 3, 2026-10-19, #34, deferred)
+
+**Suggested fix:** Add `"task": task.model_dump(mode="json", by_alias=True)` to `result`, as `update_task_reply` does.
+
+### 1341. [LOW] Phrasing reference §10.11: the ALREADY_ON row contradicts the prompt, and rows are missing
+`documentation/development/maple-phrasing-reference.md:3087` — The prompt steers "add a note to it: bring the ladder" to `attach: false` (a plain note), with ALREADY_ON only as the executor's backstop, but the row says the reply ends with it. Missing rows: the overage yes carrying the PDF, the answer to a question from a create made from a file (planned again), and the split "no". The §10.11 intro omits `create_estimate` from the attach ops. (Maple attachments review round 3, 2026-10-19, #50, deferred)
+
+**Suggested fix:** Reword that row (plan `add_note`, no attach; ALREADY_ON only if attach is planned); add the three rows; add `create_estimate` to the intro.
+
+
 ## Platform — API, models and data
 
 **Resolved 2026-09-27** (platform `2c2e5d0`): `agents/conversation/out_of_chat.py` answers company default percentages, team/invitations, billing/plan/credits, Load Standard, CSV import, units, divisions, unlink, duplicate, the estimate document and photos with the place in the app where each is done (user-guide wording), as a policy refusal read on the command head only. Pinned by `tests/test_out_of_chat_redirects.py` (including false-positive guards: work-item markup, "the duplicate contact", "the invoice task", note bodies) and corpus rows `boundary-*`. Snapshot: "duplicate it" and "set the company's default markup for work items to 20%" now redirect.
@@ -2717,6 +2787,12 @@ geocode and note it in the comment.
 `platform/routers/auth.py:621` — The route hides unknown emails behind a generic 200, but Firebase's TOO_MANY_ATTEMPTS_TRY_LATER can only arise for an account that exists, so the 429 added for PYTHON-W (like the 502 it replaced) tells a caller under throttle that the address has an account. Pre-existing (the 502 already differed), hence LOW. (Sentry fixes review 2026-10-17 #49, deferred)
 
 **Suggested fix:** Needs Simon's call. Either (a) answer the Firebase throttle with the generic 200 message and log the warning (hides the account; the real user gets no hint), or (b) keep the 429 but word it exactly like our own limiter ("Too many requests. Please try again later.") so it reads as the per-address limit any email can hit. Recommended: (b).
+
+### 1329. [LOW] Maple uploads hold their bytes in memory while queued for a read slot
+`platform/routers/agents.py:950` — `await file.read()` runs before `store_attachment` waits on the 4 read slots, so up to 30 uploads per user (300MB) can sit in RAM though Starlette spooled them to disk. (Maple attachments review round 3, 2026-10-19, #38, deferred)
+
+**Suggested fix:** A `_buffer_slot` semaphore (2×READ_CONCURRENCY) around `file.read()` + `store_attachment`.
+
 
 ## Platform — services, scripts and integrations
 
@@ -3323,6 +3399,27 @@ row count first — this may be years away.
 
 **Suggested fix:** When `shown_for_name` is non-empty and `enable_standard` is False, write an audit entry with `shown_for_name`.
 
+### 1304. [MEDIUM] A PDF whose pages sit in compressed object streams is read whatever its length
+`platform/services/maple_attachments.py:118` — `pdf_page_count` counts `/Type /Page` objects in the file's bytes, because no PDF library is installed. A PDF that keeps its page objects in compressed object streams (common from modern exporters) shows none, so its count is unknown and it is read whole — bounded only by OpenAI's own 100-page cap on file inputs, so one such upload can still cost far more than a 20-page read. (review 2026-10-18 #7, fixed in part by /fix-issues: Simon's pick was `pypdf`, which needs a new dependency.)
+
+**Suggested fix:** Add `pypdf` to requirements.txt and count pages with `len(PdfReader(BytesIO(content)).pages)` in `asyncio.to_thread`, falling back to the byte count when the PDF won't parse; keep `MAX_PDF_PAGES_TO_READ` = 20.
+
+### 1305. [MEDIUM] Untested edge cases in `waiting_slot`
+`platform/services/maple_attachments.py:240` — Edge cases: L257–258 — `left > 0` (two admitted, one finishes); L256 — the `.get(key, 1)` default with the key already gone. (Maple attachments review round 3, 2026-10-19, #14, deferred)
+
+**Suggested fix:** Cap at waiting + 2, enter two slots, exit one → `_uploads_in_flight[(company, user)] == 1`; exit the second → the key is gone.
+
+### 1327. [LOW] The attachment sweep's shield doesn't survive shutdown
+`platform/services/maple_attachments.py:465` — On cancel, `await asyncio.shield(...)` raises at once; the lifespan ends and `asyncio.run` cancels the shielded inner task too, possibly between the row delete and the blob delete. (Maple attachments review round 3, 2026-10-19, #36, deferred)
+
+**Suggested fix:** `deletion = asyncio.ensure_future(delete_attachment(row)); try: await asyncio.shield(deletion) except asyncio.CancelledError: await deletion; raise`.
+
+### 1328. [LOW] A failed thumbnail upload strands the full-size blob
+`platform/services/maple_attachments.py:300` — `store_image_blobs` stores the original, then the thumbnail, before the guarded insert; an error on the second leaves an orphan the sweep can't find (task and note uploads too). (Maple attachments review round 3, 2026-10-19, #37, deferred)
+
+**Suggested fix:** In `store_image_blobs`, on a thumbnail failure (BaseException) shield-delete the first blob and re-raise.
+
+
 ## Portal — estimate builder
 
 **Update 2026-09-27** (platform `a612723`, `3526a08`): the server half is fixed — the conversation remembers its language (`conversation_lang`), a short reply in a non-English conversation is detected and translated, a code/email/number reply is answered in the conversation's language, and "No."/"No, thanks." read as a no. Still open (portal, design §8): the restored transcript shows the English history.
@@ -3875,10 +3972,44 @@ oversight.
 
 **Suggested fix:** Set a ref when any local turn completes, and skip the restored `open_question` once it is set.
 
-### 1253. [MEDIUM] Maple's and Support's composers now differ, one tab apart
+### 1253. ~~[MEDIUM] Maple's and Support's composers now differ, one tab apart~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18 (Maple attachments):** one shared pill bar, `components/common/ComposerBar` — a leading round control (the "+" that attaches a file), the textbox, trailing controls (Maple's mic), the round send button; Enter is a new line and Cmd/Ctrl+Enter sends; files dragged over it highlight it. `lib/composerStyles` holds the pill's classes for both tabs; Support's new-conversation button sits in the Maple header beside its X, where the Chat tab's New session is (`SupportPanel` renders it into `MapleHeader`'s slot, `headerActions`; Simon 2026-10-19). Tests: `ComposerBar.test.tsx`, `SupportPanel.test.tsx`, `AiPanelComposerLayout.test.tsx`, `AiPanelAttachments.test.tsx`, `AiPanelSupportFlag.test.tsx`.
+
 `portal/src/lib/composerStyles.ts:2` — Maple's composer became a single pill-shaped bar (`components/Layout/MapleComposer.tsx`, Maple chat UI branch `claude/maple-chat-ui-707776`, 2026-10-16), while Support keeps the textbox with a column of three buttons (new conversation, attach, send) styled by `composerStyles`. The file existed to stop drift between the two, which sit one tab apart. The comment now says these styles are Support's and that the design question is open. Fixing it means redesigning Support's input bar, including where its new-conversation and attach buttons go and its Cmd/Ctrl+Return send, which is bigger than the review fix described. (review 2026-10-16 #18)
 
 **Suggested fix:** Decision for Simon. Either give Support the same pill bar (my pick: the two panels sit one tab apart), moving the pill classes into `composerStyles` for both and putting Support's new-conversation button in its panel header as Maple's now is, or accept the difference and keep the comment as it is.
+
+### 1312. [MEDIUM] Untested edge cases in `thumbUrlFor` / `useThumbUrl`
+`portal/src/components/Layout/MapleAttachmentChips.tsx:16` — Edge cases: (a) L20 — a failed fetch is evicted so a later mount fetches again; no test rejects for a real id; (b) L36 — the `.catch` keeping the name tile; the existing test uses `id: ""`, so `attachmentBlob` never runs; (c) L34/40 — unmounting before the fetch resolves sets no state. (Maple attachments review round 3, 2026-10-19, #21, deferred)
+
+**Suggested fix:** Id "gone-1": reject once → name tile; remount with a resolving mock → a second fetch and an img. Rename the existing test "files without ids still list". Use unique ids per test (the cache outlives tests).
+
+### 1313. [MEDIUM] Untested edge case in `StagedChipTile`: the uploading spinner
+`portal/src/components/common/StagedFileChips.tsx:75` — Edge case: L90 — the uploading spinner (`staged-file-uploading`) is never queried. (Maple attachments review round 3, 2026-10-19, #22, deferred)
+
+**Suggested fix:** In "an upload in flight…", assert it on the PDF tile and its absence on the ready photo.
+
+### 1314. [MEDIUM] Untested edge case in SupportPanel's `handleSend`: a failed send
+`portal/src/components/common/SupportPanel.tsx:259` — Edge case: L281–283 — a failed send keeps the draft and the staged file and shows the error; untested, so moving `clearStagedFiles()` above the await would pass. (Maple attachments review round 3, 2026-10-19, #23, deferred)
+
+**Suggested fix:** `sendMessageWithFile` rejects once with an ApiError; stage, type, send → error shown, chip and draft kept.
+
+### 1332. [LOW] An effect re-run with files staged strands their uploads (dev only)
+`portal/src/lib/uploadQueue.ts:59` — Fast Refresh re-runs effects: `stop()` clears `live` but keeps `added`, so the re-run's `add` ignores staged keys; an in-flight upload lands as forgotten and its chip spins forever. (Maple attachments review round 3, 2026-10-19, #41, deferred)
+
+**Suggested fix:** Track finished keys; `stop` drops unfinished keys from `added`. Test: add, stop, add the same key → it runs.
+
+### 1333. [LOW] A swept thumbnail is re-requested on every panel open
+`portal/src/components/Layout/MapleAttachmentChips.tsx:20` — Any rejection evicts the cache entry, a 404 included, so a restored session with swept photos refetches each time. (Maple attachments review round 3, 2026-10-19, #42, deferred)
+
+**Suggested fix:** On a 404 ApiError keep a resolved "" (name tile) instead of evicting.
+
+### 1334. [LOW] A drag leave while inactive can leave the composer bar green
+`portal/src/lib/useFileDropTarget.ts:38` — `onDragLeave` returns early when inactive, so a target turning inactive mid-drag keeps its depth, and stays highlighted when it turns active again. (Maple attachments review round 3, 2026-10-19, #43, deferred)
+
+**Suggested fix:** Always decrement in `onDragLeave`, or reset depth when `active` turns false.
+
 
 ## Portal — settings, billing, onboarding and ops
 
@@ -4213,6 +4344,27 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 `portal/src/lib/materialSizes.ts:45` — A price typed as "1e999" reads as Infinity, fails `Number.isFinite`, and is sent as null — so the server prices the size from the markup instead of refusing or keeping what was typed. No test drives that arm; it was untested in handleSubmit too (moved code). (review 2026-10-18, #1251 round 2 #1, deferred)
 
 **Suggested fix:** Add to tests/materialSizes.test.ts: `sizeRowsPayload([row({ price: "1e999" })], true)` → `[{ size: "1 bag", unit: "u1", cost: 10, price: null }]` (pins today's behaviour: a non-finite price is treated as blank).
+
+### 1315. [MEDIUM] Untested edge case in `PhotoTileFace`: the spinner while a thumb loads
+`portal/src/components/tasks/TaskPhotoGrid.tsx:49` — Edge case: L62–66 — the spinner while a thumb loads. (Maple attachments review round 3, 2026-10-19, #24, deferred)
+
+**Suggested fix:** `photoBlob` never resolves → `.animate-spin` inside the tile.
+
+### 1316. [MEDIUM] Untested edge case in `PhotoTile`: a video's delete label
+`portal/src/components/tasks/TaskPhotoGrid.tsx:69` — Edge case: L103 — a video's delete badge now reads "Delete video clip.mp4"; unasserted. (Maple attachments review round 3, 2026-10-19, #25, deferred)
+
+**Suggested fix:** Assert that name in "video tiles render a placeholder…".
+
+### 1317. [MEDIUM] Untested edge case in `ViewerMedia`: the spinner while the full file loads
+`portal/src/components/tasks/TaskPhotoGrid.tsx:229` — Edge case: L230 — the spinner while the full file loads. (Maple attachments review round 3, 2026-10-19, #26, deferred)
+
+**Suggested fix:** `photoBlob` pending, open a tile → `.animate-spin` in the dialog, no img/video/iframe.
+
+### 1318. [MEDIUM] Untested edge case in `TaskDialog`: the staged PDF tile
+`portal/src/components/tasks/TaskDialog.tsx:98` — Edge case: L770 — the staged PDF tile (`PdfTile`) isn't asserted; deleting the arm renders a broken `<img>` with tests green. (Maple attachments review round 3, 2026-10-19, #27, deferred)
+
+**Suggested fix:** In "a staged PDF uploads the original file", assert the name "quote.pdf" shows and no img has that alt.
+
 
 ## Website
 
@@ -5932,3 +6084,67 @@ clean either way.
 
 **Suggested fix:** Append to the note: "Review round 1 moved the stored-sizes rebuild into `_stored_size_entries` and added two tests: a price said again at its own value still records the unpriced size at its cost, and a stored size with neither a price nor a cost is left out of a sizes write." Do it when #1252 moves to the archive.
 
+### 1319. [MEDIUM] `attachmentBlob`'s "full" size has no production caller (dead code)
+`portal/src/api/agents.ts:39` — The only caller passes "thumb"; "full" is reached only by agentsApi.test. (Maple attachments review round 3, 2026-10-19, #28, deferred)
+
+**Suggested fix:** Make `size` required and drop "full" until a viewer needs it; update the test.
+
+### 1320. [MEDIUM] `VIDEO_ACCEPT` is exported but imported nowhere (dead export)
+`portal/src/lib/media.ts:9` — TaskMediaButtons switched to NOTE_ATTACHMENT_ACCEPT; it's used only inside media.ts. (Maple attachments review round 3, 2026-10-19, #29, deferred)
+
+**Suggested fix:** Drop the `export`.
+
+### 1321. [MEDIUM] `read_error` on `MapleAttachmentUpload` is never populated (dead field)
+`portal/src/api/agents.ts:18` — The server deliberately leaves `read_error` out of the upload reply; the portal type still declares it. (Maple attachments review round 3, 2026-10-19, #30, deferred)
+
+**Suggested fix:** Remove the field from the type.
+
+### 1326. [LOW] Bare "turn_index" literal in the planner's file helpers
+`platform/agents/planner/execute_files.py:93` — New code (and `snapshot.previous_files` / `forget_stale_files`) repeats the literal where `focus.TURN_INDEX_KEY` exists. (Maple attachments review round 3, 2026-10-19, #35, deferred)
+
+**Suggested fix:** Import TURN_INDEX_KEY in both places.
+
+### 1330. [LOW] `lifespan` has no docstring
+`platform/main.py:122` — It now starts and stops the background attachment sweeper. LOW: an app hook rather than a public API. (Maple attachments review round 3, 2026-10-19, #39, deferred)
+
+**Suggested fix:** One line: startup (Sentry, Firebase, DB, invitation cleanup, the attachment sweeper), shutdown (cancel the sweeper, close the reCAPTCHA client).
+
+### 1331. [LOW] `canSend`'s doc contradicts the words rule
+`portal/src/components/common/ComposerBar.tsx:26` — It reads "Whether there is something to send — text, or a file." Under the words rule (Simon 2026-10-19) a file alone can't be sent. (Maple attachments review round 3, 2026-10-19, #40, deferred)
+
+**Suggested fix:** "Whether the message can go: words typed, and no file holding it."
+
+### 1336. [LOW] Misindented `setFileError("")` in SupportPanel
+`portal/src/components/common/SupportPanel.tsx:198` — Six spaces inside a four-space block. (Maple attachments review round 3, 2026-10-19, #45, deferred)
+
+**Suggested fix:** Reindent.
+
+### 1337. [LOW] `anyVideos` now means "any video or PDF"
+`portal/src/components/tasks/TaskDialog.tsx:425` — The name no longer matches what it checks. (Maple attachments review round 3, 2026-10-19, #46, deferred)
+
+**Suggested fix:** Rename to `anyAsIs`.
+
+### 1338. [LOW] Video-only names on the task dialog's Attach input
+`portal/src/components/tasks/TaskMediaButtons.tsx:9` — `videoInputRef`, the "photo OR video" doc and testid `task-dialog-video-input` now cover videos and PDFs (also TaskDialog L128). (Maple attachments review round 3, 2026-10-19, #47, deferred)
+
+**Suggested fix:** Rename to `attachInputRef` / `task-dialog-attach-input`; update the doc and tests.
+
+### 1339. [LOW] `kindLabel` is a pass-through to `mediaKind`
+`portal/src/components/notes/NoteAttachmentStrip.tsx:21` — A one-line wrapper, also used as a type (L125). (Maple attachments review round 3, 2026-10-19, #48, deferred)
+
+**Suggested fix:** Call `mediaKind` directly; use `ReturnType<typeof mediaKind>`.
+
+### 1340. [LOW] `MapleAttachmentChip` names two different things
+`portal/src/components/Layout/MapleAttachmentChips.tsx:65` — The sent-chip component here, and the staged-chip interface in useMapleAttachments.ts:11. (Maple attachments review round 3, 2026-10-19, #49, deferred)
+
+**Suggested fix:** Rename the component `SentAttachmentChip`.
+
+### 1342. [LOW] The Maple attachments design doc lags review round 2
+`documentation/development/plans/2026-10-18-maple-attachments-design.md:20` — The decision table runs 1–7, 9, 10, 8; nothing covers the already-on guard, the split-files question, the code-block read-back or `_discard_unless_saved`. (Maple attachments review round 3, 2026-10-19, #51, deferred)
+
+**Suggested fix:** Renumber; add a decision row (or §3.4 sentences) for the guard and the split question.
+
+### 1343. [LOW] The Maple attachments design doc documents the upload reply with `read_error`
+`documentation/development/plans/2026-10-18-maple-attachments-design.md:41` — The server never sends it (it stays server-side). (Maple attachments review round 3, 2026-10-19, #52, deferred)
+
+**Suggested fix:** Remove it from the documented reply shape.

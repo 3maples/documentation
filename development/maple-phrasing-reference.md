@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-17
+**Last updated:** 2026-10-19
 
 ### Recent changes
 
@@ -598,6 +598,8 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `estimate for sod at {street address}` [est] | `create_estimate` property | ✅ address resolved against the Property catalog and linked *(2026-07-06 — unique match required; ambiguous/unknown falls back to the ask-to-link follow-up)* |
 | `I'm here at the Smiths, make a new estimate for a cedar fence` / `create a new estimate for a cedar fence on the Johnson job` [est] | ask | ✅ *"A new estimate for the cedar fence, or the estimate you have open?"* — its own words ("start a new estimate", "the open one") and a yes answer it *(round 8)* — with an estimate open and the work planned onto it, an estimate the words may ask for is asked, never made from the words — the answer plans the request again (`as_asked.new_or_open_estimate`); an explicit reference ("on this estimate", "add it to E0042", "work item 2") keeps the work on the one open without asking *(2026-10-13, review round 5 #3; asked since round 7)* |
 | `create an estimate` [none] | `create_estimate` | ✅ over the plan's included estimates with a card on file (and the notice on), the charge is asked first — the estimate pages' words — then, on the yes, "What type of work needs to be done?"; the yes carries to that request for 30 minutes and one create, and to any question the planner asks of it ("which customer?") *(2026-10-13, acceptance M4; review rounds 1–2 #2, #37)* |
+| `create an estimate from this PDF` / `draft a quote from this photo` [est] | `create_estimate` attach | ✅ with a photo or PDF on the message: the scope is copied from what Maple read in the file — only what the file shows, never invented — and the new estimate carries the file(s) as an estimate-level note *(Simon 2026-10-18; with files on the message, one create and nothing else taking them, the planner sets attach itself)* |
+| `create an estimate from this quote and attach it` [est] | `create_estimate` attach | ✅ one create: the estimate from the file's text, carrying the file as a note — a note on the step just made is folded into it, so the file is filed once (Maple attachments, 2026-10-18) |
 
 *Not yet in the Plan format — a plan with two actions, or several turns (phase 3):*
 
@@ -1096,6 +1098,8 @@ These edit **top-level `Estimate` fields** (`title`, `description`) — distinct
 | `create a note for this estimate: {text}` / `create a note on {EST}: {text}` / `make a note on this estimate that the gate code is 4411` / `new note for this quote: {text}` [est] | `add_note` | ✅ an estimate-level Note *(2026-09-24 — was `create_estimate`. `create a note for this work item: …` files a work-item Note.)* |
 | `Add a note that says: {text}` / `add a note: {text}` / `create a note: {text}` / `leave a note that the gate code is 4411` / `add note - {text}` [est] | `add_note` | ✅ **no target at all**, estimate in play: an estimate-level Note, even with a work item anchored *(2026-09-24 — was `create_estimate`: "add" plus the borrowed estimate domain read as a create)* |
 | `write down on the {title} estimate that the gate code is 4411` [est] | `add_note` | ✅ the planner handles it — an estimate's note (review round 13 #39) — was a gap: *(`write down` is a cue, but only `remember` has a `... that ...` tail extractor; needs the tail generalized)* |
+| `add this plan to the estimate` / `attach this quote to {EST}` / `put this photo on E0042's notes` [est] | `add_note` attach | ✅ with a photo or PDF on the message (or the previous one): an estimate-level note with the file(s), signed by you, on the Notes feed (Maple attachments, 2026-10-18) |
+| `add this photo to work item 2` / `attach this to the patio work item` [est] | `add_note` attach | ✅ with words, the note is added without the file; with none, nothing is written; either way the reply says why — a work item's note takes files on the estimate page (`WORK_ITEM_NOTE_FILES_REFUSAL`) (Maple attachments, 2026-10-18; review 2026-10-19) |
 
 *Not yet in the Plan format — a refusal that depends on the estimate's status (phase 3):*
 
@@ -1757,6 +1761,11 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `link John Doe to 123 Main St` / `link 123 Main St to John Doe` / `connect Carla Diaz with the Elm House property` / `add Carla Diaz to 12 Oak St` / `Carla Diaz lives at 12 Oak St` | `link` | ✅ links them (either order); "already linked" when they are *(the guide's own phrasing was unknown on the rules tier)* |
 | `link Zed Quill to 12 Oak St` | `link` | ✅ no such contact: "I couldn't find a contact or a property called Zed Quill." |
 | `remove Ana Reyes from 12 Oak St` / `unlink Ana Reyes from 12 Oak St` | refuse `out_of_chat` `unlink` | 🛑 done in the app — §9.8 |
+| `add this to Elm House's notes` / `add a note to Bob Lee with this PDF` / `put this photo on 12 Oak St` | `add_note` attach | ✅ with a photo or PDF on the message (or the previous one): a note with the file(s), signed by you; the body is whatever else was said, and may be nothing (Maple attachments, 2026-10-18) |
+| `add a note to Bob Lee with the gate code from the PDF` | `add_note` body | ✅ the fact is copied out of the file's text into the note — only what was asked for, never the whole file (Maple attachments, 2026-10-18) |
+| `attach this to Elm House` / `put this on 12 Oak St` | `add_note` attach | ✅ a note with the file(s) on the property; with no file on the message or the previous one, Maple says to add a photo or PDF with the + button (`NO_FILE_ON_MESSAGE_REFUSAL`) (Maple attachments, 2026-10-18) |
+| `add this business card as a contact` / `create a contact from this photo` | `create_contact` | ✅ with a photo of a card on the message: the name, phone and email are copied from what Maple read into the contact's fields; the file isn't attached — only an estimate or a task carries the file it was made from (review 2026-10-18 #34) |
+| `add a note to Elm House: call back Tuesday` | `add_note` | ✅ after `what's in this photo?`, the previous message's photo isn't attached: a file goes on a record a message later only when the message points at it ("it", "this", "that photo") (review 2026-10-18 #33) |
 
 *Not yet in the Plan format — several turns, a state the test world can't build, or a refusal that depends on the user's role (phase 3):*
 
@@ -2381,6 +2390,9 @@ Additive is the default, matching estimate notes (§5.x) — a drive-by note nev
 | `we shouldn't set the notes on the fence task to foo` / `please don't add to the task: call Bob` / `don't add to T0042 bring the contract` | `acknowledge` | ✅ nothing changes *(2026-09-30, #762; 2026-10-11, #847 — as above)* |
 | `add a note to it: don't park on the lawn` [task_focus] | `add_note` parent.domain=task | ✅ the note's own words are content, never a negated command *(2026-09-30, #762 — the anchor sits before the verb, so the note body is untouched)* |
 | `add to the fence task: we shouldn't dig here` | `update_task` fields.notes_append | ✅ the note's own words are content, never a negated command *(2026-09-30, #762)* |
+| `attach this to the task` / `add this photo to T0042` / `put this on the fence task` [task_focus] | `update_task` attach | ✅ with a photo or PDF on the message (or the previous one): the file(s) are copied onto the task's media (the Media section in the app); with none, `NO_FILE_ON_MESSAGE_REFUSAL` (Maple attachments, 2026-10-18) |
+| `add a note to the task with this photo: call first` [task_focus] | `add_note` parent.domain=task attach | ✅ the words go on the description, the file on the task's media (Maple attachments, 2026-10-18) |
+| `create a task from this photo: fix the gate latch` / `new task with this PDF: order the pavers` / `make a task from this photo` | `create_task` attach | ✅ the words after the colon (or what the photo shows) are its text; the file(s) go on the new task's Media — a task's notes are its description, so its files are its media (Maple attachments, 2026-10-18) |
 
 ### 7.6.1.1 Dictated payloads — the first intent wins
 
@@ -2727,7 +2739,7 @@ Requests Maple doesn't do from chat are refused with where to do them, in the us
 | `unlink Carla Diaz from 12 Oak St` / `detach the contact` | refuse `out_of_chat` `unlink` | 🛑 redirected to the property or contact in the app; unlinking a task's property is Maple's (§7.6) |
 | `duplicate the patio estimate` / `clone this material` / `make a copy of {material}` | refuse `out_of_chat` `duplicate` | 🛑 redirected to Duplicate in the row's menu on the Estimates, Materials or People page |
 | `generate the document for E0042` / `export a PDF` / `create a Google Doc` | refuse `out_of_chat` `documents` | 🛑 redirected to the estimate's Documents button *(user decision 2026-09-27: no document generation from chat)* |
-| `add a photo to the task` / `upload a video` | refuse `out_of_chat` `media` | 🛑 redirected to Photo or Video on the task in the app |
+| `add a photo to the task` / `upload a video` | refuse `out_of_chat` `media` | 🛑 with no file on the message or the previous one: says to attach it with the + button and name the record (`MEDIA_ATTACH_REFUSAL`; a video always goes on the task in the app); while `MAPLE_ATTACHMENTS_ENABLED` is off, today's redirect to Photo or Video on the task (Maple attachments, 2026-10-18) |
 
 Detectors are narrow on purpose — a false positive refuses something Maple can do: "delete the duplicate contact" is a delete, "set the markup on work item 1 to 20%" is Maple's. Tests: `tests/test_out_of_chat_redirects.py`, `tests/test_maple_refusal_is_final.py`.
 
@@ -3059,6 +3071,23 @@ Turns about the conversation itself are answered after the question gate has had
 | `start over` / `reset` / `clear the chat` | `start_over` | ✅ points to the clear button; drops anything Maple was waiting on |
 
 **Language** (2026-09-27): the conversation keeps the language the user is writing in. A short reply ("sí", "2", "Cambridge") is answered in that language rather than re-detected from two characters, and a language-neutral message (a code, a number) never switches it (`services/translation.py::conversation_language`).
+
+## 10.11 Files on the message *(2026-10-18)*
+
+A photo or PDF sent with a message (the + button, or dropped on the message box; `POST /agents/attachments`, then `attachment_ids` on the turn) is read once at upload and shown to the planner as a `FILES_ON_MESSAGE` block. The planner puts it on the record the user names (`attach` on `add_note`, `create_task`, `update_task`), reads it back (`describe_files`), or copies facts out of it into a scope, a body or a description. The file is remembered for **one more message** (`last_files`, the state's "Files on the previous message"), so a question about it and then "attach it" works, and so does the answer to "which task?" — when Maple asks something about a request that used the previous message's file, or asks which record was meant, the file is kept for the answer too; a question about anything else lets it lapse, and a new record made from an answer takes the file only when the request it answers used it. Behind `MAPLE_ATTACHMENTS_ENABLED`; the plan is [`plans/2026-10-18-maple-attachments-design.md`](plans/2026-10-18-maple-attachments-design.md).
+
+| Phrasing | Plan | Status |
+|---|---|---|
+| `what's in this photo?` / `read this` / `what does it say?` | `describe_files` | ✅ with a file on the message (or the previous one): what Maple read from each file — its text, then what it shows, in a plain block (a link in a file is shown, never clickable); a file that couldn't be read says so; with none, `NO_FILE_ON_MESSAGE_REFUSAL` (Maple attachments, 2026-10-18) — the portal never sends a file without words (Simon 2026-10-19); the API reads a files-only message the same way |
+| `attach it to T0042` / `now put it on the fence task` | `update_task` attach | ✅ the previous message's file, one turn later — after `what's in this photo?` (Maple attachments, 2026-10-18) |
+| `the one at Elm House` [task_focus] | `update_task` attach | ✅ answering "which task?" to `attach this to the fence task`: the file rides along to the answer — the message that carried it is the previous one (Maple attachments, 2026-10-18); and when the question was asked about the previous message's file (`what's in this photo?` → `attach it to the fence task` → "which task?"), the file is kept for the answer too (review round 3 #8) |
+| `attach this to T0042` | `update_task` attach | ✅ with the photo two messages back, Maple says there's no file on that message (`NO_FILE_ON_MESSAGE_REFUSAL`) — a file is on its message and the next one only; send it again (Maple attachments, 2026-10-18) |
+| `T0042` | `update_task` attach | ✅ a task named with a file on the message and nothing else said: the file goes on the task's media (review 2026-10-19) |
+| `Elm House` | `add_note` attach | ✅ a contact, property or estimate named with a file on the message and nothing else said: a note with no words, carrying the file (review 2026-10-19) |
+| `what does this quote say, and create a task to call the customer` | `describe_files` | ✅ then `create_task`: the file is read back and the new task is made without it — a plan that reads the files leaves them off the create (review 2026-10-18 #32, 2026-10-19) |
+| `attach the photo to T0042 and the PDF to E0042` | ask | ✅ with two or more files on the message, Maple asks first — "Just to check: put all 2 files on each of them? (yes/no)" — since each record would take every file; no leaves it all as it was and says to send each file with its own message (review 2026-10-19 #18) |
+| `add a note to it: bring the ladder` [task_focus] | `add_note` | ✅ just after `create a task from this photo: fix the gate`: the note is added and the photo isn't copied onto the task a second time — "Those files are already on it." (the state says where the previous message's files went; review 2026-10-19 #17) |
+| `attach this estimate to Elm House` [est] | `link` | ✅ with a file on the message too: "attach this estimate (or contact) to …" names a record — a link, never the file (review 2026-10-19) |
 
 ---
 
