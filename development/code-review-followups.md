@@ -128,7 +128,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 973 | [platform/services/maple_metrics.py](../../platform/services/maple_metrics.py) | the metrics engine, first measured 2026-10-06; +7 that day (`pre_tax_total`); +113 by 2026-10-13 (`priced_work_items`, `_count_and_value`, `ItemDollars` / `PricedItem` for the ratio shapes; review 2026-10-13 round 3 #45). **Next step:** the Phase 3 ratios (`run_win_rate`, `run_margin`, `priced_work_items` and their helpers) into `maple_ratios.py` beside `maple_ratio_shapes.py`, which already holds the shapes |
 | 903 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
 | 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
-| 860 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
+| 906 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838); 906 on 2026-10-19 (+22: the What's New buttons beside the bell — they move with the sidebar and drawer extractions). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
 | 854 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements); then `ResizeWorkItem` (+16, 2026-10-11); +21 on 2026-10-13 (`Metric.year` / `since` / `excluding`, `win_rate_by_value`; round 3 #45). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
 | 846 | [platform/agents/planner/policy.py](../../platform/agents/planner/policy.py) | 846 on 2026-10-16 (+28: material sizes and the Owner/Admin price check for the shared catalog); **crossed the line 2026-10-13** (792 → 818) in the planner gap-fixing change (`_nameless_checked`, `_typed_nameless_line`). **Next split:** `_nameless_checked`, `_typed_nameless_line`, `_line_kind` and `resolve_work_items` into `policy_lines.py`, as `policy_subject.py` was — review round 13 #20 |
@@ -1057,7 +1057,10 @@ affordance that was just deliberately removed.
 overflow state already tracked (`edges.above || edges.below`, plus a `hasOverflow` flag) so short
 notes do not each add a tab stop.
 
-### 110. [LOW] `FeedbackPanel` error message has no live-region announcement
+### 110. ~~[LOW] `FeedbackPanel` error message has no live-region announcement~~ — RESOLVED 2026-10-19
+
+**Resolved 2026-10-19:** both components it named are gone. `FeedbackPanel.tsx` went when Support absorbed the Trello Feedback panel (2026-07-02), and `ChangeLogPanel.tsx` was deleted when What's New moved to a dialog beside the notification bell. Its replacement, `portal/src/components/notifications/WhatsNewDialog.tsx`, renders its load error with `role="alert"`. Move to the archive in the next cleanup.
+
 **File**: [portal/src/components/common/FeedbackPanel.tsx:169](../../portal/src/components/common/FeedbackPanel.tsx)
 **Severity**: LOW (accessibility)
 
@@ -3824,7 +3827,10 @@ Found during 2026-07-01 manual dev testing: `onSnapshot` terminates permanently 
 The card lists tasks from every status column, including the terminal "Done" status. A finished task whose due date has passed will sit at the top of the card in red indefinitely, crowding out genuinely actionable tasks (the card only shows 5). Deferred pending a product decision on whether "Done" tasks belong in the card.
 **Suggested fix:** Fetch task statuses (taskStatusesApi.list), identify the final status column, and exclude tasks in it — or filter in selectDashboardTasks via a passed-in "done" status id.
 
-### 112. [LOW] Replace `isMountedRef`/`fetchTokenRef` race-guards with `AbortController`
+### 112. ~~[LOW] Replace `isMountedRef`/`fetchTokenRef` race-guards with `AbortController`~~ — RESOLVED 2026-10-19
+
+**Resolved 2026-10-19:** both panels it would migrate are gone. `FeedbackPanel.tsx` was retired into Support (2026-07-02), and `ChangeLogPanel.tsx` was deleted when What's New became `WhatsNewDialog`, which is mounted fresh per open and guards its one fetch with an effect-local `cancelled` flag, with no refs. Teaching `apiRequest` an `AbortSignal` is still a fine idea, but nothing here needs it. Move to the archive in the next cleanup.
+
 **Files**: [portal/src/components/common/ChangeLogPanel.tsx](../../portal/src/components/common/ChangeLogPanel.tsx), [portal/src/components/common/FeedbackPanel.tsx](../../portal/src/components/common/FeedbackPanel.tsx), [portal/src/api/client.ts](../../portal/src/api/client.ts)
 **Severity**: LOW (refactor)
 
@@ -3906,7 +3912,7 @@ The resolve-conversation effect (deps `[open, activeTab, activeType]`) clears dr
 **Suggested fix:** Accept, or preserve the draft across dropdown switches by keying the draft-clear on `activeTab` only.
 
 ### 391. [LOW] portal/src/components/Layout/PortalLayout.tsx:147 — flag-off environments now have NO in-app feedback entry point
-The Support tab is still gated on `supportEnabled` (VITE_SUPPORT_PANEL_ENABLED), and the Trello Feedback tab — which was unconditional — is gone. In any build without the flag, the footer is just Maple | What's New: no way to contact support in-app at all. Prod has the flag on today, so no current impact — but the documented way to "turn the panel off" (empty the GitHub var + rebuild) now has a much bigger blast radius than before: it silently removes the only contact channel, not just a beta feature. The flag has effectively changed meaning from rollout gate to kill switch.
+The Support tab is still gated on `supportEnabled` (VITE_SUPPORT_PANEL_ENABLED), and the Trello Feedback tab — which was unconditional — is gone. In any build without the flag, the Maple panel has no tab row at all (What's New moved beside the notification bell on 2026-10-19, and a lone Chat tab isn't rendered): no way to contact support in-app at all. Prod has the flag on today, so no current impact — but the documented way to "turn the panel off" (empty the GitHub var + rebuild) now has a much bigger blast radius than before: it silently removes the only contact channel, not just a beta feature. The flag has effectively changed meaning from rollout gate to kill switch.
 **Suggested fix:** Either accept (flag stays permanently on) and note the kill-switch semantics in the workflow comment next to VITE_SUPPORT_PANEL_ENABLED — or drop the flag gating entirely now that Support is the production channel (remove isSupportPanelEnabled and render unconditionally).
 
 ### 393. [LOW] portal/src/components/common/SupportPanel.tsx:156 — App Check gate covers only the message/doc listener
