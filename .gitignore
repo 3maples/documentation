@@ -10,3 +10,5 @@ Varello/
 # Transient code-review ledger (written by /code-review, consumed by /fix-issues)
 .code-review-findings.md
 
+# Database backups hold company and customer data: never commit them
+/Dev Backups/
