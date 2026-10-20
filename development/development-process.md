@@ -129,6 +129,9 @@ command:
   entry** for the promoted commits before pushing (`/release <target>
   [major|minor|patch]`, minor by default). A `website` release gets none.
   Committing the entry to `documentation/` is a separate step.
+- For `portal` and `app` it also writes that version into
+  `portal/src/lib/buildInfo.ts` (shown as "Build: X.Y.Z" in the user menu),
+  commits it on portal `main`, and pushes `main` and `release` together.
 - **Fast-forward only**; if `release` has diverged it aborts (never force-push).
 - **Pushing `release` triggers the production deploy** (website → GitHub Actions,
   platform → Render, portal → Firebase). So `/release` ships to prod, and per the
