@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1355**. Never
+- **Entries are numbered and permanent.** Next free number: **1356**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -51,24 +51,27 @@ RESOLVED in the same commit.
 
 ## Priority queue — top ten
 
-**Re-derived 2026-10-18** from the 743 entries left after the 2026-10-18 consolidation. Ranked by user
-impact first (wrong writes, data integrity, privacy), then risk, then how much each fix unblocks.
-Planner gaps rank high because the planner is now the default for every company.
+**Re-derived 2026-10-20**, after the Maple attachments and the standard materials replacement added
+#1290–#1351. Ranked by user impact first (wrong writes, data integrity, privacy, cost), then risk,
+then how much each fix unblocks. Planner gaps rank high because the planner is the default for
+every company.
 
 | # | Item | Why it's here |
 |---|------|---------------|
-| 1 | ~~#1089~~ — **done 2026-10-18** (with #1090–#1092) | Maple plans `title: Call the supplier` as a task search, so the task is never created — a regression in the default Maple path (3 of 3 runs). The same parity run found three read questions answered with the wrong list: #1090, #1091, #1092. Fix them together and probe the neighbouring rows live. |
-| 2 | ~~#1251~~ — **done 2026-10-18** (with #1252) | Pricing writes the wrong number. The Materials page saves a size's price as its cost when Cost is blank, which `.claude/rules/pricing.md` forbids. Fix it with its twin #1252, where Maple's size rebuild fills a missing price with the cost and so refuses a Member's description edit. |
-| 3 | ~~#817~~ — **done 2026-10-18** | Sentry receives frame locals, including Firebase token claims and chat messages, from every `logger.exception`. This is a privacy leak to a third party. **Needs your decision** on the scrubbing approach; the fix itself is small. |
-| 4 | [#846](#846-high-planner-owed-verification-after-phase-8) | The planner is the default for everyone, but its post-phase-8 verification is still owed: task statuses in the parity state, the acceptance corpus, about 250 reference rows never put to the planner, and the later 2026-10-11 changes, which have never run live. |
-| 5 | [#947](#947-medium-planner-add-bob-as-the-contact-on-e0042-can-create-a-new-bob) | Maple can plan `create_contact` beside a link, so "add Bob as the contact on E0042" can create a second Bob. Nothing checks for an existing contact first. [#948](#948-medium-planner-a-property-create-beside-a-link-doesnt-check-the-address-exists) is the same gap for properties. |
-| 6 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Same-field concurrent edits still resolve last-write-wins with no signal. The server mechanism and the TaskDialog are built; the estimate builder is the remaining surface. |
-| 7 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script runs `--apply` with no environment guard or confirmation, so one wrong shell writes to production data. Mirror `backfill_companies_to_free.py` (`--prod`, `--mongo-url`, a confirmation prompt). |
-| 8 | [#60](#60-medium-no-unique-compound-index-on-material--contact) | Material has only a non-unique `(company, name)` index, so concurrent creates can duplicate a name. The shared catalog now relies on unique names. Audit Dev and Prod for duplicates, then make the index unique. |
-| 9 | [#196](#196-medium-implement-payment_failed-user-notification) | A card decline leaves the customer in `past_due` with no notice from the platform (the handler is still a TODO). Send a Brevo email from `invoice.payment_failed`. |
-| 10 | [#4](#4-high-file-and-function-size) | File and function size, the backlog's biggest theme. The clean first move is extracting the invitation lifecycle from `routers/auth.py` into `routers/invitations.py` (about 400 lines). |
+| 1 | Planner phrasing gaps G1–G33, with [#846](#846-high-planner-owed-verification-after-phase-8) | The 2026-10-19 parity run found G1–G33 (⚠️ rows in the phrasing reference; decisions D1–D4 made 2026-10-19). Their plan, `plans/2026-10-19-maple-phrasing-gaps-plan.md`, waits for the go-ahead on step 0 and is not yet on `main` (branch `claude/maple-phrasing-review-0af5ac`). Fold in what #846 still owes after that run, and the parity run the standard materials replacement owes (it changed `MaterialFields.unit`'s description in `agents/planner/schema_fields.py`). |
+| 2 | [#947](#947-medium-planner-add-bob-as-the-contact-on-e0042-can-create-a-new-bob) | Maple can plan `create_contact` beside a link, so "add Bob as the contact on E0042" can create a second Bob. Nothing checks for an existing contact first. [#948](#948-medium-planner-a-property-create-beside-a-link-doesnt-check-the-address-exists) is the same gap for properties. |
+| 3 | ~~#60~~ — **done 2026-10-20**, production audit owed before release | Material has only a non-unique `(company, name)` index, so concurrent creates can duplicate a name, and the shared catalog relies on unique names. Dev's names are unique since the 2026-10-20 replacement renamed clashes "(custom)", so Dev can take the unique index now; production needs the same rename settled before the new list goes there. |
+| 4 | [#1304](#1304-medium-a-pdf-whose-pages-sit-in-compressed-object-streams-is-read-whatever-its-length) | A PDF with its pages in compressed object streams shows no page count, so Maple reads it whole, up to OpenAI's 100-page cap rather than our 20. One upload can cost several normal reads. The fix (`pypdf`) is chosen and adds one dependency. |
+| 5 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Same-field concurrent edits still resolve last-write-wins with no signal. The server mechanism and the TaskDialog are built; the estimate builder is the remaining surface. |
+| 6 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script runs `--apply` with no environment guard or confirmation, so one wrong shell writes to production data. Mirror `backfill_companies_to_free.py` (`--prod`, `--mongo-url`, a confirmation prompt). |
+| 7 | [#196](#196-medium-implement-payment_failed-user-notification) | A card decline leaves the customer in `past_due` with no notice from the platform (the handler is still a TODO). Send a Brevo email from `invoice.payment_failed`. |
+| 8 | [#865](#865-medium-when-a-create-makes-nothing-the-later-steps-are-dropped-without-a-word) | When a create makes nothing, the plan's later steps are dropped without a word. |
+| 9 | [#1001](#1001-medium-a-command-followed-by-a-separate-question-is-read-as-a-question) | A command followed by a separate question is answered as a question, and the command never runs. |
+| 10 | [#1329](#1329-low-maple-uploads-hold-their-bytes-in-memory-while-queued-for-a-read-slot) | Maple uploads sit in memory while they wait for a read slot, up to 300MB per user. LOW, but attachments are live, so the exposure is real. |
 
-**Next in line:** [#607](#607-medium-deleting-a-doc-version-can-still-remove-a-blob-a-concurrent-generate-is-keeping) (a doc-version delete can remove a blob a concurrent generate is keeping), [#408](#408-medium-portalsrccomponentsdashboardupcomingtaskscardtsx38--completed-tasks-surface-in-upcoming-tasks) (Done tasks fill the dashboard's Upcoming Tasks card; needs a product call), [#865](#865-medium-when-a-create-makes-nothing-the-later-steps-are-dropped-without-a-word) (a failed create silently drops the plan's later steps), [#1001](#1001-medium-a-command-followed-by-a-separate-question-is-read-as-a-question) (a command followed by a question is asked instead of done), and the [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) section.
+**Next in line:** [#4](#4-high-file-and-function-size) (file and function size; the first move is still extracting the invitation lifecycle from `routers/auth.py` into `routers/invitations.py`), [#607](#607-medium-deleting-a-doc-version-can-still-remove-a-blob-a-concurrent-generate-is-keeping) (a doc-version delete can remove a blob a concurrent generate is keeping), [#408](#408-medium-portalsrccomponentsdashboardupcomingtaskscardtsx38--completed-tasks-surface-in-upcoming-tasks) (Done tasks fill the dashboard's Upcoming Tasks card; needs a product call), and the [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) section.
+
+**Done from the 2026-10-18 ranking:** #1089 (with #1090–#1092), #1251 (with #1252) and #817, all on 2026-10-18.
 
 The queue's earlier history (the 2026-09-20 ranking, its closures and demotions) is kept in the archive's 2026-10-18 section.
 
@@ -371,7 +374,12 @@ Fix (when it bites): switch to `{"$or": [{"name": n, "unit": u} for ...]}`
 — exact tuples, no bloat. Not worth doing until we see a CSV where this
 matters.
 
-### 60. [MEDIUM] No unique compound index on Material / Contact
+### 60. ~~[MEDIUM] No unique compound index on Material / Contact~~ — RESOLVED 2026-10-20
+
+**Resolved 2026-10-20:** `Material` has a unique `(company, name)` index, `company_name_unique`, with a case-insensitive collation (`NAME_COLLATION`, strength 2), so it agrees with `assert_name_available` on case. The collation also treats full-width and decomposed spellings as their plain forms ("Ｍulch" is "Mulch"), so the lookups that name the holder after a refusal use it too. Its own name and collation let it sit beside the plain lookup index. It doesn't collapse spacing, which the check does, so names that differ only in spacing are still the check's alone. A write that passes the check while another takes the name now gets the usual refusal, not a 500. `name_held` in `services/material_catalog_writes.py` turns the index's error into `NameTaken`, and Beanie's `RevisionIdWasChanged` re-wrap from `set()` too, around the route's create and rename, Maple's create and `duplicate`. A CSV row that loses the race updates the material that won it. Tests: `tests/test_material_unique_names.py`. `test_material_name_hides.py`'s pre-unique duplicate now differs in spacing, since a case-only one can't be stored.
+
+Dev was audited on 2026-10-20: 1,416 materials, no duplicate names exactly, case-insensitively or trimmed. **Production is still owed an audit before this ships:** the index is built at startup, and a duplicate there stops the app from starting. Until the branch merges, a test run from `main` on a machine where this branch's tests ran meets the index, which Beanie never drops, in the local test database. `main`'s `test_material_name_hides.py` then fails storing a case-only duplicate. Merge first, or drop `company_name_unique` from the local test database before that run (review 2026-10-20 #5). Contact keeps no unique index, as below.
+
 **Files**: [platform/models/material.py:32](../../platform/models/material.py),
 [platform/models/contact.py:45](../../platform/models/contact.py)
 **Severity**: LOW–MEDIUM (data integrity, not an active bug)
@@ -5236,6 +5244,11 @@ total row count rather than blank-row count.
 `portal/src/lib/useWhatsNewUnseen.ts:22` — Edge cases: (a) a null response (`apiRequest` returns null on a 204/empty body) leaves the dot unchanged — no test resolves `unseen()` with null; (b) a visibilitychange to a hidden tab must not re-check — the only visibility test fires while jsdom reports "visible". (review 2026-10-20 What's New badge #5, deferred)
 
 **Suggested fix:** (a) `mockedApi.unseen.mockResolvedValue(null as never)`, render, assert hasUnseen stays false after the call settles; (b) `Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })`, dispatch `visibilitychange`, assert `unseen()` was called only once (the mount); restore the property afterwards.
+
+### 1355. [MEDIUM] `test_vocabulary_unique_names.py` fails after the planner and Maple suites in one run
+`platform/tests/test_vocabulary_unique_names.py` — It passes alone (14 of 14). Run after `test_maple_conversations.py`, `test_maple_refusal_is_final.py` and the `test_planner_*` files (the set that imports the material catalog), 11 to 13 of its tests fail with 401s and `KeyError: '_id'`, and a different neighbour fails on each run (`estimate-delete-listed-row-not-the-open-one`, `list_templates` paging, `show me the notes for 12 Oak St`). `main` at 9945d94 fails the same way, so it isn't a regression. The 401s suggest a test removes or changes the shared test user its `X-Test-Email` header names. (found 2026-10-20 while checking #60)
+
+**Suggested fix:** Bisect the batch to the file that leaves the shared user or company changed. Have that test restore it, or give the vocabulary tests their own user.
 
 ## Codebase hygiene (batchable)
 
