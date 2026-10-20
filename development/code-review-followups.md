@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1352**. Never
+- **Entries are numbered and permanent.** Next free number: **1355**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -128,7 +128,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 973 | [platform/services/maple_metrics.py](../../platform/services/maple_metrics.py) | the metrics engine, first measured 2026-10-06; +7 that day (`pre_tax_total`); +113 by 2026-10-13 (`priced_work_items`, `_count_and_value`, `ItemDollars` / `PricedItem` for the ratio shapes; review 2026-10-13 round 3 #45). **Next step:** the Phase 3 ratios (`run_win_rate`, `run_margin`, `priced_work_items` and their helpers) into `maple_ratios.py` beside `maple_ratio_shapes.py`, which already holds the shapes |
 | 903 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
 | 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
-| 885 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838); 906 on 2026-10-19 (+22: the What's New buttons beside the bell — they move with the sidebar and drawer extractions), then 885 when the user menu moved into `UserMenuItems.tsx`. Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
+| 901 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838); 906 on 2026-10-19 (+22: the What's New buttons beside the bell — they move with the sidebar and drawer extractions), then 885 when the user menu moved into `UserMenuItems.tsx`, then 901 on 2026-10-20 (+16: the What's New dot on three buttons and its hook). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
 | 854 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements); then `ResizeWorkItem` (+16, 2026-10-11); +21 on 2026-10-13 (`Metric.year` / `since` / `excluding`, `win_rate_by_value`; round 3 #45). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
 | 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
 | 846 | [platform/agents/planner/policy.py](../../platform/agents/planner/policy.py) | 846 on 2026-10-16 (+28: material sizes and the Owner/Admin price check for the shared catalog); **crossed the line 2026-10-13** (792 → 818) in the planner gap-fixing change (`_nameless_checked`, `_typed_nameless_line`). **Next split:** `_nameless_checked`, `_typed_nameless_line`, `_line_kind` and `resolve_work_items` into `policy_lines.py`, as `policy_subject.py` was — review round 13 #20 |
@@ -5221,6 +5221,21 @@ total row count rather than blank-row count.
 `platform/agents/estimate/catalog_text.py:123` — Edge case in code moved here unchanged: a stem seen twice with a lower weight the second time keeps the first (`seen.get(stem, 0.0) < weight` false); no test asserts the dedupe. (review 2026-10-20 round 2 #11, deferred)
 
 **Suggested fix:** Test: `build_profile("stone stones") == (("stone", 1.0),)`.
+
+### 1352. [MEDIUM] change_logs `get_unseen`: the no-entries branch is untested
+`platform/routers/change_logs.py:63` — Edge case: an empty change-log collection (line 66, `if newest is None` → `has_unseen` false) is never driven by a test; production always has releases and the test DB keeps whatever entries are there. (review 2026-10-20 What's New badge #3, deferred)
+
+**Suggested fix:** `test_unseen_false_when_no_entries`: monkeypatch `routers.change_logs._newest_entry_id` to an async function returning None, sign up a user, assert GET /change-logs/unseen returns `{"has_unseen": false}`.
+
+### 1353. [MEDIUM] change_logs `mark_seen`: the no-entries branch is untested
+`platform/routers/change_logs.py:77` — Edge case: with no entries (line 85, `if newest is not None` false) nothing is written; no test asserts the user's marker is left untouched and the reply is still `{"has_unseen": false}`. (review 2026-10-20 What's New badge #4, deferred)
+
+**Suggested fix:** `test_mark_seen_without_entries_writes_nothing`: monkeypatch `_newest_entry_id` to return None, POST /change-logs/seen, assert 200 `{"has_unseen": false}` and the user's `changelog_seen_id` is still None.
+
+### 1354. [MEDIUM] useWhatsNewUnseen: the null-response and hidden-tab arms are untested
+`portal/src/lib/useWhatsNewUnseen.ts:22` — Edge cases: (a) a null response (`apiRequest` returns null on a 204/empty body) leaves the dot unchanged — no test resolves `unseen()` with null; (b) a visibilitychange to a hidden tab must not re-check — the only visibility test fires while jsdom reports "visible". (review 2026-10-20 What's New badge #5, deferred)
+
+**Suggested fix:** (a) `mockedApi.unseen.mockResolvedValue(null as never)`, render, assert hasUnseen stays false after the call settles; (b) `Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })`, dispatch `visibilitychange`, assert `unseen()` was called only once (the mount); restore the property afterwards.
 
 ## Codebase hygiene (batchable)
 
