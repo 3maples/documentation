@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1344**. Never
+- **Entries are numbered and permanent.** Next free number: **1352**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -5187,6 +5187,41 @@ total row count rather than blank-row count.
 
 **Suggested fix:** `assert "empty" in response.json()["detail"].lower()`.
 
+### 1344. [MEDIUM] build_standard_materials `clean_rows`: a bad cost's exit code is untested
+`platform/scripts/build_standard_materials.py:130` — Edge case: a blank or non-numeric cost raises `ValueError`. Round-2 fix #16 now drives that arm (`test_a_bad_cost_names_its_file_and_row` asserts the file/name/size message from `build`); what stays untested is that `main` reports it — returns 1, prints "Nothing written", writes no file. (review 2026-10-20 round 2 #5, deferred)
+
+**Suggested fix:** Test: a row with cost "TBD" → `builder.main([folder, "--out", out]) == 1`, `not out.exists()`.
+
+### 1345. [MEDIUM] build_standard_materials `_brand_from_url`: a mismatched domain is untested
+`platform/scripts/build_standard_materials.py:161` — Edge case: a provider URL whose domain doesn't spell the name's first words (`pthorticulture.com` for "Premier Tech …") returns `None` after the loop; no test pins that a mismatched domain names no brand. (review 2026-10-20 round 2 #6, deferred)
+
+**Suggested fix:** Test: "Acme Widget" with description "Provider reference: https://example.com/" builds as "Acme Widget".
+
+### 1346. [MEDIUM] build_standard_materials `brand_names`: a cue naming another brand is untested
+`platform/scripts/build_standard_materials.py:178` — Edge case: a description cue naming a brand the name doesn't start with (line 194) falls through to the URL lookup; no test covers it. (review 2026-10-20 round 2 #7, deferred)
+
+**Suggested fix:** Test: name "Erosion Blanket", description "Acme branded system." → name unchanged.
+
+### 1347. [MEDIUM] build_standard_materials `write_outputs`: no `--report` is untested
+`platform/scripts/build_standard_materials.py:300` — Edge case: without `--report` (`report_path is None`) only the seed is written; no test runs `main` that way. (review 2026-10-20 round 2 #8, deferred)
+
+**Suggested fix:** Test: `main([folder, "--out", out])` returns 0, writes the seed, and creates no other file in `tmp_path`.
+
+### 1348. [MEDIUM] build_standard_materials `load_rows`: a folder with no blank rows is untested
+`platform/scripts/build_standard_materials.py:106` — Edge case: no blank rows (`if blank:` false) adds no "blank rows dropped" section; no test asserts its absence. (review 2026-10-20 round 2 #9, deferred)
+
+**Suggested fix:** Test: one clean row → `"blank rows dropped" not in report`.
+
+### 1349. [MEDIUM] catalog_text `_stem`: the -ies, -ches/-xes and -ing rules are untested
+`platform/agents/estimate/catalog_text.py:94` — Edge cases in code moved here unchanged (2026-10-20): the "-ies" rule ("supplies" → "supply"), the "-ches/-shes/-sses/-xes/-zes" rule ("benches" → "bench") and the "-ing" rule ("edging" → "edg"); the scorer tests drive only the plural "-s" and "-ed" rules. (review 2026-10-20 round 2 #10, deferred)
+
+**Suggested fix:** Tests in `tests/test_catalog_text.py`: `_stem("supplies") == "supply"`, `_stem("benches") == "bench"`, `_stem("boxes") == "box"`, `_stem("string") == "string"` (guard), `_stem("edging") == "edg"`; and "landscape supplies" matches "Landscape Supply" at or above AUTO.
+
+### 1350. [MEDIUM] catalog_text `build_profile`: the duplicate-stem dedupe is untested
+`platform/agents/estimate/catalog_text.py:123` — Edge case in code moved here unchanged: a stem seen twice with a lower weight the second time keeps the first (`seen.get(stem, 0.0) < weight` false); no test asserts the dedupe. (review 2026-10-20 round 2 #11, deferred)
+
+**Suggested fix:** Test: `build_profile("stone stones") == (("stone", 1.0),)`.
+
 ## Codebase hygiene (batchable)
 
 Small, low-risk cleanups. Safe to batch into a single `chore: code hygiene`
@@ -6154,3 +6189,9 @@ clean either way.
 `documentation/development/plans/2026-10-18-maple-attachments-design.md:41` — The server never sends it (it stays server-side). (Maple attachments review round 3, 2026-10-19, #52, deferred)
 
 **Suggested fix:** Remove it from the documented reply shape.
+
+### 1351. [LOW] The workspace `.gitignore` doesn't ignore documentation worktree folders
+`.gitignore:5` — The 2026-10-20 fix (round 1 #22) ignores `/platform-*/`, `/portal-*/` and `/website-*/`, the sibling worktrees a session creates beside the product repos inside its own worktree folder, but not `/documentation-*/`, so a session's `documentation-materials/` shows as untracked in that worktree's `git status`. Only session worktrees are affected: the main checkout has no such folder (Simon, 2026-10-20). `/commit` stages explicit paths, so the risk is low. (review 2026-10-20 round 3 #2, deferred)
+
+**Suggested fix:** Add `/documentation-*/` beside the other three patterns.
+
