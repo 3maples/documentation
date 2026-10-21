@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1364**. Never
+- **Entries are numbered and permanent.** Next free number: **1365**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -2356,6 +2356,11 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 `documentation/development/maple-phrasing-reference.md:3087` — The prompt steers "add a note to it: bring the ladder" to `attach: false` (a plain note), with ALREADY_ON only as the executor's backstop, but the row says the reply ends with it. Missing rows: the overage yes carrying the PDF, the answer to a question from a create made from a file (planned again), and the split "no". The §10.11 intro omits `create_estimate` from the attach ops. (Maple attachments review round 3, 2026-10-19, #50, deferred)
 
 **Suggested fix:** Reword that row (plan `add_note`, no attach; ALREADY_ON only if attach is planned); add the three rows; add `create_estimate` to the intro.
+
+### 1364. [MEDIUM] Edge case untested: a rename's taken name whose holder is gone
+`platform/agents/labour/service.py:415` — Edge case in `_update_labour_via_api`: L446–447 — the route answered 409 for a taken name but `role_name_holder` finds no holder by the time Maple looks (the holder renamed or deleted in between). The refusal then names the requested name with no hidden hint. No test drives this arm; the taken-name tests always find the holder. (review 2026-10-21 round 5 #1, standard People roles, deferred)
+
+**Suggested fix:** In `test_labour_agent_standard_roles.py`: monkeypatch `agents.labour.service.role_name_holder` to return None, rename "Hedge Pruner" to "Crew Lead" → the reply is `ROLE_NAME_TAKEN_REFUSAL.format(name="Crew Lead")` with no `HIDDEN_ROLE_HINT`.
 
 
 ## Platform — API, models and data
