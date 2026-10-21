@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1363**. Never
+- **Entries are numbered and permanent.** Next free number: **1364**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -325,6 +325,8 @@ seams that already exist as separate classes.
 | 148 | `upload_labours_csv` — platform/routers/labours.py:142 (first measured 2026-10-17 at 150, review #40; 148 after the Company read moved into the access check. The shared header check, then `_parse_labour_rows` / `_write_labours` for its two phases) |
 | 130 | `upload_equipments_csv` — platform/routers/equipments.py:63 (first measured 2026-10-17, review #41. The same split as `upload_labours_csv`) |
 | 76 | `delegate_generic` — platform/routers/agent_helpers/delegate_generic.py:31 (+6 on 2026-10-17 for the confidence fallback, PYTHON-V; review #42. Move the optional follow-up merge, L60-76, into `_merge_optional_follow_up(...)`) |
+| 170 | `MaterialRow` — portal/src/components/estimates/MaterialsTable.tsx:50 (first measured 2026-10-21 in the Work Item cost-column change, +~20 for the editable Cost cell, the moved Qty cell and read-only `disabled` — review 2026-10-21 #5, deferred. Extract a `LineCell({ label, span, children })` shared with `ActivityRow` for the repeated `<td>` + phone label, then split out the menu / collapsed-header block) |
+| 174 | `ActivityRow` — portal/src/components/estimates/ActivitiesTable.tsx:49 (first measured 2026-10-21, same change, +~20 for the Cost cell and read-only `disabled` — review 2026-10-21 #6, deferred. Same `LineCell` extraction as `MaterialRow`, and move the calculator button into an `EffortCalculatorCell`) |
 
 #### Watch
 
@@ -5278,6 +5280,13 @@ total row count rather than blank-row count.
 `platform/scripts/prune_firebase_users.py:128` — Edge case: line 146, the "No email — kept, check these by hand" listing. `plan_deletions` is tested for no-email users, but no `_run` test includes one, so the listing — and that they never reach `delete_auth_users` — isn't checked end to end. (review 2026-10-20 Firebase split #16, deferred)
 
 **Suggested fix:** add `AuthUser("ghost", None)` to the harness's auth users, run with `apply=True`, assert `"ghost" not in h.deleted` and the output contains "No email".
+
+### 1363. [LOW] .claude/launch.json: machine-specific dev configs from the Work Item cost-column check — RESOLVED 2026-10-21
+**RESOLVED 2026-10-21** — dropped while syncing the branch with main: main had added an equivalent `platform-8002` + `portal-5176` pair, so the branch's `launch.json` now matches main. Move to the archive in the next cleanup.
+
+`.claude/launch.json:61` — `platform-8011-cors-5175` hardcodes `/Users/simmy/Development/3Maples/platform`, and both it and `portal-5175` were added only to run a worktree's portal beside the main checkout's (5173/5174 and 8001 were taken, and the :8000 platform's CORS allow-list stops at 5174). The file is tracked in the workspace repo, so committing them ships configs that won't run on another machine. (review 2026-10-21 #10, deferred)
+
+**Suggested fix:** revert `.claude/launch.json` once manual testing of the cost columns is done (`git checkout -- .claude/launch.json` from the worktree root) and leave it out of the commit.
 
 ## Codebase hygiene (batchable)
 
