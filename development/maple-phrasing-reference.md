@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-19
+**Last updated:** 2026-10-21
 
 ### Recent changes
 
@@ -2061,6 +2061,26 @@ Fixed 2026-09-27 (#693): the name extractor read "S" out of `show me my labour r
 
 Note: "labor burden" and "unbillable rate" are company-level settings, not per-role fields. The Labour Agent's get response shows the role's Avg. Wage and computed Rate. The explanation of how rate is computed (wage + unbillable% + labor burden%) is provided when users attempt to edit rate directly.
 
+## 5.8a Standard roles (2026-10-21)
+
+The 3Maples standard roles are each company's own role records tagged with a
+standard key: their name, responsibilities and unit are the standard list's,
+their wage is the company's. Role names are unique within a company (case and
+spacing ignored, hidden roles included). A hidden role is out of Maple's lists
+and name lookups; estimate lines keep it.
+
+| Phrasing | Plan | Status |
+|---|---|---|
+| `set Foreman's wage to 45` / `change the cost of Foreman to $45` | `update_labour` fields.wage=45 | ✅ a standard role's wage is the company's; its Rate follows. Owners and Admins only: a Member is told *"Only owners and admins can set role wages."*, nothing written; a Member's `create a new role called Arborist` likewise gets *"Only owners and admins can add people roles."* before any question (unanswered tracker: `not_permitted` `role`) |
+| `rename Foreman to Field Boss` | `update_labour` fields.name | ✅ Foreman being a standard role, nothing is written: *"Foreman is a standard role, so its name, responsibilities and unit can't change. You can still change its wage."* (unanswered tracker: `policy` `standard_role`) |
+| `make Foreman daily` | `update_labour` fields.unit | ✅ refused the same way: a standard role's unit is the standard list's |
+| `delete the Foreman role` | `delete_labour` | ✅ asked first; for a standard role the yes **hides** it: *"I've hidden the standard role 'Foreman' from your people roles."* |
+| `create a new role called Crew Lead` | `create_labour` fields.name | ✅ with a Crew Lead role already there (hidden ones count), nothing is written: *"A role named 'Crew Lead' already exists."* — and, when that role is hidden, *"It's hidden — turn on Show Hidden on the People page to find it."* (`policy` `name_taken`); a rename to a taken name is refused the same way |
+
+A hidden role is not found by name ("show me the Foreman role" with Foreman
+hidden answers as for any role the company doesn't list); show it on the
+People page.
+
 ## 5.9 People gaps
 
 | Phrasing | Plan | Status |
@@ -2733,7 +2753,7 @@ Requests Maple doesn't do from chat are refused with where to do them, in the us
 | `set the default markup to 20%` / `change our company tax rate` / `what's the material markup?` | refuse `out_of_chat` `settings_financial` | 🛑 redirected to Settings → Financial tab (Owners and Admins); work-item markup/overhead/tax stay Maple's (§1.5.7) |
 | `invite Sam to the team` / `add a new team member` / `remove a user` | refuse `out_of_chat` `team` | 🛑 redirected to Settings → Team Members tab |
 | `upgrade my plan` / `how many Maple credits do I have left?` / `change my credit card` / `show my invoices` | refuse `out_of_chat` `billing` | 🛑 redirected to Settings → Billing tab |
-| `load the standard materials` / `reload standard people` | refuse `out_of_chat` `load_standard` | 🛑 redirected to the Materials page's Categories tab (standard materials come in by category) or Load Standard in the People page's actions menu |
+| `load the standard materials` / `reload standard people` | refuse `out_of_chat` `load_standard` | 🛑 redirected to the Materials page's Categories tab (standard materials come in by category); the standard roles are always on the People page — Show Hidden or Unhide All in its actions menu shows hidden ones *(2026-10-21)* |
 | `import contacts from a CSV` / `upload a spreadsheet of materials` | refuse `out_of_chat` `csv_import` | 🛑 redirected to the CSV upload on the Properties, Contacts or Materials page |
 | `add a unit called pallet` / `rename the unit bag` | refuse `out_of_chat` `units` | 🛑 redirected to the Materials page's Units tab (categories: §9.3) |
 | `add a division called Snow Removal` | refuse `out_of_chat` `divisions` | 🛑 redirected to Settings → Divisions tab; setting a work item's division stays Maple's (§1.5.2) |
@@ -2746,7 +2766,7 @@ Detectors are narrow on purpose — a false positive refuses something Maple can
 
 ## 9.9 Deletes — a plain yes, from someone allowed to *(2026-09-27)*
 
-Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A standard material is hidden rather than deleted, and a company material an estimate or template uses is refused (§4.1, 2026-10-15). A request about a record's links ("remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8); a request about its notes deletes the note you name, after asking (§3.9).
+Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A standard material is hidden rather than deleted, and a company material an estimate or template uses is refused (§4.1, 2026-10-15); a standard role is hidden rather than deleted too (§5.8a, 2026-10-21). A request about a record's links ("remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8); a request about its notes deletes the note you name, after asking (§3.9).
 
 ---
 
