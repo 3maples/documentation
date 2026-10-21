@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1355**. Never
+- **Entries are numbered and permanent.** Next free number: **1363**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -5236,6 +5236,46 @@ total row count rather than blank-row count.
 `portal/src/lib/useWhatsNewUnseen.ts:22` — Edge cases: (a) a null response (`apiRequest` returns null on a 204/empty body) leaves the dot unchanged — no test resolves `unseen()` with null; (b) a visibilitychange to a hidden tab must not re-check — the only visibility test fires while jsdom reports "visible". (review 2026-10-20 What's New badge #5, deferred)
 
 **Suggested fix:** (a) `mockedApi.unseen.mockResolvedValue(null as never)`, render, assert hasUnseen stays false after the call settles; (b) `Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })`, dispatch `visibilitychange`, assert `unseen()` was called only once (the mount); restore the property afterwards.
+
+### 1355. [MEDIUM] copy_storage_files `select_objects`: the folderless-file branch is untested
+`platform/scripts/copy_storage_files.py:109` — Edge case: line 113, the `len(parts) < 3` arm — a file directly in a company prefix with no company folder (e.g. `companies/readme.txt`) is counted as an unknown prefix, neither copied nor counted as another company's. No test drives it. (review 2026-10-20 Firebase split #9, deferred)
+
+**Suggested fix:** assert `select_objects(["companies/readme.txt"], {"dev1"}).unknown_prefixes == {"companies": 1}` and that `selected` is empty.
+
+### 1356. [MEDIUM] copy_storage_files `copy_objects`: the no-metadata and no-size branches are untested
+`platform/scripts/copy_storage_files.py:131` — Edge cases: (a) line 151, a source file with no custom metadata (no download token) is uploaded without the follow-up `patch()` — every test file carries metadata; (b) line 145, `source_blob.size or 0` when the SDK reports no size. (review 2026-10-20 Firebase split #10, deferred)
+
+**Suggested fix:** (a) a source file stored with `metadata=None`: assert it is copied, its target metadata is None, and the stand-in recorded no patch; (b) a stand-in blob with `size=None`: assert `copied_bytes` counts it as 0.
+
+### 1357. [MEDIUM] copy_storage_files `rewrite_attachment_urls`: the missing-key and mixed-attachment branches are untested
+`platform/scripts/copy_storage_files.py:168` — Edge cases: (a) line 179, a message doc with no `attachments` key at all (the test's m2 has an empty list, not a missing key); (b) line 184, a message whose attachments mix a copied source-bucket link with another link — only the first should change. (review 2026-10-20 Firebase split #11, deferred)
+
+**Suggested fix:** (a) a message `{"text": "hi"}` is left untouched and not counted; (b) a message with one copied source-bucket attachment and one `https://example.com/x.png` attachment — assert only the first `downloadUrl` changes and the count is 1.
+
+### 1358. [MEDIUM] copy_storage_files `_run`: the no-companies abort is untested
+`platform/scripts/copy_storage_files.py:228` — Edge case: line 245, aborting when MongoDB returns no companies (wrong or empty database). (The review's other arm, the same-project refusal, moved into `firebase_split.load_source_and_target` with #7 and is tested there.) (review 2026-10-20 Firebase split #12, deferred)
+
+**Suggested fix:** make the harness's `load_companies` return `[]`; assert exit code 1 and `h.target.uploads == 0`.
+
+### 1359. [MEDIUM] copy_support_chat `_run`: the missing-in-source warning is untested
+`platform/scripts/copy_support_chat.py:145` — Edge case: line 163, the warning listing MongoDB conversations with no Firestore doc to copy (`report.missing_in_source`) never runs in a `_run` test — the harness's ids are all in the source. (review 2026-10-20 Firebase split #13, deferred)
+
+**Suggested fix:** have the harness's `load_conversation_ids` return `{"dev1", "gone"}`, run `_run`, and assert (capsys) the output names `gone` under the warning line.
+
+### 1360. [MEDIUM] prune_firebase_users `delete_auth_users`: the error-printing branch is untested
+`platform/scripts/prune_firebase_users.py:107` — Edge case: line 115, printing each error when Firebase reports failed deletions — the batching test's stub returns `errors=[]`, so the loop body never runs. (review 2026-10-20 Firebase split #14, deferred)
+
+**Suggested fix:** stub `failure_count=1, errors=[SimpleNamespace(reason="USER_NOT_FOUND")]`; assert `delete_auth_users` returns 1 and capsys output contains `USER_NOT_FOUND`.
+
+### 1361. [MEDIUM] prune_firebase_users `_print_sample`: the truncation branch is untested
+`platform/scripts/prune_firebase_users.py:120` — Edge case: line 124, the "… and N more" line printed when more than `_SAMPLE` (50) users are listed. No test lists more than two; the live dev run took this arm (98 users). (review 2026-10-20 Firebase split #15, deferred)
+
+**Suggested fix:** `_print_sample("t", [AuthUser(f"u{i}", f"u{i}@x.com") for i in range(52)])` — assert capsys output contains "… and 2 more" and exactly 50 user lines.
+
+### 1362. [MEDIUM] prune_firebase_users `_run`: the no-email listing is untested end to end
+`platform/scripts/prune_firebase_users.py:128` — Edge case: line 146, the "No email — kept, check these by hand" listing. `plan_deletions` is tested for no-email users, but no `_run` test includes one, so the listing — and that they never reach `delete_auth_users` — isn't checked end to end. (review 2026-10-20 Firebase split #16, deferred)
+
+**Suggested fix:** add `AuthUser("ghost", None)` to the harness's auth users, run with `apply=True`, assert `"ghost" not in h.deleted` and the output contains "No email".
 
 ## Codebase hygiene (batchable)
 
