@@ -1,6 +1,10 @@
 # Estimate Documents dialog — Additional Information & images
 
-**Status:** Implemented 2026-09-23 (plan: 2026-09-23-estimate-documents-dialog-plan.md)
+**Status:** Implemented 2026-09-23 (plan: 2026-09-23-estimate-documents-dialog-plan.md).
+Partly superseded 2026-10-21 by
+[2026-10-21-estimate-doc-images-layout.md](2026-10-21-estimate-doc-images-layout.md):
+image sizes and captions, note photos (reverses D6), 30 images with
+thumbnails, row layout, and per-user edit access to the doc.
 **Date:** 2026-09-23
 
 ## Why
@@ -25,7 +29,7 @@ the doc after the NOTES section.
 | D3 | Blank Additional Information prints **`--`**. `Estimate.notes` no longer feeds `{{NOTES}}` at all. |
 | D4 | **Images only.** PDFs are out of scope. |
 | D5 | Additional Information and images are **stored on the version record**, and the dialog prefills from the latest version. |
-| D6 | Images are **new uploads only**. There is no picker for existing note photos. They carry forward through D5. |
+| D6 | Images are **new uploads only**. There is no picker for existing note photos. They carry forward through D5. **Reversed 2026-10-21:** note photos can be picked and are copied in (see the 2026-10-21 design). |
 | D7 | Images reach Google through **short-lived signed Firebase Storage URLs**. They are not platform URLs, which Google can't reach from local dev. |
 | D8 | Generated versions are **read-only** in the dialog: open or delete only, with no reloading of an older version's inputs. |
 | D9 | **Maple never writes what prints.** "Add a note to the estimate" in Maple now files a real estimate-level `Note` in the Notes feed and no longer writes `Estimate.notes`. Maple has no access to Additional Information. (Option C, decided 2026-09-23.) |
@@ -54,7 +58,7 @@ A new `services/estimate_doc_images.py` follows `services/company_logo.py`:
 - It sets a `MAX_IMAGE_PIXELS` guard (decompression-bomb protection), the same
   way the logo code does.
 - Limits: **10MB per file** before processing, and **10 images per
-  document**.
+  document** (**30 since 2026-10-21**, with a ~320px thumbnail stored per image).
 
 Processing validates every file before anything is stored. One bad file
 rejects the whole request with a 400 that names the file.
@@ -172,6 +176,9 @@ this change so the field has one less stale reader.
    valid. Each image uses `insertInlineImage` with
    `objectSize.width = min(468pt, width_px × 0.75pt)` and the height scaled to
    match. 468pt is the 6.5" text width of a Letter page with 1" margins.
+   **Replaced 2026-10-21:** images now sit in borderless one-row tables,
+   one, three or four per row by size, with captions, in the dialog's
+   order (see the 2026-10-21 design).
 
 If the template has **no** `{{NOTES}}` placeholder, the images are appended
 at the end of the document body instead of being dropped, and a warning is
@@ -188,7 +195,8 @@ authenticated and company-scoped, and resolves the id the same way as
 `keep_image_ids`. It mirrors the note-attachment read
 (`GET /notes/{id}/attachments/{att}`), which the portal consumes through
 `apiRequestBlob` and object URLs. A `?size=thumb` variant is **not** added:
-images are already capped at 2000px, and there are at most 10.
+images are already capped at 2000px, and there are at most 10. (**Added
+2026-10-21** with the cap raised to 30.)
 
 ### Delete
 
@@ -332,7 +340,7 @@ render it when it's non-empty.
 ## Out of scope
 
 - PDFs (D4).
-- Choosing photos from existing estimate notes (D6).
+- Choosing photos from existing estimate notes (D6). Done 2026-10-21.
 - Reordering images beyond "kept, then new".
-- Captions on images.
+- Captions on images. Done 2026-10-21.
 - Migrating or removing `Estimate.notes`.
