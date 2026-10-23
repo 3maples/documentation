@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1356**. Never
+- **Entries are numbered and permanent.** Next free number: **1437**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -58,7 +58,7 @@ every company.
 
 | # | Item | Why it's here |
 |---|------|---------------|
-| 1 | Planner phrasing gaps G1–G33, with [#846](#846-high-planner-owed-verification-after-phase-8) | The 2026-10-19 parity run found G1–G33 (⚠️ rows in the phrasing reference; decisions D1–D4 made 2026-10-19). Their plan, `plans/2026-10-19-maple-phrasing-gaps-plan.md`, waits for the go-ahead on step 0 and is not yet on `main` (branch `claude/maple-phrasing-review-0af5ac`). Fold in what #846 still owes after that run, and the parity run the standard materials replacement owes (it changed `MaterialFields.unit`'s description in `agents/planner/schema_fields.py`). |
+| 1 | [#846](#846-high-planner-owed-verification-after-phase-8) | The phrasing gaps the 2026-10-19 parity run found, G1–G35, were closed on `main` on 2026-10-22 ([plan](plans/2026-10-19-maple-phrasing-gaps-plan.md)), with a full live run after them. #846's other items are still owed: task statuses in the parity state, the acceptance corpus on the planner pipeline, and acceptance conversations for the ~250 reference rows never put to the planner. |
 | 2 | [#947](#947-medium-planner-add-bob-as-the-contact-on-e0042-can-create-a-new-bob) | Maple can plan `create_contact` beside a link, so "add Bob as the contact on E0042" can create a second Bob. Nothing checks for an existing contact first. [#948](#948-medium-planner-a-property-create-beside-a-link-doesnt-check-the-address-exists) is the same gap for properties. |
 | 3 | ~~#60~~ — **done 2026-10-20**, production audit owed before release | Material has only a non-unique `(company, name)` index, so concurrent creates can duplicate a name, and the shared catalog relies on unique names. Dev's names are unique since the 2026-10-20 replacement renamed clashes "(custom)", so Dev can take the unique index now; production needs the same rename settled before the new list goes there. |
 | 4 | [#1304](#1304-medium-a-pdf-whose-pages-sit-in-compressed-object-streams-is-read-whatever-its-length) | A PDF with its pages in compressed object streams shows no page count, so Maple reads it whole, up to OpenAI's 100-page cap rather than our 20. One upload can cost several normal reads. The fix (`pypdf`) is chosen and adds one dependency. |
@@ -132,9 +132,10 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 903 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
 | 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
 | 901 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838); 906 on 2026-10-19 (+22: the What's New buttons beside the bell — they move with the sidebar and drawer extractions), then 885 when the user menu moved into `UserMenuItems.tsx`, then 901 on 2026-10-20 (+16: the What's New dot on three buttons and its hook). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
-| 854 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements); then `ResizeWorkItem` (+16, 2026-10-11); +21 on 2026-10-13 (`Metric.year` / `since` / `excluding`, `win_rate_by_value`; round 3 #45). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
-| 837 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. Still 37 over |
-| 846 | [platform/agents/planner/policy.py](../../platform/agents/planner/policy.py) | 846 on 2026-10-16 (+28: material sizes and the Owner/Admin price check for the shared catalog); **crossed the line 2026-10-13** (792 → 818) in the planner gap-fixing change (`_nameless_checked`, `_typed_nameless_line`). **Next split:** `_nameless_checked`, `_typed_nameless_line`, `_line_kind` and `resolve_work_items` into `policy_lines.py`, as `policy_subject.py` was — review round 13 #20 |
+| 930 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | 930 on 2026-10-21 (+51: the catalog actions and undo_last, gap plan 2026-10-19); **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements); then `ResizeWorkItem` (+16, 2026-10-11); +21 on 2026-10-13 (`Metric.year` / `since` / `excluding`, `win_rate_by_value`; round 3 #45). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
+| 878 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. 2026-10-21: +41 for per-request connections (`_request_builder`), `_load_credentials_info` and the `grant_writer` / `revoke_writer` delegates; the sharing logic itself went to `services/google_drive_sharing.py`. Still 78 over |
+| 1,029 | [platform/agents/planner/policy.py](../../platform/agents/planner/policy.py) | 1,029 on 2026-10-22 (+14, the review's round 3 fixes: hidden names among several matches, a size change that can't apply); 1,015 on 2026-10-22 (+29, the review's round 2 fixes); 986 on 2026-10-21 (+130: the gap plan's catalog checks and undo, and the review's fixes); 846 on 2026-10-16 (+28: material sizes and the Owner/Admin price check for the shared catalog); **crossed the line 2026-10-13** (792 → 818) in the planner gap-fixing change (`_nameless_checked`, `_typed_nameless_line`). **Next split:** `_nameless_checked`, `_typed_nameless_line`, `_line_kind` and `resolve_work_items` into `policy_lines.py`, as `policy_subject.py` was — review round 13 #20 |
+| 801 | [platform/services/material_catalog_writes.py](../../platform/services/material_catalog_writes.py) | **crossed the line 2026-10-21** (795 → 801): `next_copy_name` for Maple's copy offer (gap plan 2026-10-19 D2; review 2026-10-21 #83). **Next step:** move the copy helpers (`duplicate`, `next_copy_name`, `_next_copy_name`) into a `material_catalog_copies.py` re-exported from `material_catalog` — it joins the reader/writer import cycle, so it wants its own change |
 | ~~1,027~~ 322 | [platform/agents/planner/execute.py](../../platform/agents/planner/execute.py) | **RESOLVED 2026-10-08** — split before switchover phase 5, no behavior change: the handlers moved to `execute_records.py` (contacts, properties, materials, roles, templates, tasks; 404), `execute_estimates.py` (estimate reads joined its writes; 309), `execute_links.py` (the notes feed joined links and notes; 142) and `execute_figures.py` (catalog figures, dashboard, metric; 94). `execute.py` keeps the meta replies, the gate and the run, and builds `COVERED` from each module's `HANDLERS`; `test_each_op_has_one_handler_across_the_executors_modules` fails on an op two modules register. Move to the archive in the next cleanup |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
@@ -205,6 +206,7 @@ seams that already exist as separate classes.
 
 | Lines | Function |
 |------:|----------|
+| 74 | `TaskStatusesTab` — portal/src/components/tasks/TaskStatusesTab.tsx:22 (2026-10-21: moved from Settings to the Tasks page's Statuses tab and split over three review rounds, ~292 → 74 — the table, row, both dialogs and the `useTaskStatuses` hook came out. What's left is the header and the two dialog mounts. **Next step:** pull the dialog mounts into `TaskStatusDialogs` if it grows again — review 2026-10-21 round 3 #3) |
 | 995 | `_orchestrate_turn` — routers/agents.py:1152 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) Re-measured 822 on 2026-10-07; +28 that day (794 → 822) for the unanswered tracker's `_track_unanswered` closure and the crash-record hand-off. Re-measured 965 on 2026-10-13 (+7 in the planner gap-fixing change for the request as typed and the overage carry; the rest is older drift — review 2026-10-13 round 5 #32). Re-measured 995 at :1152 on 2026-10-19, Maple attachments round 3 (965 → 995). |
 | 82 | `PhotoViewer` — portal/src/components/tasks/TaskPhotoGrid.tsx:111 (2026-10-19, review round 2 #29 for Maple attachments: `ViewerMedia` and `ViewerNav` extracted, 136 → 82, below the 128 it started at. What's left is the dialog shell, the focus effect and its comments: next, lift the focus/keyboard effect into a `useViewerKeys` hook) |
 | 54 | `store_attachment` — platform/services/maple_attachments.py:263 (new 2026-10-19, over 50 since the round-2 reorder — Maple attachments round 3 #11. Extract the validate/decode branch into `_prepare_upload(content, content_type, filename)` returning (normalized, name, kind, to_read, read_type, thumbnail); `store_attachment` drops to ~30 lines) |
@@ -216,6 +218,7 @@ seams that already exist as separate classes.
 | 66 | `_check_add_size_guard` — platform/agents/material/service.py:2396 (edited 2026-10-17. Extract the missing-field reply — round 4 #18) |
 | 210 | `StandardMaterialDialog` — portal/src/components/materials/StandardMaterialDialog.tsx:42 (new 2026-10-16. Split out `StandardDialogFooter` and `StandardPriceRow` — review 2026-10-16 round 2 #60) |
 | ~390 | `MaterialCategoriesTab` — portal/src/components/materials/MaterialCategoriesTab.tsx:24 (moved from Settings 2026-10-17, its reload and add/edit dialog taken out; +~80 on 2026-10-16 for the standard opt-in. Move the opt-in into a `useStandardOptIn(companyId)` hook plus a small component — round 2 #61) |
+| 386 | `SignupPage` — portal/src/pages/auth/SignupPage.tsx:60 (first measured 2026-10-20 at 393 with Continue with Google and the busy hold — Google SSO review #12, deferred; 386 on 2026-10-21: the terms checkbox came out (one consent line now covers Google and email) and the email form collapses behind "Sign up with email". Extracting the field markup alone still leaves it far over, since `handleSubmit` is ~110 lines. Move the submit flow into a `useEmailSignup()` hook (create, portal user, invitation, verification email, rollback) and the fields into `SignupFormFields` under `components/auth/`) |
 | ~267 | `MaterialUnitsTab` — portal/src/components/materials/MaterialUnitsTab.tsx:25 (moved from Settings 2026-10-17; the reload and add/edit dialog came out. **Next step:** #337's shared `ResourceCatalogTab`, which both tabs collapse into — review 2026-10-17 round 2 #5) |
 | 53 | `upload_materials_csv` — platform/routers/materials.py:225 (2026-10-16; move the audit and reply-building out of the handler — round 2 #62) |
 | ~70 | `create_company_with_bootstrap` — platform/services/company_service.py:92 (grew 2026-10-16; pull the step list into `_bootstrap_steps(include_materials, include_roles)` — round 2 #63) |
@@ -301,7 +304,7 @@ seams that already exist as separate classes.
 | 70 | `parse_task_list_ask` — agents/task/list_filters.py:139 (new 2026-09-27; one reader per filter phrase) |
 | 63 | `open_questions` — routers/agent_helpers/open_question.py:235 (new 2026-09-27; one small reader per question kind — pending intents, delete records, router flows — concatenated — review 2026-09-27 #56) |
 | 132 | `_handle_awaited_field_value` — agents/task/field_flow.py:117 (about 120 before 2026-09-28; +6 then for replies that restate the command. Extract `_read_awaited_value(field, message)` for the cancel check and restated value, and turn the per-field if-chain into a dispatch dict of `_apply_awaited_<field>` coroutines — review 2026-09-28 #4) |
-| 676 | `TasksPage` component body — portal/src/pages/TasksPage.tsx:64 (637 before 2026-09-28; +39 then for Maple's `?open=` task links — the fetch-by-id fallback, its ref guard and the dialog shared with the error state. **Next step:** move the deep-link handling into `portal/src/hooks/useTaskDeepLink.ts` taking `{ tasks, isLoading, onOpen: setEditingTask }` and returning `requestedTaskId` for the two initializers; `tests/TasksPageDeepLink.test.tsx` covers it unchanged — review 2026-09-28 #1) |
+| 677 | `TasksPage` component body — portal/src/pages/TasksPage.tsx:65 (+1 net on 2026-10-21: the heading moved into `TasksSection`, and the loading and error screens are wrapped in it so the Statuses tab stays reachable; 637 before 2026-09-28; +39 then for Maple's `?open=` task links — the fetch-by-id fallback, its ref guard and the dialog shared with the error state. **Next step:** move the deep-link handling into `portal/src/hooks/useTaskDeepLink.ts` taking `{ tasks, isLoading, onOpen: setEditingTask }` and returning `requestedTaskId` for the two initializers; `tests/TasksPageDeepLink.test.tsx` covers it unchanged — review 2026-09-28 #1) |
 | — | seven functions in `platform/agents/task/` (see archive for the list) |
 | — | four functions in `agents/estimate/assumption_handlers.py` (measured 2026-10-09, after the detector moved to `assumption_detect.py` in switchover phase 6c): `_handle_assumption_material_swap` :400 (92), `_handle_assumption_size_adjustment` :680 (63), `_find_size_assumption` :497 (62), `_resolve_swap_material` :280 (58; +7 in 6c for the planner's "Which material?" — extract the two `ask_to_rewrite` clarifies into `_ask_material(...)`) |
 | — | functions in `agents/estimate/llm_pipeline.py:677` (per-scope assumptions) |
@@ -311,7 +314,7 @@ seams that already exist as separate classes.
 | 64 | `list_properties_reply` — agents/property/service.py:2458 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_property_list_items(serialized)` — review 2026-10-08 #11, deferred) |
 | 63 | `list_labours_reply` — agents/labour/service.py:1253 (new 2026-10-08, phase 2a: moved out of the list fall-through; extract `_labour_list_items(serialized)` — review 2026-10-08 #12, deferred) |
 | 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
-| 63 | `execute` — platform/agents/planner/execute.py:463 (was 46; phase 8 added step pointing and the policy refusal; +4 on 2026-10-11 for the work items of an estimate a create of the plan made, #864. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
+| 70 | `execute` — platform/agents/planner/execute.py:515 (63 until re-measured 2026-10-22, review round 5: the gap plan's undo snapshot around each write; was 46; phase 8 added step pointing and the policy refusal; +4 on 2026-10-11 for the work items of an estimate a create of the plan made, #864. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
 | 54 | `_planner_turn` — platform/agents/planner/turn.py:561 (re-measured 2026-10-19, review round 6 #7; +2 on 2026-10-19, review round 5 #1: records whether the plan that ran uses the files; 2026-10-19: the body moved here under a new 18-line `run_planner_turn` wrapper that keeps a question's files, review round 3 #8 / round 4 #11; was `run_planner_turn` at :521; :507 until 2026-10-14, #906; :465 until re-measured 2026-10-14, review round 27 #9; 58 at :390 until re-measured 2026-10-14, review round 13 #35; new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
 | 51 | `list_reply` — platform/agents/conversation/record_lists.py:99 (new 2026-10-11: the `within` filter, #845. Move the query building into `_rows(ask, company)` — review 2026-10-11 #11, deferred) |
 | 76 | `_redo_read` — platform/agents/planner/followups.py:187 (the old `_redo` body, renamed when `_redo` became its amount wrapper — review round 26 #4, 2026-10-14; 73 at :157 and 75 at :152 before, review round 13 #35; was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; +11 on 2026-10-13 (a status a win rate can't take, the exclusion dropped on a subject swap; round 3 #45); a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
@@ -326,6 +329,11 @@ seams that already exist as separate classes.
 | 148 | `upload_labours_csv` — platform/routers/labours.py:142 (first measured 2026-10-17 at 150, review #40; 148 after the Company read moved into the access check. The shared header check, then `_parse_labour_rows` / `_write_labours` for its two phases) |
 | 130 | `upload_equipments_csv` — platform/routers/equipments.py:63 (first measured 2026-10-17, review #41. The same split as `upload_labours_csv`) |
 | 76 | `delegate_generic` — platform/routers/agent_helpers/delegate_generic.py:31 (+6 on 2026-10-17 for the confidence fallback, PYTHON-V; review #42. Move the optional follow-up merge, L60-76, into `_merge_optional_follow_up(...)`) |
+| 170 | `MaterialRow` — portal/src/components/estimates/MaterialsTable.tsx:50 (first measured 2026-10-21 in the Work Item cost-column change, +~20 for the editable Cost cell, the moved Qty cell and read-only `disabled` — review 2026-10-21 #5, deferred. Extract a `LineCell({ label, span, children })` shared with `ActivityRow` for the repeated `<td>` + phone label, then split out the menu / collapsed-header block) |
+| 174 | `ActivityRow` — portal/src/components/estimates/ActivitiesTable.tsx:49 (first measured 2026-10-21, same change, +~20 for the Cost cell and read-only `disabled` — review 2026-10-21 #6, deferred. Same `LineCell` extraction as `MaterialRow`, and move the calculator button into an `EffortCalculatorCell`) |
+| 158 | `useWorkItemLines` — portal/src/hooks/useWorkItemLines.ts:35 (new 2026-10-22: the Work Item editor's line state and handlers, lifted out of `WorkItemInlineContent` in the cost → price change — review 2026-10-22 round 2 #3. Next seam: `useMaterialLines({ companyId, catalog, pricing })` and `useActivityLines({ people, pricing })`, the catalog resolution staying in the material half; the component composes the two) |
+| 495 | `WorkItemInlineContent` — portal/src/components/estimates/WorkItemInlineContent.tsx:52 (first recorded 2026-10-22 after the lines hook took 103 lines out (650 → 547 file lines) — review 2026-10-22 round 2 #4. Next seam: the markup / gross-margin / adjust handlers (`handleProfitMarginChange`, `handleGrossMarginChange`, `handleAdjustSet` and the breakdown memos) into a `useWorkItemPricing` hook) |
+| 492 | `TemplatesTab` — portal/src/components/settings/TemplatesTab.tsx:30 (first recorded 2026-10-22 after the company fetch moved into `useCompanyDefaults` (532 → 516 file lines) — review 2026-10-22 round 2 #5. Next seam: the template form dialog state (`editingTemplate`, `isFormOpen`, `handleSave`, `initialWorkItem`) into a `useTemplateForm` hook) |
 
 #### Watch
 
@@ -538,6 +546,11 @@ now.
 `platform/services/material_catalog_writes.py:629` — The first find has no `company` prefix (no index serves it), then each company reads all its names plus find/update/prune. (review 2026-10-17 round 5 #21, deferred)
 
 **Suggested fix:** Add an index `{standard: 1, hidden_for_name: 1}` (or reuse #1206's slot) and batch the per-company work as `hide_name_clashes_for` does.
+
+### 1424. [LOW] list_by_source reads 50 rows to show 10
+`platform/agents/planner/execute_catalog.py:247` — page_size=50 while `_LIST_MAX` is 10. (review 2026-10-21 #154, deferred)
+
+**Suggested fix:** page_size=_LIST_MAX.
 
 ## Silently swallowed errors
 
@@ -977,6 +990,15 @@ both tables' headers.
 
 **Suggested fix:** Use `ComposerNotice` for both (dismiss labels "Dismiss" and "Dismiss voice error").
 
+### 1423. [LOW] execute_catalog._audit re-implements the routes' audit helper
+`platform/agents/planner/execute_catalog.py:51` — It rebuilds `routers/material_helpers/common.audit` field by field. (review 2026-10-21 #153, deferred)
+
+**Suggested fix:** Call `audit(...)` under audit_source("maple"), keeping only the context-email fallback and the category type.
+
+### 1435. [LOW] The "visible text without sr-only" matcher is duplicated across two Materials page test files
+`portal/tests/MaterialsPageServerList.test.tsx:114` — The Materials page's description link reads "here" with a hidden `, details on Standard materials and costs` suffix (its accessible name). `visibleText()` in `MaterialsPageStandardCostsDialog.test.tsx:48` and the same clone-strip-compare logic inline in the server-list test's `findByText` callback are two copies of one helper, which drift the next time the hidden suffix changes. A twin is MEDIUM by the dead-code rule; LOW because it is five lines of test-only code. (review 2026-10-22 materials description popup round 3 #1, deferred)
+
+**Suggested fix:** Move `visibleText(node: Element): string` to `portal/tests/helpers/visibleText.ts` (beside `actionsMenuLayout.ts`) and import it in both tests; the server-list matcher becomes `node?.tagName === "P" && visibleText(node) === text`.
 
 ## Accessibility
 
@@ -1455,6 +1477,21 @@ Both prompts gained another rule (reverse + now labor-time). Still clear, but th
 `platform/prompts/maple_planner.py:156` — "'the breakdown of estimates by division(s)' is dashboard {card: by_division}" repeats the rule a few clauses earlier. (review 2026-10-13 round 2 #79, deferred)
 
 **Suggested fix:** Delete the second clause.
+
+### 1405. [LOW] The file-removal rule lives in the planner prompt and in code
+`platform/prompts/maple_planner.py:92` — Prompt entanglement: `as_asked_files._REMOVES_FILE` already decides it. (review 2026-10-21 #135, deferred)
+
+**Suggested fix:** Shorten the prompt line to a hint, or keep it and note the code decides.
+
+### 1406. [LOW] The average-rate rule lives in the planner prompt and in code
+`platform/prompts/maple_planner.py:186` — Prompt entanglement: `as_asked_reads._AVERAGE_RATE` already decides it. (review 2026-10-21 #136, deferred)
+
+**Suggested fix:** As for the file-removal rule.
+
+### 1407. [LOW] Close chat phrasings route to different ops with no stated priority
+`platform/prompts/maple_planner.py:170` — "clear the chat" → start_over but "delete this conversation" → history; "what did I ask you last time?" (history) sits beside "say that again" (repeat). (review 2026-10-21 #137, deferred)
+
+**Suggested fix:** State it: the open conversation cleared or deleted → start_over, past ones → history; add reference rows for "delete this chat" and "what did I just ask?".
 
 ## Platform — Maple agents
 
@@ -2361,6 +2398,310 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Reword that row (plan `add_note`, no attach; ALREADY_ON only if attach is planned); add the three rows; add `create_estimate` to the intro.
 
+### 1364. [MEDIUM] Edge case untested: a rename's taken name whose holder is gone
+`platform/agents/labour/service.py:415` — Edge case in `_update_labour_via_api`: L446–447 — the route answered 409 for a taken name but `role_name_holder` finds no holder by the time Maple looks (the holder renamed or deleted in between). The refusal then names the requested name with no hidden hint. No test drives this arm; the taken-name tests always find the holder. (review 2026-10-21 round 5 #1, standard People roles, deferred)
+
+**Suggested fix:** In `test_labour_agent_standard_roles.py`: monkeypatch `agents.labour.service.role_name_holder` to return None, rename "Hedge Pruner" to "Crew Lead" → the reply is `ROLE_NAME_TAKEN_REFUSAL.format(name="Crew Lead")` with no `HIDDEN_ROLE_HINT`.
+
+### 1365. [MEDIUM] file_removal_is_media: edge cases untested
+`platform/agents/planner/as_asked_files.py:70` — Edge cases: (a) a refusal of "other" falling through to the redirect; (b) a refusal of its own (bulk_delete with "delete all photos from my tasks") left; (c) out_of_chat with another capability left. (review 2026-10-21 #95, deferred)
+
+**Suggested fix:** One test per arm: "other" → removes_file; bulk_delete → `is plan`; out_of_chat units → `is plan`.
+
+### 1366. [MEDIUM] named_with_files: edge cases untested
+`platform/agents/planner/as_asked_files.py:99` — Edge cases: (a) more than one action; (b) a target not by name. (review 2026-10-21 #96, deferred)
+
+**Suggested fix:** Two get_task actions → `is plan`; get_task by focus → `is plan`.
+
+### 1367. [MEDIUM] work_item_files_refused: edge cases untested
+`platform/agents/planner/as_asked_files.py:130` — Edge cases: (a) several actions; (b) edit_estimate with no commands; (c) mixed commands. (review 2026-10-21 #97, deferred)
+
+**Suggested fix:** One test per arm, each `is plan`.
+
+### 1368. [MEDIUM] average_rate_is_a_figure: edge cases untested
+`platform/agents/planner/as_asked_reads.py:38` — Edge cases: (a) a refusal reason outside the set; (b) out_of_chat with another capability; (c) nothing refused. (review 2026-10-21 #98, deferred)
+
+**Suggested fix:** Parametrize those three with "what's my average labour rate?" → `is plan`.
+
+### 1369. [MEDIUM] new_template_refused: edge case untested
+`platform/agents/planner/as_asked_reads.py:51` — Edge case: no clarify (already refused, or planned apply_template). (review 2026-10-21 #99, deferred)
+
+**Suggested fix:** list_templates plan with "add a template" → `is plan`.
+
+### 1370. [MEDIUM] stray_yes_writes_nothing: edge case untested
+`platform/agents/planner/as_asked_reads.py:60` — Edge case: no write in the plan ("ok" planned as acknowledge). (review 2026-10-21 #100, deferred)
+
+**Suggested fix:** acknowledge with "ok" → `is plan`.
+
+### 1371. [MEDIUM] edit_estimate: the work-item file sentence beside a question is untested
+`platform/agents/planner/execute_estimates.py:362` — Edge case: the needs_clarification arm with files on the message; the sentence must not be added to a question. (review 2026-10-21 #101, deferred)
+
+**Suggested fix:** Stub edit_reply to ask, files "this" → WORK_ITEM_NOTE_FILES_REFUSAL not in the reply.
+
+### 1372. [MEDIUM] _work_item_notes_left_files: edge cases untested
+`platform/agents/planner/execute_estimates.py:381` — Edge cases: (a) no commands; (b) mixed command ops; (c) files already filed by an earlier step → False. It reads this message's and a kept plan's files only, not the previous message's (a note with no word of the file would be told it was left off). (review 2026-10-21 #102, deferred)
+
+**Suggested fix:** One direct test per arm, (c) with LAST_FILES_KEY carrying filed_on.
+
+### 1373. [MEDIUM] _list_notes: a filed-file ask on a task is untested
+`platform/agents/planner/execute_links.py:213` — Edge case: a filed-file ask on a task (the task details path) gets the D3 sentence; no test drives it. (The no-notes-feed refusal is now tested.) (review 2026-10-21 #103, deferred)
+
+**Suggested fix:** A task parent with "what's in the photo on the fence task?" → the reply ends with FILED_FILES_NOT_READ.
+
+### 1374. [MEDIUM] _build_task_details: the creator and file-count edge cases are untested
+`platform/agents/task/base.py:415` — Edge cases: (a) created_by_email None → "- Created by: -"; (b) more than 10 files → " and N more" (older tasks can hold more). (review 2026-10-21 #104, deferred)
+
+**Suggested fix:** A task with no creator → that line; a task with 12 photos → "- Files: 12 — " and "and 2 more".
+
+### 1375. [MEDIUM] list_added: edge cases untested
+`platform/agents/planner/execute_added.py:87` — Edge cases: (a) another filter that's only non-scalar (related beside added) → " anything else"; (b) the "Unnamed contact/property" labels; (c) a period with no start and no end. (review 2026-10-21 #105, deferred)
+
+**Suggested fix:** {added: month, related: Elm House} → "not narrowed by anything else"; a nameless record → the fallback label; remove (c)'s guard if it can't happen.
+
+### 1376. [MEDIUM] added_in: the all_time arm is untested
+`platform/agents/planner/execute_added.py:15` — Edge case: added "all_time" falls through to the plain list. (review 2026-10-21 #106, deferred)
+
+**Suggested fix:** list_contacts {added: all_time} → today's plain list.
+
+### 1377. [MEDIUM] _update_contact: the early return before a clear is untested
+`platform/agents/planner/execute_records.py:137` — Edge case: the early return when the set part fails or asks; nothing pins that the clear is skipped then. (review 2026-10-21 #107, deferred)
+
+**Suggested fix:** Stub update_contact_reply to ask on a set+clear → phone still stored, the reply is the question.
+
+### 1378. [MEDIUM] _update_property: the early return before a clear is untested
+`platform/agents/planner/execute_records.py:221` — Edge case: the same early return for properties. (review 2026-10-21 #108, deferred)
+
+**Suggested fix:** The same test with update_property_reply stubbed to ask → postal_zip unchanged.
+
+### 1379. [MEDIUM] "A contact keeps its name" isn't pinned by a test
+`platform/agents/planner/schema_fields.py:101` — Edge case: the property guard is tested, but nothing asserts first_name/last_name can't be cleared. (review 2026-10-21 #109, deferred)
+
+**Suggested fix:** `ContactFields(clear=[name])` raises for first_name and last_name.
+
+### 1380. [MEDIUM] undo._what: the delete arm is untested
+`platform/agents/planner/undo.py:85` — Edge case: the delete_ arm ("a delete"). (review 2026-10-21 #110, deferred)
+
+**Suggested fix:** delete_contact then undo → CANT_UNDO "a delete".
+
+### 1381. [MEDIUM] undo._raw: the invalid-id arm is untested
+`platform/agents/planner/undo.py:91` — Edge case: a non-ObjectId record id or company → None. (review 2026-10-21 #111, deferred)
+
+**Suggested fix:** `_raw("contact", "nope", company)` is None.
+
+### 1382. [MEDIUM] undo._before_write: a ref that isn't one record is untested
+`platform/agents/planner/undo.py:110` — Edge case: a ref that isn't "one" → None. (review 2026-10-21 #112, deferred)
+
+**Suggested fix:** A check whose target is "several" → None, and after_write keeps undoable False.
+
+### 1383. [MEDIUM] undo._wrote: the not-written arms are untested
+`platform/agents/planner/undo.py:161` — Edge cases: success False, needs_clarification, and a refusal/clarify operation should each leave the older entry. (review 2026-10-21 #113, deferred)
+
+**Suggested fix:** After Ana's phone change, a handler result with success False, then one that asks → the entry is still Ana's.
+
+### 1384. [MEDIUM] undo.after_write: its except arm is untested
+`platform/agents/planner/undo.py:172` — Edge case: `_after_write` raising (keep undoable False, log); only before_write is broken in tests. (review 2026-10-21 #114, deferred)
+
+**Suggested fix:** Monkeypatch `_after_write` to raise → the entry is {"op": …, "undoable": False}.
+
+### 1385. [MEDIUM] undo._after_write: edge cases untested
+`platform/agents/planner/undo.py:183` — Edge cases: op not in WRITES or not written; an estimate whose status changed → undoable False (the status-date guard); an entry over _MAX_KEPT → undoable False; a create whose record isn't found → undoable False. (Changed-nothing is now tested.) (review 2026-10-21 #115, deferred)
+
+**Suggested fix:** One unit test per arm with a stub action/check/result, asserting the stored entry.
+
+### 1386. [MEDIUM] undo.unpacked: edge cases untested
+`platform/agents/planner/undo.py:229` — Edge cases: a loaded value that isn't a dict → {}; a non-str input (looks dead: entries always store a str). (review 2026-10-21 #116, deferred)
+
+**Suggested fix:** Test the first; drop the non-str arm.
+
+### 1387. [MEDIUM] undo.question: the nothing-kept arm is untested
+`platform/agents/planner/undo.py:303` — Edge case: no entry → None (which makes _ask_undo return "confirm:undo_nothing"). (review 2026-10-21 #117, deferred)
+
+**Suggested fix:** `question({})` is None.
+
+### 1388. [MEDIUM] undo.undo_last: edge cases untested
+`platform/agents/planner/undo.py:323` — Edge cases: the entry gone between question and yes → NOTHING_TO_UNDO; the delete of a create failing (a material in use) keeps the entry; the record deleted since → CHANGED_SINCE; the write-back matching nothing (moved between read and write) → CHANGED_SINCE. (review 2026-10-21 #118, deferred)
+
+**Suggested fix:** One test per arm, asserting the reply and whether LAST_WRITE_KEY remains.
+
+### 1389. [MEDIUM] confirm._ask_undo: edge cases untested
+`platform/agents/planner/confirm.py:299` — Edge cases: an undo beside other actions → "confirm:undo_with_others"; no question → "confirm:undo_nothing". (review 2026-10-21 #119, deferred)
+
+**Suggested fix:** A two-action plan (undo_last + get_contact) → that string; an empty context → "confirm:undo_nothing".
+
+### 1390. [MEDIUM] _check_action: a stray yes planned as an undo is untested
+`platform/agents/planner/policy.py:871` — Edge case: a stray "yes" planned as undo_last should be asked, not run; only a delete is covered. (review 2026-10-21 #120, deferred)
+
+**Suggested fix:** check_plan(undo_last, message "yes", nothing open) → decision "ask".
+
+### 1391. [MEDIUM] execute_catalog._audit: edge cases untested, and most catalog audits unasserted
+`platform/agents/planner/execute_catalog.py:51` — Edge cases: the context-email fallback when no acting user. The hide and the category toggle assert their audit entries; show one, show all, reset and copy don't. (review 2026-10-21 #121, deferred)
+
+**Suggested fix:** Assert the entry (action, resource type, metadata, source maple) in each write test; one with no acting user → user_email from the context.
+
+### 1392. [MEDIUM] hide_material: the write-failed arm is untested
+`platform/agents/planner/execute_catalog.py:92` — Edge case: CatalogError (removed between check and write) → CATALOG_WRITE_FAILED. (review 2026-10-21 #122, deferred)
+
+**Suggested fix:** Make set_hidden raise MaterialNotFound → that reply and no audit entry.
+
+### 1393. [MEDIUM] show_material: edge cases untested
+`platform/agents/planner/execute_catalog.py:108` — Edge cases: show-all with one shown (singular); kept_hidden with one and several names after some were shown; a single show raising NameTaken; CatalogError. (review 2026-10-21 #123, deferred)
+
+**Suggested fix:** Stub unhide_all to (1, []), (2, ["A", "B"]) and assert each; set_hidden raising NameTaken and MaterialNotFound → the two refusals.
+
+### 1394. [MEDIUM] reset_material: edge cases untested
+`platform/agents/planner/execute_catalog.py:150` — Edge cases: NameTaken (a hidden standard whose name a company material now holds); CatalogError. (review 2026-10-21 #124, deferred)
+
+**Suggested fix:** That name clash → "<name> " + NAME_TAKEN_TO_SHOW_REFUSAL; reset_to_standard raising → CATALOG_WRITE_FAILED.
+
+### 1395. [MEDIUM] copy_material: edge cases untested
+`platform/agents/planner/execute_catalog.py:171` — Edge cases: CatalogError/ValueError from duplicate (no category or unit, too many copies); the copy not found after insert. (review 2026-10-21 #125, deferred)
+
+**Suggested fix:** duplicate raising ValueError → CATALOG_WRITE_FAILED, no copy; get_effective None → only "I've made …".
+
+### 1396. [MEDIUM] set_standard_category: edge cases untested
+`platform/agents/planner/execute_catalog.py:199` — Edge cases: the category gone between question and yes; CatalogError. (review 2026-10-21 #126, deferred)
+
+**Suggested fix:** Rename the category before the yes → NO_STANDARD_CATEGORY_REFUSAL; the service raising → CATALOG_WRITE_FAILED.
+
+### 1397. [MEDIUM] standard_category: edge cases untested
+`platform/agents/planner/execute_catalog.py:73` — Edge cases: an invalid company id → None; a name in another case or spacing matching through norm_name. (review 2026-10-21 #127, deferred)
+
+**Suggested fix:** `standard_category("not-an-id", "x") is None`; "aggregates  &  base materials" finds Aggregates.
+
+### 1398. [MEDIUM] source_sentence: the hidden suffix is untested
+`platform/agents/planner/execute_catalog.py:224` — Edge case: the " It's hidden from your lists." suffix. (review 2026-10-21 #128, deferred)
+
+**Suggested fix:** A stub hidden standard → ends with that sentence.
+
+### 1399. [MEDIUM] _check_catalog_ops / _effective_target: an unresolved target is untested
+`platform/agents/planner/policy.py:712` — Edge case: `_effective_target` None (not one record, bad id, or not found), which lets structure updates and reset/copy pass with no offer or refusal. (review 2026-10-21 #129, deferred)
+
+**Suggested fix:** reset/copy with a "none" target → the verdict comes only from the unresolved ref.
+
+### 1400. [MEDIUM] _check_catalog_notes: a note on a role is untested
+`platform/agents/planner/policy.py:771` — Edge case: add_note on a role parent (only a material is tested). (review 2026-10-21 #130, deferred)
+
+**Suggested fix:** add_note {parent: {domain: labour, text: Foreman}} → would_refuse with NOTES_NOT_ON_CATALOG_MESSAGE.
+
+### 1401. [MEDIUM] _ask_catalog: edge cases untested
+`platform/agents/planner/confirm.py:327` — Edge cases: a target with no label ("Okay — I've left  as it is."); the `confirm:{op}` fallthrough. (review 2026-10-21 #131, deferred)
+
+**Suggested fix:** A hand-built check with an unlabelled hide target → assert the wording; remove the fallthrough if no op reaches it.
+
+### 1402. [MEDIUM] hidden_material_named: the bare-name retry is untested
+`platform/agents/planner/resolve.py:174` — Edge case: the bare-name retry ("the Black Mulch material" → "Black Mulch"). (review 2026-10-21 #132, deferred)
+
+**Suggested fix:** Hide mulch, `hidden_material_named("the <mulch> material", company)` → one, mulch's id.
+
+### 1404. [LOW] as_asked_reads imports policy's private _stray_reply
+`platform/agents/planner/as_asked_reads.py:60` — A deferred import of a private helper; renaming it breaks this module only at runtime. (review 2026-10-21 #134, deferred)
+
+**Suggested fix:** Make it public (`stray_reply`) and import that in both.
+
+### 1408. [LOW] START_OVER names an icon button by its tooltip
+`platform/agents/conversation/meta.py:44` — "tap Start a new session" points at an icon-only button with no visible text, hard to find on a phone. (review 2026-10-21 #138, deferred)
+
+**Suggested fix:** Describe the icon: "tap the new-session button (the speech bubble with a +) at the top of the Maple panel".
+
+### 1411. [LOW] cleared_sentence: an unreachable fallback, and repeated names said twice
+`platform/agents/text_utils.py:1613` — The humanize fallback can't be reached through the clear Literals; clear=["phone", "phone"] reads "phone number and phone number". (review 2026-10-21 #141, deferred)
+
+**Suggested fix:** De-duplicate the names first (or a uniqueness validator on clear).
+
+### 1412. [LOW] Clearing an already-empty field still writes, audits and says "I've cleared"
+`platform/agents/contact/service.py:2098` — The full payload skips narrowing, so updated_at moves, an audit entry with no diff is written, and the user is told a field was cleared that was empty. Same in agents/property/service.py `clear_property_fields_reply`. (review 2026-10-21 #142, deferred)
+
+**Suggested fix:** Clear only fields that hold a value; if none do, say "<name> has no phone number to clear."
+
+### 1413. [LOW] A set-and-clear reply doesn't mention the value set
+`platform/agents/planner/execute_records.py:137` — The update's own reply is dropped; the user reads only "I've cleared Ana's phone number". (review 2026-10-21 #143, deferred)
+
+**Suggested fix:** Name both: "I've updated Ana Reyes's email and cleared her phone number."
+
+### 1414. [LOW] With no valid company, undo_last runs without asking
+`platform/agents/planner/policy.py:871` — `undo.check` sits inside `if company is not None:`; unreachable for a signed-in user and `_raw` would refuse anyway, but it's the one path to undo with no yes. (review 2026-10-21 #144, deferred)
+
+**Suggested fix:** Refuse undo_last with NOTHING_TO_UNDO when there's no company.
+
+### 1415. [LOW] Undo restores a field the write added as null, not removed
+`platform/agents/planner/undo.py:362` — A key missing before Maple's write is `$set` to None rather than `$unset`; harmless for Optional fields but not the record as it was. (review 2026-10-21 #145, deferred)
+
+**Suggested fix:** Split into $set (keys that were present) and $unset (keys that were absent).
+
+### 1416. [LOW] undo._SKIP names fields that don't exist
+`platform/agents/planner/undo.py:56` — No model has `converting_at` or `revision_id`; Task's field is `converting_since`. (review 2026-10-21 #146, deferred)
+
+**Suggested fix:** Use `converting_since` and drop `revision_id`.
+
+### 1417. [LOW] undo._WHAT["delete_note"] is dead
+`platform/agents/planner/undo.py:59` — `_what` returns "a delete" for every delete_ op before reading the map. (review 2026-10-21 #147, deferred)
+
+**Suggested fix:** Remove the entry, or read _WHAT first.
+
+### 1418. [LOW] The "write_failed" check in undo._wrote is dead
+`platform/agents/planner/undo.py:161` — Only execute's except branch makes that operation, and it now keeps the write as can't-undo itself (`undo.write_failed`) without calling after_write. (review 2026-10-21 #148, deferred)
+
+**Suggested fix:** Remove the check.
+
+### 1419. [LOW] undo stores a turn on every entry and never reads it
+`platform/agents/planner/undo.py:167` — `_keep` stamps turn on every entry; nothing reads it. (review 2026-10-21 #149, deferred)
+
+**Suggested fix:** Use it for an expiry (an undo of a create days later) or drop it.
+
+### 1420. [LOW] Undoing a create isn't kept as destructive
+`platform/agents/planner/confirm.py:561` — Only delete_ ops set "destructive", so the undo-of-create question (which deletes a record) doesn't get the plain-yes-only rule. (review 2026-10-21 #150, deferred)
+
+**Suggested fix:** Mark it destructive when the last write was a create.
+
+### 1421. [LOW] The undo reports two different intents
+`platform/agents/planner/undo.py:323` — undo_last's replies say "undo_last" while policy refusals use INTENT_OF_OP's "undo". (review 2026-10-21 #151, deferred)
+
+**Suggested fix:** Use `schema.INTENT_OF_OP["undo_last"]` in both.
+
+### 1422. [LOW] Undoing a task's attach orphans the copied files
+`platform/agents/planner/undo.py:362` — An attach changes `photos`; the undo sets them back but never deletes the per-copy blobs. (review 2026-10-21 #152, deferred)
+
+**Suggested fix:** Mark a photos change as can't-undo, or delete the blobs the undo removes.
+
+### 1425. [LOW] The reset question doesn't say a hidden standard comes back
+`platform/agents/planner/confirm.py:327` — Reset also drops the hide, but neither the question nor the reply mentions it shows in lists again. (review 2026-10-21 #155, deferred)
+
+**Suggested fix:** When the target is hidden, add "and it'll show in your materials again".
+
+### 1426. [LOW] The category turn-on reply ignores standards kept hidden for a name
+`platform/agents/planner/execute_catalog.py:199` — "they're in your lists now" is said even when some stayed hidden because a company material holds the name; the REST toggle reports them. (review 2026-10-21 #156, deferred)
+
+**Suggested fix:** Append "<names> stayed hidden — one of your own materials has its name." when `result.hidden_for_name` is set.
+
+### 1428. [MEDIUM] `_is_where` (now `_delete_said`): the no-name arm untested
+`platform/agents/planner/as_asked_files.py:108` — Edge case: a delete with no name (by focus, listed) beside an attach is taken as the removal's and dropped. (review 2026-10-21 round 5 #4, deferred. Its arm (b), a removal with an empty place, went with the place check: round 7 #1 replaced it with `_delete_said`, which keeps a delete only when the message says its record is deleted.)
+
+**Suggested fix:** [update_task attach, delete_task {by: focus}] with "attach this to T0042 and remove the photo from that task" → ["update_task"].
+
+### 1429. [MEDIUM] `_hidden_named`: edge cases untested
+`platform/agents/planner/policy.py:367` — Edge cases: (a) a lookup result other than none / one / several is left as it is (line 378); (b) several visible matches where one is the name said exactly keeps the visible result (line 381), never the hidden lookup. (review 2026-10-21 round 5 #5, deferred)
+
+**Suggested fix:** (a) `_hidden_named(Resolved(..., "unresolved"), "Black Mulch", c)` → the same object; (b) a `several` result with candidates ("X", "X Dyed") for the text "X" → the same object, with `hidden_material_named` monkeypatched to fail if called.
+
+### 1430. [MEDIUM] `_size_change_applies`: the no-size arm untested
+`platform/agents/planner/policy.py:732` — Edge case. A remove or rename with no size named returns True, so the copy question still stands (line 734); no test drives it. (review 2026-10-21 round 5 #6, deferred)
+
+**Suggested fix:** {remove_size: True} (no size) on mulch as an Owner → COPY_OFFER_REASON in the check's reasons.
+
+### 1431. [MEDIUM] `_ask_copy_offer`: the no-material arm untested
+`platform/agents/planner/confirm.py:343` — Edge case. With no record id, or `get_effective` finding nothing, the question is worded from the fields as planned (lines 351–352); moved here by round 4 #15 and still untested. (review 2026-10-21 round 5 #7, deferred)
+
+**Suggested fix:** Call it with a target whose record_id is "" and a size rename → the question says "rename the size there".
+
+### 1432. [MEDIUM] `_answer_kept`: a no that asks again with a sentence kept is untested
+`platform/agents/planner/turn.py:161` — Edge case. With `decline_asks` true, the sentence the planner added is not said (line 200): the request is planned again from the answer and says it then. No test pins that the question goes out without it. (review 2026-10-21 round 5 #8, deferred)
+
+**Suggested fix:** The round 4 #19 confirm test with `decline_asks=True` → the reply is "Okay — which contact did you mean?" and doesn't contain MEDIA_REMOVE_REFUSAL.
+
+### 1434. [MEDIUM] A line named without its work item is looked for on the model's guess
+`platform/agents/planner/policy.py:414` — "make the excavation activity 8 hours" after "show me estimate E0001" names no work item, and the planner's state doesn't list each work item's lines, so the model sometimes plans work item 2; the executor says "I couldn't find a activity matching "excavation" on "Back lawn seeding"" and writes nothing. Two of four live runs (acceptance 2026-10-22, `estimate-activity-lines-by-rule`, now in `explained.py`).
+
+**Suggested fix:** in `resolve_work_items`, when the message names no work item and a line command's name is on exactly one work item of the estimate, point the command at that work item (asking first, as a guessed target is); several or none stay as planned. Test with the corpus's est_patio world.
 
 ## Platform — API, models and data
 
@@ -3430,6 +3771,15 @@ row count first — this may be years away.
 
 **Suggested fix:** In `store_image_blobs`, on a thumbnail failure (BaseException) shield-delete the first blob and re-raise.
 
+### 1403. [MEDIUM] find_by_name: the visibility argument is untested at the service
+`platform/services/material_catalog.py:535` — Edge cases: the new invalid-visibility ValueError; no service-level test of visibility="hidden". (review 2026-10-21 #133, deferred)
+
+**Suggested fix:** visibility "nope" raises; with mulch hidden, visibility "hidden" returns only mulch and the default returns nothing.
+
+### 1409. [LOW] The cant_undo outcome rule matches a short prefix
+`platform/services/maple_outcomes.py:155` — `CANT_UNDO.split("{")[0]` is "My last change was ", which matches as a substring of unrelated replies. (review 2026-10-21 #139, deferred)
+
+**Suggested fix:** Match the fixed tail after the placeholder.
 
 ## Portal — estimate builder
 
@@ -4333,6 +4683,8 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 `portal/src/lib/materials.ts:25` — `Math.round(x*100)/100` rounds halves up; the server's `round(x, 2)` rounds half-even (cost 2.10 at 25%: portal 2.63, server 2.62). (review 2026-10-17 round 4 #25, deferred)
 
 **Suggested fix:** Show the markup price as a placeholder and send null so the server's `markup_price` is the only rounding.
+
+**Resolved 2026-10-22:** `portal/src/lib/money.ts::roundToCent` rounds half-even like the platform's `round(x, 2)`; `markupPrice` (and the new `labourRate`) use it, so the portal's figure matches the server's at an exact half-cent (`tests/money.test.ts`, `tests/materials.test.ts`). Done in the Work Item cost → price change.
 
 ### 1278. [MEDIUM] Dead arms: `"price_recorded" in size` and `"source" in material`
 `portal/src/pages/MaterialsPage.tsx:741` — `openEditMaterial` widened to `Material | EffectiveMaterial`, but both callers pass an `EffectiveMaterial`, so the `in` checks' false arms can't run. (review 2026-10-17 round 5 #14, deferred)
@@ -5245,7 +5597,54 @@ total row count rather than blank-row count.
 
 **Suggested fix:** (a) `mockedApi.unseen.mockResolvedValue(null as never)`, render, assert hasUnseen stays false after the call settles; (b) `Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })`, dispatch `visibilitychange`, assert `unseen()` was called only once (the mount); restore the property afterwards.
 
-### 1355. [MEDIUM] `test_vocabulary_unique_names.py` fails after the planner and Maple suites in one run
+### 1355. [MEDIUM] copy_storage_files `select_objects`: the folderless-file branch is untested
+`platform/scripts/copy_storage_files.py:109` — Edge case: line 113, the `len(parts) < 3` arm — a file directly in a company prefix with no company folder (e.g. `companies/readme.txt`) is counted as an unknown prefix, neither copied nor counted as another company's. No test drives it. (review 2026-10-20 Firebase split #9, deferred)
+
+**Suggested fix:** assert `select_objects(["companies/readme.txt"], {"dev1"}).unknown_prefixes == {"companies": 1}` and that `selected` is empty.
+
+### 1356. [MEDIUM] copy_storage_files `copy_objects`: the no-metadata and no-size branches are untested
+`platform/scripts/copy_storage_files.py:131` — Edge cases: (a) line 151, a source file with no custom metadata (no download token) is uploaded without the follow-up `patch()` — every test file carries metadata; (b) line 145, `source_blob.size or 0` when the SDK reports no size. (review 2026-10-20 Firebase split #10, deferred)
+
+**Suggested fix:** (a) a source file stored with `metadata=None`: assert it is copied, its target metadata is None, and the stand-in recorded no patch; (b) a stand-in blob with `size=None`: assert `copied_bytes` counts it as 0.
+
+### 1357. [MEDIUM] copy_storage_files `rewrite_attachment_urls`: the missing-key and mixed-attachment branches are untested
+`platform/scripts/copy_storage_files.py:168` — Edge cases: (a) line 179, a message doc with no `attachments` key at all (the test's m2 has an empty list, not a missing key); (b) line 184, a message whose attachments mix a copied source-bucket link with another link — only the first should change. (review 2026-10-20 Firebase split #11, deferred)
+
+**Suggested fix:** (a) a message `{"text": "hi"}` is left untouched and not counted; (b) a message with one copied source-bucket attachment and one `https://example.com/x.png` attachment — assert only the first `downloadUrl` changes and the count is 1.
+
+### 1358. [MEDIUM] copy_storage_files `_run`: the no-companies abort is untested
+`platform/scripts/copy_storage_files.py:228` — Edge case: line 245, aborting when MongoDB returns no companies (wrong or empty database). (The review's other arm, the same-project refusal, moved into `firebase_split.load_source_and_target` with #7 and is tested there.) (review 2026-10-20 Firebase split #12, deferred)
+
+**Suggested fix:** make the harness's `load_companies` return `[]`; assert exit code 1 and `h.target.uploads == 0`.
+
+### 1359. [MEDIUM] copy_support_chat `_run`: the missing-in-source warning is untested
+`platform/scripts/copy_support_chat.py:145` — Edge case: line 163, the warning listing MongoDB conversations with no Firestore doc to copy (`report.missing_in_source`) never runs in a `_run` test — the harness's ids are all in the source. (review 2026-10-20 Firebase split #13, deferred)
+
+**Suggested fix:** have the harness's `load_conversation_ids` return `{"dev1", "gone"}`, run `_run`, and assert (capsys) the output names `gone` under the warning line.
+
+### 1360. [MEDIUM] prune_firebase_users `delete_auth_users`: the error-printing branch is untested
+`platform/scripts/prune_firebase_users.py:107` — Edge case: line 115, printing each error when Firebase reports failed deletions — the batching test's stub returns `errors=[]`, so the loop body never runs. (review 2026-10-20 Firebase split #14, deferred)
+
+**Suggested fix:** stub `failure_count=1, errors=[SimpleNamespace(reason="USER_NOT_FOUND")]`; assert `delete_auth_users` returns 1 and capsys output contains `USER_NOT_FOUND`.
+
+### 1361. [MEDIUM] prune_firebase_users `_print_sample`: the truncation branch is untested
+`platform/scripts/prune_firebase_users.py:120` — Edge case: line 124, the "… and N more" line printed when more than `_SAMPLE` (50) users are listed. No test lists more than two; the live dev run took this arm (98 users). (review 2026-10-20 Firebase split #15, deferred)
+
+**Suggested fix:** `_print_sample("t", [AuthUser(f"u{i}", f"u{i}@x.com") for i in range(52)])` — assert capsys output contains "… and 2 more" and exactly 50 user lines.
+
+### 1362. [MEDIUM] prune_firebase_users `_run`: the no-email listing is untested end to end
+`platform/scripts/prune_firebase_users.py:128` — Edge case: line 146, the "No email — kept, check these by hand" listing. `plan_deletions` is tested for no-email users, but no `_run` test includes one, so the listing — and that they never reach `delete_auth_users` — isn't checked end to end. (review 2026-10-20 Firebase split #16, deferred)
+
+**Suggested fix:** add `AuthUser("ghost", None)` to the harness's auth users, run with `apply=True`, assert `"ghost" not in h.deleted` and the output contains "No email".
+
+### 1363. [LOW] .claude/launch.json: machine-specific dev configs from the Work Item cost-column check — RESOLVED 2026-10-21
+**RESOLVED 2026-10-21** — dropped while syncing the branch with main: main had added an equivalent `platform-8002` + `portal-5176` pair, so the branch's `launch.json` now matches main. Move to the archive in the next cleanup.
+
+`.claude/launch.json:61` — `platform-8011-cors-5175` hardcodes `/Users/simmy/Development/3Maples/platform`, and both it and `portal-5175` were added only to run a worktree's portal beside the main checkout's (5173/5174 and 8001 were taken, and the :8000 platform's CORS allow-list stops at 5174). The file is tracked in the workspace repo, so committing them ships configs that won't run on another machine. (review 2026-10-21 #10, deferred)
+
+**Suggested fix:** revert `.claude/launch.json` once manual testing of the cost columns is done (`git checkout -- .claude/launch.json` from the worktree root) and leave it out of the commit.
+
+### 1436. [MEDIUM] `test_vocabulary_unique_names.py` fails after the planner and Maple suites in one run
 `platform/tests/test_vocabulary_unique_names.py` — It passes alone (14 of 14). Run after `test_maple_conversations.py`, `test_maple_refusal_is_final.py` and the `test_planner_*` files (the set that imports the material catalog), 11 to 13 of its tests fail with 401s and `KeyError: '_id'`, and a different neighbour fails on each run (`estimate-delete-listed-row-not-the-open-one`, `list_templates` paging, `show me the notes for 12 Oak St`). `main` at 9945d94 fails the same way, so it isn't a regression. The 401s suggest a test removes or changes the shared test user its `X-Test-Email` header names. (found 2026-10-20 while checking #60)
 
 **Suggested fix:** Bisect the batch to the file that leaves the shared user or company changed. Have that test restore it, or give the vocabulary tests their own user.
@@ -6223,3 +6622,17 @@ clean either way.
 
 **Suggested fix:** Add `/documentation-*/` beside the other three patterns.
 
+### 1410. [LOW] The five catalog actions are listed twice in the Action union
+`platform/agents/planner/schema.py:740` — Two lines repeat them (the second mis-indented); harmless, a merge slip. (review 2026-10-21 #140, deferred)
+
+**Suggested fix:** Delete the second line.
+
+### 1427. [LOW] The catalog op names are spelled out in five places
+`platform/agents/planner/policy.py:107` — WRITE_OPS, _MATERIAL_CATALOG_OPS, execute.WRITES, INTENT_OF_OP and execute_catalog.HANDLERS each list them. (review 2026-10-21 #157, deferred)
+
+**Suggested fix:** Define CATALOG_OPS once and build the others from it.
+
+### 1433. [MEDIUM] `_locked_text`'s `doc is None` arm is unreachable
+`platform/agents/planner/undo.py:318` — Dead code. Since round 4 #21 both callers pass the record they read and return before calling it when that is None (check: gone since; undo_last: changed since), so the None test at line 327 can no longer be reached. (review 2026-10-21 round 5 #9, deferred)
+
+**Suggested fix:** Type the parameter `doc: Mapping[str, Any]` and test only `policy._locked(doc.get("status"))`.

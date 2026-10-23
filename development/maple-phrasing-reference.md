@@ -2,9 +2,29 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-19
+**Last updated:** 2026-10-22
 
 ### Recent changes
+
+**2026-10-19 (review after the October features):** the reference was read
+against the shared material catalog, session history and files on a message,
+and each candidate phrasing planned twice on the live planner. New ✅/🛑 rows
+for what already works — a misspelt command, "is there a contact named Bob?" /
+"do I have Black Mulch?", two contact fields at once, "start a new chat", a
+contact updated from a business card, a property made from a work order, a
+material's cost from an invoice, one task per line of a photographed list
+(§2–§4, §3.9, §7.6.1, §10.10). Twenty-four gaps, G1–G24, are ⚠️ rows in §3,
+§4.1, §4.11, §7.13, §10.10 and §10.11 — hiding, showing and resetting standard
+materials, Chat history, videos, a task's photos, clearing a field, "added this
+month", undo — with the plan to close them, and Simon's four decisions (undo
+only when asked and confirmed; a copy offered for a standard material; filed files
+listed, not read; one material per message), in
+[`plans/2026-10-19-maple-phrasing-gaps-plan.md`](plans/2026-10-19-maple-phrasing-gaps-plan.md).
+The full live run that day (§12.4) added G25–G33: four rows the planner now
+misses every time (§4.8, §5.11, §5.5, §8.1), an offer to delete a task when
+asked to remove its PDF, a stray yes re-planning a stale delete, a task status
+not taken as an answer, and two harness gaps — file rows run without a file,
+and the conversations run on today's state.
 
 The full dated history lives in
 [`maple-phrasing-changelog.md`](maple-phrasing-changelog.md) (split out of this
@@ -598,8 +618,8 @@ Handler: `_handle_get_estimate` detects `_GRAND_TOTAL_QUERY_PATTERN` and leads t
 | `estimate for sod at {street address}` [est] | `create_estimate` property | ✅ address resolved against the Property catalog and linked *(2026-07-06 — unique match required; ambiguous/unknown falls back to the ask-to-link follow-up)* |
 | `I'm here at the Smiths, make a new estimate for a cedar fence` / `create a new estimate for a cedar fence on the Johnson job` [est] | ask | ✅ *"A new estimate for the cedar fence, or the estimate you have open?"* — its own words ("start a new estimate", "the open one") and a yes answer it *(round 8)* — with an estimate open and the work planned onto it, an estimate the words may ask for is asked, never made from the words — the answer plans the request again (`as_asked.new_or_open_estimate`); an explicit reference ("on this estimate", "add it to E0042", "work item 2") keeps the work on the one open without asking *(2026-10-13, review round 5 #3; asked since round 7)* |
 | `create an estimate` [none] | `create_estimate` | ✅ over the plan's included estimates with a card on file (and the notice on), the charge is asked first — the estimate pages' words — then, on the yes, "What type of work needs to be done?"; the yes carries to that request for 30 minutes and one create, and to any question the planner asks of it ("which customer?") *(2026-10-13, acceptance M4; review rounds 1–2 #2, #37)* |
-| `create an estimate from this PDF` / `draft a quote from this photo` [est] | `create_estimate` attach | ✅ with a photo or PDF on the message: the scope is copied from what Maple read in the file — only what the file shows, never invented — and the new estimate carries the file(s) as an estimate-level note *(Simon 2026-10-18; with files on the message, one create and nothing else taking them, the planner sets attach itself)* |
-| `create an estimate from this quote and attach it` [est] | `create_estimate` attach | ✅ one create: the estimate from the file's text, carrying the file as a note — a note on the step just made is folded into it, so the file is filed once (Maple attachments, 2026-10-18) |
+| `create an estimate from this PDF` / `draft a quote from this photo` [est+quote] | `create_estimate` attach | ✅ with a photo or PDF on the message: the scope is copied from what Maple read in the file — only what the file shows, never invented — and the new estimate carries the file(s) as an estimate-level note *(Simon 2026-10-18; with files on the message, one create and nothing else taking them, the planner sets attach itself)* |
+| `create an estimate from this quote and attach it` [est+quote] | `create_estimate` attach | ✅ one create: the estimate from the file's text, carrying the file as a note — a note on the step just made is folded into it, so the file is filed once (Maple attachments, 2026-10-18) |
 
 *Not yet in the Plan format — a plan with two actions, or several turns (phase 3):*
 
@@ -839,9 +859,9 @@ The rename handler already covers description updates. These phrasings extend th
 | `add activity "Excavation" to {WI}` / `add activity "Planting" with 8 hours of effort to {WI}` / `remove the Excavation activity from {WI}` [wi] | `edit_estimate` | ✅ |
 | `add an activity called "Grading" with role Landscaper to {WI}` [wi] | `edit_estimate` | ✅ *(2026-09-27)* |
 | `remove all activities from {WI}` [wi] | refuse `bulk_delete` | 🛑 bulk-delete refusal (§9.1) |
-| `change the role on the Excavation activity to Foreman` [wi] | `edit_estimate` | ✅ *(2026-09-24 — re-snapshots rate and cost basis from the role's Rate)* |
+| `change the role on the Excavation activity to Foreman` [wi] | `edit_estimate` | ✅ *(2026-09-24 — re-snapshots the rate and, since 2026-10-22, the role snapshot: its wage and the company's unbillable and burden %)* |
 | `assign the Landscaper role to the cleanup activity` / `set the effort on the Grading activity in {WI} to 12 hours` / `make the excavation activity 6 hours` [wi] | `edit_estimate` | ✅ *(2026-09-24)* |
-| `update the rate for the Planting activity to $45/hr` [wi] | `edit_estimate` | ✅ *(2026-09-24 — a hand-set rate keeps the role's cost basis)* |
+| `update the rate for the Planting activity to $45/hr` [wi] | `edit_estimate` | ✅ *(2026-09-24 — a hand-set rate keeps the role snapshot, so the cost basis stays the role's)* |
 | `assign an effort rate card to the Excavation activity in {WI}` [wi] | refuse `out_of_chat` `rate_cards` | 🛑 redirected: the effort calculator on the activity; rate cards are in Settings *(was a gap: no chat command for rate cards)* |
 | `what activities are in {WI}?` / `list the activities on {WI}` [wi] | `list_work_item_lines` lines=activities | ✅ |
 | `how many activities does {WI} have?` [wi] | `list_work_item_lines` count lines=activities | ✅ |
@@ -1098,8 +1118,8 @@ These edit **top-level `Estimate` fields** (`title`, `description`) — distinct
 | `create a note for this estimate: {text}` / `create a note on {EST}: {text}` / `make a note on this estimate that the gate code is 4411` / `new note for this quote: {text}` [est] | `add_note` | ✅ an estimate-level Note *(2026-09-24 — was `create_estimate`. `create a note for this work item: …` files a work-item Note.)* |
 | `Add a note that says: {text}` / `add a note: {text}` / `create a note: {text}` / `leave a note that the gate code is 4411` / `add note - {text}` [est] | `add_note` | ✅ **no target at all**, estimate in play: an estimate-level Note, even with a work item anchored *(2026-09-24 — was `create_estimate`: "add" plus the borrowed estimate domain read as a create)* |
 | `write down on the {title} estimate that the gate code is 4411` [est] | `add_note` | ✅ the planner handles it — an estimate's note (review round 13 #39) — was a gap: *(`write down` is a cue, but only `remember` has a `... that ...` tail extractor; needs the tail generalized)* |
-| `add this plan to the estimate` / `attach this quote to {EST}` / `put this photo on E0042's notes` [est] | `add_note` attach | ✅ with a photo or PDF on the message (or the previous one): an estimate-level note with the file(s), signed by you, on the Notes feed (Maple attachments, 2026-10-18) |
-| `add this photo to work item 2` / `attach this to the patio work item` [est] | `add_note` attach | ✅ with words, the note is added without the file; with none, nothing is written; either way the reply says why — a work item's note takes files on the estimate page (`WORK_ITEM_NOTE_FILES_REFUSAL`) (Maple attachments, 2026-10-18; review 2026-10-19) |
+| `add this plan to the estimate` / `attach this quote to {EST}` / `put this photo on E0042's notes` [est+quote] | `add_note` attach | ✅ with a photo or PDF on the message (or the previous one): an estimate-level note with the file(s), signed by you, on the Notes feed (Maple attachments, 2026-10-18) |
+| `add this photo to work item 2` / `attach this to the patio work item` [est+photo] | `add_note` parent.domain=work_item attach | ✅ with words, the note is added without the file; with none, nothing is written; either way the reply says why — a work item's note takes files on the estimate page (`WORK_ITEM_NOTE_FILES_REFUSAL`) (Maple attachments, 2026-10-18; review 2026-10-19). The model often plans the work item's note as an edit command, with the command copied in as its text ("Add this photo.") or none: `as_asked_files.work_item_files_refused` makes that the refusal, and an edit with words of its own says the file isn't on it *(live run 2026-10-20)* |
 
 *Not yet in the Plan format — a refusal that depends on the estimate's status (phase 3):*
 
@@ -1179,6 +1199,9 @@ showed, and the question it last asked.
 | *(menu open)* → `delete all work items` / `add equipment to the patio` | the bulk-delete / equipment refusal — an open question never takes them | 🛑 refused |
 | *(material or contact opened last)* → `set the markup to 25%` | goes to that record's agent, not the estimate left earlier | ✅ rule |
 | `delete estimate E0042` → `confirm` (Member, not the creator) | "Only the estimate's creator or an Owner can delete …" — the Delete button's rule | 🛑 refused |
+
+*Live run 2026-10-19, G31 ([gap plan](plans/2026-10-19-maple-phrasing-gaps-plan.md)):* in the acceptance conversation `safety-stale-delete-not-replayed`, the stray `yes` on turn 3 was planned as the delete from turn 1 again (asked first, so nothing was deleted) in both conversation runs. Fixed the same day: a bare yes, ok or no with nothing asked never plans a write (`as_asked_reads.stray_yes_writes_nothing`) — Maple says she isn't waiting on an answer.
+
 
 *On the planner:*
 
@@ -1532,6 +1555,7 @@ resolved 2026-10-03.
 | `add a property called Birch Cottage` | `create_property` fields.name | ✅ *(2026-09-27)* |
 | `list all properties` | `list_properties` | ✅ |
 | `delete the property {property}` | `delete_property` | ✅ |
+| `delet the proprty at 14 Birch Rd` | `delete_property` | ✅ a misspelt command reads as said, then asks first like any delete *(2026-10-19 review — probed live, §13.1)* |
 
 *Not yet in the Plan format — several turns (phase 3):*
 
@@ -1577,6 +1601,8 @@ These routed but reached no record until 2026-09-27: the agent couldn't read a n
 | `list properties in Guelph` | `list_properties` filter.city=Guelph | ✅ |
 | `properties matching Elm in Toronto` | `list_properties` filter.text=Elm filter.city=Toronto | ✅ *(2026-10-11, #845 — fell back)* |
 | `how many properties does Ana Lee own in Toronto?` | `list_properties` count filter.owner filter.city=Toronto | ✅ *(2026-10-11, #845 — fell back)* |
+| `do we have a property on Oak St?` | `list_properties` filter.text | ✅ a yes/no about a record is the list it would be in *(2026-10-19 review — probed live, §13.1)* |
+| `properties added last week` | `list_properties` filter.added | ✅ the properties added in that period, on the user's clock, newest first; beside another filter the window is said back, never dropped — G22 (gap plan 2026-10-19, closed the same day) |
 
 A city nobody has is said so ("You don't have any properties in Ottawa").
 
@@ -1696,6 +1722,9 @@ Routed, but found no one until 2026-09-27 — see §2.3.
 | `list homeowners in Guelph` | `list_contacts` filter.role filter.city=Guelph | ✅ *(2026-09-27, #687)* |
 | `contacts named Ana in Toronto` | `list_contacts` filter.name=Ana filter.city=Toronto | ✅ a name beside them too *(2026-10-11, #845 — fell back)* |
 | `home owners named Di` | `list_contacts` filter.name=Di filter.role | ✅ a name beside them too *(2026-10-11, #845 — fell back)* |
+| `is there a contact named Bob?` | `list_contacts` filter.name=Bob | ✅ a yes/no about a record is the list it would be in *(2026-10-19 review — probed live, §13.1)* |
+| `shwo my contacs` | `list_contacts` | ✅ misspelt, read as said *(2026-10-19 review — probed live, §13.1)* |
+| `which contacts did I add this month?` | `list_contacts` filter.added | ✅ the contacts added in that period, newest first — G22 (gap plan 2026-10-19, closed the same day) |
 
 A filtered list is remembered, so `show me the second one` picks from it.
 
@@ -1708,6 +1737,8 @@ A filtered list is remembered, so `show me the second one` picks from it.
 | `her email is ana@new.example.com` / `add her email ana@new.example.com` / `ana@new.example.com` [contact_focus] | `update_contact` fields.email=ana@new.example.com | ✅ the contact just created or shown — a bare email too *(2026-09-27, §10.8 — these were unknown, or started a second contact)* |
 | `and her email is ana@new.example.com` [contact_focus] | `update_contact` fields.email=ana@new.example.com | ✅ "and" first: the same update — never "what about X?" *(2026-10-04, #741 — the follow-up rewrite took it as a new target and showed "contact her email is …"; a target that states a value — " is ", " are ", "should be", "=" — is none)* |
 | `and the phone should be 519-555-1234` [contact_focus] | `update_contact` fields.phone=519-555-1234 | ✅ "and" first: the same update — never "what about X?" *(2026-10-04, #741)* |
+| `set Bob Lee's phone to 519-555-0000 and his email to bob@lee.ca` | `update_contact` fields.phone=519-555-0000 fields.email=bob@lee.ca | ✅ two fields in one write *(2026-10-19 review — probed live, §13.2)* |
+| `remove Bob Lee's phone number` / `clear Ana Reyes's email` | `update_contact` fields.clear | ✅ "I've cleared Bob Lee's phone number." — a contact keeps its name; a property clears only its postal code and country — G21 (gap plan 2026-10-19, closed the same day) |
 | `add a note to {contact}: "prefers texts"` / `set the notes on {contact} to "prefers texts"` | `add_note` | ✅ *(2026-09-17 — `notes` is no longer a `Contact` field; the phrasing creates a real `Note`, authored by the acting user, instead of writing a scalar. Also handled inline on create.)* |
 
 *Not yet in the Plan format — several turns (phase 3):*
@@ -1761,11 +1792,15 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `link John Doe to 123 Main St` / `link 123 Main St to John Doe` / `connect Carla Diaz with the Elm House property` / `add Carla Diaz to 12 Oak St` / `Carla Diaz lives at 12 Oak St` | `link` | ✅ links them (either order); "already linked" when they are *(the guide's own phrasing was unknown on the rules tier)* |
 | `link Zed Quill to 12 Oak St` | `link` | ✅ no such contact: "I couldn't find a contact or a property called Zed Quill." |
 | `remove Ana Reyes from 12 Oak St` / `unlink Ana Reyes from 12 Oak St` | refuse `out_of_chat` `unlink` | 🛑 done in the app — §9.8 |
-| `add this to Elm House's notes` / `add a note to Bob Lee with this PDF` / `put this photo on 12 Oak St` | `add_note` attach | ✅ with a photo or PDF on the message (or the previous one): a note with the file(s), signed by you; the body is whatever else was said, and may be nothing (Maple attachments, 2026-10-18) |
-| `add a note to Bob Lee with the gate code from the PDF` | `add_note` body | ✅ the fact is copied out of the file's text into the note — only what was asked for, never the whole file (Maple attachments, 2026-10-18) |
-| `attach this to Elm House` / `put this on 12 Oak St` | `add_note` attach | ✅ a note with the file(s) on the property; with no file on the message or the previous one, Maple says to add a photo or PDF with the + button (`NO_FILE_ON_MESSAGE_REFUSAL`) (Maple attachments, 2026-10-18) |
-| `add this business card as a contact` / `create a contact from this photo` | `create_contact` | ✅ with a photo of a card on the message: the name, phone and email are copied from what Maple read into the contact's fields; the file isn't attached — only an estimate or a task carries the file it was made from (review 2026-10-18 #34) |
-| `add a note to Elm House: call back Tuesday` | `add_note` | ✅ after `what's in this photo?`, the previous message's photo isn't attached: a file goes on a record a message later only when the message points at it ("it", "this", "that photo") (review 2026-10-18 #33) |
+| `add this to Elm House's notes` / `add a note to Bob Lee with this PDF` / `put this photo on 12 Oak St` [none+photo] | `add_note` attach | ✅ with a photo or PDF on the message (or the previous one): a note with the file(s), signed by you; the body is whatever else was said, and may be nothing (Maple attachments, 2026-10-18) |
+| `add a note to Bob Lee with the gate code from the PDF` [none+quote] | `add_note` body | ✅ the fact is copied out of the file's text into the note — only what was asked for, never the whole file (Maple attachments, 2026-10-18) |
+| `attach this to Elm House` / `put this on 12 Oak St` [none+photo] | `add_note` attach | ✅ a note with the file(s) on the property; with no file on the message or the previous one, Maple says to add a photo or PDF with the + button (`NO_FILE_ON_MESSAGE_REFUSAL`) (Maple attachments, 2026-10-18) |
+| `add this business card as a contact` / `create a contact from this photo` [none+card] | `create_contact` | ✅ with a photo of a card on the message: the name, phone and email are copied from what Maple read into the contact's fields; the file isn't attached — only an estimate or a task carries the file it was made from (review 2026-10-18 #34) |
+| `update Bob Lee's phone from this card` / `use this card to update Bob Lee` [none+card] | `update_contact` fields.phone | ✅ with a photo of a card on the message: the fields asked for (or, said generally, every field the card shows) are copied from what Maple read; the file isn't attached *(2026-10-19 review — probed live with a card on the message)* |
+| `create a property from this work order` [none+workorder] | `create_property` fields.street fields.city | ✅ with the PDF on the message: the name and address are copied from what Maple read; the file isn't attached — a property create only copies the facts *(2026-10-19 review — probed live with a work order on the message)* |
+| `add this photo to the Foreman role` [none+photo] | refuse `notes_on_catalog` | 🛑 roles and materials take no notes or files *(2026-10-19 review — probed live)* |
+| `attach this to Black Mulch` [none+invoice] | refuse `notes_on_catalog` | 🛑 materials and roles take no notes or files — refused in the policy whatever the model planned (it planned a note on the material one run in two) — G19 (gap plan 2026-10-19, closed the same day) |
+| `add a note to Elm House: call back Tuesday` [none+prev_photo] | `add_note` | ✅ after `what's in this photo?`, the previous message's photo isn't attached: a file goes on a record a message later only when the message points at it ("it", "this", "that photo") (review 2026-10-18 #33) |
 
 *Not yet in the Plan format — several turns, a state the test world can't build, or a refusal that depends on the user's role (phase 3):*
 
@@ -1799,7 +1834,23 @@ deleted: *"I can't delete 'Edging' because it's used on estimates or
 templates. You can hide it on the Materials page instead."* Creating a
 material whose name a visible material already has is refused: *"A material
 named 'Black Mulch' already exists."* Asking Maple to hide, show or reset a
-material comes in stage 4 of the plan.
+material is stage 4 of the catalog plan — done 2026-10-19, below
+([gap plan](plans/2026-10-19-maple-phrasing-gaps-plan.md) step 3).
+
+*What the catalog shows (2026-10-19 — the catalog design's §9; each was a gap the review found, probed live):*
+
+| Phrasing | Plan | Status |
+|---|---|---|
+| `hide Black Mulch` / `hide the Black Mulch material from my list` | `hide_material` | ✅ asked first — *"Hide Black Mulch from your materials? You can show it again any time. (yes/no)"* — then hidden from lists, pickers and Maple; standard or the company's own; Owner/Admin — G1 (gap plan 2026-10-19, closed the same day) |
+| `show Black Mulch again` / `unhide Black Mulch` | `show_material` | ✅ found among the hidden materials and shown again, no question; one that isn't hidden is said so; Owner/Admin — G2 (gap plan 2026-10-19, closed the same day) |
+| `which materials have I hidden?` / `show my hidden materials` | `list_materials` filter.hidden | ✅ the hidden ones, named so "the second one" picks from them — G3 (gap plan 2026-10-19, closed the same day) |
+| `unhide all my materials` | `show_material` all | ✅ asked first, then every hidden material shown again (the Materials page's unhide-all); one whose name the company's own material holds stays hidden and is named — G4 (gap plan 2026-10-19, closed the same day) |
+| `reset Black Mulch to the standard price` / `go back to the standard price for Black Mulch` | `reset_material` | ✅ asked first, then the company's own costs, prices and hide dropped; the company's own material is refused — *"… is your own material, so there's no standard to reset it to."* — G5 (gap plan 2026-10-19, closed the same day) |
+| `is Black Mulch a standard material?` | `get_material` field=source | ✅ *"Black Mulch is a standard material, from 3Maples' list — you can hide it, or change its cost and price."* / *"… is your own material."* — G6 (gap plan 2026-10-19, closed the same day) |
+| `which of my materials are standard?` / `list my custom materials` | `list_materials` filter.source | ✅ standard or the company's own; beside a category, price or estimate it is said back — G7 (gap plan 2026-10-19, closed the same day) |
+| `turn on the Irrigation standard materials` / `stop showing standard materials in Soil` | `set_standard_category` | ✅ asked first, then the category's standard materials on or off (per-item hides kept); a category with no standard materials is said so; Load Standard stays the redirect for loading them all — G8 (gap plan 2026-10-19, closed the same day) |
+| `add a 2 yd size to Black Mulch` | `update_material` fields.add_size fields.size | ✅ refused with the offer of a copy (D2, Simon 2026-10-19): *"Black Mulch is a standard material, so its sizes can't change. Want me to make you a copy — Black Mulch copy — and add the size there? (yes/no)"*; the yes makes the copy and changes it; Owner/Admin — G9 (gap plan 2026-10-19, closed the same day) |
+| `make me a copy of Black Mulch` | `copy_material` | ✅ a standard material copied as the company's own, "Black Mulch copy"; a copy of the company's own material stays the app's (§9.8); Owner/Admin *(gap plan 2026-10-19, D2)* |
 
 ## 4.2 Casual phrasings
 
@@ -1831,6 +1882,7 @@ The "different" / "types of" modifiers don't change the routing — `how many` a
 |---|---|---|
 | `find materials named concrete` / `search for materials matching concrete` | `list_materials` filter.text=concrete | ✅ |
 | `show materials in in stock` | ask | ✅ |
+| `do I have Black Mulch?` | `list_materials` filter.text | ✅ a yes/no about a record is the list it would be in *(2026-10-19 review — probed live, §13.1)* |
 
 ## 4.6 Field-targeted update (material-level)
 
@@ -1839,6 +1891,7 @@ The "different" / "types of" modifiers don't change the routing — `how many` a
 | `change the price of {material} to $5` / `update the price on {material} to $5` / `set {material}'s price to $5` | `update_material` fields.price=5 | ✅ |
 | `change the cost of Topsoil to 20` | `update_material` fields.cost=20 | ✅ no "material" said *(2026-09-27 — a material, role or template named exactly is rewritten kind-first, `catalog_names.py`)* |
 | `update Topsoil's price to 45` | `update_material` fields.price=45 | ✅ no "material" said *(2026-09-27 — a material, role or template named exactly is rewritten kind-first, `catalog_names.py`)* |
+| `update my Black Mulch price from this invoice` [none+invoice] | `update_material` fields.size fields.cost | ✅ with a supplier invoice on the message: what was paid is the size's cost (the price follows from the markup), for the size the invoice names — Owners and Admins only *(2026-10-19 review — probed live with an invoice on the message)* |
 | `move Topsoil to the Bulk Materials category` | `update_material` fields.category | ✅ *(2026-09-27, #694 — the category name is resolved to its id, never created; it failed every time)* |
 | `rename it to Screened Topsoil` [material_focus] | `update_material` fields.name | ✅ the material in focus |
 | `show me the Black Mulch material` / `show me Black Mulch` | `get_material` | ✅ *(it listed every material, or looked for a contact)* |
@@ -1855,7 +1908,8 @@ own (a price pins it over the markup); its name, description, category and
 sizes — a size's unit included, even one the company has no unit for — are
 refused, with nothing written: *"Black Mulch is a standard material, so its
 name, description, category and sizes can't change. You can still change its
-cost and price."* *(2026-10-16 — a unit given for a standard size whose unit
+cost and price."* An Owner or Admin is offered a copy instead, since
+2026-10-19 (§4.1, D2). *(2026-10-16 — a unit given for a standard size whose unit
 the company doesn't carry was said as updated, with nothing changed.)*
 
 ## 4.7 Verbless (Phase 2b material-shape residual)
@@ -1874,7 +1928,8 @@ A size is a number with an optional unit and package word (`3 cu ft`, `3 cu ft b
 | `delete size {size} for {material}` / `remove the {size} size from {material}` | `update_material` fields.remove_size fields.size | ✅ that size removed |
 | `update the price for {material} with size {size} to $5` | `update_material` fields.size fields.price=5 | ✅ that size only |
 | `change the cost of the {size} size of {material} to 4.50` | `update_material` fields.size fields.cost=4.50 | ✅ that size only |
-| `Topsoil 1 yd is $6 per bag` / `Mulch is $6 per bag` | `update_material` fields.size fields.price=6 fields.unit | ✅ that size's price and unit (with no size said, a one-size material's only size); a standard material's unit can't change — refused, nothing written, but its own unit said beside the price is just the price *(2026-10-17 — the unit was dropped while Maple said it updated; a standard's own unit refused the price)* |
+| `Topsoil 1 yd is $6 per bag` | `update_material` fields.size fields.price=6 fields.unit | ✅ that size's price and unit (with no size said, a one-size material's only size); a standard material's unit can't change — refused, nothing written, but its own unit said beside the price is just the price *(2026-10-17 — the unit was dropped while Maple said it updated; a standard's own unit refused the price)* |
+| `Mulch is $6 per bag` | `update_material` fields.price=6 fields.unit | ✅ the price of the material named Mulch, for its size; several matching are asked which — G26 (gap plan 2026-10-19, closed the same day) |
 | `rename size {size} of {material} to 1 cubic yard` | `update_material` fields.size fields.rename_size_to | ✅ |
 | `delete size 1 cu yd for Topsoil` | `update_material` fields.remove_size fields.size | ✅ Topsoil has no such size: *"Topsoil doesn't come in 1 cu yd — it comes in 1 yd, 2 cu ft, Bag."* — nothing changed *(2026-10-02, #700 — replied "I've updated the material" and changed nothing. Sizes match whatever their case)* |
 | `rename size 1 cu yd of Topsoil to 2 cu yd` | `update_material` fields.size fields.rename_size_to | ✅ Topsoil has no such size: the same reply — nothing changed *(2026-10-02, #700)* |
@@ -1960,6 +2015,7 @@ A create that is missing details asks for the next one alone, remembers which, a
 |---|---|---|
 | `Clear Coat` | conversation `ref-category-named-like-a-command` | ✅ the planner handles it — was a gap: a category the company has whose name opens with a command verb is the answer; today's `bare_answer` refused it *(deferred 2026-09-29 — name-answers plan §7)* |
 | `Clear Stone` | conversation `ref-material-named-like-a-command` | ✅ the planner handles it — was a gap: the name in reply to *"What's the material called?"*, then the category is asked *(deferred 2026-09-29 — name-answers plan §7)* |
+| `add the materials on this invoice to my catalog` [none+invoice] | `create_material` | ✅ the first two planned as creates (an invoice can have more lines than a plan has actions — review 2026-10-21 #73); several material creates in one plan are refused — *"I add one material at a time — tell me the first one to add."* — never one question for all their details (D4, Simon 2026-10-19: there's no invoice in the app) — G18 (gap plan 2026-10-19, closed the same day). The prompt line once quoted the refusal and the model made it "one task at a time" for a to-do list too; it now says plan the first two creates *(live run 2026-10-20; 2026-10-21, 18/18 re-plans with a 7-line invoice)* |
 
 ## 4.12 Catalog figures *(2026-10-01, metrics plan Phase 4)*
 
@@ -2028,7 +2084,7 @@ Fixed 2026-09-27 (#693): the name extractor read "S" out of `show me my labour r
 | Phrasing | Plan | Status |
 |---|---|---|
 | `find labour roles named Foreman` / `search for labour roles matching Foreman` | `list_labours` filter.name=Foreman | ✅ |
-| `show labour roles in outdoor` | `list_labours` filter.name=outdoor | ✅ |
+| `show labour roles in outdoor` | `list_labours` filter.name=outdoor | ✅ roles have no division or category: the name filter — G27 (gap plan 2026-10-19, closed the same day) |
 
 ## 5.6 Field-targeted update
 
@@ -2060,6 +2116,26 @@ Fixed 2026-09-27 (#693): the name extractor read "S" out of `show me my labour r
 | `what's the labor burden for the role {role}?` / `what's the unbillable rate for the role {role}?` | `get_labour` | ✅ |
 
 Note: "labor burden" and "unbillable rate" are company-level settings, not per-role fields. The Labour Agent's get response shows the role's Avg. Wage and computed Rate. The explanation of how rate is computed (wage + unbillable% + labor burden%) is provided when users attempt to edit rate directly.
+
+## 5.8a Standard roles (2026-10-21)
+
+The 3Maples standard roles are each company's own role records tagged with a
+standard key: their name, responsibilities and unit are the standard list's,
+their wage is the company's. Role names are unique within a company (case and
+spacing ignored, hidden roles included). A hidden role is out of Maple's lists
+and name lookups; estimate lines keep it.
+
+| Phrasing | Plan | Status |
+|---|---|---|
+| `set Foreman's wage to 45` / `change the cost of Foreman to $45` | `update_labour` fields.wage=45 | ✅ a standard role's wage is the company's; its Rate follows. Owners and Admins only: a Member is told *"Only owners and admins can set role wages."*, nothing written; a Member's `create a new role called Arborist` likewise gets *"Only owners and admins can add people roles."* before any question (unanswered tracker: `not_permitted` `role`) |
+| `rename Foreman to Field Boss` | `update_labour` fields.name | ✅ Foreman being a standard role, nothing is written: *"Foreman is a standard role, so its name, responsibilities and unit can't change. You can still change its wage."* (unanswered tracker: `policy` `standard_role`) |
+| `make Foreman daily` | `update_labour` fields.unit | ✅ refused the same way: a standard role's unit is the standard list's |
+| `delete the Foreman role` | `delete_labour` | ✅ asked first; for a standard role the yes **hides** it: *"I've hidden the standard role 'Foreman' from your people roles."* |
+| `create a new role called Crew Lead` | `create_labour` fields.name | ✅ with a Crew Lead role already there (hidden ones count), nothing is written: *"A role named 'Crew Lead' already exists."* — and, when that role is hidden, *"It's hidden — turn on Show Hidden on the People page to find it."* (`policy` `name_taken`); a rename to a taken name is refused the same way |
+
+A hidden role is not found by name ("show me the Foreman role" with Foreman
+hidden answers as for any role the company doesn't list); show it on the
+People page.
 
 ## 5.9 People gaps
 
@@ -2094,7 +2170,8 @@ left out and counted.
 | `who's my highest-paid role?` / `which role gets paid the most?` | `catalog_figure` kind=highest_role field=cost | ✅ the same by average wage *(help about contact roles)* |
 | `which role has the lowest wage?` | `catalog_figure` kind=lowest_role field=cost | ✅ the same by average wage — *"Your lowest-paid role by wage is Landscaper at $25.00 an hour."* *(help about contact roles)* |
 | `what's the average wage of my roles?` | `catalog_figure` kind=average_role field=cost | ✅ *"Average wage of your roles: $36.67 an hour across 3 roles."* — per unit when there are several *(help about contact roles)* |
-| `what's my average labour rate?` / `what's the average rate across my roles?` | `catalog_figure` kind=average_role field=price | ✅ per unit when there are several *(help about contact roles)* |
+| `what's the average rate across my roles?` | `catalog_figure` kind=average_role field=price | ✅ per unit when there are several *(help about contact roles)* |
+| `what's my average labour rate?` | `catalog_figure` kind=average_role field=price | ✅ the roles' average rate — set right from the words when the model refuses it as a Rate setting (`as_asked_reads`) — G25 (gap plan 2026-10-19, closed the same day) |
 | `what's the average wage for Foreman?` | `get_labour` field=wage | ✅ that role's wage (§5.8) — not a figure across roles |
 
 **Open gaps:** none tracked (see [code-review-followups.md](code-review-followups.md)). Resolved 2026-09-27: #674, #675, #676, #677, #678, #682, #683, #690, #693.
@@ -2390,10 +2467,13 @@ Additive is the default, matching estimate notes (§5.x) — a drive-by note nev
 | `we shouldn't set the notes on the fence task to foo` / `please don't add to the task: call Bob` / `don't add to T0042 bring the contract` | `acknowledge` | ✅ nothing changes *(2026-09-30, #762; 2026-10-11, #847 — as above)* |
 | `add a note to it: don't park on the lawn` [task_focus] | `add_note` parent.domain=task | ✅ the note's own words are content, never a negated command *(2026-09-30, #762 — the anchor sits before the verb, so the note body is untouched)* |
 | `add to the fence task: we shouldn't dig here` | `update_task` fields.notes_append | ✅ the note's own words are content, never a negated command *(2026-09-30, #762)* |
-| `attach this to the task` / `add this photo to T0042` / `put this on the fence task` [task_focus] | `update_task` attach | ✅ with a photo or PDF on the message (or the previous one): the file(s) are copied onto the task's media (the Media section in the app); with none, `NO_FILE_ON_MESSAGE_REFUSAL` (Maple attachments, 2026-10-18) |
-| `attach these to T0042` / `add this photo to the fence task` [task_focus] | `update_task` attach | ✅ when the files would put the task over 10 (a task holds at most 10 files, any kind): none is attached — `attach` is every file — and Maple says why (`TASK_FILES_FULL_REFUSAL`); a change said beside them is still made (2026-10-19) |
-| `add a note to the task with this photo: call first` [task_focus] | `add_note` parent.domain=task attach | ✅ the words go on the description, the file on the task's media (Maple attachments, 2026-10-18) |
-| `create a task from this photo: fix the gate latch` / `new task with this PDF: order the pavers` / `make a task from this photo` | `create_task` attach | ✅ the words after the colon (or what the photo shows) are its text; the file(s) go on the new task's Media — a task's notes are its description, so its files are its media (Maple attachments, 2026-10-18) |
+| `attach this to the task` / `add this photo to T0042` / `put this on the fence task` [task_focus+photo] | `update_task` attach | ✅ with a photo or PDF on the message (or the previous one): the file(s) are copied onto the task's media (the Media section in the app); with none, `NO_FILE_ON_MESSAGE_REFUSAL` (Maple attachments, 2026-10-18) |
+| `attach these to T0042` / `add this photo to the fence task` [task_focus+photo+quote] | `update_task` attach | ✅ when the files would put the task over 10 (a task holds at most 10 files, any kind): none is attached — `attach` is every file — and Maple says why (`TASK_FILES_FULL_REFUSAL`); a change said beside them is still made (2026-10-19) |
+| `add a note to the task with this photo: call first` [task_focus+photo] | `add_note` parent.domain=task attach | ✅ the words go on the description, the file on the task's media (Maple attachments, 2026-10-18) |
+| `create a task from this photo: fix the gate latch` / `new task with this PDF: order the pavers` / `make a task from this photo` [none+photo] | `create_task` attach | ✅ the words after the colon (or what the photo shows) are its text; the file(s) go on the new task's Media — a task's notes are its description, so its files are its media (Maple attachments, 2026-10-18) |
+| `make a task for each item on this list` [none+list] | `create_task` | ✅ with a photo of a to-do list on the message: one task per line read from it; with several creates nothing claims the file, so none carries it *(2026-10-19 review — probed live with a list on the message)* |
+| `remove the photo from T0042` | refuse `out_of_chat` `media` | 🛑 a task's media is removed on the task in the app *(2026-10-19 review — probed live; the refusal's words are a gap, §10.11)* |
+| `delete the PDF on the fence task` | refuse `out_of_chat` `media` | 🛑 *"I can't remove a photo or file from chat — open the task or the note in the app and remove it there."* — never the offer to delete the task (`as_asked_files`) — G29 (gap plan 2026-10-19, closed the same day) |
 
 ### 7.6.1.1 Dictated payloads — the first intent wins
 
@@ -2431,6 +2511,8 @@ Either step can be entered directly: `description` on its own selects the field 
 ## 7.7 Status changes
 
 `TaskStatus` values are **per-company** (defaults: `To Do`, `In Progress`, `Done`). Status names resolve exact → case-insensitive → fuzzy; an unrecognized name triggers a clarification listing the company's statuses. Status changes fold under `update_task` (same pattern as estimate status transitions under `update_estimate`, §1.4).
+
+*Live run 2026-10-19, G32 ([gap plan](plans/2026-10-19-maple-phrasing-gaps-plan.md)):* in the acceptance conversation `task-status-answered-by-a-request-shaped-status`, `New Request` — a status the company has, in reply to the status question — is not taken as the answer: the planner asks again what to do or which status, in both conversation runs. **Closed:** in the acceptance run of 2026-10-20, on the planner's own state, `New Request` sets the task's status (G33 was why it failed there before: the parity run fed today's state).
 
 | Phrasing | Plan | Status |
 |---|---|---|
@@ -2547,6 +2629,7 @@ Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-sup
 - **Bare-title references** (possessive §7.3, verbless, set-possessive §7.6) — no "task" keyword to anchor on; both tiers fail (2026-07-22 Tier-2 run). Same gap class as materials/contacts pre-Phase-2b; a catalog-backed title lookup would close it.
 - **Informal create cue** — `I need to remember to…` (unverified). `jot down…`, `remind me to…` and the to-do list forms work since 2026-09-27.
 - **`who is the {task} task assigned to?`** — unwired; details view covers the need.
+- **`who created this task?`** [task_focus] — planned as the task's details, which don't say who created it (`created_by_email` is stored). G24 in the [gap plan](plans/2026-10-19-maple-phrasing-gaps-plan.md) (2026-10-19 review, probed live).
 - **`add a task to the estimate`** — routes to the Task Agent (estimate work items are never called "tasks" in code or docs); when the message names an estimate, Maple should offer redirection to the work-item flow ("Did you mean a work item on the estimate?"). Not yet implemented.
 
 Task details (2026-09-27) also show the linked property, the estimate it was converted into, and how many photos and videos it has.
@@ -2566,7 +2649,7 @@ Questions users ask when they think about the domain rather than the database. R
 | `who lives at {property}?` | `get_property` field=contacts | ✅ the contacts linked to the property |
 | `what contacts are at {property}?` | `list_contacts` filter.related | ✅ the contacts linked to the property |
 | `who owns {property}?` | `get_property` field=owner | ✅ its Home Owners only *(2026-10-11, #845 — it listed every contact linked; none marked: "None of 12 Oak St's contacts is a Home Owner.")* |
-| `what properties does {contact} own?` | `list_properties` filter.owner | ✅ the contact's properties, as row 1537 counts them *(reference run 2026-10-13 — was `get_contact` field=properties)* |
+| `what properties does {contact} own?` | `list_properties` filter.owner | ✅ the contact's properties — a prompt line — G28 (gap plan 2026-10-19, closed the same day) |
 | `where does {contact} live?` | `get_contact` field=properties | ✅ the properties linked to the contact |
 | `show me {contact}'s properties` | `get_contact` field=properties | ✅ the possessive flow |
 | `which properties does contact {contact} linked to?` | `get_contact` field=properties | ✅ *(May expansion — new "linked to" cross-resource pattern)* |
@@ -2733,12 +2816,14 @@ Requests Maple doesn't do from chat are refused with where to do them, in the us
 | `set the default markup to 20%` / `change our company tax rate` / `what's the material markup?` | refuse `out_of_chat` `settings_financial` | 🛑 redirected to Settings → Financial tab (Owners and Admins); work-item markup/overhead/tax stay Maple's (§1.5.7) |
 | `invite Sam to the team` / `add a new team member` / `remove a user` | refuse `out_of_chat` `team` | 🛑 redirected to Settings → Team Members tab |
 | `upgrade my plan` / `how many Maple credits do I have left?` / `change my credit card` / `show my invoices` | refuse `out_of_chat` `billing` | 🛑 redirected to Settings → Billing tab |
-| `load the standard materials` / `reload standard people` | refuse `out_of_chat` `load_standard` | 🛑 redirected to the Materials page's Categories tab (standard materials come in by category) or Load Standard in the People page's actions menu |
+| `load the standard materials` / `reload standard people` | refuse `out_of_chat` `load_standard` | 🛑 redirected to the Materials page's Categories tab (standard materials come in by category); the standard roles are always on the People page — Show Hidden or Unhide All in its actions menu shows hidden ones *(2026-10-21)* |
 | `import contacts from a CSV` / `upload a spreadsheet of materials` | refuse `out_of_chat` `csv_import` | 🛑 redirected to the CSV upload on the Properties, Contacts or Materials page |
 | `add a unit called pallet` / `rename the unit bag` | refuse `out_of_chat` `units` | 🛑 redirected to the Materials page's Units tab (categories: §9.3) |
 | `add a division called Snow Removal` | refuse `out_of_chat` `divisions` | 🛑 redirected to Settings → Divisions tab; setting a work item's division stays Maple's (§1.5.2) |
 | `unlink Carla Diaz from 12 Oak St` / `detach the contact` | refuse `out_of_chat` `unlink` | 🛑 redirected to the property or contact in the app; unlinking a task's property is Maple's (§7.6) |
-| `duplicate the patio estimate` / `clone this material` / `make a copy of {material}` | refuse `out_of_chat` `duplicate` | 🛑 redirected to Duplicate in the row's menu on the Estimates, Materials or People page |
+| `duplicate the patio estimate` | refuse `out_of_chat` `duplicate` | 🛑 redirected to Duplicate in the row's menu on the Estimates, Materials or People page — a standard material's copy is Maple's since 2026-10-19 (§4.1, D2) |
+| `make a copy of {material}` | `copy_material` | ✅ a standard material is copied as the company's own; the company's own material gets the redirect above — the policy decides, from the record (`policy._check_catalog_ops`; gap plan 2026-10-19, D2) |
+| `clone this material` [material_focus] | `copy_material` | ✅ the material in focus, decided as above; with none in focus the model either plans the copy (Maple asks which) or gives the Duplicate redirect — both fine *(live run 2026-10-20: it was in the refusal row above until D2)* |
 | `generate the document for E0042` / `export a PDF` / `create a Google Doc` | refuse `out_of_chat` `documents` | 🛑 redirected to the estimate's Documents button *(user decision 2026-09-27: no document generation from chat)* |
 | `add a photo to the task` / `upload a video` | refuse `out_of_chat` `media` | 🛑 with no file on the message or the previous one: says to attach it with the + button and name the record (`MEDIA_ATTACH_REFUSAL`; a video always goes on the task in the app); while `MAPLE_ATTACHMENTS_ENABLED` is off, today's redirect to Photo or Video on the task (Maple attachments, 2026-10-18) |
 
@@ -2746,7 +2831,7 @@ Detectors are narrow on purpose — a false positive refuses something Maple can
 
 ## 9.9 Deletes — a plain yes, from someone allowed to *(2026-09-27)*
 
-Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A standard material is hidden rather than deleted, and a company material an estimate or template uses is refused (§4.1, 2026-10-15). A request about a record's links ("remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8); a request about its notes deletes the note you name, after asking (§3.9).
+Every Maple delete asks first, and only a plain yes confirms it — "yes", "yes, delete it", "confirm delete". Before, the catalog agents confirmed on any message *containing* "yes", "confirm" or "delete it" (#674): "delete it" deleted at once, "no, don't delete it" confirmed, and so did a name like "Reyes". A delete question lives one turn (§10.6). Deleting a property, contact, material, role, template or task is for Owners and Admins, as in the app (`delete_role_refusal`, `agents/conversation/delete_confirmation.py`); a Member is told so. A standard material is hidden rather than deleted, and a company material an estimate or template uses is refused (§4.1, 2026-10-15); a standard role is hidden rather than deleted too (§5.8a, 2026-10-21). A request about a record's links ("remove Ana from 12 Oak St") never deletes the record — it is redirected (§9.8); a request about its notes deletes the note you name, after asking (§3.9).
 
 ---
 
@@ -3070,6 +3155,20 @@ Turns about the conversation itself are answered after the question gate has had
 | `no, don't delete it` / `don't` / `no wait` / `keep it` / `leave it` / `don't delete Ana Reyes` | `acknowledge` | ✅ nothing asked: "I'm not waiting on an answer right now — …" — a decline that asks for nothing stays a stray no *(2026-10-01, #706 review — "no, don't delete it" and "don't delete Ana Reyes" offered the delete; a negated delete is a no whatever it names)*; `don't delete Ana Reyes` is *"Okay — I'll leave it as it is."* *(2026-10-11, #847)* |
 | `repeat that` / `say that again` | `repeat` | ✅ Maple's last reply again |
 | `start over` / `reset` / `clear the chat` | `start_over` | ✅ points to the clear button; drops anything Maple was waiting on |
+| `start a new chat` / `new conversation` | `start_over` | ✅ *(2026-10-19 review — probed live; the reply's words are a gap, §10.10)* |
+| `show me my past conversations` / `open my last chat` | refuse `out_of_chat` `history` | 🛑 *"I only see this conversation. Your past conversations are under Chat history at the top of the Maple panel — open one there to pick it up again, or delete it. …"* — G10 (gap plan 2026-10-19, closed the same day) |
+| `what did we talk about yesterday?` / `what did I ask you last time?` | refuse `out_of_chat` `history` | 🛑 the same — Maple sees only the conversation open now — G11 (gap plan 2026-10-19, closed the same day) |
+| `delete this conversation` / `delete my chat history` | refuse `out_of_chat` `history` | 🛑 the same — the one open now can't be deleted — G12 (gap plan 2026-10-19, closed the same day) |
+| `undo that` [est] | `undo_last` | ✅ asked first (D1, Simon 2026-10-19: never on her own) — *"Undo my last change to E0042 — title back to Jones backyard? (yes/no)"*; the yes sets each field back while the record is as Maple left it, never on an estimate that has left Draft/Review since; a create is undone by deleting it while unchanged since, asked as a delete; a note, link, status or delete is said as a change she can't undo — G23 (gap plan 2026-10-19, closed the same day) |
+| `take that back` [contact_focus] | `undo_last` | ✅ the same: Maple's own last change, asked first — G23 (gap plan 2026-10-19, closed the same day) |
+| `put the price back to what it was` [material_focus] | `undo_last` | ✅ the same — G23 (gap plan 2026-10-19, closed the same day) |
+
+**Start over since session history** (2026-10-19 review, G13 in the
+[gap plan](plans/2026-10-19-maple-phrasing-gaps-plan.md)): `start over` and
+`start a new chat` plan right; the reply (`meta.START_OVER`) pointed to "the
+clear button at the top of the Maple panel" — since 2026-10-16 the panel's
+button is *Start a new session*, and the old conversation is kept under *Chat
+history*. Fixed the same day: it names both.
 
 **Language** (2026-09-27): the conversation keeps the language the user is writing in. A short reply ("sí", "2", "Cambridge") is answered in that language rather than re-detected from two characters, and a language-neutral message (a code, a number) never switches it (`services/translation.py::conversation_language`).
 
@@ -3079,16 +3178,34 @@ A photo or PDF sent with a message (the + button, or dropped on the message box;
 
 | Phrasing | Plan | Status |
 |---|---|---|
-| `what's in this photo?` / `read this` / `what does it say?` | `describe_files` | ✅ with a file on the message (or the previous one): what Maple read from each file — its text, then what it shows, in a plain block (a link in a file is shown, never clickable); a file that couldn't be read says so; with none, `NO_FILE_ON_MESSAGE_REFUSAL` (Maple attachments, 2026-10-18) — the portal never sends a file without words (Simon 2026-10-19); the API reads a files-only message the same way |
-| `attach it to T0042` / `now put it on the fence task` | `update_task` attach | ✅ the previous message's file, one turn later — after `what's in this photo?` (Maple attachments, 2026-10-18) |
-| `the one at Elm House` [task_focus] | `update_task` attach | ✅ answering "which task?" to `attach this to the fence task`: the file rides along to the answer — the message that carried it is the previous one (Maple attachments, 2026-10-18); and when the question was asked about the previous message's file (`what's in this photo?` → `attach it to the fence task` → "which task?"), the file is kept for the answer too (review round 3 #8) |
+| `what's in this photo?` / `read this` / `what does it say?` [none+photo] | `describe_files` | ✅ with a file on the message (or the previous one): what Maple read from each file — its text, then what it shows, in a plain block (a link in a file is shown, never clickable); a file that couldn't be read says so; with none, `NO_FILE_ON_MESSAGE_REFUSAL` (Maple attachments, 2026-10-18) — the portal never sends a file without words (Simon 2026-10-19); the API reads a files-only message the same way |
+| `attach it to T0042` / `now put it on the fence task` [none+prev_photo] | `update_task` attach | ✅ the previous message's file, one turn later — after `what's in this photo?` (Maple attachments, 2026-10-18) |
+| `the one at Elm House` [task_focus+prev_photo] | `update_task` attach | ✅ answering "which task?" to `attach this to the fence task`: the file rides along to the answer — the message that carried it is the previous one (Maple attachments, 2026-10-18); and when the question was asked about the previous message's file (`what's in this photo?` → `attach it to the fence task` → "which task?"), the file is kept for the answer too (review round 3 #8) |
 | `attach this to T0042` | `update_task` attach | ✅ with the photo two messages back, Maple says there's no file on that message (`NO_FILE_ON_MESSAGE_REFUSAL`) — a file is on its message and the next one only; send it again (Maple attachments, 2026-10-18) |
-| `T0042` | `update_task` attach | ✅ a task named with a file on the message and nothing else said: the file goes on the task's media (review 2026-10-19) |
-| `Elm House` | `add_note` attach | ✅ a contact, property or estimate named with a file on the message and nothing else said: a note with no words, carrying the file (review 2026-10-19) |
-| `what does this quote say, and create a task to call the customer` | `describe_files` | ✅ then `create_task`: the file is read back and the new task is made without it — a plan that reads the files leaves them off the create (review 2026-10-18 #32, 2026-10-19) |
-| `attach the photo to T0042 and the PDF to E0042` | ask | ✅ with two or more files on the message, Maple asks first — "Just to check: put all 2 files on each of them? (yes/no)" — since each record would take every file; no leaves it all as it was and says to send each file with its own message (review 2026-10-19 #18) |
-| `add a note to it: bring the ladder` [task_focus] | `add_note` | ✅ just after `create a task from this photo: fix the gate`: the note is added and the photo isn't copied onto the task a second time — "Those files are already on it." (the state says where the previous message's files went; review 2026-10-19 #17) |
-| `attach this estimate to Elm House` [est] | `link` | ✅ with a file on the message too: "attach this estimate (or contact) to …" names a record — a link, never the file (review 2026-10-19) |
+| `T0042` [none+photo] | `update_task` attach | ✅ a task named with a file on the message and nothing else said: the file goes on the task's media (review 2026-10-19) |
+| `Elm House` [none+photo] | `add_note` attach | ✅ a contact, property or estimate named with a file on the message and nothing else said: a note with no words, carrying the file (review 2026-10-19) |
+| `what does this quote say, and create a task to call the customer` [none+quote] | `create_task` | ✅ after `describe_files`: the file is read back and the new task is made without it — a plan that reads the files leaves them off the create (review 2026-10-18 #32, 2026-10-19) |
+| `attach the photo to T0042 and the PDF to E0042` [none+photo+quote] | ask | ✅ with two or more files on the message, Maple asks first — "Just to check: put all 2 files on each of them? (yes/no)" — since each record would take every file; no leaves it all as it was and says to send each file with its own message (review 2026-10-19 #18) |
+| `add a note to it: bring the ladder` [task_focus+prev_photo] | `add_note` parent.domain=task | ✅ just after `create a task from this photo: fix the gate`: the note is added and the photo isn't copied onto the task a second time — "Those files are already on it." (the state says where the previous message's files went; review 2026-10-19 #17) |
+| `attach this estimate to Elm House` [est+photo] | `link` | ✅ with a file on the message too: "attach this estimate (or contact) to …" names a record — a link, never the file (review 2026-10-19) |
+| `here's a video of the yard, make an estimate` | refuse `out_of_chat` `media` | 🛑 Maple reads photos and PDFs; a video goes on the task in the app — set right when the model refuses it as "other" or equipment (`as_asked_files`) — G14 (gap plan 2026-10-19, closed the same day) |
+| `remove the photo from T0042` | refuse `out_of_chat` `media` | 🛑 said as a removal: *"I can't remove a photo or file from chat — …"* (`MEDIA_REMOVE_REFUSAL`) — G15 (gap plan 2026-10-19, closed the same day) |
+| `show me the photos on T0042` | `get_task` | ✅ the task's details name its files — *"- Files: 2 — gate_latch.jpg, quote.pdf"* — G16 (gap plan 2026-10-19, closed the same day) |
+| `what's in the PDF on Elm House's note?` | `list_notes` | ✅ the notes, each with its files by name, and *"I can only read a file sent with a message — send it here and I'll read it."* — a filed file is never read (D3, Simon 2026-10-19) — G17 (gap plan 2026-10-19, closed the same day) |
+
+**Testing files** (2026-10-19 review, G20): the live run's reference rows
+started from a state with no file on the message, so every row above that needs
+one was scored without it. The 2026-10-19 rows marked "probed live with … on the
+message" were checked by hand with a file in `turn_attachments`; a `[files]`
+state for the rows was step 0 of the gap plan, done the same day: a row names its
+files after its state — `[est+quote]` on this message, `[task_focus+prev_photo]` on
+the one before (`tests/planner_parity/cases.FILES`: photo, quote, card, invoice,
+workorder, list). The live run of 2026-10-19 bore it
+out: 19 rows needing a file were scored without one — most asked for the file,
+two were blockers (`attach this quote to E0042` was redirected as `documents`,
+where with no file it should say to attach one; `make a task from this photo`
+was the media redirect), and `read this` / `what does it say?` went to help and
+small talk.
 
 ---
 
@@ -3347,7 +3464,144 @@ The 11 Tier 1 misses are the known-gap `xfail(strict=False)` Task bare-title cla
 
 *Note (2026-06-09): the new Social & personality surface (§11.6) — greetings via the `social` intent and personal questions via the `personal` help topic — is not yet represented in the auto-generated matrix above; see §11.6 for its phrasing catalog.*
 
-## 12.4 Related docs
+## 12.4 Live run 2026-10-19
+
+`tests/test_planner_parity_live.py` (`-m llm_e2e`), after the review in
+[`plans/2026-10-19-maple-phrasing-gaps-plan.md`](plans/2026-10-19-maple-phrasing-gaps-plan.md);
+compared with the run of 2026-10-14 (corpora) and 2026-10-12 (conversations).
+
+| Source | Cases | Agree | Differ | Blockers | Refusals ok | Refusals missed |
+|---|---|---|---|---|---|---|
+| routing | 3549 | 2330 | 682 | 0 | — | 0 |
+| expected | 107 | 81 | 25 | 0 | — | 0 |
+| crud | 206 | 178 | 10 | 0 | 18 | 0 |
+| reference | 1476 | 1339 | 48 | 4 | 75 | 2 |
+| conversations (turns) | 648 | 586 / 590 on a re-run | 60 / 56 | — | — | — |
+
+- **Blockers and missed refusals:** two are rows that need a file (G20);
+  `delete Driveway Maintenance` is explained (a code guard turns the refusal
+  into the delete); `what's my average labour rate?` is G25; `delete the PDF on
+  the fence task` is G29; `add a template` was missed on 2026-10-14 too —
+  asked for a name instead of refused (G30).
+- **Rows that drift run to run** (G30) — right one or two times in three
+  re-plans: `add a work item to {EST}` [est] and `add mulch to the front patio
+  work item` [wi] / `add a Landscaper to the estimate` [est] (ask instead), `show
+  me the task from 3 days ago` (a list), `how much does Black Mulch cost?` (a
+  list), `what roles are available?` (help), `what are the estimate divisions?`
+  (the divisions redirect), `don't drop the markup on work item 2` [wi] (once an
+  estimate edit — `said.told_not_to` sets the turn right). `update {task}'s
+  description` asks for the text, the field-then-value question the row means.
+- **Conversations:** most new differences are the `ref-*` conversations added
+  since 2026-10-12, where the planner is right and today's pipeline isn't.
+  G31 and G32 repeat in both runs. `Clear Coat` and `Remove Sod` read as
+  requests because the run feeds the planner today's state — today's pipeline
+  never asked the question the planner would have — so a conversation where the
+  two part ways on turn 1 tests nothing after it (G33). Two planner calls failed
+  on a dropped TLS connection; the four `RuntimeError` turns were in the 10-12 run
+  too.
+
+**After the gap plan (2026-10-20)** — the reference source again
+(`PARITY_SOURCES=reference`), with the 29 file rows on their files: 1,511 cases,
+1,392 agree, 30 differ, **0 blockers** (4 before), 4 missed refusals — each read:
+`attach this to Black Mulch` and `add a template` are set right before anything
+runs (`explained.py`), `make a copy of {material}` is now `copy_material` (its own
+row), and `remove Ana Reyes from 14 Birch Rd` refused 2 of 3 re-plans (G30's
+drift). 36 rows came right; of the 15 that went the other way, re-planned three
+times, two were the gap plan's own prompt lines — "what's the price of Topsoil?"
+and "Ana Reyes's properties" — narrowed the same day (3/3 and 2/3 since); the
+rest drift as before (`pipeline by status` and `what are the material units?`
+missed on 2026-10-14 too). The routing, expected and CRUD sources and the
+parity run's conversations are owed, on Simon's word (the acceptance run is below).
+
+**The new rows alone (2026-10-20)** — the 78 rows the gap plan added or moved
+onto file states, three plans each (95 cases): 262 of 285 right at first. Read
+row by row:
+- **Fixed.** "add this photo to work item 2" was planned as the work item's note,
+  written as "Add this photo." without the photo or left blank (which would ask
+  for its text). `as_asked_files.work_item_files_refused` now gives the work-item
+  refusal, and an edit with words of its own says the file isn't on it.
+- **Fixed, the gap plan's own prompt lines.** The several-materials line quoted
+  its "one at a time" question, and the model asked it of "make a task for each
+  item on this list" too (3/3). The line now says to plan one create per material,
+  and the policy refuses (15/15 re-plans). The material-source line had pulled
+  "do I have Black Mulch?" to `get_material` (now `list_materials`, 3/3).
+- **Rows reworded to the plan they mean.** `parent.domain=work_item` and
+  `parent.domain=task` on two note rows, so a task's note planned as
+  `update_task {notes_append}` (the same write) agrees. `create_task` on the
+  read-then-create row. `create_material` on the invoice row. "clone this
+  material" moved from the Duplicate refusal row to its own `copy_material` row
+  ([material_focus]), since D2.
+- **Explained** (`explained.py`). "T0042" and "Elm House" with a photo are set
+  right by `named_with_files`. "the one at Elm House" answers a question, so it
+  is never planned alone (the run can't build the open question).
+
+The re-run after these changes: 272 of 288 right, 0 blockers. Of the 16 left,
+11 are explained. 3 are the clone phrasing before its row moved; with a material
+in focus it plans `copy_material` 2 of 2. The other 2 are drift: "what's in the
+PDF on Elm House's note?" planned `describe_files` once in three, and the model
+wrote an empty note body twice for one plan, failing validation after the
+retry, so that turn fell back.
+
+**Acceptance run, 2026-10-20** (`test_planner_acceptance_live.py`, every
+conversation on the planner's own state): 294 of 312 passed, and 627 of 632
+turns were answered by the planner. The 5 handed back are by design ("never
+mind", "hi maple", a yes to a question the old pipeline asked).
+- **G32 is closed**: `task-status-answered-by-a-request-shaped-status` passes.
+- **30 gaps of the old pipeline** pass on the planner.
+- **17 failures** are explained, each one explained before this branch.
+- **1 failure counted**: `metrics-best-customers-then-last-year` once asked what
+  "best customers" means. Alone it passed 3 of 3, and "who are my
+  best/top/biggest customers?" planned the ranking 15 of 15: drift.
+
+The corpus had no conversation for the gap plan's multi-turn flows, so four were
+added (`corpus.GAP_PLAN_2026_10_19`): undo after a yes, undo declined, a stray yes
+after a declined delete, and hide asked first. All four passed in each of three
+runs (12 of 12). The copy offer (D2) needs a standard material the world doesn't
+seed; its unit tests pin it.
+
+**Live runs, 2026-10-22** — after the review rounds and the sync with main. The
+full parity run (all four sources) had 0 blockers:
+
+| Source | Cases | Agree | Differ | Blockers | Refusals missed |
+|---|---|---|---|---|---|
+| routing | 3549 | 2366 | 645 | 0 | 0 |
+| expected | 107 | 84 | 22 | 0 | 0 |
+| crud | 206 | 178 | 9 | 0 | 0 |
+| reference | 1517 | 1397 | 34 | 0 | 2 |
+
+Both missed refusals were already explained ("attach this to Black Mulch", "add a
+template"). The reference rows that newly differed were checked: the systematic
+ones are set right before the policy runs (a total over an amount is the list's,
+"my margin" the company's, the cedar fence asks which estimate). Parity scores
+the model's plan before those corrections.
+
+The acceptance run had 291 of 316 passing, with 8 counting. Each was rerun three
+times. Three failed every time and were fixed:
+- "due Thursday", said on a Thursday, was set to today. The prompt now says a due
+  date set by a day's name alone is the first such day after today.
+- "what's the total value of my Maintenance estimates for Bob Lee before tax?"
+  after a recurring-work figure was planned as that figure again. A lone
+  `redo_last` whose message is a whole figure question is now asked for once more.
+- "add a labour role" got the planner's own name question. A name question for a
+  create with nothing else said is now asked for once more, so the role create
+  asks in its usual words.
+
+One wrong copy of an email ("jordan.6d3f65c0@…" planned without "jordan.") is set
+back to the email the message says (`said_tasks._email_said`). Three
+conversations were added to `explained.py`: two where the model carries "Bob Lee"
+onto a count and Maple asks rather than widen it, and the excavation activity
+looked for on the wrong work item (follow-up #1434).
+
+The first weekday wording ("'due Thursday' said on a Thursday is a week away")
+made the model push "Friday" a week out too. The line now gives both cases.
+After it, the fixed conversations passed 15 of 15, and the weekday ones three
+reruns with none counting.
+
+The reference rows rerun on the final prompt: 1404 agree, 27 differ, 0 blockers,
+1 missed refusal (explained). The 5 newly differing rows are reads or questions
+asked before anything runs.
+
+## 12.5 Related docs
 
 - `CLAUDE.md` > "Maple (Orchestrator) — CRUD assistant policies" — architectural overview
 - `documentation/development/plans/maple-xfail-wave-1.md` — active plan for closing the remaining xfail backlog
