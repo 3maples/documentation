@@ -859,9 +859,9 @@ The rename handler already covers description updates. These phrasings extend th
 | `add activity "Excavation" to {WI}` / `add activity "Planting" with 8 hours of effort to {WI}` / `remove the Excavation activity from {WI}` [wi] | `edit_estimate` | ✅ |
 | `add an activity called "Grading" with role Landscaper to {WI}` [wi] | `edit_estimate` | ✅ *(2026-09-27)* |
 | `remove all activities from {WI}` [wi] | refuse `bulk_delete` | 🛑 bulk-delete refusal (§9.1) |
-| `change the role on the Excavation activity to Foreman` [wi] | `edit_estimate` | ✅ *(2026-09-24 — re-snapshots rate and cost basis from the role's Rate)* |
+| `change the role on the Excavation activity to Foreman` [wi] | `edit_estimate` | ✅ *(2026-09-24 — re-snapshots the rate and, since 2026-10-22, the role snapshot: its wage and the company's unbillable and burden %)* |
 | `assign the Landscaper role to the cleanup activity` / `set the effort on the Grading activity in {WI} to 12 hours` / `make the excavation activity 6 hours` [wi] | `edit_estimate` | ✅ *(2026-09-24)* |
-| `update the rate for the Planting activity to $45/hr` [wi] | `edit_estimate` | ✅ *(2026-09-24 — a hand-set rate keeps the role's cost basis)* |
+| `update the rate for the Planting activity to $45/hr` [wi] | `edit_estimate` | ✅ *(2026-09-24 — a hand-set rate keeps the role snapshot, so the cost basis stays the role's)* |
 | `assign an effort rate card to the Excavation activity in {WI}` [wi] | refuse `out_of_chat` `rate_cards` | 🛑 redirected: the effort calculator on the activity; rate cards are in Settings *(was a gap: no chat command for rate cards)* |
 | `what activities are in {WI}?` / `list the activities on {WI}` [wi] | `list_work_item_lines` lines=activities | ✅ |
 | `how many activities does {WI} have?` [wi] | `list_work_item_lines` count lines=activities | ✅ |
