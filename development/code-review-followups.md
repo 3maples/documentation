@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1437**. Never
+- **Entries are numbered and permanent.** Next free number: **1439**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -452,6 +452,8 @@ Defer until perf measurements demand it; current shape is correct
 and clear. Worth coupling with a fixture-based perf test.
 
 ### 443. [MEDIUM] platform/routers/ops.py:200 — task counts aggregate the whole collection
+**RESOLVED 2026-10-22** (analytics MCP server, phase 1): `services/ops_queries.py::_counts_by_company` now `$match`es the page's company ids before grouping.
+
 `_counts_by_company` runs `$group` with no `$match`, and is now called on `tasks`
 as well as `users` for the ops Companies list. The page needs counts for at most
 100 company ids, but the pipeline scans every task in the database on every load.
@@ -551,6 +553,11 @@ now.
 `platform/agents/planner/execute_catalog.py:247` — page_size=50 while `_LIST_MAX` is 10. (review 2026-10-21 #154, deferred)
 
 **Suggested fix:** page_size=_LIST_MAX.
+
+### 1437. [MEDIUM] The New Users page still loads every candidate and asks Firebase for all of them
+`platform/services/ops_queries.py:559` — `list_new_users` now takes `stage` / `offset` / `limit` and the MCP tool pages and caps it (review 2026-10-22 #16, fixed in part). The query itself still loads every unverified, company-less and mid-onboarding user ever. With `live_verification` on (the `/ops/new-users` route), it also runs one Firebase lookup over all of them, because a verified orphan is dropped only after its live verification is known. The rows are then sliced in Python. This grows with spam signups. (review 2026-10-22 #16, remainder deferred: a full fix moves the orphan and verification classification into the query, which is larger than the finding described.)
+
+**Suggested fix:** Classify in Mongo first. Put the never-joined and orphan conditions (`company: None` with `_id` in the ever-joined set, or `has_ever_joined_company`) and the onboarding-incomplete companies into the query, page there with `skip` / `limit`, and run the live Firebase lookup on the page's rows only. Add `page` / `page_size` to the route; the portal page already shows "N of total".
 
 ## Silently swallowed errors
 
@@ -1265,6 +1272,11 @@ happens on the phone (where the image is genuinely secondary) rather than on des
 `portal/src/components/common/ActionsMenu.tsx:141` — A disabled menuitem can't be focused and its title isn't announced. (review 2026-10-16 round 2 #115, deferred)
 
 **Suggested fix:** `aria-disabled` plus a guarded onClick with `aria-describedby`, or visible secondary text.
+
+### 1438. [MEDIUM] The shared dialog's close button has no accessible name
+`portal/src/components/ui/dialog.tsx:114` — `DialogContent`'s X button renders only an icon, with no `aria-label` or visually hidden text, so screen readers announce it as an unnamed "button" in every dialog in the app. Found 2026-10-22 while testing the API keys dialog, whose test has to pick the close control as the dialog's first button.
+
+**Suggested fix:** Add `aria-label="Close"` to the button (and `aria-hidden` on the icon). Then switch `tests/StaffApiKeysDialog.test.tsx` to `getByRole("button", { name: /close/i })`.
 
 ## Responsive and breakpoint drift
 
@@ -2930,6 +2942,8 @@ instance of the pattern.
 only the new route would make it inconsistent with siblings).
 
 ### 453. [LOW] platform/routers/ops.py:417 — company-detail payload carries stale membership fields
+**RESOLVED 2026-10-22** (review 2026-10-22 #14): the analytics MCP server's `get_company` gives these fields to agents, so the accept-as-is reasoning below no longer held. `services/ops_queries.py::list_company_users` now passes `email_verified`, `membership_status` and `company_archived` as the Users page does.
+
 Reviewed and **accepted as-is** rather than deferred by omission. `list_company_users`
 calls `_serialize_user_summary(u, company.name)` with defaults, so the payload reports
 `membership_status="active"` and `company_archived=False` even for an archived company.
