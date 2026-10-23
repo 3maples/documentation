@@ -69,7 +69,7 @@ One command ([docs](https://code.claude.com/docs/en/mcp.md)); `--scope user`
 makes it available in every project:
 
 ```bash
-claude mcp add --transport http maples https://api-dev.3maples.ai/mcp --header "Authorization: Bearer 3m_mcp_…" --scope user
+claude mcp add --transport http 3maples-operations https://api-dev.3maples.ai/mcp --header "Authorization: Bearer 3m_mcp_…" --scope user
 ```
 
 To keep the key out of the config, use a `.mcp.json` (project scope) that reads
@@ -79,7 +79,7 @@ Claude Code blanks those inside remote-server headers.
 ```json
 {
   "mcpServers": {
-    "maples": {
+    "3maples-operations": {
       "type": "http",
       "url": "https://api-dev.3maples.ai/mcp",
       "headers": { "Authorization": "Bearer ${MAPLES_MCP_TOKEN}" }
@@ -107,7 +107,7 @@ header needs a bridge. The usual one is [`mcp-remote`](https://github.com/geelen
 ```json
 {
   "mcpServers": {
-    "maples": {
+    "3maples-operations": {
       "command": "npx",
       "args": ["mcp-remote", "https://api-dev.3maples.ai/mcp", "--header", "Authorization:${AUTH_HEADER}"],
       "env": { "AUTH_HEADER": "Bearer 3m_mcp_…" }
