@@ -328,6 +328,9 @@ seams that already exist as separate classes.
 | 76 | `delegate_generic` — platform/routers/agent_helpers/delegate_generic.py:31 (+6 on 2026-10-17 for the confidence fallback, PYTHON-V; review #42. Move the optional follow-up merge, L60-76, into `_merge_optional_follow_up(...)`) |
 | 170 | `MaterialRow` — portal/src/components/estimates/MaterialsTable.tsx:50 (first measured 2026-10-21 in the Work Item cost-column change, +~20 for the editable Cost cell, the moved Qty cell and read-only `disabled` — review 2026-10-21 #5, deferred. Extract a `LineCell({ label, span, children })` shared with `ActivityRow` for the repeated `<td>` + phone label, then split out the menu / collapsed-header block) |
 | 174 | `ActivityRow` — portal/src/components/estimates/ActivitiesTable.tsx:49 (first measured 2026-10-21, same change, +~20 for the Cost cell and read-only `disabled` — review 2026-10-21 #6, deferred. Same `LineCell` extraction as `MaterialRow`, and move the calculator button into an `EffortCalculatorCell`) |
+| 158 | `useWorkItemLines` — portal/src/hooks/useWorkItemLines.ts:35 (new 2026-10-22: the Work Item editor's line state and handlers, lifted out of `WorkItemInlineContent` in the cost → price change — review 2026-10-22 round 2 #3. Next seam: `useMaterialLines({ companyId, catalog, pricing })` and `useActivityLines({ people, pricing })`, the catalog resolution staying in the material half; the component composes the two) |
+| 495 | `WorkItemInlineContent` — portal/src/components/estimates/WorkItemInlineContent.tsx:52 (first recorded 2026-10-22 after the lines hook took 103 lines out (650 → 547 file lines) — review 2026-10-22 round 2 #4. Next seam: the markup / gross-margin / adjust handlers (`handleProfitMarginChange`, `handleGrossMarginChange`, `handleAdjustSet` and the breakdown memos) into a `useWorkItemPricing` hook) |
+| 492 | `TemplatesTab` — portal/src/components/settings/TemplatesTab.tsx:30 (first recorded 2026-10-22 after the company fetch moved into `useCompanyDefaults` (532 → 516 file lines) — review 2026-10-22 round 2 #5. Next seam: the template form dialog state (`editingTemplate`, `isFormOpen`, `handleSave`, `initialWorkItem`) into a `useTemplateForm` hook) |
 
 #### Watch
 
@@ -4672,6 +4675,8 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 `portal/src/lib/materials.ts:25` — `Math.round(x*100)/100` rounds halves up; the server's `round(x, 2)` rounds half-even (cost 2.10 at 25%: portal 2.63, server 2.62). (review 2026-10-17 round 4 #25, deferred)
 
 **Suggested fix:** Show the markup price as a placeholder and send null so the server's `markup_price` is the only rounding.
+
+**Resolved 2026-10-22:** `portal/src/lib/money.ts::roundToCent` rounds half-even like the platform's `round(x, 2)`; `markupPrice` (and the new `labourRate`) use it, so the portal's figure matches the server's at an exact half-cent (`tests/money.test.ts`, `tests/materials.test.ts`). Done in the Work Item cost → price change.
 
 ### 1278. [MEDIUM] Dead arms: `"price_recorded" in size` and `"source" in material`
 `portal/src/pages/MaterialsPage.tsx:741` — `openEditMaterial` widened to `Material | EffectiveMaterial`, but both callers pass an `EffectiveMaterial`, so the `in` checks' false arms can't run. (review 2026-10-17 round 5 #14, deferred)
