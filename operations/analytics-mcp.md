@@ -7,13 +7,7 @@ log and usage history. Design and decisions:
 [`development/plans/analytics-mcp-server.md`](../development/plans/analytics-mcp-server.md).
 Rules for anyone changing it: `.claude/rules/mcp-analytics.md`.
 
-| Environment | Endpoint |
-|---|---|
-| Dev | `https://api-dev.3maples.ai/mcp` |
-| Production | `https://<production API host>/mcp` |
-
-It answers 404 until `MCP_SERVER_ENABLED=true` is set on that environment's
-platform service (see [Turning it on](#turning-it-on)).
+Endpoint: `https://api.3maples.ai/mcp`
 
 ---
 
@@ -56,7 +50,7 @@ The server speaks Streamable HTTP and takes the key as a bearer token:
 the endpoint both work):
 
 ```bash
-curl -s https://api-dev.3maples.ai/mcp \
+curl -s https://api.3maples.ai/mcp \
   -H "Authorization: Bearer $MAPLES_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
@@ -69,7 +63,7 @@ One command ([docs](https://code.claude.com/docs/en/mcp.md)); `--scope user`
 makes it available in every project:
 
 ```bash
-claude mcp add --transport http 3maples-operations https://api-dev.3maples.ai/mcp --header "Authorization: Bearer 3m_mcp_…" --scope user
+claude mcp add --transport http 3maples-operations https://api.3maples.ai/mcp --header "Authorization: Bearer 3m_mcp_…" --scope user
 ```
 
 To keep the key out of the config, use a `.mcp.json` (project scope) that reads
@@ -81,7 +75,7 @@ Claude Code blanks those inside remote-server headers.
   "mcpServers": {
     "3maples-operations": {
       "type": "http",
-      "url": "https://api-dev.3maples.ai/mcp",
+      "url": "https://api.3maples.ai/mcp",
       "headers": { "Authorization": "Bearer ${MAPLES_MCP_TOKEN}" }
     }
   }
@@ -90,33 +84,46 @@ Claude Code blanks those inside remote-server headers.
 
 ### claude.ai and Claude Desktop (custom connector)
 
-**Settings → Connectors → Add custom connector**: the endpoint URL, and the key
-as a fixed request header (`Authorization` = `Bearer 3m_mcp_…`). Anthropic's
-[custom connector guide](https://support.claude.com/en/articles/11175166-getting-started-with-custom-connectors-using-remote-mcp)
-covers servers that use "an API key, bearer token, or other fixed credential
-instead of OAuth". Not yet tried against this server (2026-10-22): check the
-field accepts an `Authorization` header before relying on it. On a Team or
-Enterprise plan an owner may have to add the connector for the organisation.
+Setting up the MCP connection in Claude Desktop:
+
+1. **Settings → Connectors → Add custom connector.**
+2. **Name:** `3maples-operations`. **URL:** `https://api.3maples.ai/mcp`
+3. **Authentication:** choose **No sign-in**. Don't choose a sign-in option: this
+   server has no OAuth, so a sign-in attempt would just fail.
+4. **Request headers:** add
+   - name `Authorization`
+   - value `Bearer 3m_mcp_…` (the word `Bearer`, a space, then your key)
+5. Save, then turn the connector on in a chat's tools menu.
+
+Depending on the account, the authentication and header settings may be on a
+second screen after the URL; Anthropic's [custom connector guide](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
+describes both layouts. On a Team or Enterprise plan an owner may have to add
+the connector for the organisation. The same connector works in claude.ai on
+the web.
 
 ### Claude Desktop config file
 
-`claude_desktop_config.json` runs only local servers, so a remote server with a
-header needs a bridge. The usual one is [`mcp-remote`](https://github.com/geelen/mcp-remote)
-(community tooling, not Anthropic's; not yet tried against this server):
+For an account whose custom connector screen has no **Request headers**
+option. `claude_desktop_config.json` runs only local servers, so a remote server
+with a header needs a bridge. The usual one is
+[`mcp-remote`](https://github.com/geelen/mcp-remote) (community tooling, not
+Anthropic's). Open **Settings → Developer → Edit Config** and add `mcpServers`
+as a top-level entry if the file has none. Quit Claude Desktop with ⌘Q and
+reopen it after saving.
 
 ```json
 {
   "mcpServers": {
     "3maples-operations": {
       "command": "npx",
-      "args": ["mcp-remote", "https://api-dev.3maples.ai/mcp", "--header", "Authorization:${AUTH_HEADER}"],
+      "args": ["-y", "mcp-remote", "https://api.3maples.ai/mcp", "--header", "Authorization:${AUTH_HEADER}"],
       "env": { "AUTH_HEADER": "Bearer 3m_mcp_…" }
     }
   }
 }
 ```
 
-Prefer the custom connector above where it works.
+Keep the key in `env`, not in `args`: Claude Desktop splits arguments that contain spaces. If the server doesn't appear, read `~/Library/Logs/Claude/mcp-server-<name>.log`.
 
 ### Cursor and other clients
 
@@ -176,46 +183,8 @@ who asked, which tool, with what arguments, how many rows came back.
 
 | You see | Why | Fix |
 |---|---|---|
-| HTTP 404 | The server is off in this environment | Set `MCP_SERVER_ENABLED=true` ([Turning it on](#turning-it-on)) |
+| HTTP 404 | The server is off in this environment | Set `MCP_SERVER_ENABLED=true` on that environment's platform service |
 | HTTP 401 | Missing, mistyped, revoked or expired key, or the staff account is disabled | Check the header is `Authorization: Bearer 3m_mcp_…`; issue a new key |
 | HTTP 429 | More than 120 requests a minute on this key, or 600 from one address | Wait a minute; ask fewer, broader questions |
 | "include_details needs an ops_admin or root key" | Your role can't see details | Ask without details, or use a senior key |
 | "a range is at most 400 days" | The question spans more than 400 days | Ask per year |
-
----
-
-## Turning it on
-
-Per environment, on the platform web service in the Render dashboard
-(`fastapi-app`), **Environment**:
-
-1. Add `MCP_SERVER_ENABLED` = `true`. The limits have working defaults
-   (`MCP_RATE_LIMIT_PER_MINUTE`, `MCP_MAX_PAGE_SIZE`, `MCP_MAX_BUCKETS`,
-   `MCP_QUERY_TIMEOUT_MS`; see `platform/.env.example`).
-2. Save; Render redeploys. `/mcp` now answers 401 to a request without a key.
-
-### Before the release that first ships it
-
-The same release adds the 395-day audit retention. **Its first startup in an
-environment deletes every audit row older than 395 days.** Before promoting it,
-count what would go, read-only:
-
-```bash
-cd platform
-MONGODB_URL='<that environment's connection string>' .venv/bin/python scripts/audit_retention_check.py
-```
-
-If that environment sets its own `AUDIT_LOG_RETENTION_DAYS`, pass it with
-`--days <n>`; otherwise the script uses this machine's setting (395).
-
-It prints the total, the oldest row and the rows that would be deleted, by
-action. It writes nothing and never builds indexes. Dev, checked 2026-10-22:
-6,069 rows, oldest 2026-03-20, **none** would be deleted. Production is the one
-to check.
-
-After merging into the main checkout, its `platform/.venv` needs the new
-dependency (`mcp`) before the pre-push hook can import the app:
-
-```bash
-cd platform && .venv/bin/pip install -r requirements.txt
-```
