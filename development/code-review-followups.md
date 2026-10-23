@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1435**. Never
+- **Entries are numbered and permanent.** Next free number: **1436**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -983,6 +983,11 @@ both tables' headers.
 `platform/agents/planner/execute_catalog.py:51` — It rebuilds `routers/material_helpers/common.audit` field by field. (review 2026-10-21 #153, deferred)
 
 **Suggested fix:** Call `audit(...)` under audit_source("maple"), keeping only the context-email fallback and the category type.
+
+### 1435. [LOW] The "visible text without sr-only" matcher is duplicated across two Materials page test files
+`portal/tests/MaterialsPageServerList.test.tsx:114` — The Materials page's description link reads "here" with a hidden `, details on Standard materials and costs` suffix (its accessible name). `visibleText()` in `MaterialsPageStandardCostsDialog.test.tsx:48` and the same clone-strip-compare logic inline in the server-list test's `findByText` callback are two copies of one helper, which drift the next time the hidden suffix changes. A twin is MEDIUM by the dead-code rule; LOW because it is five lines of test-only code. (review 2026-10-22 materials description popup round 3 #1, deferred)
+
+**Suggested fix:** Move `visibleText(node: Element): string` to `portal/tests/helpers/visibleText.ts` (beside `actionsMenuLayout.ts`) and import it in both tests; the server-list matcher becomes `node?.tagName === "P" && visibleText(node) === text`.
 
 ## Accessibility
 
