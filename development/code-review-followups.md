@@ -242,6 +242,7 @@ seams that already exist as separate classes.
 | 67 | `sync_payment_method` — routers/billing.py:443 (61 before 2026-10-01, +6 for the card-ownership 404 — tenant batch 2 review #3. Move the Stripe calls into `_make_default_card(stripe, company, payment_method_id) -> (brand, last4)`) |
 | 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
+| ~470 | `CompanyStep` component — portal/src/components/onboarding/CompanyStep.tsx:77 (first measured 2026-10-24 review #1; move the address block — street/city/province/postal and autocomplete — into a `CompanyAddressFields` component, and the create-vs-update submit into a `useCompanySubmit` hook) |
 | ~264 | `TourRunner` — portal/src/components/tours/TourManager.tsx:83 |
 | 282 | `OrchestratorAgent.process()` — agents/orchestrator/service.py:1883 (god-method; +19 on 2026-09-24 — move the two new early exits into one `_match_estimate_conversation_lane()`, review #67) |
 | 196 | `handle_pending_optional_follow_up` — routers/agent_helpers/optional_follow_up.py:462 (down from ~281 by #326; #326 claimed this was already tracked here — it was not) |
