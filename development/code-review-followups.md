@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1439**. Never
+- **Entries are numbered and permanent.** Next free number: **1440**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -118,7 +118,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,284 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
 | 1,274 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
 | 1,246 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | −153 by 2026-09-27 |
-| 1,224 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below. 1,224 on 2026-10-17 (+14: the Firebase throttle → 429 on the verification and password-reset routes, PYTHON-W) |
+| 1,360 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below. 1,360 on 2026-10-23 (+42: the email-only resend endpoint and signup's `created` flag, auth screens review). 1,224 on 2026-10-17 (+14: the Firebase throttle → 429 on the verification and password-reset routes, PYTHON-W) |
 | 1,206 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | +11 on 2026-09-27 |
 | 1,201 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
 | 1,177 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
@@ -218,7 +218,8 @@ seams that already exist as separate classes.
 | 66 | `_check_add_size_guard` — platform/agents/material/service.py:2396 (edited 2026-10-17. Extract the missing-field reply — round 4 #18) |
 | 210 | `StandardMaterialDialog` — portal/src/components/materials/StandardMaterialDialog.tsx:42 (new 2026-10-16. Split out `StandardDialogFooter` and `StandardPriceRow` — review 2026-10-16 round 2 #60) |
 | ~390 | `MaterialCategoriesTab` — portal/src/components/materials/MaterialCategoriesTab.tsx:24 (moved from Settings 2026-10-17, its reload and add/edit dialog taken out; +~80 on 2026-10-16 for the standard opt-in. Move the opt-in into a `useStandardOptIn(companyId)` hook plus a small component — round 2 #61) |
-| 386 | `SignupPage` — portal/src/pages/auth/SignupPage.tsx:60 (first measured 2026-10-20 at 393 with Continue with Google and the busy hold — Google SSO review #12, deferred; 386 on 2026-10-21: the terms checkbox came out (one consent line now covers Google and email) and the email form collapses behind "Sign up with email". Extracting the field markup alone still leaves it far over, since `handleSubmit` is ~110 lines. Move the submit flow into a `useEmailSignup()` hook (create, portal user, invitation, verification email, rollback) and the fields into `SignupFormFields` under `components/auth/`) |
+| ~430 | `SignupPage` — portal/src/pages/auth/SignupPage.tsx:62 (~430 on 2026-10-23: the orphaned-login recovery and the handed-over email prefill went in — the recovery itself lives in `lib/auth/recoverOrphanedLogin.ts`; first measured 2026-10-20 at 393 with Continue with Google and the busy hold — Google SSO review #12, deferred; 386 on 2026-10-21: the terms checkbox came out (one consent line now covers Google and email) and the email form collapses behind "Sign up with email". Extracting the field markup alone still leaves it far over, since `handleSubmit` is ~110 lines. Move the submit flow into a `useEmailSignup()` hook (create, portal user, invitation, verification email, rollback) and the fields into `SignupFormFields` under `components/auth/`) |
+| ~450 | `LoginPage` — portal/src/pages/auth/LoginPage.tsx:94 (first measured 2026-10-23, auth screens review #8: the notice banners handed over from other auth pages, the notice-clearing effect and the "no 3Maples account" banner went into an already-oversized component — 552-line file. Same split as SignupPage: the submit flow into a `useEmailLogin()` hook, the banner and notice logic (`NOTICE_BANNERS`, the clearing effect, the user-not-found banner) into a `useLoginBanner()` hook, and the form fields into a component under `components/auth/`) |
 | ~267 | `MaterialUnitsTab` — portal/src/components/materials/MaterialUnitsTab.tsx:25 (moved from Settings 2026-10-17; the reload and add/edit dialog came out. **Next step:** #337's shared `ResourceCatalogTab`, which both tabs collapse into — review 2026-10-17 round 2 #5) |
 | 53 | `upload_materials_csv` — platform/routers/materials.py:225 (2026-10-16; move the audit and reply-building out of the handler — round 2 #62) |
 | ~70 | `create_company_with_bootstrap` — platform/services/company_service.py:92 (grew 2026-10-16; pull the step list into `_bootstrap_steps(include_materials, include_roles)` — round 2 #63) |
@@ -3159,6 +3160,12 @@ geocode and note it in the comment.
 
 **Suggested fix:** A `_buffer_slot` semaphore (2×READ_CONCURRENCY) around `file.read()` + `store_attachment`.
 
+
+
+### 1439. [LOW] The email-only verification resend answers differently under a throttle or outage
+`platform/routers/auth.py:685` — `/auth/resend-verification-request` answers 200 alike for unknown, already-verified and sent. But Firebase's TOO_MANY_ATTEMPTS_TRY_LATER (→ 429), and a Brevo failure (→ 502) after a successful lookup, can only happen for an existing account, so a caller can tell under throttle or outage. This is the same pattern as #1298 for password reset, at the endpoint added 2026-10-23 when the Resend verification page dropped its password. LOW because it needs a throttle or outage to show. (Auth screens review 2026-10-23 #9, deferred: the fix is a product call.)
+
+**Suggested fix:** Decide alongside #1298. Either answer the generic 200 for both the throttle and the delivery failure (logging them as now), or keep the honest 429/502 for usability. Keep the two endpoints consistent, whichever is picked; today both give the honest answer.
 
 ## Platform — services, scripts and integrations
 
