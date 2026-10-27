@@ -1,6 +1,11 @@
 # Estimate document images: sizes, captions, note photos, edit access
 
-**Status:** Implemented 2026-10-21
+**Status:** Implemented 2026-10-21. The edit-access part (L8, "Edit access",
+the dialog's docs-access call and its read-only message) was superseded
+2026-10-26 by edit windows: Open on a version shares that Doc "anyone with the
+link can edit" until it is idle for 30 minutes or 4 hours have passed
+(`platform/services/estimate_doc_edit_window.py`); the per-user grants and the
+public view access are gone.
 **Builds on:** [2026-09-23-estimate-documents-dialog-design.md](2026-09-23-estimate-documents-dialog-design.md)
 
 ## Why

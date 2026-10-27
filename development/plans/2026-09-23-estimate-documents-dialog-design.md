@@ -4,7 +4,8 @@
 Partly superseded 2026-10-21 by
 [2026-10-21-estimate-doc-images-layout.md](2026-10-21-estimate-doc-images-layout.md):
 image sizes and captions, note photos (reverses D6), 30 images with
-thumbnails, row layout, and per-user edit access to the doc.
+thumbnails, row layout, and per-user edit access to the doc (itself replaced
+2026-10-26 by time-limited link editing on Open).
 **Date:** 2026-09-23
 
 ## Why
