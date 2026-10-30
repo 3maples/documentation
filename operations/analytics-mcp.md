@@ -1,13 +1,13 @@
 # Analytics MCP server: connect an agent
 
 For 3Maples staff. The platform serves a read-only [MCP](https://modelcontextprotocol.io)
-server at `/mcp` that lets an AI agent (Claude Code, Claude Desktop, Cursor, your
+server at `/mcp/internal` that lets an AI agent (Claude Code, Claude Desktop, Cursor, your
 own) answer usage questions from the same data as the ops portal, plus the audit
 log and usage history. Design and decisions:
 [`development/plans/analytics-mcp-server.md`](../development/plans/analytics-mcp-server.md).
 Rules for anyone changing it: `.claude/rules/mcp-analytics.md`.
 
-Endpoint: `https://api.3maples.ai/mcp`
+Endpoint: `https://api.3maples.ai/mcp/internal`
 
 ---
 
@@ -50,7 +50,7 @@ The server speaks Streamable HTTP and takes the key as a bearer token:
 the endpoint both work):
 
 ```bash
-curl -s https://api.3maples.ai/mcp \
+curl -s https://api.3maples.ai/mcp/internal \
   -H "Authorization: Bearer $MAPLES_MCP_TOKEN" \
   -H "Content-Type: application/json" \
   -H "Accept: application/json, text/event-stream" \
@@ -63,7 +63,7 @@ One command ([docs](https://code.claude.com/docs/en/mcp.md)); `--scope user`
 makes it available in every project:
 
 ```bash
-claude mcp add --transport http 3maples-operations https://api.3maples.ai/mcp --header "Authorization: Bearer 3m_mcp_…" --scope user
+claude mcp add --transport http 3maples-operations https://api.3maples.ai/mcp/internal --header "Authorization: Bearer 3m_mcp_…" --scope user
 ```
 
 To keep the key out of the config, use a `.mcp.json` (project scope) that reads
@@ -75,7 +75,7 @@ Claude Code blanks those inside remote-server headers.
   "mcpServers": {
     "3maples-operations": {
       "type": "http",
-      "url": "https://api.3maples.ai/mcp",
+      "url": "https://api.3maples.ai/mcp/internal",
       "headers": { "Authorization": "Bearer ${MAPLES_MCP_TOKEN}" }
     }
   }
@@ -87,7 +87,7 @@ Claude Code blanks those inside remote-server headers.
 Setting up the MCP connection in Claude Desktop:
 
 1. **Settings → Connectors → Add custom connector.**
-2. **Name:** `3maples-operations`. **URL:** `https://api.3maples.ai/mcp`
+2. **Name:** `3maples-operations`. **URL:** `https://api.3maples.ai/mcp/internal`
 3. **Authentication:** choose **No sign-in**. Don't choose a sign-in option: this
    server has no OAuth, so a sign-in attempt would just fail.
 4. **Request headers:** add
@@ -116,7 +116,7 @@ reopen it after saving.
   "mcpServers": {
     "3maples-operations": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "https://api.3maples.ai/mcp", "--header", "Authorization:${AUTH_HEADER}"],
+      "args": ["-y", "mcp-remote", "https://api.3maples.ai/mcp/internal", "--header", "Authorization:${AUTH_HEADER}"],
       "env": { "AUTH_HEADER": "Bearer 3m_mcp_…" }
     }
   }
@@ -169,8 +169,14 @@ Example questions:
 - **Audit rows are kept 395 days**, then deleted. Every audit and usage read
   covers at most 400 days (the last 30 by default).
 - **When a company finished onboarding isn't stored**, only whether it has.
-- **Users join across tools by email.** Audit rows carry the Firebase UID as
-  `user_id`; the user tools return database ids.
+- **Audit rows name their actor by database id.** `user_id` is the user's
+  `users._id` (a staff member's `staff_users._id` on staff rows), the same id
+  the user tools return, so rows join on it or on `user_email`. Rows written
+  before 2026-10-28 held the Firebase UID until
+  `scripts/backfill_audit_user_ids.py` ran on that environment.
+- **`source` is the channel a change came through**: `maple` (and its
+  agents), `mcp` (a customer's API key, once the tenant MCP server ships; nothing writes it yet), `stripe` (a webhook that moved the plan; nothing else from Stripe is audited), a script's
+  name, or none for the portal. `audit_vocabulary` lists them.
 - Unanswered Maple turns are kept 180 days; Maple turns and credits are kept
   with the LLM calls.
 

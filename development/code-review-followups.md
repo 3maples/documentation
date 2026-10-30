@@ -24,7 +24,7 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1440**. Never
+- **Entries are numbered and permanent.** Next free number: **1457**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -103,7 +103,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 
 | Lines | File | Note |
 |------:|------|------|
-| 3,797 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push); 4,022 on 2026-10-05 (+5 that day: `_create_estimate_from_template(audit=)`); 4,089 on 2026-10-06 (+67: tax in the dashboard's figures and a list's total); 4,144 on 2026-10-08 (+55, switchover phase 4d: the property link's write and reply split out as `_apply_estimate_property` for the planner); 4,163 on 2026-10-09 (+19, switchover phase 6b: today's template apply's tail split out as `_add_template_work_item`); +4 on 2026-10-10 (phase 7d: the dashboard's summary card in `dashboard_reply`) |
+| 4,098 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | 4,098 on 2026-10-28 (+7: Maple's status rows, MCP enhancements release one); +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push); 4,022 on 2026-10-05 (+5 that day: `_create_estimate_from_template(audit=)`); 4,089 on 2026-10-06 (+67: tax in the dashboard's figures and a list's total); 4,144 on 2026-10-08 (+55, switchover phase 4d: the property link's write and reply split out as `_apply_estimate_property` for the planner); 4,163 on 2026-10-09 (+19, switchover phase 6b: today's template apply's tail split out as `_add_template_work_item`); +4 on 2026-10-10 (phase 7d: the dashboard's summary card in `dashboard_reply`) |
 | 3,577 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net); +70 by 2026-09-27 — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py`; +155 on 2026-09-27 (multi-turn push: cross-record joins, dashboard, named creates) |
 | 3,611 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | 3,611 on 2026-10-17 (review rounds 4–5: size-label refusals and the planner's size read); 3,565 on 2026-10-16 (shared material catalog: reads through `services/material_catalog`, Owner/Admin gates, standard hides; −108 in the review fixes as the standard price write moved to `agents/material/catalog_writes.py`); 3,483 on 2026-10-10 (+27 over 3,456, switchover phase 7d: `material_sizes_reply` shared with today's size command, `materials_on_estimate_reply` and `_estimate_materials_reply`); +366 on 2026-09-27 (multi-turn push: size commands, one-question creates); +123 in the 2026-09-27/28 review fixes (3,087 at `main` then) — the material in focus, size-label refusals, "which material?". `_handle_size_command` is 107 lines — split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` (review 2026-09-27 #29) |
 | 2,823 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug; +70 on 2026-09-27; 2,823 on 2026-10-10 (switchover phase 7d part 2: `properties_using_reply`, the cross list's words split out as `_cross_response`, and `_estimate_linked_reply` and `_joined_properties_reply` split out of `_list_properties_by_cross_resource`, which is now under 50 lines) |
@@ -112,13 +112,13 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 2,268 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam; 2,268 on 2026-10-16 (shared material catalog: `useMaterialCatalog` replaces the loaded list, and the gap-name lookup was removed in review) |
 | 2,227 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. was `orchestrate_agent_endpoint` at 607 lines; +221 on 2026-09-27 (open question, conversation store, page signals); the endpoint body is now `_orchestrate_turn` (#689), 729 lines (functions table); re-measured 2,227 on 2026-10-07 (+63 that day, from 2,164: the turn id and the unanswered tracker's hooks on the finalize closure, the early exits and the 500 path — review 2026-10-07 #4, deferred) |
 | 1,720 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24, +156 by 2026-09-27. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73); +89 on 2026-09-27 |
-| 1,644 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
+| 1,558 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | 1,558 on 2026-10-28 (+22: the status-change row on the PUT, MCP enhancements release one); −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
 | 1,712 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | +42 on 2026-09-27; 1,712 on 2026-10-10 (+27, switchover phase 7d: `roles_on_estimate_reply`, the per-estimate list's reply split out as `_estimate_labours_reply` so the planner passes its own estimate) |
 | 1,696 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | 1,696 on 2026-10-17 (+18 in review round 2's fixes; component ~1,540); 1,678 on 2026-10-16 (shared material catalog stage 2: server paging, filters, standard pricing and the page/row menus; −41 in the review fixes when the result notices moved to `lib/materialNotices.ts`). The component function is ~1,450 lines — **next step:** move the toolbar (search, filters, sort) and the page menu with its three modals into `components/materials/` |
 | 1,284 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
 | 1,274 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
 | 1,246 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | −153 by 2026-09-27 |
-| 1,360 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below. 1,360 on 2026-10-23 (+42: the email-only resend endpoint and signup's `created` flag, auth screens review). 1,224 on 2026-10-17 (+14: the Firebase throttle → 429 on the verification and password-reset routes, PYTHON-W) |
+| 1,406 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below. 1,406 on 2026-10-28 (+48: the account-lifecycle audit rows, MCP enhancements release one). 1,360 on 2026-10-23 (+42: the email-only resend endpoint and signup's `created` flag, auth screens review). 1,224 on 2026-10-17 (+14: the Firebase throttle → 429 on the verification and password-reset routes, PYTHON-W) |
 | 1,206 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | +11 on 2026-09-27 |
 | 1,201 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
 | 1,177 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
@@ -231,7 +231,7 @@ seams that already exist as separate classes.
 | 116 | `create_estimate_tools` — platform/agents/estimate/tools.py:84 (the factory holding the tool closures; 171 → 116 on 2026-10-16 when `_best_by_name` / `_match_entry` / `_material_row` came out — review 2026-10-16 #117) |
 | 63 | `_handle_create_material` — platform/agents/material/service.py:1328 (107 → 63 on 2026-10-16, review #117; the category/unit resolution is the next cut) |
 | 53 | `_finalize_update_material` — platform/agents/material/service.py:2615 (79 → 53 on 2026-10-16, review #117) |
-| 381 | `update_estimate` — routers/estimates.py:959 (grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation, +5 on 2026-10-01 for the tenant checks; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
+| 387 | `update_estimate` — routers/estimates.py:953 (387 on 2026-10-28, +22 over 365 for the status-change row beside ESTIMATE_UPDATE — the helper below is now owed; grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation, +5 on 2026-10-01 for the tenant checks; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
 | 124 | `create_estimate` — routers/estimates.py:299 (first measured 2026-10-01: 118 before, +6 for the property and line checks before the slot claim. Extract `_assert_create_refs(company_obj_id, payload)` — tenant batch 1 review #2) |
 | 99 | `duplicate_estimate` — routers/estimates.py:790 (first measured 2026-10-01: 93 before, +6 to drop another company's property from the copy; extract the clone into `_clone_estimate(source, user_email)`) |
 | 195 | `run_task_conversion` — services/task_convert.py:45 (first measured 2026-10-01: 191 before, +4 for the property check before the slot claim; split into claim / generate-and-save / file-photos / link-or-delete helpers) |
@@ -239,7 +239,7 @@ seams that already exist as separate classes.
 | 57 | `create_task` — routers/tasks.py:98 (first measured 2026-10-01: 56 before, +1; the same helper — tenant batch 1 review #4) |
 | 76 | `archive_estimate` — routers/estimates.py:1394 (first measured 2026-10-01, ~+1 for moving the tenant 404 ahead of the status answer — tenant batch 2 review #1. Extract `_archive_actor(decoded_token, estimate) -> User` — the email/user lookup, the tenant 404 and the creator-or-Owner/Admin check — shared with `unarchive_estimate`) |
 | 76 | `unarchive_estimate` — routers/estimates.py:1473 (first measured 2026-10-01; a near-copy of `archive_estimate`'s authorization block — the same `_archive_actor` helper — tenant batch 2 review #2) |
-| 67 | `sync_payment_method` — routers/billing.py:443 (61 before 2026-10-01, +6 for the card-ownership 404 — tenant batch 2 review #3. Move the Stripe calls into `_make_default_card(stripe, company, payment_method_id) -> (brand, last4)`) |
+| 82 | `sync_payment_method` — routers/billing.py:457 (82 on 2026-10-28, +15 for the PAYMENT_METHOD_UPDATE row; 61 before 2026-10-01, +6 for the card-ownership 404 — tenant batch 2 review #3. Move the Stripe calls into `_make_default_card(stripe, company, payment_method_id) -> (brand, last4)`) |
 | 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
 | ~470 | `CompanyStep` component — portal/src/components/onboarding/CompanyStep.tsx:77 (first measured 2026-10-24 review #1; move the address block — street/city/province/postal and autocomplete — into a `CompanyAddressFields` component, and the create-vs-update submit into a `useCompanySubmit` hook) |
@@ -336,6 +336,14 @@ seams that already exist as separate classes.
 | 158 | `useWorkItemLines` — portal/src/hooks/useWorkItemLines.ts:35 (new 2026-10-22: the Work Item editor's line state and handlers, lifted out of `WorkItemInlineContent` in the cost → price change — review 2026-10-22 round 2 #3. Next seam: `useMaterialLines({ companyId, catalog, pricing })` and `useActivityLines({ people, pricing })`, the catalog resolution staying in the material half; the component composes the two) |
 | 495 | `WorkItemInlineContent` — portal/src/components/estimates/WorkItemInlineContent.tsx:52 (first recorded 2026-10-22 after the lines hook took 103 lines out (650 → 547 file lines) — review 2026-10-22 round 2 #4. Next seam: the markup / gross-margin / adjust handlers (`handleProfitMarginChange`, `handleGrossMarginChange`, `handleAdjustSet` and the breakdown memos) into a `useWorkItemPricing` hook) |
 | 492 | `TemplatesTab` — portal/src/components/settings/TemplatesTab.tsx:30 (first recorded 2026-10-22 after the company fetch moved into `useCompanyDefaults` (532 → 516 file lines) — review 2026-10-22 round 2 #5. Next seam: the template form dialog state (`editingTemplate`, `isFormOpen`, `handleSave`, `initialWorkItem`) into a `useTemplateForm` hook) |
+| 62 | `signup` — routers/auth.py:493 (first measured 2026-10-28: 53 → 62 for the USER_SIGNUP row — review 2026-10-28, MCP enhancements release one (audit gaps) #13. Move the audit call into `_audit_signup(request, user)` beside `_dispatch_signup_events`) |
+| 118 | `accept_company_invitation` — routers/auth.py:1040 (first measured 2026-10-28: 111 → 118 for the USER_JOIN_COMPANY row — review 2026-10-28, MCP enhancements release one (audit gaps) #14. Extract the company-assignment block, the join row included, into `_join_invited_company(user, invitation, request)`) |
+| 58 | `complete_company_onboarding` — routers/auth.py:1275 (**crossed the line 2026-10-28**, 39 → 58: the COMPANY_CREATE and USER_JOIN_COMPANY rows — review 2026-10-28, MCP enhancements release one (audit gaps) #15. Move both rows into `_audit_onboarding(request, user, company)`) |
+| 73 | `select_plan` — routers/billing.py:172 (first measured 2026-10-28: 60 → 73 for the PLAN_SELECT row — review 2026-10-28, MCP enhancements release one (audit gaps) #16. Extract `_audit_plan_select(request, decoded_token, company, previous, new)`) |
+| 97 | `stripe_webhook` — routers/stripe_webhooks.py:46 (first measured 2026-10-28: 92 → 97; the plan-move row is already its own `_audit_plan_change` — review 2026-10-28, MCP enhancements release one (audit gaps) #17. Extract the handler run and its error path into `_run_handler(handler, event_dict, event_type, record)`) |
+| 114 | `update_user` — routers/users.py:208 (first measured 2026-10-28: 91 → 114 for the separate role-change row — review 2026-10-28, MCP enhancements release one (audit gaps) #18. Move the role-change and generic rows into `_audit_user_update(http_request, decoded_token, user_id, company_id, before, after, action, is_removal)`) |
+| 140 | `create_audit_log` — services/audit_service.py:175 (first measured 2026-10-28: 124 → 140 for the actor resolution — review 2026-10-28, MCP enhancements release one (audit gaps) #19. Extract `async def _resolve_actor(decoded_token, user_id, user_email, user_role) -> Tuple[...]`, the block that turns any shape into the Mongo user id) |
+| 163 | `_handle_update_estimate_status_transition` — agents/estimate/crud_handlers.py:3594 (first measured 2026-10-28: 162 → 163, the `audit=False` comment — review 2026-10-28, MCP enhancements release one (audit gaps) #20. Split into three helpers: the send gate, the write, and the reply) |
 
 #### Watch
 
@@ -5670,6 +5678,90 @@ total row count rather than blank-row count.
 `platform/tests/test_vocabulary_unique_names.py` — It passes alone (14 of 14). Run after `test_maple_conversations.py`, `test_maple_refusal_is_final.py` and the `test_planner_*` files (the set that imports the material catalog), 11 to 13 of its tests fail with 401s and `KeyError: '_id'`, and a different neighbour fails on each run (`estimate-delete-listed-row-not-the-open-one`, `list_templates` paging, `show me the notes for 12 Oak St`). `main` at 9945d94 fails the same way, so it isn't a regression. The 401s suggest a test removes or changes the shared test user its `X-Test-Email` header names. (found 2026-10-20 while checking #60)
 
 **Suggested fix:** Bisect the batch to the file that leaves the shared user or company changed. Have that test restore it, or give the vocabulary tests their own user.
+
+### 1440. [LOW] `create_audit_log`: two actor arms untested (review 2026-10-28, MCP enhancements release one)
+`platform/services/audit_service.py:175` — Edge cases. Line 231: an acting user is set but the token names a different email, which should fall through to the email lookup. Line 237: an email-only call with no token (fixed for staff key rows by passing `user_id`, but no direct test).
+
+**Suggested fix:** Test 1: set an acting user, pass `decoded_token={"email": other}`, and assert the row names the other user. Test 2: call with `user_email` only and assert the id is resolved.
+
+### 1441. [LOW] `_actor_from_token`: the no-email arm is untested (review 2026-10-28, MCP enhancements release one)
+`platform/services/audit_service.py:66` — Edge case. A token with no email returns `(None, token.get("role"))` at line 77, and no test drives it.
+
+**Suggested fix:** Call `create_audit_log(decoded_token={"uid": "x"})` and assert `user_id is None`.
+
+### 1442. [LOW] `_audit_email_request`: an email with no platform user is untested (review 2026-10-28, MCP enhancements release one)
+`platform/routers/auth.py:670` — Edge case. When the email has no platform user, the row carries only the email, and no test covers it.
+
+**Suggested fix:** Stub the send, post a password reset for an email with no `User`, and assert one row with `resource_id` None and that email.
+
+### 1443. [LOW] Invitation re-accept into the user's own company: no join row, untested (review 2026-10-28, MCP enhancements release one)
+`platform/routers/auth.py:1102` — Edge case. When `should_update_company` is False (the invitation is into the company the user already belongs to), no USER_JOIN_COMPANY row should be written. No test drives that arm.
+
+**Suggested fix:** Accept an invitation into the user's current company and assert no new join row.
+
+### 1444. [LOW] Stripe webhook: a company found only after the handler writes no row, untested (review 2026-10-28, MCP enhancements release one)
+`platform/routers/stripe_webhooks.py:134` — Edge case. Since the plan-move-only rule (Simon, 2026-10-28) the row needs the company before the handler, to know the old plan. A company the handler links first (`company_before` None) writes no row, and no test drives that arm.
+
+**Suggested fix:** Stub `find_company` to return None on the first call and the company after, post a plan change, and assert no SUBSCRIPTION_SYNC row. If that case should be audited, decide what `from` says first.
+
+### 1445. [LOW] `_audit_status_change`: a target with no `version` is untested (review 2026-10-28, MCP enhancements release one)
+`platform/agents/estimate/crud_handlers.py:3562` — Edge case. A target without `version` skips `audit_metadata`, and no test drives it.
+
+**Suggested fix:** Call `_audit_status_change` with a stub target lacking `version` and assert the row has from/to but no `version` key.
+
+### 1446. [LOW] Logo upload: the replace case is untested (review 2026-10-28, MCP enhancements release one)
+`platform/routers/companies.py:337` — Edge case. `metadata.replaced` is True only when a logo already existed, and the test uploads once.
+
+**Suggested fix:** Upload twice and assert the second COMPANY_LOGO_UPLOAD row has `replaced: true`.
+
+### 1447. [LOW] `actor_of`: a plain-string role is untested (review 2026-10-28, MCP enhancements release one)
+`platform/services/audit_service.py:47` — Edge case. Line 56 handles a `role` without `.value`, and no test passes one.
+
+**Suggested fix:** Call `actor_of` on a `SimpleNamespace(email=..., id=..., role="Admin")` and assert `_user_role == "Admin"`.
+
+### 1448. [MEDIUM] No test that a cancelled subscription writes a downgrade row (review 2026-10-29, MCP enhancements release one)
+`platform/routers/stripe_webhooks.py:134` — Secondary flow. `customer.subscription.deleted` sets `plan_lookup_key = "plan_free"` (`handle_subscription_deleted`), which would write a SUBSCRIPTION_SYNC row from the paid plan to `plan_free`. The only webhook test posts `customer.subscription.updated`. **Deferred (Simon, 2026-10-29):** the product has no subscription cancellation and no upgrade or downgrade today, so this waits until one of them ships.
+
+**Suggested fix:** When cancellation or a plan change ships, let `_post_subscription_event` in `tests/test_audit_coverage.py` take the event type. Start the company on `plan_pro`, post `customer.subscription.deleted`, and assert one row with metadata `{"from": "plan_pro", "to": "plan_free", "event_type": "customer.subscription.deleted", "source": "stripe"}`.
+
+### 1449. [LOW] `resolve_user_api_key`: the missing-company arm is untested (review 2026-10-29, MCP enhancements release two)
+`platform/services/user_api_keys.py:109` — Edge case. Line 125: the user still points at the key's company, but that company document is gone, so the function returns None. No test deletes the company.
+
+**Suggested fix:** Issue a key, delete the Company document (leaving the user's `company` set), and assert `resolve_user_api_key` returns None.
+
+### 1450. [LOW] `issue_user_api_key`: the service's own input checks are untested (review 2026-10-29, MCP enhancements release two)
+`platform/services/user_api_keys.py:71` — Edge case. (a) Line 81: `checked_name` raises ValueError on a blank or 81-character name. (b) The next line: `check_expiry` raises on 0 or 366 days. The router's validation stops both before they get here, so no test reaches them.
+
+**Suggested fix:** Call `issue_user_api_key` directly. (a) With `name=" "`, assert ValueError. (b) With `expires_in_days=366`, assert ValueError.
+
+### 1451. [LOW] `aware`: the naive-datetime arm is untested (review 2026-10-29, MCP enhancements release two)
+`platform/services/api_keys_common.py:30` — Edge case. A naive datetime gets UTC attached. Motor is tz-aware, so only a key written by older code reaches this, and no test passes a naive `expires_at` to `key_status`. This is moved code, untested before the move too.
+
+**Suggested fix:** Unit-test `key_status(SimpleNamespace(revoked_at=None, expires_at=datetime(2000, 1, 1)))` and assert "expired". Also assert `aware(datetime(2000, 1, 1)).tzinfo is timezone.utc`.
+
+### 1452. ~~[LOW] `useKeyList`: the empty-reply arm is untested (review 2026-10-29, MCP enhancements release two)~~ — RESOLVED 2026-10-29
+
+**Resolved 2026-10-29** (review round 3): the guard at `portal/src/components/settings/useApiKeys.ts:28` is tested by `portal/tests/ApiKeysSection.test.tsx:196`, "an empty reply is a failed load", which answers the list with `null` and asserts "Failed to load API keys.". Move to the archive in the next cleanup.
+
+### 1453. [LOW] `useIssueUserKey`: three arms untested (review 2026-10-29, MCP enhancements release two)
+`portal/src/components/settings/useApiKeys.ts:59` — Edge cases. (a) Line 72: an empty create reply sets "Failed to create the key.". (b) Copy succeeds and the button reads "Copied". (c) The clipboard throws and the button stays "Copy".
+
+**Suggested fix:** (a) Mock `create` to resolve null and assert the message. (b) Stub `navigator.clipboard.writeText` to resolve, click Copy and assert "Copied". (c) Stub it to reject and assert "Copy" stays.
+
+### 1454. [LOW] `KeysTable`: two arms untested (review 2026-10-29, MCP enhancements release two)
+`portal/src/components/settings/ApiKeysSection.tsx` — Edge cases. (a) `KeysTable`: "Loading keys..." while the request is pending. (b) `KeyRow` (split out of `KeysTable` on 2026-10-29): an unknown scope falls back to the raw value.
+
+**Suggested fix:** (a) Mock `listMine` with a never-resolving promise and assert "Loading keys...". (b) Return a key with `scope: "admin"` (cast) and assert "admin" is shown.
+
+### 1455. [LOW] `ownerLabel`: two fallbacks untested (review 2026-10-29, MCP enhancements release two)
+`portal/src/components/settings/ApiKeysSection.tsx:222` — Edge cases. (a) No name but an email shows the email. (b) Neither shows "Former member", which is what a key whose user left shows (leaving a company revokes the key, and the row stays on the company list).
+
+**Suggested fix:** In the company-list test, add a key with `user_name: null, user_email: "x@example.com"` and assert the email. Add another with both null and assert "Former member".
+
+### 1456. [LOW] Text-block audit rows: the actor is unchecked (review 2026-10-30, MCP enhancements release two)
+`platform/tests/test_text_blocks_api.py:145` — Edge case. `test_each_change_writes_an_audit_row` checks each row's action, resource and before/after state, but not `user_id`, `user_email` or `user_role`. Those are the fields the 2026-10-30 switch to `actor_of(user)` set. If a later edit passed the wrong user or dropped `decoded_token`, the rows would name nobody or the wrong person and the test would still pass. `actor_of` has its own test (`test_audit_actor.py::test_actor_of_user`); only this router's wiring goes unchecked.
+
+**Suggested fix:** Look up the signed-in user's Mongo id (as `test_audit_coverage.py::_user_id` does). Then assert on the create, update and delete rows that `user_id` is that id, `user_email` is the signed-in email and `user_role` is "Owner".
 
 ## Codebase hygiene (batchable)
 
