@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-22
+**Last updated:** 2026-10-29
 
 ### Recent changes
 
@@ -3348,6 +3348,7 @@ The personal-question detector is deliberately **topic-keyed** so product-capabi
 | `hey` / `hi` / `hi maple` / `hello` / `howdy` | `social` | ✅ canned |
 | `good morning` / `good afternoon` / `good evening` | `social` | ✅ canned |
 | `hola` / `buenos días` | `social` | ✅ canned — Spanish, defense-in-depth |
+| `Hi Maple!` / `hello Maple` | `social` | ✅ said back to Maple's opening greeting (the first line of a new chat): "Hi!" and the question her greeting closed with, else "What would you like to do?" — the portal sends the greeting with the first message and the server keeps it as her first chat line (`client_context.record_opening`, `text_utils.greeting_after_opening`); anywhere else, the canned reply above *(2026-10-29)* |
 
 ### Personal questions — `personal` help topic (LLM, persona-answered)
 
