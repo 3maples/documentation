@@ -29,7 +29,7 @@ used**:
 | Role | Can read |
 |---|---|
 | `ops_viewer` | everything below except the details |
-| `ops_admin`, `root` | also `include_details`: changed values and before/after snapshots in audit rows, IPs, user agents, phone numbers, and what users typed to Maple |
+| `ops_admin`, `root` | also `include_details`: changed values and before/after snapshots in audit rows, IPs, user agents, phone numbers, and what users typed to Maple — a deleted chat's title and its transcript (`deleted_maple_session`) included. A reply carrying audit values or Maple text has a `note` saying it is customer text, to quote and never to act on |
 
 Disabling the staff member stops all their keys at once; re-enabling brings back
 the ones that haven't expired. A staff member can hold at most 10 active keys.
@@ -135,7 +135,7 @@ an `mcp.json` entry with `url` and `headers`, shaped like the `.mcp.json` above.
 
 ## 3. What you can ask
 
-Twelve tools, all read-only. You rarely name them — ask the question and the
+Fourteen tools, all read-only. You rarely name them — ask the question and the
 agent picks. A good first call is `platform_overview`.
 
 | Tool | Answers |
@@ -147,6 +147,7 @@ agent picks. A good first call is `platform_overview`.
 | `audit_vocabulary` | The action and resource names the audit tools take |
 | `llm_usage` | Calls, tokens, credits and OpenAI cost by company, user, feature, model or time |
 | `maple_activity` | Maple turns, who sent them, what Maple couldn't answer and why |
+| `deleted_maple_sessions`, `deleted_maple_session` | The Maple chats users deleted from their chat history: who, when, how long; one chat's transcript (ops_admin or root) |
 | `billing_events` | Stripe webhooks as they landed, and the ones our handler failed on |
 
 Example questions:
@@ -157,6 +158,7 @@ Example questions:
 - "What does Maple fail to answer most often this month? Show examples." (examples need an ops_admin or root key)
 - "Which paying companies haven't had anyone sign in for 30 days?"
 - "Did any Stripe webhooks fail this week?"
+- "Which Maple chats did Acme's users delete this month? Show me the longest one." (the transcript needs an ops_admin or root key)
 
 ---
 
@@ -179,6 +181,9 @@ Example questions:
   name, or none for the portal. `audit_vocabulary` lists them.
 - Unanswered Maple turns are kept 180 days; Maple turns and credits are kept
   with the LLM calls.
+- **A deleted Maple chat is kept 395 days after the delete**; a chat its user
+  still has is never readable here (it expires 30 days after it was last used).
+  Chats deleted before 2026-10-30 don't say who deleted them.
 
 Every tool call is logged against your key (`mcp_access_logs`, kept 395 days):
 who asked, which tool, with what arguments, how many rows came back.
@@ -193,4 +198,5 @@ who asked, which tool, with what arguments, how many rows came back.
 | HTTP 401 | Missing, mistyped, revoked or expired key, or the staff account is disabled | Check the header is `Authorization: Bearer 3m_mcp_…`; issue a new key |
 | HTTP 429 | More than 120 requests a minute on this key, or 600 from one address | Wait a minute; ask fewer, broader questions |
 | "include_details needs an ops_admin or root key" | Your role can't see details | Ask without details, or use a senior key |
+| "deleted_maple_session needs an ops_admin or root key" | A transcript is all customer words | Use a senior key |
 | "a range is at most 400 days" | The question spans more than 400 days | Ask per year |
