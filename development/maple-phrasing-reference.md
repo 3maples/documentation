@@ -6,6 +6,19 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Recent changes
 
+**2026-10-23 (location and same-address links, Simon):** Maple knows where the
+user is. On a phone the portal sends the device's position, and the property
+within 200 m of it is "here": "what tasks are here?", "create a task here …",
+"what's the address here?", "who's the contact here?", "add a note here: …"
+(new §8.5, state `[here]`). After a create, Maple offers a link as a yes/no it
+keeps with both records: a new property — the contacts already at its address;
+a new contact — the property at theirs (same street once St/Street, Ave/Avenue,
+N/North, Apt/# are folded, same city when both have one; §8.1); a new task with
+no property — the property the user is at (§8.5). Never when the request linked
+them itself, and it replaces the create's own "link a contact person?". Task
+lists show the 10 most recently updated and, past that, offer "show more" and
+a link to the Tasks page (`/tasks?propertyId=…` for one property) (§7.1, §7.5).
+
 **2026-10-19 (review after the October features):** the reference was read
 against the shared material catalog, session history and files on a message,
 and each candidate phrasing planned twice on the live planner. New ✅/🛑 rows
@@ -366,7 +379,8 @@ fails on a new row in the old format, and on any Plan row it can't read.
 
 - **Phrasing** — whole phrasings in backticks, separated by ` / `; placeholders
   as in the table above. A starting state goes in brackets after them —
-  `[est]`, `[wi]`, `[est_then_mat]`, `[<kind>_focus]`. No prose, ellipses or
+  `[est]`, `[wi]`, `[est_then_mat]`, `[<kind>_focus]`, `[here]` (the user's phone
+  at a property, §8.5). No prose, ellipses or
   arrows: a row that takes several turns names an acceptance conversation
   (`platform/tests/maple_conversations/corpus.py`) as its plan.
 - **Plan** — what the planner should do: an op from
@@ -2296,7 +2310,7 @@ Token conventions: `{task}` = a task title (e.g. `fix the fence gate`); `{status
 | `create a task with title {task}. Add the following notes: {text}` | `create_task` fields.title fields.notes_append | ✅ title and description in one turn *(the notes/description clause is split off before title extraction and stored as the task description)* |
 | `add a task to check the retaining wall` / `create a new task to: {text}` / `new task: {text}` | `create_task` | ✅ *(2026-07-25 — **content-is-description rule**: with no title cue, the body becomes the DESCRIPTION and the title is derived from it. Previously the "to …" phrase became the title, and a phrasing like `create a new task to: {text}` put the whole command line in the title.)* |
 | `create a task with the notes: {text}` / `Create a task. Add the following notes: {text}` | `create_task` fields.notes_append | ✅ notes, **no** title — creates immediately with a **title derived from the notes** *(2026-07-25 — first sentence of the notes, politeness/reminder preamble stripped ("remind me to call Bob tomorrow" → "Call Bob tomorrow"), truncated to 60 chars on a word boundary; full notes kept as the description. The reply says the title came from the notes so the user can rename it.)* |
-| `list my tasks` | `list_tasks` filter.assignee=me | ✅ the user's own tasks (§7.5) |
+| `list my tasks` | `list_tasks` filter.assignee=me | ✅ the user's own tasks (§7.5) — the 10 most recently updated; past that, a link to the Tasks page and "show more" *(2026-10-23, Simon — 20 a page before)* |
 | `show me the {task} task` | `get_task` | ✅ |
 | `create a task to call Bob tomorrow and assign it to me` / `add a task to trim the hedge due Friday and assign it to Jordan` [task_focus] | `create_task` fields.due_date fields.assignee | ✅ *(2026-09-27 — a create's tail sets fields: `assign it to` me / an email / a teammate's name, `mark it` / `status:` a status, a date phrase (`tomorrow`, `due Friday`, `by next week`, `on Oct 3`) as the due date. Instructions come out of the note; the date stays in it. Before, the trailing "assign it to …" routed the whole message to an edit of another task.)* |
 | `create a task to fix the side gate at the Elm House property` / `add a task to rake the leaves at 12 Oak St` | `create_task` fields.property | ✅ linked to the property *(2026-09-27 — "at the X property" or an "at …" tail that names one property; the words stay in the note)* |
@@ -2405,7 +2419,7 @@ own filters match (`list_filters.task_group_of`). **Open tasks** unless
 
 | Phrasing | Intent → Agent | Status |
 |---|---|---|
-| `list my tasks` (more than 20) → *"That's 1–20 of 24 … say "show more" for the next 4."* → `show more` / `next page` / `the rest` | the same list, from where it stopped — filters included | ✅ rule *(2026-09-27 — good for the next turn only; "show more" with no longer list open says so)* |
+| `list my tasks` (more than 10) → *"That's the 10 most recently updated of 24 — say "show more" for the next 10, or open the [Tasks page](/tasks)."* → `show more` / `next page` / `the rest` | the same list, from where it stopped — filters included | ✅ rule *(2026-09-27 — good for the next turn only; "show more" with no longer list open says so. Ten a page, with the Tasks page linked, since 2026-10-23 (Simon) — a list for one property links `/tasks?propertyId=…`, the only filter the page reads)* |
 
 ## 7.6 Field-targeted update
 
@@ -2487,7 +2501,7 @@ Paired rule: **an anaphoric target means the entity already exists**, so `is_ana
 |---|---|---|
 | `Add to it the following: {text}` / `Add to it the following: bring a lawn mower to his place. Need to estimate the lawn size.` [task_focus] | `update_task` fields.notes_append | ✅ the active task; the payload may mention other domains *(2026-07-25 smoke-test fix)* |
 | `add to the task the following: {text}` [task_focus] | `update_task` fields.notes_append | ✅ the planner handles it — was a gap: *(2026-09-27 review: creates a second task instead of appending)* |
-| `Add to it the following: {text}` [est] | `add_note` | ✅ an estimate-level note on the active **estimate** *(anchor decides, not the payload)* |
+| `Add to it the following: {text}` [est] | `add_note` parent.domain=estimate | ✅ an estimate-level note on the active **estimate** *(anchor decides, not the payload)* — planned as `add_note` or as `edit_estimate` commands=add_estimate_note, the same write (parity run 2026-10-23) |
 
 ## 7.6.2 Field-then-value flow (§10.1) — "update the task" → "description" → the value
 
@@ -2622,6 +2636,8 @@ Resolver: `agents/task/resolver.py::find_task_from_context_or_message` — order
 | `create a task …` at the free-plan 50-task cap | Refused with upgrade pointer (mirrors REST 409) | 🛑 refusal |
 | Convert billing outcomes (402 needs-payment / 429 blocked / 409 already-converting) | Friendly first-person refusals mapped from `run_task_conversion`'s HTTP errors | 🛑 refusal |
 
+Tasks *here* — at the property the user's phone is at — and the offer to link a new task to it are §8.5.
+
 ## 7.13 Task gaps
 
 Shipped 2026-07-22 (plan: [`plans/maple-tasks-support.md`](plans/maple-tasks-support.md)). Remaining ⚠️ rows, confirmed against both tiers where noted:
@@ -2644,8 +2660,16 @@ Questions users ask when they think about the domain rather than the database. R
 
 ## 8.1 Property ↔ Contact
 
+A new property is offered the contacts already at its address, and a new contact
+the property at theirs — the same street after normalizing (St/Street, Ave/Avenue,
+N/North, Apt/#/Unit …) and the same city when both have one
+(`services/address_match.py`). Asked after the create as a yes/no, never when the
+request linked them itself (Simon, 2026-10-23; `agents/planner/link_offers.py`).
+
 | Phrasing | Plan | Status |
 |---|---|---|
+| `add a property at 12 Oak St, Toronto ON` | `create_property` | ✅ then *"Ana Reyes has the same address — want me to link this property to Ana Reyes?"* when a contact lives there; a yes links them, a no leaves them |
+| `add a contact Cy Park at 9 Birch Road, Toronto` | `create_contact` | ✅ then *"Birch House (9 Birch Rd) has the same address — want me to link Cy Park to it?"* when one property is there |
 | `who lives at {property}?` | `get_property` field=contacts | ✅ the contacts linked to the property |
 | `what contacts are at {property}?` | `list_contacts` filter.related | ✅ the contacts linked to the property |
 | `who owns {property}?` | `get_property` field=owner | ✅ its Home Owners only *(2026-10-11, #845 — it listed every contact linked; none marked: "None of 12 Oak St's contacts is a Home Owner.")* |
@@ -2714,6 +2738,45 @@ any metric (§1.12).
 | Phrasing | Plan | Status |
 |---|---|---|
 | `what about Topsoil?` | conversation `ref-material-in-estimates-then-another` | ✅ the planner handles it — was a gap: after a material's quantity across estimates, the follow-up swaps the material *(#789's fix added a customer, not a material)* |
+
+## 8.5 Here — the property the user is at *(2026-10-23)*
+
+On a phone the portal watches the device's position from when Maple's textbox
+gets focus or a voice recording starts until the panel closes or two quiet minutes pass (never just because
+Maple opened at sign-in), and sends the last fix (under 5 minutes old) with each
+message, with its
+accuracy and age — never on a desktop, and a send never waits for one
+(`portal/src/lib/mapleLocation.ts`). The company's nearest geocoded property
+within 200 m of it is "here" — the Tasks page's rule
+(`services/nearby_property.py`, `agents/conversation/here.py`). A fix rougher
+than 200 m names no property (*"Your phone's location isn't precise enough
+right now to tell which property you're at."*); one over a minute old may be
+the last site, so a write through "here" asks first (*"Just to check — do you
+mean Oak House?"*; a note doesn't, as for any record in focus) and a task
+created "here" is offered the property rather than linked. A property named
+outright never depends on the position. The position is never saved, and the
+conversation never keeps the property; the stored turn record has no Here line,
+though an action the user pointed at with "here" is recorded like any other, by
+the record it changed (Simon, 2026-10-23; reviews the same day).
+
+The planner's state says it (`Here: the user is at property "14 Birch Rd"`), a
+record reference points at it with `by: here` (a property only), and a task's
+property or a task list's property said as "here" — or by the name the state
+gives — is that property by its id, never another of the same name. With no
+position, Maple says *"I can't tell where you are — on a phone, Maple uses its
+location to find the property you're at."*; with one near no property, *"You
+don't seem to be at any of your properties."* — then asks which property (a
+list says it instead of listing every task). A row's `[here]` state is the
+user at 14 Birch Rd with nothing in focus (`tests/planner_parity/cases.py`).
+
+| Phrasing | Plan | Status |
+|---|---|---|
+| `what tasks are here?` / `show me the tasks at this site` [here] | `list_tasks` filter.property | ✅ |
+| `create a task here to fix the gate` [here] | `create_task` fields.property | ✅ linked to the property here |
+| `what's the address here?` [here] | `get_property` field=address | ✅ |
+| `who's the contact here?` / `who lives here?` [here] | `get_property` field=contacts | ✅ |
+| `add a note here: gate code 4411` [here] | `add_note` parent.domain=property | ✅ |
+| `create a task to fix the gate` [here] | `create_task` | ✅ then offers the property here as a yes/no — *"You're at 14 Birch Rd — want me to link T0042 to it?"*; a yes links it (`agents/planner/link_offers.py`) |
 
 ---
 
