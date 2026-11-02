@@ -9467,9 +9467,9 @@ unchanged.
 | 2 | [#546](code-review-followups.md#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script with `--apply`, no environment guard and no confirmation prompt. Latent, but one wrong shell is production data. |
 | 3 | [#4](code-review-followups.md#4-high-file-and-function-size) | `routers/auth.py` — the one oversized file with a clean seam. Extract the invitation lifecycle into `routers/invitations.py` (~400 lines) and the backlog's biggest theme finally moves. |
 | 4 | [Query efficiency](code-review-followups.md#query-efficiency--scans-n1-and-missing-indexes) | Eighteen full-collection scans, N+1 loops and unindexed sorts — several on Maple's hot paths ([#25](code-review-followups.md#25-medium-regex-email-lookup-in-_resolve_user), [#328](#328-medium-_resolve_estimate_by_title-full-collection-scan-now-on-three-more-paths--resolved-2026-10-04), [#443](code-review-followups.md#443-medium-platformroutersopspy200--task-counts-aggregate-the-whole-collection), [#506](code-review-followups.md#506-medium-platformroutersestimatespy444--search-runs-an-unindexed-regex-over-titledescription)). Cost and latency grow with every customer added. |
-| 5 | [Silently swallowed errors](code-review-followups.md#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](code-review-followups.md#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](code-review-followups.md#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](code-review-followups.md#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](code-review-followups.md#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users)). |
+| 5 | [Silently swallowed errors](code-review-followups.md#silently-swallowed-errors) | Fifteen paths that discard the real failure, including the 11 bare `except Exception: pass` blocks that are the standing bandit baseline ([#64](code-review-followups.md#64-medium-workitem-divisions-fetch-swallows-errors-silently), [#430](code-review-followups.md#430-low-platformagents--11-bare-except-exception-pass-blocks-bandit-b110), [#290](code-review-followups.md#290-medium-dashboard-analytics-fetch-error-is-silent), [#461](#461-medium-portalsrcpagesauthloginpagetsx201--terminal-invitation-failure-silently-dropped-for-unverified-users--resolved-2026-10-22)). |
 | 6 | [Accessibility](code-review-followups.md#accessibility) | Twenty-seven findings, several of them keyboard traps or controls with no accessible name at all ([#43](#43-medium-trash-icon-only-buttons-have-no-accessible-name--resolved-2026-10-18), [#469](code-review-followups.md#469-low-portalsrccomponentscommonsearchableselecttsx--no-keyboard-navigation), [#476](code-review-followups.md#476-low-portalsrccomponentscommonstatusfilterdropdowntsx196--trigger-has-no-accessible-name-beyond-its-summary), [#552](code-review-followups.md#552-medium-portalsrccomponentsnotesnotebodytsx90--the-note-text-is-unreachable-by-keyboard)). |
-| 7 | [#60](code-review-followups.md#60-medium-no-unique-compound-index-on-material--contact) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
+| 7 | [#60](#60-medium-no-unique-compound-index-on-material--contact--resolved-2026-10-20) | No unique compound index on Material / Contact — duplicate rows can be created concurrently. Was "just off the list"; promoted 2026-09-22 into the slot #326 vacated. |
 
 **Closed from this queue:** #566 (local dev holds production credentials),
 closed 2026-09-22 as an owner decision — accepted risk, the laptop is not a leak
@@ -9490,3 +9490,476 @@ slot 1 because the 2026-07-27 credential exposure was unrotated; the owner
 confirmed the output never left the laptop, so rotation is withdrawn and both
 leak paths were already closed. What survives is #566 — the reason a laptop had
 production keys at all — plus #350's latent `SecretStr` gap.
+
+## Consolidation pass — 2026-10-22
+
+Every open entry was checked against the code on `main` (platform, portal, website, workspace config), after the October phrasing gaps, the two-screen onboarding, the standard materials replacement, Maple attachments and the activity role snapshot landed. Four groups moved here: entries already marked RESOLVED in the live list; entries the code now satisfies (RESOLVED 2026-10-22); entries whose code is gone or rewritten so the finding no longer applies (OBSOLETE 2026-10-22); and entries another entry or a newer design covers (SUPERSEDED 2026-10-22). Each verified entry opens with the evidence checked.
+
+**Already marked closed (12)**
+
+### 60. ~~[MEDIUM] No unique compound index on Material / Contact~~ — RESOLVED 2026-10-20
+
+**Resolved 2026-10-20:** `Material` has a unique `(company, name)` index, `company_name_unique`, with a case-insensitive collation (`NAME_COLLATION`, strength 2), so it agrees with `assert_name_available` on case. The collation also treats full-width and decomposed spellings as their plain forms ("Ｍulch" is "Mulch"), so the lookups that name the holder after a refusal use it too. Its own name and collation let it sit beside the plain lookup index. It doesn't collapse spacing, which the check does, so names that differ only in spacing are still the check's alone. A write that passes the check while another takes the name now gets the usual refusal, not a 500. `name_held` in `services/material_catalog_writes.py` turns the index's error into `NameTaken`, and Beanie's `RevisionIdWasChanged` re-wrap from `set()` too, around the route's create and rename, Maple's create and `duplicate`. A CSV row that loses the race updates the material that won it. Tests: `tests/test_material_unique_names.py`. `test_material_name_hides.py`'s pre-unique duplicate now differs in spacing, since a case-only one can't be stored.
+
+Dev was audited on 2026-10-20: 1,416 materials, no duplicate names exactly, case-insensitively or trimmed. **Production is still owed an audit before this ships:** the index is built at startup, and a duplicate there stops the app from starting. Until the branch merges, a test run from `main` on a machine where this branch's tests ran meets the index, which Beanie never drops, in the local test database. `main`'s `test_material_name_hides.py` then fails storing a case-only duplicate. Merge first, or drop `company_name_unique` from the local test database before that run (review 2026-10-20 #5). Contact keeps no unique index, as below.
+
+**Files**: [platform/models/material.py:32](../../platform/models/material.py),
+[platform/models/contact.py:45](../../platform/models/contact.py)
+**Severity**: LOW–MEDIUM (data integrity, not an active bug)
+
+Both models declare only `IndexModel([("company", ASCENDING)])`. Concurrent
+inserts can produce duplicates for the same `(company, name)`.
+
+The reviewer's proposed fix — "compound unique index on (company, name)
+for all inventory models" — is correct for Material but **wrong for
+Contact**. Two contacts can legitimately share a full name (two different
+"John Smith" homeowners). A Contact uniqueness constraint would need to
+include email/phone, and even that is debatable.
+
+Fix: for Material, add `IndexModel([("company", ASCENDING), ("name",
+ASCENDING)], unique=True)` — but only after auditing prod data for
+existing duplicates; index creation fails if violations exist. For
+Contact, no unique index (reviewer was wrong on this one); if
+deduplication is a real concern, surface it in the UI on create/update
+instead.
+
+**Absorbed:** #66.
+
+### 110. ~~[LOW] `FeedbackPanel` error message has no live-region announcement~~ — RESOLVED 2026-10-19
+
+**Resolved 2026-10-19:** both components it named are gone. `FeedbackPanel.tsx` went when Support absorbed the Trello Feedback panel (2026-07-02), and `ChangeLogPanel.tsx` was deleted when What's New moved to a dialog beside the notification bell. Its replacement, `portal/src/components/notifications/WhatsNewDialog.tsx`, renders its load error with `role="alert"`. Move to the archive in the next cleanup.
+
+**File**: [portal/src/components/common/FeedbackPanel.tsx:169](../../portal/src/components/common/FeedbackPanel.tsx)
+**Severity**: LOW (accessibility)
+
+The submission-error div is a plain `<div className="text-xs text-red-600">{error}</div>`.
+Screen readers don't announce it when it appears, so a visually impaired
+user gets no audible signal that submission failed — they have to walk the
+DOM to find out why nothing happened.
+
+Fix: add `role="alert"` (or `aria-live="polite"`) to the error div. The
+same applies to `ChangeLogPanel.tsx:166`, which uses the identical
+pattern.
+
+### 1089. ~~[HIGH] "title: Call the supplier" plans a task search instead of the task's create~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18:** a prompt line's counter-case in `prompts/maple_planner.py` (the task line): a title alone ("title: Call the supplier") is a new task, `create_task {fields: {title}}`, never a search. Live 3×: the row agrees 3/3 (was 1/3). The neighbours hold 3/3 ("create a task called / with title …", "new task: …", "add a task to …", "show me Call the supplier's details", "what's the Call the supplier task's due date?", "tell me about task Call the supplier"). "update Call the supplier's description" varies as it did before the change (6/8 after, 2/3 before; one miss is a clarify asking what it should say). Owes the next parity run.
+`platform/prompts/maple_planner.py` — Reference row `title: Call the supplier` (`create_task` fields.title) is planned `list_tasks {filter: {search: "Call the supplier"}}` 3 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The task is never created; the user gets a search of their tasks instead. Likely a side effect of this batch's possessive-task-title line ("Call the supplier's description / details / due date" → `update_task` / `get_task` by name), which taught the model to read "Call the supplier" as a task's name. A regression, so fixed — not explained.
+
+**Suggested fix:** Narrow the prompt line to the possessive it was written for (a task named with "'s" and a field), or add the counter-case ("title: X" alone is a new task with that title → `create_task`). Probe the row and its neighbours live 3× (the possessive rows 2319/2320/2325, "show me Call the supplier's details", #1091) before and after.
+
+### 1090. ~~[MEDIUM] "How much does Polymeric sand cost?" plans a material list instead of the material~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18:** the materials-cost line in `prompts/maple_planner.py` now splits the two readings: an estimate's materials by price is `list_materials {filter: {related, price}}`, and one material named ("how much does Polymeric sand cost?") is `get_material {field: price}`, never a list. Live 3×: the row agrees 3/3 (was 2/3). "how much does 50 lb of Polymeric sand cost?", "how much does Black Mulch cost?", "how much does mulch cost?" (still `list_materials`) and "which of E0042's materials cost over $10?" all hold 3/3. Review round 1 #1 added the counter-case — a kind of material ("how much does mulch cost?") lists the matches — re-probed live 3×: Polymeric sand, 50 lb of Polymeric sand, mulch, Black Mulch and E0042's materials over $10 all hold 3/3. Owes the next parity run.
+`platform/prompts/maple_planner.py` — Reference row (`get_material`) is planned `list_materials` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The reply is a list rather than the one material's prices — a different shape, not wrong data. Likely pulled by this batch's line "Asking what materials cost is a read, never material_cost … list_materials {filter: {related: E0042, price: …}}", which was meant for an estimate's lines.
+
+**Suggested fix:** Narrow that line to an estimate's materials ("which of E0042's materials cost over $10?") and say one material named is `get_material`. Probe live 3× with its neighbours (rows 468, 470, "how much is mulch?").
+
+### 1091. ~~[MEDIUM] "show me the task at 14 Birch Rd" plans a task list instead of the task~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18:** re-checked live after #1089's fix, as the entry asked: `get_task` 3/3 before the prompt change and 3/3 after. Nothing to change.
+`platform/prompts/maple_planner.py` — Reference row (`get_task`) is planned `list_tasks` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. Read-only: the user sees the property's tasks rather than the one. Possibly the same pull as #1089.
+
+**Suggested fix:** Re-check after #1089's fix; if it still varies, a prompt example ("the task at <property>" is that property's one task, `get_task`) or explain it (a property's task list holds the task asked for).
+
+### 1092. ~~[MEDIUM] "what's in my backlog?" plans an estimate list instead of the Backlog card~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18:** the backlog example in `prompts/maple_planner.py` now names "what's in my backlog?" and "how big is my backlog?" as `dashboard {card: backlog}`, next to the line that keeps "which estimates are in my backlog?" a list (Won + Scheduled). Live 3×: the row agrees 3/3 (was 0/3). "which estimates are in my backlog?" (still the list), "what's the backlog value?", "backlog?", "i'd like to see my backlog" and "how is the backlog value calculated?" (help) all hold 3/3. Owes the next parity run.
+`platform/prompts/maple_planner.py` — Reference row (`dashboard` card=backlog) is planned `list_estimates` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The list's estimates vs the card's figure — not wrong data, but the backlog question has one answer in the dashboard. Possibly nudged by the new amount line, which leads with `list_estimates` examples.
+
+**Suggested fix:** Check what `list_estimates` the model planned (the backlog reading of commit 1ad8dd0 — Won + Scheduled — must hold either way); then a prompt example or an `as_asked` correction like `pipeline_card` for "backlog", or explain it if the list answers it as the card does.
+
+### 1252. ~~[MEDIUM] Maple's size rebuild fills an unrecorded price with the cost, so a Member's description edit can be refused~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18:** `_material_payload_from_fields` rebuilds a stored size with no recorded price as `price: None`, so an edit that doesn't touch the sizes matches the snapshot and carries no `sizes`. When the sizes are written, `_keep_selling_at_cost` sends an untouched unpriced size at its cost, as the portal does (a null price would be marked up by the server). A size whose cost changed still has its price dropped and is priced from the markup. Tests (`tests/test_maple_material_catalog_writes.py`, #1252 block): a Member describes and renames such a material, and its sizes stay as stored; an Owner's description edit leaves the size unpriced; an Owner's price edit of another size keeps it selling at its cost; an Owner's cost edit of it prices it from the markup.
+`platform/agents/material/service.py` `_material_payload_from_fields` — For a company material whose size has no recorded price, the rebuilt sizes fall back to the cost, so they differ from the stored snapshot and every edit carries `sizes`. A Member's rename or description edit is then refused as a price change ("Only owners and admins can change material prices and sizes."). Only affects materials saved without a price. Found while fixing review 2026-10-17 round 3 #1.
+
+**Suggested fix:** Rebuild existing sizes with their stored price as-is (keep `None`), so an edit that doesn't touch sizes carries no `sizes`. Test: a Member describes a company material whose size has no price.
+
+### 817. ~~[MEDIUM] Sentry ships frame locals — token claims and chat messages — with every `logger.exception`~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18:** your decision — drop all locals. `_init_sentry` in `platform/main.py` passes `include_local_variables=False`, so every event keeps its stack and loses every frame's variables, and `max_request_body_size="never"`, because the FastAPI integration also attached the JSON body (the `/agents/orchestrate` chat message) as `request.data` — `send_default_pii=False` gates only cookies and headers (review round 1). `tests/test_sentry_init.py`: production init turns locals and request bodies off (and keeps `send_default_pii=False`); Sentry isn't started outside production or without a DSN; an exception captured through a client built from those options keeps its frames and carries no `vars`. The template instantiation's type-only log (`routers/agent_helpers/template_estimate.py:183`, #318) stays, its comment now giving the reason that holds — the exception's message can hold the estimate's values, as in the edit executor's type-only logs (`agents/estimate/edit_executor.py:420/426`, #619). The brevo rule keeps its "never `logger.exception`", its reason restated: a Brevo error's message can echo the contact email (`.claude/rules/brevo.md`).
+`platform/main.py:59` — `sentry_sdk.init` leaves `include_local_variables` at its default (True; SDK 2.70), and `send_default_pii=False` does not strip frame variables. The default scrubber denylists exact keys such as `token`, not `decoded_token`, `message` or `context_payload`. So each of the ~29 `logger.exception` calls on Maple paths (`routers/agents.py:1828` among them) can send the user's Firebase claims (uid, email), their chat message and conversation state to Sentry. The estimate edit executor and the template instantiation (#318) log the exception type only for this reason, but that costs the stack. Found reviewing #318 (review 2026-10-05 #1).
+
+**Suggested fix:** Needs your decision. Either set `include_local_variables=False` in `sentry_sdk.init`, which keeps every stack and drops locals everywhere (my pick: one line, covers all sites, and the type-only logs could go back to full tracebacks); or keep locals and add an `EventScrubber` denylist for `decoded_token`, `message`, `context_payload`, `chat_history` and the user/email names — narrower, but every new local name is a new leak.
+
+### 112. ~~[LOW] Replace `isMountedRef`/`fetchTokenRef` race-guards with `AbortController`~~ — RESOLVED 2026-10-19
+
+**Resolved 2026-10-19:** both panels it would migrate are gone. `FeedbackPanel.tsx` was retired into Support (2026-07-02), and `ChangeLogPanel.tsx` was deleted when What's New became `WhatsNewDialog`, which is mounted fresh per open and guards its one fetch with an effect-local `cancelled` flag, with no refs. Teaching `apiRequest` an `AbortSignal` is still a fine idea, but nothing here needs it. Move to the archive in the next cleanup.
+
+**Files**: [portal/src/components/common/ChangeLogPanel.tsx](../../portal/src/components/common/ChangeLogPanel.tsx), [portal/src/components/common/FeedbackPanel.tsx](../../portal/src/components/common/FeedbackPanel.tsx), [portal/src/api/client.ts](../../portal/src/api/client.ts)
+**Severity**: LOW (refactor)
+
+Both panels copy a manual race-guard pattern (`isMountedRef`,
+`submitTokenRef` / `fetchTokenRef`, post-await staleness checks) to drop
+results from superseded fetches. The cleaner shape is `AbortController`
++ `signal`, but it requires changing the shared API client.
+
+Fix:
+1. Teach `apiRequest` in `portal/src/api/client.ts` to accept an
+   `AbortSignal` and pass it through to `fetch`.
+2. Migrate `ChangeLogPanel` and `FeedbackPanel` together — abort the
+   in-flight request on unmount or on a new submit/fetch, then drop the
+   ref-based guards.
+
+Migrate both call sites in the same PR so the pattern is consistent.
+
+### 1253. ~~[MEDIUM] Maple's and Support's composers now differ, one tab apart~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18 (Maple attachments):** one shared pill bar, `components/common/ComposerBar` — a leading round control (the "+" that attaches a file), the textbox, trailing controls (Maple's mic), the round send button; Enter is a new line and Cmd/Ctrl+Enter sends; files dragged over it highlight it. `lib/composerStyles` holds the pill's classes for both tabs; Support's new-conversation button sits in the Maple header beside its X, where the Chat tab's New session is (`SupportPanel` renders it into `MapleHeader`'s slot, `headerActions`; Simon 2026-10-19). Tests: `ComposerBar.test.tsx`, `SupportPanel.test.tsx`, `AiPanelComposerLayout.test.tsx`, `AiPanelAttachments.test.tsx`, `AiPanelSupportFlag.test.tsx`.
+
+`portal/src/lib/composerStyles.ts:2` — Maple's composer became a single pill-shaped bar (`components/Layout/MapleComposer.tsx`, Maple chat UI branch `claude/maple-chat-ui-707776`, 2026-10-16), while Support keeps the textbox with a column of three buttons (new conversation, attach, send) styled by `composerStyles`. The file existed to stop drift between the two, which sit one tab apart. The comment now says these styles are Support's and that the design question is open. Fixing it means redesigning Support's input bar, including where its new-conversation and attach buttons go and its Cmd/Ctrl+Return send, which is bigger than the review fix described. (review 2026-10-16 #18)
+
+**Suggested fix:** Decision for Simon. Either give Support the same pill bar (my pick: the two panels sit one tab apart), moving the pill classes into `composerStyles` for both and putting Support's new-conversation button in its panel header as Maple's now is, or accept the difference and keep the comment as it is.
+
+### 1251. ~~[MEDIUM] Materials page sends the price as the cost when Cost is blank~~ — RESOLVED 2026-10-18
+
+**Resolved 2026-10-18:** `handleSubmit` refuses a save when a labelled size row has no valid cost ("Cost is required for all material sizes."), checked before anything is sent and only when the sizes changed, like the unit check. The row is never skipped (an edit would delete the size). The cost is now `Number(size.cost)`, with no fallback to the price, and the Cost input is `required`. Tests (`portal/tests/MaterialsPageForm.test.tsx`, #1251 block): an edit's added size with a price and no cost is refused with nothing sent; a new material's second row likewise, though the first is complete; Cost is `required` and Price is not; a blank unlabelled row is still skipped.
+`portal/src/pages/MaterialsPage.tsx` — `cost = costProvided ? parsedCost : (price ?? NaN)`: unlike the gap dialog, the page's Cost field isn't `required`, so a size row with a label and a price but no cost stores the price as the catalog cost — the coercion `.claude/rules/pricing.md` forbids. Removing the fallback alone would silently drop the row (and on edit delete the size). Found while fixing review 2026-10-17 round 3 #7/#8.
+
+**Suggested fix:** Refuse the save with a per-row "Cost is required" error (and mark the Cost input `required`), then use `cost: parsedCost`. Test: a row with a price and no cost is refused and nothing is sent.
+
+### 1363. [LOW] .claude/launch.json: machine-specific dev configs from the Work Item cost-column check — RESOLVED 2026-10-21
+**RESOLVED 2026-10-21** — dropped while syncing the branch with main: main had added an equivalent `platform-8002` + `portal-5176` pair, so the branch's `launch.json` now matches main. Move to the archive in the next cleanup.
+
+`.claude/launch.json:61` — `platform-8011-cors-5175` hardcodes `/Users/simmy/Development/3Maples/platform`, and both it and `portal-5175` were added only to run a worktree's portal beside the main checkout's (5173/5174 and 8001 were taken, and the :8000 platform's CORS allow-list stops at 5174). The file is tracked in the workspace repo, so committing them ships configs that won't run on another machine. (review 2026-10-21 #10, deferred)
+
+**Suggested fix:** revert `.claude/launch.json` once manual testing of the cost columns is done (`git checkout -- .claude/launch.json` from the worktree root) and leave it out of the commit.
+
+**Resolved by the code (16)**
+
+### 461. ~~[MEDIUM] portal/src/pages/auth/LoginPage.tsx:201 — terminal invitation failure silently dropped for unverified users~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** portal/src/pages/auth/LoginPage.tsx:170-199 (invitationIsDead adds 'Your team invitation is no longer valid' line to the verify banner); tests/LoginPageInvitationOrdering.test.tsx:173-256
+When the sign-in is unverified AND the invitation accept failed, `inviteError` is discarded so
+the verify banner wins — deliberate, and commented in the code. But on a terminal status
+(403/404/409) the pending invitation is ALSO cleared, so the token is gone and the user was
+never told. They verify, sign back in, and land in `/onboarding` with no company and no
+indication an invitation ever existed, let alone lapsed. This is the exact path for an invitee
+whose invitation hits the 7-day expiry while they work through verification — the scenario the
+change was written to unblock.
+
+**Suggested fix:** when `inviteError` had a terminal status, append a second line to the verify
+banner ("Your invitation has expired — ask them to send a new one."). Turns a silent dead end
+into an actionable one. Needs a test in `tests/LoginPageInvitationOrdering.test.tsx`.
+
+### 292. ~~[LOW] `RowActionsMenu` has two near-identical menu-item buttons~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** components/common/RowActionsMenu.tsx now builds an items array for the shared ActionsMenu; no hand-written Move up/Move down buttons remain
+**Where:** `portal/src/components/common/RowActionsMenu.tsx` — the Move up and Move down `<button>` blocks differ only in icon, label, and onClick.
+
+**Issue:** Minor duplication. Refactor only worthwhile if a fourth/fifth menu item lands.
+
+**Fix:** Extract a small `<MenuItem icon={…} label={…} disabled={…} onClick={…} />` helper if the menu grows.
+
+### 177. ~~[LOW] Grand Total contrast borderline at small text sizes~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** styles/theme.css:54-62 documents the 3.02:1 contrast of --total-bg and adds darker --maple-green (#2A7D58, 5.03:1) for white-text buttons; guarded by tests/mapleGreenContrast.test.ts
+**Severity**: LOW
+`portal/src/pages/NewEstimateWithActivityPage.tsx:1273` — the new
+`bg-total-bg` (`#38A776`) with `text-white` measures ~3.03:1. Passes WCAG
+AA only via the large-bold exemption (text is `text-lg font-bold`).
+Acceptable here, but if the same token is reused for normal-weight or
+smaller text it will fail AA.
+
+Fix: if reuse is needed, define a darker variant (e.g.
+`--total-bg-strong: #2E8A60`) for normal-weight text. Or document on the
+token in `theme.css` that it's only safe for large-bold copy.
+
+### 899. ~~[MEDIUM] "while a work item is in play" is undefined~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** prompts/maple_planner.py:200 now defines it ('while a work item is in focus or named') and contrasts the catalog update_material case
+`platform/prompts/maple_planner.py:131` — Line 111 says a catalog price is settable (update_material); line 131 sends "set the price of pavers to $4.25" to the estimate line when a work item is "in play". A user with an estimate open who means the catalog price gets the line changed. (review 2026-10-11 #79, deferred)
+
+**Suggested fix:** Define it: "a work item in focus in the state, or named in the message". Add one contrasting catalog example, and cover both in the parity run.
+
+### 882. ~~[MEDIUM] `_redo_list`'s period fallback is untested~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** tests/test_planner_followups.py:131-134 test_a_list_for_another_period_falls_back_unless_estimates drives _redo_list's period arm (followup:redo_last.list_contacts.period); same branch as list_tasks
+`platform/agents/planner/followups.py:123` — Edge case. (review 2026-10-11 #57, deferred)
+
+**Suggested fix:** `_expand(_stored({"op":"list_tasks"}), {"op":"redo_last","period":"last_month"}) == "followup:redo_last.list_tasks.period"`.
+
+### 896. ~~[MEDIUM] The override's absolute out-of-bounds arm is untested~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** tests/test_planner_schema.py:262 test_a_planner_edit_command_keeps_todays_bounds raises ValidationError through PSetWorkItemPercentage._in_bounds (tax 150; same absolute-bounds arm as markup 600)
+`platform/agents/planner/schema_edits.py:112` — The override replaces the base validator, and nothing asserts that a value of 600 (markup) still raises. (review 2026-10-11 #71, deferred)
+
+**Suggested fix:** `pytest.raises(ValidationError)` for `{set_work_item_percentage, field: markup, value: 600}`.
+
+### 900. ~~[MEDIUM] The unsaid question at turn level is untested~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** tests/test_planner_turn.py:383-399 drives without_unsaid at turn level (unnamed filter question + sold-beside-Review question) and asserts the kept open question
+`platform/agents/planner/turn.py:283` — Edge case. `said.without_unsaid` returning text, which becomes a kept question through `run_planner_turn`, is only tested at the `said` level. (review 2026-10-11 #80, deferred)
+
+**Suggested fix:** Wire `list_estimates {sold, statuses:[Review]}` with "how many won estimates in review?" → the response is the question, and an open question carries REPLAN_KEY.
+
+### 1069. ~~[MEDIUM] Reference row asks or reads another way: "what properties does {contact} own?" [none]~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** G28 closed it: prompts/maple_planner.py:186 plans 'what properties does X own?' as list_properties filter.owner; reference row (maple-phrasing-reference.md:2652) marked closed; commit 5c2f514
+`documentation/development/maple-phrasing-reference.md:2499` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner planned get_contact instead of list_properties filter.owner; it agreed 2 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
+
+**Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
+
+### 1124. ~~[LOW] The estimate agent builds an unused materials JSON every generation~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** agents/estimate/service.py _fetch_materials_inventory no longer builds a materials JSON string or returns inventory['materials']; tests/test_estimate_inventory_catalog.py asserts 'materials' not in inventory ("No whole-catalog JSON dump")
+`platform/agents/estimate/service.py:511` — `inventory["materials"]` is a `json.dumps(indent=2)` of the whole visible catalog (~400 rows) built every generation; the generation prompt has no placeholder for it.
+
+**Suggested fix:** Drop `materials_str` and the `available_materials=` kwarg at service.py:1031.
+
+### 1136. ~~[MEDIUM] Untested edge cases in getCategoryName~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** portal/tests/MaterialsPageServerList.test.tsx 'category and unit names fall back to the company's lists' asserts Unknown for category null and for unknown id 'gone'
+`portal/src/pages/MaterialsPage.tsx:343` — Untested arms: no category and an unknown id → "Unknown". (review 2026-10-16 round 2 #71, deferred)
+
+**Suggested fix:** One test each.
+
+### 1260. ~~[LOW] Cost-fill rounding can be a cent off the server's markup price~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** portal/src/lib/money.ts roundToCent rounds half-even; materials.ts markupPrice uses it; tests/materials.test.ts:43 markupPrice(2.1,25)=2.62
+`portal/src/lib/materials.ts:25` — `Math.round(x*100)/100` rounds halves up; the server's `round(x, 2)` rounds half-even (cost 2.10 at 25%: portal 2.63, server 2.62). (review 2026-10-17 round 4 #25, deferred)
+
+**Suggested fix:** Show the markup price as a placeholder and send null so the server's `markup_price` is the only rounding.
+
+**Resolved 2026-10-22:** `portal/src/lib/money.ts::roundToCent` rounds half-even like the platform's `round(x, 2)`; `markupPrice` (and the new `labourRate`) use it, so the portal's figure matches the server's at an exact half-cent (`tests/money.test.ts`, `tests/materials.test.ts`). Done in the Work Item cost → price change.
+
+### 277. ~~[LOW] Pydantic 2.11 deprecation warning surfaces in async tests~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** installed lazy_model 0.3.0 (.venv) parser/new.py now reads self.__class__.model_fields, so the Pydantic 2.11 instance-access deprecation no longer fires (pydantic 2.13.5)
+Six warnings per test run from
+`lazy_model/parser/new.py:110` — "Accessing the 'model_fields' attribute on
+the instance is deprecated. Instead, you should access this attribute from
+the model class. Deprecated in Pydantic V2.11 to be removed in V3.0."
+
+Not introduced by these tests; it's a third-party (`lazy_model`)
+compatibility gap with Pydantic 2.11. Surfaced because the new async tests
+exercise Beanie model loading paths. Will break when Pydantic V3 lands
+(currently slated for a 2026-Q3+ release).
+
+Fix: bump `lazy_model` when an upstream release addresses the deprecation,
+or pin Pydantic to <2.11 until then. Track upstream
+[BAMR-team/lazy-model](https://github.com/roman-right/lazy-model).
+
+### 396. ~~[LOW] platform/services/ops_verification.py — no Firebase-failure unit test~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** platform/tests/test_ops_verification_lookup.py::test_raising_lookup_is_reported_as_failure (+ test_lookup_failure_logs_the_underlying_exception) simulate a Firebase failure and assert lookup_failed
+No test simulates a Firebase Admin SDK failure (e.g. `firebase_admin_auth.get_user_by_email` raising something other than `UserNotFoundError`) to verify the verification flow degrades safely.
+
+### 503. ~~[LOW] platform/tests/ — `asyncio.run` in unit tests runs on a different loop than Beanie's client~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** platform/tests/_portal.py portal_call helper exists and its docstring documents that DB calls must go through the app loop, not asyncio.run (the 'documented portal_call convention' fix)
+`tests/conftest.py` initializes Beanie through the session-scoped TestClient, so
+the Motor client is bound to that client's portal loop. Any test that drives an
+endpoint with `asyncio.run(...)` creates a fresh loop, and every DB call from it
+fails with "Future attached to a different loop". Two files were affected
+(`test_orchestrator_endpoint.py`, `test_agents_api.py`) and both are now stubbed
+at the persistence boundary, which is the right answer for *those* tests — they
+are unit tests of routing, and real coverage lives in `test_conversation_api.py`.
+
+The general trap remains: any future test that reaches for the DB through
+`asyncio.run` will fail silently or noisily depending on whether the caller logs,
+and the failure looks like a product bug rather than a harness one. Note that
+tests using `portal_call(client, ...)` are fine — they run on the right loop, and
+`TestReadableIdEndToEnd` genuinely exercises persistence that way.
+
+**Suggested fix:** either a conftest guard that fails loudly when a Beanie call
+is made from a loop other than the client's, or a documented `portal_call`
+convention for any test that needs the DB. The guard is more work but catches it
+at the point of the mistake; a note in `CLAUDE.md`'s testing section is the cheap
+version.
+
+### 1043. ~~[LOW] "Said back" comments beside the updated ratio comment~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** agents/estimate/command_grammar.py has no 'said back' comments left; lines 349 and 382 say 'answered' (Simon 2026-10-13)
+`platform/agents/estimate/command_grammar.py:370` — Lines 370, 371 and 376 still say ranked and by-month ratios are said back, just below line 349, which round 13 updated to "answered". (review round 14 #20, deferred)
+
+**Suggested fix:** Reword them to "answered (Simon 2026-10-13)".
+
+### 1107. ~~[LOW] TemplateDialog indentation slip~~ — RESOLVED 2026-10-22
+
+**Resolved (consolidation 2026-10-22):** portal/src/components/estimates/TemplateDialog.tsx:196 `people={people}` is now aligned with its sibling props
+`portal/src/components/estimates/TemplateDialog.tsx:192` — `people={people}` is indented four spaces deeper than its sibling props, left over from removing the `materials` prop.
+
+**Suggested fix:** Re-indent it.
+
+**Obsolete — code gone or rewritten (16)**
+
+### 219. ~~[MEDIUM] `VALID_PLAN_KEYS` duplicates `PLAN_LOOKUP_KEYS` from `billing-plans.ts`~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** VALID_PLAN_KEYS no longer exists anywhere in portal/src; onboarding is two screens (lib/onboardingSteps.ts)
+**File**: [portal/src/pages/OnboardingPage.tsx:21-25](../../portal/src/pages/OnboardingPage.tsx)
+**Severity**: MEDIUM
+
+The new `VALID_PLAN_KEYS` set added by [#205](code-review-followups-archive.md)
+hardcodes the three plan lookup keys, but
+`portal/src/lib/billing-plans.ts:136-140` already exports
+`PLAN_LOOKUP_KEYS: PlanLookupKey[]`. Two lists to keep in sync — adding
+a fourth plan in `billing-plans.ts` would silently reject the new key
+during localStorage hydration without a single line in this file
+indicating why.
+
+Fix: `import { PLAN_LOOKUP_KEYS } from "../lib/billing-plans"` and
+derive `const VALID_PLAN_KEYS: ReadonlySet<string> = new Set(PLAN_LOOKUP_KEYS)`.
+Roll into the next OnboardingPage edit.
+
+### 601. ~~[LOW] Doc-image loading placeholder's aria-label is ignored~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** DocImagePicker no longer has the aria-label placeholder div; the tile (DocImageTile.tsx:81-83) is role=group named by file name and the loading box is a plain div
+`portal/src/components/estimates/DocImagePicker.tsx:18` — A `div` with `aria-label` and no role is not announced, so screen readers get nothing while a kept image loads or after it fails. The remove badge still names the file, hence LOW.
+
+**Suggested fix:** Add `role="img"` to the placeholder.
+
+### 548. ~~[MEDIUM] portal/src/lib/onboardingSteps.ts:79 — the desktop progress row may now wrap~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** lib/onboardingSteps.ts: wizard is now two steps (company, complete); the eight-label progress row and 'Choose Plan' label are gone
+
+The two longest labels in the set replaced two of the shortest: `percentages` went "Defaults" →
+"Percentages" and `plan` went "Plan" → "Choose Plan". The desktop `StepIndicator` renders all eight
+labels in one `flex` row with seven 24px connector rules and `gap-2`, inside a `max-w-3xl` (768px)
+container that itself sits inside `px-4`. Estimated to land within a few pixels of the available
+736px. It will not overflow horizontally — the label `<span>`s have no `whitespace-nowrap`, so they
+wrap — but one or two labels going to two lines would make the dot row ragged. jsdom does no layout,
+so no test can catch this, and `/onboarding` is behind `firebaseAuth.currentUser` so it was not
+visually verified.
+
+**Suggested fix:** needs a look at ≥1024px width first. If it wraps: either shorten `plan` back
+toward "Plan" in `STEP_LABELS` (the card title stays "Choose Your Plan" — they are already
+independent), or widen `containerWidthClass` in `OnboardingPage.tsx` from `max-w-3xl` to `max-w-4xl`
+for the non-plan steps.
+
+### 1223. ~~[LOW] The prefilter's premise is miscounted (needs your call)~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** agents/estimate/catalog_prefilter.py docstring now premises the standard list at 6,711 rows (2026-10-19 replacement), so the 376/150-row miscount and the 200 threshold question no longer apply
+`platform/agents/estimate/catalog_prefilter.py:4` — Docstrings say 376 rows; the seed is 369 size rows grouping into 150 materials, so with a 200 threshold a migrated company with <50 own materials never prefilters. (review 2026-10-16 round 2 #159, deferred)
+
+**Suggested fix:** Needs your call: (a) correct the docstrings to 150 and keep 200 — my pick, a 150-row scan was fine; (b) lower the threshold to ~120.
+
+### 359. ~~[LOW] platform/services/company_bootstrap.py:68 — (name, unit) lookup key assumes canonical unit casing~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** services/company_bootstrap.py now only calls standard_roles.ensure_company_roles; the (doc.name, doc.unit) existing_by_key lookup no longer exists (commit fccf5e8).
+`existing_by_key` is keyed by `(doc.name, doc.unit)` where `doc.unit` is the LabourUnit
+str-enum, and looked up with the template's raw `unit` string. It works today only because
+default_labours.csv uses exactly "Hourly" (verified). If a future seed row used an
+alias/lowercase unit ("hour"), the key would miss on rerun and insert a DUPLICATE role
+instead of overwriting. The legacy find_one had the same latent gap, so this is not a
+regression — but the in-memory key makes the casing assumption implicit.
+**Suggested fix:** Normalize the template unit when building/looking up the key, e.g. key
+on `LabourUnit.from_string(template["unit"])` on both sides, so alias/case variants resolve
+to the same enum. (Or assert the seed CSV uses canonical unit values.)
+
+### 210. ~~[MEDIUM] `PlanStep` should disable the grid when `companyId` is null~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** components/onboarding/PlanStep.tsx deleted by commit 937c09a (onboarding cut to Company + Complete screens); only CompanyStep.tsx and CompletionStep.tsx remain.
+**File**: `portal/src/components/onboarding/PlanStep.tsx:18-33`
+**Severity**: MEDIUM
+
+If `companyId` is null when the user clicks Select, they see "Missing company context. Please reload and try again." But by step 6, the company was created in step 1 — a missing companyId here is a code-flow bug, not a user-recoverable state. Telling the user to reload is unhelpful.
+
+Fix: pass a `disabled` prop down to `PlanPickerGrid` when `!companyId`. Render an inline "Initializing your account…" notice instead of letting the user click and fail.
+
+### 421. ~~[LOW] portal/src/components/settings/BillingTab.tsx:133 — "0 / 0" Tasks row during mixed-version deploys~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** the code is unchanged (BillingTab.tsx:135), but the risk is a mixed-version window between a portal and a platform deploy. Simon deploys during downtime (decided 2026-10-17), so that window has no users and the row never shows.
+If the portal deploys before the platform, subscription responses lack
+`used_tasks`/`included_tasks`; strict `=== null` (correctly) refuses to treat
+`undefined` as unlimited, so the Tasks row renders "0 / 0" until the backend
+ships. Transient and flag-gated.
+**Suggested fix:** Optionally skip the row when `state.included_tasks ===
+undefined`, or deploy platform before (or together with) portal.
+
+### 1135. ~~[MEDIUM] Untested edge case: turnOnStandardMaterials failing~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** turnOnStandardMaterials/step flag no longer exist; OnboardingPage.tsx:51-70 handleFinish runs setAllStandard via Promise.allSettled, non-blocking, and tests/OnboardingPageSequence.test.tsx:262 covers a rejection.
+`portal/src/pages/OnboardingPage.tsx:128` — When `setAllStandard` rejects, the flag must stay false, the step show the error, and the last screen not claim the materials are on. (review 2026-10-16 round 2 #70, deferred)
+
+**Suggested fix:** Reject `setAllStandardMock` once; assert the error, then after Skip the completion screen lacks "turned on for you".
+
+### 220. ~~[MEDIUM] Onboarding plan-persistence test reimplements `readPersistedPlanKey`~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** portal/tests/onboardingPlanPersistence.test.tsx and readPersistedPlanKey no longer exist (grep of src/tests finds nothing); onboarding cut to two screens
+**File**: [portal/tests/onboardingPlanPersistence.test.tsx:11-17](../../portal/tests/onboardingPlanPersistence.test.tsx)
+**Severity**: MEDIUM
+
+The new test landed alongside [#205](code-review-followups-archive.md)
+defines its own copy of `readPersistedPlanKey` and `VALID_PLAN_KEYS`
+rather than importing from `OnboardingPage.tsx`. If the production
+validation changes (e.g., adds `plan_enterprise` or tightens
+acceptance), the test still passes against the old logic and gives
+false confidence.
+
+Fix: extract `readPersistedPlanKey` (and `VALID_PLAN_KEYS`) into a
+small `portal/src/lib/onboardingPlanStorage.ts` helper, export it, and
+have both `OnboardingPage.tsx` and the test import from there. Drives
+both sides from one source.
+
+### 341. ~~[LOW] New reload API tests don't wrap cleanup in `try/finally`~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** no reload endpoint/tests remain: grep 'reload' in routers and tests/test_material_categories_api.py / test_material_units_api.py finds nothing
+The reload tests in `tests/test_material_categories_api.py` /
+`test_material_units_api.py` follow the file's existing trailing-`# Cleanup`
+convention, so a mid-test assertion failure skips the API cleanup calls.
+`conftest`'s by-company teardown backstops it, so this is cosmetic. Fix only if
+these files grow: fixture-based cleanup.
+
+### 361. ~~[LOW] portal/src/pages/OnboardingPage.tsx:140 — back-nav wiring isn't covered by a test~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** OnboardingPage.tsx now has only company->complete steps; the Contacts step onBack(goToStep(1)) wiring was deleted
+The new `onBack={() => goToStep(1)}` on the Contacts step and the
+`companyId`/`onCompanyUpdated` props are untested at the page level. The meaningful logic
+(create-vs-update, prefill) is covered in `CompanyStepEdit.test.tsx`; this is just one-line
+glue, but the navigation contract has no regression guard.
+**Suggested fix:** Optional — `OnboardingPage` needs firebase mocking to render (no existing
+pattern), so low-value to test directly. Acceptable to leave given the branch logic is
+covered.
+
+### 32. ~~[MEDIUM] `hasattr(l.unit, "value")` defensive check with unclear motivation~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** routers/labours.py upload_labours_csv was rewritten (name-keyed existing_by_name, ~line 316); no hasattr(l.unit, 'value') or existing_by_key left (grep of routers/labours.py).
+**File**: `routers/labours.py:202`
+**Severity**: MEDIUM
+
+`existing_by_key = {(l.name, l.unit.value if hasattr(l.unit, "value") else l.unit): l for l in candidates}` —
+the `Labour.unit` field is typed as `LabourUnit` enum in the model, so
+`.value` should always work. The `hasattr` fallback either (a) defends
+against legacy string-valued rows in prod, or (b) is defensive coding
+without cause. If (a), document it; if (b), drop it.
+
+Fix: grep production data once to check whether any `Labour` rows have
+`unit` stored as a raw string. If none, simplify to `l.unit.value`. If
+some, add a one-line comment and file a data-migration task.
+
+### 549. ~~[LOW] portal/src/components/onboarding/CsvUploadStep.tsx:29 — required props that two of the three modes ignore~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** portal/src/components/onboarding/ now holds only CompanyStep.tsx and CompletionStep.tsx; CsvUploadStep was removed with the two-screen onboarding
+
+`sampleCsvUrl` and `onUpload` are non-optional, but `infoOnly` and `standardOnly` never read either —
+the sample link and the file input are both inside the `infoOnly || standardOnly ? null :` branch. So
+`OnboardingPage` passes `sampleCsvUrl={MATERIALS_SAMPLE_CSV_URL}` and a live `onUpload` to screens
+that cannot upload, which reads as though they can.
+
+**Suggested fix:** make both optional and have the normal-mode branch require them (a discriminated
+union on the mode would be most honest, but optional props plus the existing branch guard is enough).
+Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sites in
+`OnboardingPage.tsx`.
+
+### 1076. ~~[LOW] #1071's suggested fix can't work~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** #1071 (the entry whose fix this disputes) is archived as RESOLVED 2026-10-18 via a `_reply_rules` 'I can't narrow ' -> cant_narrow rule (services/maple_outcomes.py:217, pinned in tests/test_maple_outcomes.py:138); no live entry carries the disputed fix
+`documentation/development/code-review-followups.md` — #1071 suggests a `_reply_rules` entry for AMOUNT_UNREAD, but the say-back goes out as a `social` meta envelope (as told_not_to's reply does), and `services/maple_outcomes._classify` returns None for `intent == "social"` before reaching `_reply_rules`, so that entry would never be read. (review round 21 #7, deferred)
+
+**Suggested fix:** Rewrite #1071: give the say-back its own intent or envelope, or pass a planned `Outcome("cant_narrow", "amount")` through `PlannerTurn` to `_planned_outcome`; then the CONSTANT_CASES row.
+
+### 1079. ~~[LOW] Stale and missing locations in #1071, #1076, #1077~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** #1071 and #1077 are now in code-review-followups-archive.md (resolved); the file has been renumbered/grown to 6.6k lines, so the cited positions are moot
+`documentation/development/code-review-followups.md:2471` — #1071 still cites `unread_scope.py:40`; AMOUNT_UNREAD is now at :30. #1076 and #1077 name the followups file with no line (#1071 is at :2470, #1070 at :2463). (review round 22 #8, deferred)
+
+**Suggested fix:** Change #1071 to `unread_scope.py:30`, and add `:2470` and `:2463` to #1076 and #1077.
+
+### 1185. ~~[LOW] Stray second blank line~~ — OBSOLETE 2026-10-22
+
+**Obsolete (consolidation 2026-10-22):** portal/src/pages/OnboardingPage.tsx was rewritten for the two-screen flow; no double blank line remains (awk scan)
+`portal/src/pages/OnboardingPage.tsx:58` — Added by this change. (review 2026-10-16 round 2 #120, deferred)
+
+**Suggested fix:** Delete it.

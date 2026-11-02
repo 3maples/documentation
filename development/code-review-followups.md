@@ -24,6 +24,15 @@ entries moved to the archive: 88 already marked closed, 31 the code now satisfie
 is gone or rewritten, and 1 superseded. 743 remain. The archive's 2026-10-18 section lists them
 with the evidence checked.
 
+**Consolidation 2026-10-22** — all 880 open entries checked against the code on `main` again, after
+the October phrasing gaps, the two-screen onboarding, the standard materials replacement, Maple
+attachments and the activity role snapshot landed. 44 moved to the archive: 12 already marked
+closed, 16 the code now satisfies, and 16 whose code is gone or rewritten (most from the onboarding
+cut) or whose risk Simon has ruled out (#421, deploys happen in downtime). 836 remain. 130 open
+entries whose file, line or scope had drifted got a **Checked 2026-10-22** line under the title.
+#4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
+evidence checked.
+
 - **Entries are numbered and permanent.** Next free number: **1457**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
@@ -51,37 +60,36 @@ RESOLVED in the same commit.
 
 ## Priority queue — top ten
 
-**Re-derived 2026-10-20**, after the Maple attachments and the standard materials replacement added
-#1290–#1351. Ranked by user impact first (wrong writes, data integrity, privacy, cost), then risk,
-then how much each fix unblocks. Planner gaps rank high because the planner is the default for
-every company.
+**Re-derived 2026-10-22**, after the consolidation above. Ranked by user impact first (wrong writes,
+data integrity, privacy, cost), then risk, then how much each fix unblocks. Planner gaps rank high
+because the planner is the default for every company.
 
 | # | Item | Why it's here |
 |---|------|---------------|
-| 1 | [#846](#846-high-planner-owed-verification-after-phase-8) | The phrasing gaps the 2026-10-19 parity run found, G1–G35, were closed on `main` on 2026-10-22 ([plan](plans/2026-10-19-maple-phrasing-gaps-plan.md)), with a full live run after them. #846's other items are still owed: task statuses in the parity state, the acceptance corpus on the planner pipeline, and acceptance conversations for the ~250 reference rows never put to the planner. |
-| 2 | [#947](#947-medium-planner-add-bob-as-the-contact-on-e0042-can-create-a-new-bob) | Maple can plan `create_contact` beside a link, so "add Bob as the contact on E0042" can create a second Bob. Nothing checks for an existing contact first. [#948](#948-medium-planner-a-property-create-beside-a-link-doesnt-check-the-address-exists) is the same gap for properties. |
-| 3 | ~~#60~~ — **done 2026-10-20**, production audit owed before release | Material has only a non-unique `(company, name)` index, so concurrent creates can duplicate a name, and the shared catalog relies on unique names. Dev's names are unique since the 2026-10-20 replacement renamed clashes "(custom)", so Dev can take the unique index now; production needs the same rename settled before the new list goes there. |
-| 4 | [#1304](#1304-medium-a-pdf-whose-pages-sit-in-compressed-object-streams-is-read-whatever-its-length) | A PDF with its pages in compressed object streams shows no page count, so Maple reads it whole, up to OpenAI's 100-page cap rather than our 20. One upload can cost several normal reads. The fix (`pypdf`) is chosen and adds one dependency. |
-| 5 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Same-field concurrent edits still resolve last-write-wins with no signal. The server mechanism and the TaskDialog are built; the estimate builder is the remaining surface. |
-| 6 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script runs `--apply` with no environment guard or confirmation, so one wrong shell writes to production data. Mirror `backfill_companies_to_free.py` (`--prod`, `--mongo-url`, a confirmation prompt). |
-| 7 | [#196](#196-medium-implement-payment_failed-user-notification) | A card decline leaves the customer in `past_due` with no notice from the platform (the handler is still a TODO). Send a Brevo email from `invoice.payment_failed`. |
-| 8 | [#865](#865-medium-when-a-create-makes-nothing-the-later-steps-are-dropped-without-a-word) | When a create makes nothing, the plan's later steps are dropped without a word. |
-| 9 | [#1001](#1001-medium-a-command-followed-by-a-separate-question-is-read-as-a-question) | A command followed by a separate question is answered as a question, and the command never runs. |
-| 10 | [#1329](#1329-low-maple-uploads-hold-their-bytes-in-memory-while-queued-for-a-read-slot) | Maple uploads sit in memory while they wait for a read slot, up to 300MB per user. LOW, but attachments are live, so the exposure is real. |
+| 1 | [#947](#947-medium-planner-add-bob-as-the-contact-on-e0042-can-create-a-new-bob) + [#948](#948-medium-planner-a-property-create-beside-a-link-doesnt-check-the-address-exists) | Maple can plan `create_contact` or `create_property` beside a link, so "add Bob as the contact on E0042" can create a second Bob and link it. The only guard is a prompt line (`maple_planner.py:211`); `policy.py` checks nothing. A duplicate record written into the customer's data, from the default pipeline. |
+| 2 | [#846](#846-high-planner-owed-verification-after-phase-8) | G1–G35 closed and the full live run are done. Still owed: task statuses in the parity state, the acceptance corpus on the planner pipeline, and acceptance conversations for the ~250 reference rows never put to the planner. This is how the next #947 gets found before a customer does. |
+| 3 | [#1304](#1304-medium-a-pdf-whose-pages-sit-in-compressed-object-streams-is-read-whatever-its-length) | A PDF with its pages in compressed object streams shows no page count, so Maple reads it whole, up to OpenAI's 100-page cap rather than our 20. One upload can cost several normal reads. The fix (`pypdf`) is chosen. |
+| 4 | [#490](#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Same-field concurrent edits still resolve last-write-wins with no signal. Work-item saves now send `base_version`; the field auto-save, whole-save and `ConflictNotice` in the estimate builder are not wired, and `persist_fields` writes no audit entry. |
+| 5 | [#1436](#1436-medium-test_vocabulary_unique_namespy-fails-after-the-planner-and-maple-suites-in-one-run) | The full pytest run fails 11–13 vocabulary tests (and a rotating neighbour) though each passes alone, so the `/release` gate is red on every run and a real failure can hide in it. Some test leaves the shared test user changed. |
+| 6 | [#1329](#1329-low-maple-uploads-hold-their-bytes-in-memory-while-queued-for-a-read-slot) | Maple uploads sit in memory while they wait for a read slot, up to 300MB per user. Production runs on a 512 MB instance that idles around 260 MB and restarted out of memory on 2026-10-29 and 2026-10-31, so one user's burst of uploads can crash it. Moved up 2026-11-01. |
+| 7 | [#546](#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script runs `--apply` with no environment guard or confirmation, so one wrong shell writes to a live database. Mirror `backfill_companies_to_free.py` (`--prod`, `--mongo-url`, a confirmation prompt). |
+| 8 | [#196](#196-medium-implement-payment_failed-user-notification) | A card decline leaves the customer in `past_due` with no notice from the platform (the handler is still a TODO). Send a Brevo email from `invoice.payment_failed`. |
+| 9 | [#1434](#1434-medium-a-line-named-without-its-work-item-is-looked-for-on-the-models-guess) | "make the excavation activity 8 hours" with no work item named is looked for on the model's guess, and failed two of four live runs on 2026-10-22. Nothing is written, but the edit doesn't happen. |
+| 10 | [#865](#865-medium-when-a-create-makes-nothing-the-later-steps-are-dropped-without-a-word) | When a create makes nothing, the plan's later steps are dropped without a word. |
 
-**Next in line:** [#4](#4-high-file-and-function-size) (file and function size; the first move is still extracting the invitation lifecycle from `routers/auth.py` into `routers/invitations.py`), [#607](#607-medium-deleting-a-doc-version-can-still-remove-a-blob-a-concurrent-generate-is-keeping) (a doc-version delete can remove a blob a concurrent generate is keeping), [#408](#408-medium-portalsrccomponentsdashboardupcomingtaskscardtsx38--completed-tasks-surface-in-upcoming-tasks) (Done tasks fill the dashboard's Upcoming Tasks card; needs a product call), and the [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) section.
+**Next in line:** [#1001](#1001-medium-a-command-followed-by-a-separate-question-is-read-as-a-question) (a command followed by a separate question is asked about as a question; moved down 2026-11-01 for #1329), [#1100](#1100-medium-dead-route-post-materialsload-standard-keep-until-the-new-portal-ships) (the dead `load-standard` route is now unblocked: the stage-2 portal is on `release`), [#4](#4-high-file-and-function-size) (the first move is still extracting the invitation lifecycle from `routers/auth.py`), [#607](#607-medium-deleting-a-doc-version-can-still-remove-a-blob-a-concurrent-generate-is-keeping), [#408](#408-medium-portalsrccomponentsdashboardupcomingtaskscardtsx38--completed-tasks-surface-in-upcoming-tasks) (needs a product call), and the [Query efficiency](#query-efficiency--scans-n1-and-missing-indexes) section.
 
-**Done from the 2026-10-18 ranking:** #1089 (with #1090–#1092), #1251 (with #1252) and #817, all on 2026-10-18.
+**Done from the 2026-10-20 ranking:** #60 on 2026-10-20 (production checked 2026-10-24, 0 duplicates; shipped in 1.15.0; the entry is in the archive's 2026-10-22 section).
 
-The queue's earlier history (the 2026-09-20 ranking, its closures and demotions) is kept in the archive's 2026-10-18 section.
+The queue's earlier history is kept in the archive's 2026-10-18 section.
 
 ## File and function size
 
 ### 4. [HIGH] File and function size
 
 **The single tracker for every file-length and function-length finding.** Line
-counts below re-measured on `main`, 2026-09-20; the Maple rows (Maple agents,
-`routers/agents.py` and the Maple test files) re-measured 2026-09-27.
+counts in both file tables re-measured on `main`, 2026-11-01 (the function table
+keeps the date on each row).
 Forty-four entries were folded in here on 2026-08-25 and a further twenty on
 2026-09-20; their bodies —
 including the suggested split for each — are preserved under
@@ -103,40 +111,40 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 
 | Lines | File | Note |
 |------:|------|------|
-| 4,098 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | 4,098 on 2026-10-28 (+7: Maple's status rows, MCP enhancements release one); +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push); 4,022 on 2026-10-05 (+5 that day: `_create_estimate_from_template(audit=)`); 4,089 on 2026-10-06 (+67: tax in the dashboard's figures and a list's total); 4,144 on 2026-10-08 (+55, switchover phase 4d: the property link's write and reply split out as `_apply_estimate_property` for the planner); 4,163 on 2026-10-09 (+19, switchover phase 6b: today's template apply's tail split out as `_add_template_work_item`); +4 on 2026-10-10 (phase 7d: the dashboard's summary card in `dashboard_reply`) |
-| 3,577 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net); +70 by 2026-09-27 — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py`; +155 on 2026-09-27 (multi-turn push: cross-record joins, dashboard, named creates) |
-| 3,611 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | 3,611 on 2026-10-17 (review rounds 4–5: size-label refusals and the planner's size read); 3,565 on 2026-10-16 (shared material catalog: reads through `services/material_catalog`, Owner/Admin gates, standard hides; −108 in the review fixes as the standard price write moved to `agents/material/catalog_writes.py`); 3,483 on 2026-10-10 (+27 over 3,456, switchover phase 7d: `material_sizes_reply` shared with today's size command, `materials_on_estimate_reply` and `_estimate_materials_reply`); +366 on 2026-09-27 (multi-turn push: size commands, one-question creates); +123 in the 2026-09-27/28 review fixes (3,087 at `main` then) — the material in focus, size-label refusals, "which material?". `_handle_size_command` is 107 lines — split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` (review 2026-09-27 #29) |
-| 2,823 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug; +70 on 2026-09-27; 2,823 on 2026-10-10 (switchover phase 7d part 2: `properties_using_reply`, the cross list's words split out as `_cross_response`, and `_estimate_linked_reply` and `_joined_properties_reply` split out of `_list_properties_by_cross_resource`, which is now under 50 lines) |
-| 2,561 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
-| 2,498 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | +123 on 2026-09-27 |
-| 2,268 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam; 2,268 on 2026-10-16 (shared material catalog: `useMaterialCatalog` replaces the loaded list, and the gap-name lookup was removed in review) |
-| 2,227 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. was `orchestrate_agent_endpoint` at 607 lines; +221 on 2026-09-27 (open question, conversation store, page signals); the endpoint body is now `_orchestrate_turn` (#689), 729 lines (functions table); re-measured 2,227 on 2026-10-07 (+63 that day, from 2,164: the turn id and the unanswered tracker's hooks on the finalize closure, the early exits and the 500 path — review 2026-10-07 #4, deferred) |
-| 1,720 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24, +156 by 2026-09-27. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73); +89 on 2026-09-27 |
+| 4,103 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | 4,098 on 2026-10-28 (+7: Maple's status rows, MCP enhancements release one); +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push); 4,022 on 2026-10-05 (+5 that day: `_create_estimate_from_template(audit=)`); 4,089 on 2026-10-06 (+67: tax in the dashboard's figures and a list's total); 4,144 on 2026-10-08 (+55, switchover phase 4d: the property link's write and reply split out as `_apply_estimate_property` for the planner); 4,163 on 2026-10-09 (+19, switchover phase 6b: today's template apply's tail split out as `_add_template_work_item`); +4 on 2026-10-10 (phase 7d: the dashboard's summary card in `dashboard_reply`) |
+| 3,661 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net); +70 by 2026-09-27 — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py`; +155 on 2026-09-27 (multi-turn push: cross-record joins, dashboard, named creates) |
+| 3,641 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | 3,611 on 2026-10-17 (review rounds 4–5: size-label refusals and the planner's size read); 3,565 on 2026-10-16 (shared material catalog: reads through `services/material_catalog`, Owner/Admin gates, standard hides; −108 in the review fixes as the standard price write moved to `agents/material/catalog_writes.py`); 3,483 on 2026-10-10 (+27 over 3,456, switchover phase 7d: `material_sizes_reply` shared with today's size command, `materials_on_estimate_reply` and `_estimate_materials_reply`); +366 on 2026-09-27 (multi-turn push: size commands, one-question creates); +123 in the 2026-09-27/28 review fixes (3,087 at `main` then) — the material in focus, size-label refusals, "which material?". `_handle_size_command` is 107 lines — split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` (review 2026-09-27 #29) |
+| 2,859 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug; +70 on 2026-09-27; 2,823 on 2026-10-10 (switchover phase 7d part 2: `properties_using_reply`, the cross list's words split out as `_cross_response`, and `_estimate_linked_reply` and `_joined_properties_reply` split out of `_list_properties_by_cross_resource`, which is now under 50 lines) |
+| 2,679 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | +123 on 2026-09-27 |
+| 2,538 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. was `orchestrate_agent_endpoint` at 607 lines; +221 on 2026-09-27 (open question, conversation store, page signals); the endpoint body is now `_orchestrate_turn` (#689), 729 lines (functions table); re-measured 2,227 on 2026-10-07 (+63 that day, from 2,164: the turn id and the unanswered tracker's hooks on the finalize closure, the early exits and the 500 path — review 2026-10-07 #4, deferred) |
+| 2,515 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
+| 2,236 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam; 2,268 on 2026-10-16 (shared material catalog: `useMaterialCatalog` replaces the loaded list, and the gap-name lookup was removed in review) |
+| 1,852 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24, +156 by 2026-09-27. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73); +89 on 2026-09-27 |
+| 1,819 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | +42 on 2026-09-27; 1,712 on 2026-10-10 (+27, switchover phase 7d: `roles_on_estimate_reply`, the per-estimate list's reply split out as `_estimate_labours_reply` so the planner passes its own estimate) |
+| 1,693 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | 1,696 on 2026-10-17 (+18 in review round 2's fixes; component ~1,540); 1,678 on 2026-10-16 (shared material catalog stage 2: server paging, filters, standard pricing and the page/row menus; −41 in the review fixes when the result notices moved to `lib/materialNotices.ts`). The component function is ~1,450 lines — **next step:** move the toolbar (search, filters, sort) and the page menu with its three modals into `components/materials/` |
 | 1,558 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | 1,558 on 2026-10-28 (+22: the status-change row on the PUT, MCP enhancements release one); −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
-| 1,712 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | +42 on 2026-09-27; 1,712 on 2026-10-10 (+27, switchover phase 7d: `roles_on_estimate_reply`, the per-estimate list's reply split out as `_estimate_labours_reply` so the planner passes its own estimate) |
-| 1,696 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | 1,696 on 2026-10-17 (+18 in review round 2's fixes; component ~1,540); 1,678 on 2026-10-16 (shared material catalog stage 2: server paging, filters, standard pricing and the page/row menus; −41 in the review fixes when the result notices moved to `lib/materialNotices.ts`). The component function is ~1,450 lines — **next step:** move the toolbar (search, filters, sort) and the page menu with its three modals into `components/materials/` |
-| 1,284 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
-| 1,274 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
-| 1,246 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | −153 by 2026-09-27 |
-| 1,406 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below. 1,406 on 2026-10-28 (+48: the account-lifecycle audit rows, MCP enhancements release one). 1,360 on 2026-10-23 (+42: the email-only resend endpoint and signup's `created` flag, auth screens review). 1,224 on 2026-10-17 (+14: the Firebase throttle → 429 on the verification and password-reset routes, PYTHON-W) |
-| 1,206 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | +11 on 2026-09-27 |
-| 1,201 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
-| 1,177 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
-| 1,163 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | +48 over the 2026-09-24 review passes; +15 by 2026-09-27 |
-| 1,195 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases; +65 on 2026-09-28 for the target-first field shapes and `restated_field_value`. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46) |
-| 1,176 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27; 1,102 on 2026-10-05 (+14 for the save failure's outage/bug split, #619); 1,176 on 2026-10-13 (+74: the nameless-line helpers — `_nameless_line`, `_current_index` / `_original_index`, `_batch_line`, `_removed_line`, `_forget_shifted_lines`; review 2026-10-13 rounds 4–5) |
+| 1,543 | [website/index.html](../../website/index.html) | first measured 2026-10-22; the single-page site (footer icon duplication is #456) |
+| 1,411 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below. 1,406 on 2026-10-28 (+48: the account-lifecycle audit rows, MCP enhancements release one). 1,360 on 2026-10-23 (+42: the email-only resend endpoint and signup's `created` flag, auth screens review). 1,224 on 2026-10-17 (+14: the Firebase throttle → 429 on the verification and password-reset routes, PYTHON-W) |
+| 1,319 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | −153 by 2026-09-27 |
+| 1,281 | [platform/agents/estimate/service.py](../../platform/agents/estimate/service.py) | |
+| 1,274 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | +11 on 2026-09-27 |
+| 1,255 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
+| 1,202 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases; +65 on 2026-09-28 for the target-first field shapes and `restated_field_value`. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46) |
+| 1,179 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27; 1,102 on 2026-10-05 (+14 for the save failure's outage/bug split, #619); 1,176 on 2026-10-13 (+74: the nameless-line helpers — `_nameless_line`, `_current_index` / `_original_index`, `_batch_line`, `_removed_line`, `_forget_shifted_lines`; review 2026-10-13 rounds 4–5) |
+| 1,171 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
+| 1,171 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | +48 over the 2026-09-24 review passes; +15 by 2026-09-27 |
 | 1,108 | [platform/agents/estimate/command_grammar.py](../../platform/agents/estimate/command_grammar.py) | the written command list (design 2026-09-25), first measured 2026-10-06 at 1,060 (1,108 re-measured 2026-10-14, review round 13 #35); +23 that day (tax: `_M_TAX`, the "of my estimates" and bare-total lookaheads, the "how much are my estimates worth" and headless total-value entries). **Next step:** move each family of entries (metric, line, ranking / by month / comparison, ratio) into `grammar_metrics.py` and keep `_CORE` here as their concatenation |
+| 1,095 | [portal/src/pages/PeoplePage.tsx](../../portal/src/pages/PeoplePage.tsx) | |
 | 1,031 | [platform/agents/task/service.py](../../platform/agents/task/service.py) | **crossed the line 2026-09-27** (was 688); 1,048 by 2026-10-08, then −43 when `_handle_task_due_change` moved into operations.py (switchover phase 4b, done); +26 on 2026-10-13 (planner gap fixes; review 2026-10-13 round 3 #45). **Next step:** a `TaskListBase` layer in `agents/task/listing.py` holding `_handle_list_tasks`, `_due_note`, `_resolve_list_ask` and `_FINISHED_STATUS_NAMES`; split `_handle_update_subop` into a detector table plus a named-target helper — about 600 lines left (review 2026-09-27 #47) |
-| 818 | [platform/agents/task/operations.py](../../platform/agents/task/operations.py) | **crossed the line 2026-10-08** (was 774): `_handle_task_due_change` moved in beside the other sub-handlers (switchover phase 4b). **Next step:** the convert flow (`_handle_convert_task`, `_perform_conversion`, `_convert_error_copy`, about 175 lines) into `agents/task/convert.py` as a `TaskConvertBase` layer (review 2026-10-08 (4b) #22, deferred) |
-| 973 | [platform/services/maple_metrics.py](../../platform/services/maple_metrics.py) | the metrics engine, first measured 2026-10-06; +7 that day (`pre_tax_total`); +113 by 2026-10-13 (`priced_work_items`, `_count_and_value`, `ItemDollars` / `PricedItem` for the ratio shapes; review 2026-10-13 round 3 #45). **Next step:** the Phase 3 ratios (`run_win_rate`, `run_margin`, `priced_work_items` and their helpers) into `maple_ratios.py` beside `maple_ratio_shapes.py`, which already holds the shapes |
-| 903 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
-| 883 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
-| 901 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838); 906 on 2026-10-19 (+22: the What's New buttons beside the bell — they move with the sidebar and drawer extractions), then 885 when the user menu moved into `UserMenuItems.tsx`, then 901 on 2026-10-20 (+16: the What's New dot on three buttons and its hook). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
-| 930 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | 930 on 2026-10-21 (+51: the catalog actions and undo_last, gap plan 2026-10-19); **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements); then `ResizeWorkItem` (+16, 2026-10-11); +21 on 2026-10-13 (`Metric.year` / `since` / `excluding`, `win_rate_by_value`; round 3 #45). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
-| 848 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. 2026-10-21: +41 for per-request connections (`_request_builder`), `_load_credentials_info` and the sharing delegates; the sharing logic itself went to `services/google_drive_sharing.py`. 2026-10-26: −30 — `share_document` and the `grant_writer` / `revoke_writer` delegates replaced by `open_link_editing` / `close_link_access` / `modified_time`. Still 48 over |
 | 1,029 | [platform/agents/planner/policy.py](../../platform/agents/planner/policy.py) | 1,029 on 2026-10-22 (+14, the review's round 3 fixes: hidden names among several matches, a size change that can't apply); 1,015 on 2026-10-22 (+29, the review's round 2 fixes); 986 on 2026-10-21 (+130: the gap plan's catalog checks and undo, and the review's fixes); 846 on 2026-10-16 (+28: material sizes and the Owner/Admin price check for the shared catalog); **crossed the line 2026-10-13** (792 → 818) in the planner gap-fixing change (`_nameless_checked`, `_typed_nameless_line`). **Next split:** `_nameless_checked`, `_typed_nameless_line`, `_line_kind` and `resolve_work_items` into `policy_lines.py`, as `policy_subject.py` was — review round 13 #20 |
-| 801 | [platform/services/material_catalog_writes.py](../../platform/services/material_catalog_writes.py) | **crossed the line 2026-10-21** (795 → 801): `next_copy_name` for Maple's copy offer (gap plan 2026-10-19 D2; review 2026-10-21 #83). **Next step:** move the copy helpers (`duplicate`, `next_copy_name`, `_next_copy_name`) into a `material_catalog_copies.py` re-exported from `material_catalog` — it joins the reader/writer import cycle, so it wants its own change |
-| ~~1,027~~ 322 | [platform/agents/planner/execute.py](../../platform/agents/planner/execute.py) | **RESOLVED 2026-10-08** — split before switchover phase 5, no behavior change: the handlers moved to `execute_records.py` (contacts, properties, materials, roles, templates, tasks; 404), `execute_estimates.py` (estimate reads joined its writes; 309), `execute_links.py` (the notes feed joined links and notes; 142) and `execute_figures.py` (catalog figures, dashboard, metric; 94). `execute.py` keeps the meta replies, the gate and the run, and builds `COVERED` from each module's `HANDLERS`; `test_each_op_has_one_handler_across_the_executors_modules` fails on an op two modules register. Move to the archive in the next cleanup |
+| 966 | [platform/services/maple_metrics.py](../../platform/services/maple_metrics.py) | the metrics engine, first measured 2026-10-06; +7 that day (`pre_tax_total`); +113 by 2026-10-13 (`priced_work_items`, `_count_and_value`, `ItemDollars` / `PricedItem` for the ratio shapes; review 2026-10-13 round 3 #45). **Next step:** the Phase 3 ratios (`run_win_rate`, `run_margin`, `priced_work_items` and their helpers) into `maple_ratios.py` beside `maple_ratio_shapes.py`, which already holds the shapes |
+| 936 | [platform/agents/planner/schema.py](../../platform/agents/planner/schema.py) | 930 on 2026-10-21 (+51: the catalog actions and undo_last, gap plan 2026-10-19); **crossed the line 2026-10-11** (was 785): phase 8 added fields (stale_days, before_tax, days, within, limit, the task refinements); then `ResizeWorkItem` (+16, 2026-10-11); +21 on 2026-10-13 (`Metric.year` / `since` / `excluding`, `win_rate_by_value`; round 3 #45). **Next step:** the follow-up and answer actions (RedoLast, RefineLast, ShowMore, Answer) or the figures (Metric, Dashboard, CatalogFigure) into `schema_reads.py`, as schema_edits/schema_fields already are (review 2026-10-11 #73, deferred) |
+| 922 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
+| 912 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
+| 905 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838); 906 on 2026-10-19 (+22: the What's New buttons beside the bell — they move with the sidebar and drawer extractions), then 885 when the user menu moved into `UserMenuItems.tsx`, then 901 on 2026-10-20 (+16: the What's New dot on three buttons and its hook). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx` |
+| 890 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. 2026-10-21: +41 for per-request connections (`_request_builder`), `_load_credentials_info` and the sharing delegates; the sharing logic itself went to `services/google_drive_sharing.py`. 2026-10-26: −30 — `share_document` and the `grant_writer` / `revoke_writer` delegates replaced by `open_link_editing` / `close_link_access` / `modified_time`. 2026-11-01: +37 for text-block markdown in estimate docs (3ca456c; the formatter itself is `services/doc_markdown.py`). Still 90 over |
+| 861 | [platform/services/material_catalog_writes.py](../../platform/services/material_catalog_writes.py) | **crossed the line 2026-10-21** (795 → 801): `next_copy_name` for Maple's copy offer (gap plan 2026-10-19 D2; review 2026-10-21 #83). **Next step:** move the copy helpers (`duplicate`, `next_copy_name`, `_next_copy_name`) into a `material_catalog_copies.py` re-exported from `material_catalog` — it joins the reader/writer import cycle, so it wants its own change |
+| 812 | [platform/agents/task/operations.py](../../platform/agents/task/operations.py) | **crossed the line 2026-10-08** (was 774): `_handle_task_due_change` moved in beside the other sub-handlers (switchover phase 4b). **Next step:** the convert flow (`_handle_convert_task`, `_perform_conversion`, `_convert_error_copy`, about 175 lines) into `agents/task/convert.py` as a `TaskConvertBase` layer (review 2026-10-08 (4b) #22, deferred) |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
 lifecycle into `routers/invitations.py` (~400 lines, a clean seam, leaves
@@ -144,54 +152,52 @@ lifecycle into `routers/invitations.py` (~400 lines, a clean seam, leaves
 
 #### Test files over 800 lines
 
-**Stale since 2026-09-28** (review 2026-09-28 #11, deferred): the source table
-above was re-measured that day, this one was not. Thirteen counts are out of
-date (e.g. test_material_agent.py is 2,193, test_orchestrator_intents.py
-2,580, test_property_agent.py 2,278, test_maple_task_operations.py 2,023), and
-three files over 800 lines are missing: `tests/maple_conversations/corpus.py`
-(1,354), `test_command_grammar.py` (957), `test_address_service.py` (855).
-Re-measure with `wc -l`, add the three rows, re-sort.
-
 Softer guideline — inline-explicit setup is a deliberate trade against hidden
 fixtures — but these are past the point of scanning.
 
 | Lines | File |
 |------:|------|
-| 851 | [platform/tests/test_material_overrides_api.py](../../platform/tests/test_material_overrides_api.py) | new 2026-10-16 with the shared material catalog; crossed 800 in review round 3. **Next step:** move the reset/load-standard and upload sections into `test_material_standard_bulk_api.py` (review 2026-10-17 round 3 #13) |
-| 1,365 | [platform/tests/test_planner_execute_files.py](../../platform/tests/test_planner_execute_files.py) | new 2026-10-18 with Maple attachments; grew one review-round section at a time, so the file-memory tests sit in four sections by when they were found. **Next step:** move the file-memory tests (`keep_for_question`, `carry_kept_files`, `files_on_the_create`, `_files_planned_again`, `note_filed`, `files_for`) into `tests/test_planner_file_memory.py`, one section per helper; the handler tests stay — a pure move (Maple attachments review round 8 #1) |
-| 889 | [platform/tests/test_media_blobs.py](../../platform/tests/test_media_blobs.py) | 277 → 889 with Maple attachments (2026-10-19), from the pixel-cap and JPEG scan-walk tests of review rounds 4–6. **Next step:** move those sections and the image builders they share into `tests/test_media_blobs_pixel_caps.py` — a pure move (Maple attachments review round 8 #2) |
-| 6,194 | platform/tests/test_estimate_agent.py |
-| 5,565 | platform/tests/test_estimate_api.py |
-| 4,329 | platform/tests/test_orchestrator_endpoint.py |
-| 2,655 | platform/tests/test_contact_agent.py |
-| 2,493 | platform/tests/test_orchestrator_intents.py |
-| 2,431 | platform/tests/test_maple_estimate_field_edits.py |
-| 2,218 | platform/tests/test_property_agent.py |
-| 2,020 | platform/tests/test_material_agent.py |
-| 1,984 | platform/tests/test_maple_task_operations.py |
-| 1,501 | platform/tests/test_auth_api.py |
-| 1,371 | platform/tests/test_text_utils.py |
-| 1,367 | platform/tests/test_maple_task_crud.py |
-| 1,325 | platform/tests/test_tasks_api.py |
-| 1,219 | portal/tests/TaskDialog.test.tsx |
-| 1,174 | platform/tests/test_cross_resource_joins.py |
-| 1,138 | platform/tests/test_maple_work_item_context.py |
-| 965 | platform/tests/test_planner_said.py (553 before 2026-10-13; the review's said.py split moved new cases to `test_planner_said_corrections.py` — split the rest along `said_metrics` / `said_tasks` / `said_resize` / `said_guards`, review 2026-10-13 #141, deferred) |
-| 1,167 | platform/tests/test_estimate_gathering.py (823 when listed; +76 on 2026-10-14 for the property-gone reply and its 404 match, review rounds 13 #3 / 14 #8–#9, #17, #23; +268 on 2026-10-12 for the created reply's property follow-up and every finalize branch — the seam is `TestFinalizeGatheringStashedProperty` + the helper classes → `tests/test_estimate_gathering_finalize.py`) |
-| 1,025 | platform/tests/test_planner_confirm.py (563 → 1,025 in the planner gap-fixing change; split the round-7/8 line-label tests from the question-write tests — review round 13 #23) |
+| 6,564 | platform/tests/test_estimate_agent.py |
+| 5,676 | platform/tests/test_estimate_api.py |
+| 4,370 | platform/tests/test_orchestrator_endpoint.py |
+| 2,839 | platform/tests/test_material_agent.py |
+| 2,743 | platform/tests/test_contact_agent.py |
+| 2,740 | platform/tests/test_orchestrator_intents.py |
+| 2,600 | platform/tests/maple_conversations/corpus.py (first listed 2026-10-22; the acceptance corpus, data not test logic) |
+| 2,479 | platform/tests/test_maple_estimate_field_edits.py |
+| 2,406 | platform/tests/test_property_agent.py |
+| 2,345 | platform/tests/test_maple_task_operations.py |
+| 1,820 | platform/tests/test_auth_api.py |
+| 1,628 | [platform/tests/test_planner_execute_files.py](../../platform/tests/test_planner_execute_files.py) | new 2026-10-18 with Maple attachments; grew one review-round section at a time, so the file-memory tests sit in four sections by when they were found. **Next step:** move the file-memory tests (`keep_for_question`, `carry_kept_files`, `files_on_the_create`, `_files_planned_again`, `note_filed`, `files_for`) into `tests/test_planner_file_memory.py`, one section per helper; the handler tests stay — a pure move (Maple attachments review round 8 #1) |
+| 1,473 | platform/tests/test_text_utils.py |
+| 1,401 | platform/tests/test_maple_task_crud.py |
+| 1,379 | portal/tests/TaskDialog.test.tsx |
+| 1,364 | platform/tests/test_tasks_api.py |
+| 1,211 | platform/tests/test_cross_resource_joins.py |
+| 1,193 | platform/tests/test_estimate_gathering.py (823 when listed; +76 on 2026-10-14 for the property-gone reply and its 404 match, review rounds 13 #3 / 14 #8–#9, #17, #23; +268 on 2026-10-12 for the created reply's property follow-up and every finalize branch — the seam is `TestFinalizeGatheringStashedProperty` + the helper classes → `tests/test_estimate_gathering_finalize.py`) |
+| 1,192 | platform/tests/test_estimate_edit_executor.py (890 when listed; +204 in the planner gap-fixing change, review round 13 #26) |
+| 1,152 | platform/tests/test_maple_work_item_context.py |
+| 1,089 | platform/tests/test_metric_query.py (first listed 2026-10-22) |
+| 1,068 | platform/tests/test_planner_said_corrections.py (new in the planner gap-fixing change; split along `said_metrics` / `said_tasks` / `said_resize` — review round 13 #24) |
+| 1,049 | [platform/tests/test_media_blobs.py](../../platform/tests/test_media_blobs.py) | 277 → 889 with Maple attachments (2026-10-19), from the pixel-cap and JPEG scan-walk tests of review rounds 4–6. **Next step:** move those sections and the image builders they share into `tests/test_media_blobs_pixel_caps.py` — a pure move (Maple attachments review round 8 #2) |
+| 1,042 | platform/tests/test_planner_confirm.py (563 → 1,025 in the planner gap-fixing change; split the round-7/8 line-label tests from the question-write tests — review round 13 #23) |
+| 1,037 | platform/tests/conftest.py |
+| 989 | platform/tests/test_command_grammar.py (first listed 2026-10-22) |
+| 987 | platform/tests/test_planner_said.py (553 before 2026-10-13; the review's said.py split moved new cases to `test_planner_said_corrections.py` — split the rest along `said_metrics` / `said_tasks` / `said_resize` / `said_guards`, review 2026-10-13 #141, deferred) |
+| 978 | platform/tests/test_task_convert_api.py |
+| 973 | portal/tests/TasksPage.test.tsx |
 | 957 | platform/tests/test_user_api.py |
-| 926 | portal/tests/TasksPage.test.tsx |
-| 925 | platform/tests/test_task_convert_api.py |
-| 923 | platform/tests/test_labour_agent.py |
-| 922 | platform/tests/test_maple_estimate_targeting.py |
-| 907 | platform/tests/test_maple_work_item_edits.py |
-| 1,170 | platform/tests/test_estimate_edit_executor.py (890 when listed; +204 in the planner gap-fixing change, review round 13 #26) |
-| 883 | platform/tests/test_maple_listed_positional_reference.py |
-| 880 | platform/tests/test_planner_said_corrections.py (new in the planner gap-fixing change; split along `said_metrics` / `said_tasks` / `said_resize` — review round 13 #24) |
-| 862 | platform/tests/test_company_api.py |
+| 951 | platform/tests/test_maple_estimate_targeting.py |
+| 944 | platform/tests/test_labour_agent.py |
+| 909 | platform/tests/test_maple_work_item_edits.py |
+| 896 | platform/tests/test_company_api.py |
+| 889 | platform/tests/test_maple_listed_positional_reference.py |
+| 861 | [platform/tests/test_material_overrides_api.py](../../platform/tests/test_material_overrides_api.py) | new 2026-10-16 with the shared material catalog; crossed 800 in review round 3. **Next step:** move the reset/load-standard and upload sections into `test_material_standard_bulk_api.py` (review 2026-10-17 round 3 #13) |
 | 857 | platform/tests/test_planner_execute_figures.py (543 → 857 in the planner gap-fixing change — review round 13 #25) |
-| 822 | platform/tests/conftest.py |
-| 818 | platform/tests/test_agents_api.py |
+| 855 | platform/tests/test_address_service.py (first listed 2026-10-22) |
+| 848 | platform/tests/test_planner_policy.py (first listed 2026-10-22) |
+| 846 | platform/tests/test_planner_followups.py (first listed 2026-10-22) |
+| 815 | platform/tests/test_agents_api.py |
 | 808 | platform/tests/test_llm_usage_tracking.py |
 
 `test_llm_usage_tracking.py` (added 2026-10-07, review #4, deferred) crossed 800 with the
@@ -392,34 +398,6 @@ Fix (when it bites): switch to `{"$or": [{"name": n, "unit": u} for ...]}`
 — exact tuples, no bloat. Not worth doing until we see a CSV where this
 matters.
 
-### 60. ~~[MEDIUM] No unique compound index on Material / Contact~~ — RESOLVED 2026-10-20
-
-**Resolved 2026-10-20:** `Material` has a unique `(company, name)` index, `company_name_unique`, with a case-insensitive collation (`NAME_COLLATION`, strength 2), so it agrees with `assert_name_available` on case. The collation also treats full-width and decomposed spellings as their plain forms ("Ｍulch" is "Mulch"), so the lookups that name the holder after a refusal use it too. Its own name and collation let it sit beside the plain lookup index. It doesn't collapse spacing, which the check does, so names that differ only in spacing are still the check's alone. A write that passes the check while another takes the name now gets the usual refusal, not a 500. `name_held` in `services/material_catalog_writes.py` turns the index's error into `NameTaken`, and Beanie's `RevisionIdWasChanged` re-wrap from `set()` too, around the route's create and rename, Maple's create and `duplicate`. A CSV row that loses the race updates the material that won it. Tests: `tests/test_material_unique_names.py`. `test_material_name_hides.py`'s pre-unique duplicate now differs in spacing, since a case-only one can't be stored.
-
-Dev was audited on 2026-10-20: 1,416 materials, no duplicate names exactly, case-insensitively or trimmed. **Production is still owed an audit before this ships:** the index is built at startup, and a duplicate there stops the app from starting. Until the branch merges, a test run from `main` on a machine where this branch's tests ran meets the index, which Beanie never drops, in the local test database. `main`'s `test_material_name_hides.py` then fails storing a case-only duplicate. Merge first, or drop `company_name_unique` from the local test database before that run (review 2026-10-20 #5). Contact keeps no unique index, as below.
-
-**Files**: [platform/models/material.py:32](../../platform/models/material.py),
-[platform/models/contact.py:45](../../platform/models/contact.py)
-**Severity**: LOW–MEDIUM (data integrity, not an active bug)
-
-Both models declare only `IndexModel([("company", ASCENDING)])`. Concurrent
-inserts can produce duplicates for the same `(company, name)`.
-
-The reviewer's proposed fix — "compound unique index on (company, name)
-for all inventory models" — is correct for Material but **wrong for
-Contact**. Two contacts can legitimately share a full name (two different
-"John Smith" homeowners). A Contact uniqueness constraint would need to
-include email/phone, and even that is debatable.
-
-Fix: for Material, add `IndexModel([("company", ASCENDING), ("name",
-ASCENDING)], unique=True)` — but only after auditing prod data for
-existing duplicates; index creation fails if violations exist. For
-Contact, no unique index (reviewer was wrong on this one); if
-deduplication is a real concern, surface it in the UI on create/update
-instead.
-
-**Absorbed:** #66.
-
 ### 71. [MEDIUM] Sequential `material.replace()` per remap is slow at scale
 **File**: [platform/scripts/db/backfill_material_units.py:60](../../platform/scripts/db/backfill_material_units.py)
 **Severity**: MEDIUM (performance, fine for current scale)
@@ -440,6 +418,8 @@ Material.find_many({"company": company_id, "sizes.unit": old_unit_id}).update_ma
 Skips the `before_event` hook, so set `updated_at` explicitly.
 
 ### 157. [MEDIUM] Cross-resource transitive join uses two round-trips instead of $lookup
+**Checked 2026-10-22:** Function now at agents/property/service.py:861 and filters lines via estimate_line_filter (line items live in work items); still two round trips loading full estimates.
+
 **File**: [platform/agents/property/service.py:1071](../../platform/agents/property/service.py)
 **Severity**: MEDIUM (perf hook)
 
@@ -555,6 +535,8 @@ now.
 **Suggested fix:** Accept it for now; if the collection grows, render per reason with an aggregation (`$group` by reason/detail for the counts) and iterate the rows with an async cursor instead of `.to_list()`.
 
 ### 1285. [LOW] `release_name_hides_for` scans every tenant, then ~4 round trips per company
+**Checked 2026-10-22:** Query now filters standard $in ids first (material_catalog_writes.py:693), but still no company prefix/index on hidden_for_name and still ~per-company round trips in _release_name_hides.
+
 `platform/services/material_catalog_writes.py:629` — The first find has no `company` prefix (no index serves it), then each company reads all its names plus find/update/prune. (review 2026-10-17 round 5 #21, deferred)
 
 **Suggested fix:** Add an index `{standard: 1, hidden_for_name: 1}` (or reuse #1206's slot) and batch the per-company work as `hide_name_clashes_for` does.
@@ -601,6 +583,8 @@ Fix: differentiate infrastructure errors (`ServerSelectionTimeoutError`,
 propagate. Apply the same shape to other migration scripts in one pass.
 
 ### 184. [MEDIUM] `response.json()` decode errors no longer caught in `address_service.py`
+**Checked 2026-10-22:** Line numbers stale: unguarded response.json() now at address_service.py:368, :411, :465 (autocomplete/details/geocode); :508 already catches ValueError.
+
 **File**: [platform/services/address_service.py:366, :409, :468](../../platform/services/address_service.py)
 **Severity**: MEDIUM (behaviour change)
 
@@ -622,6 +606,8 @@ to `except (httpx.HTTPError, httpx.TimeoutException, ValueError):`.
 Otherwise leave as-is and accept the loud-fail behaviour.
 
 ### 269. [MEDIUM] Overage-dialog audit-event failures swallowed without Sentry capture
+**Checked 2026-10-22:** EstimatesPage.tsx:299/316, SettingsPage.tsx:1054/1079 and also useMapleCreditsOverage.ts:77/86 swallow; none call Sentry.
+
 Surfaced 2026-05-19 in the overage-acknowledgment-dialog review.
 
 `portal/src/pages/EstimatesPage.tsx` (the `handleOverageConfirm` and
@@ -647,25 +633,14 @@ Fix: replace each `catch {}` with
 **Fix:** Track an `analyticsError` state and render a small inline note ("Couldn't load analytics — retry") when set.
 
 ### 330. [MEDIUM] `target.save()` unwrapped in `_handle_update_estimate_description`
+**Checked 2026-10-22:** Handler now writes with persist_fields(target, 'description') (crud_handlers.py:3751), still not wrapped in the 'couldn't reach the database' try/except.
+
 The new description handler follows the notes handler's bare-save precedent,
 but the property-link handler in the same file wraps its save in try/except
 with a friendly "couldn't reach the database" envelope — the file has two
 precedents and the new code picked the weaker one. A Mongo hiccup surfaces as a
 generic 500 instead of the retry prompt. Fix: wrap like the link path, or
 extract a `_save_or_error` helper and use it in all three field-edit handlers.
-
-### 461. [MEDIUM] portal/src/pages/auth/LoginPage.tsx:201 — terminal invitation failure silently dropped for unverified users
-When the sign-in is unverified AND the invitation accept failed, `inviteError` is discarded so
-the verify banner wins — deliberate, and commented in the code. But on a terminal status
-(403/404/409) the pending invitation is ALSO cleared, so the token is gone and the user was
-never told. They verify, sign back in, and land in `/onboarding` with no company and no
-indication an invitation ever existed, let alone lapsed. This is the exact path for an invitee
-whose invitation hits the 7-day expiry while they work through verification — the scenario the
-change was written to unblock.
-
-**Suggested fix:** when `inviteError` had a terminal status, append a second line to the verify
-banner ("Your invitation has expired — ask them to send a new one."). Turns a silent dead end
-into an actionable one. Needs a test in `tests/LoginPageInvitationOrdering.test.tsx`.
 
 ### 68. [LOW] `backfill_divisions.py` uses broad `except Exception`
 **File**: [platform/scripts/db/backfill_divisions.py:54](../../platform/scripts/db/backfill_divisions.py)
@@ -678,6 +653,8 @@ broad excepts CRITICAL by default. No action expected unless the script
 gets reused for repeated migrations.
 
 ### 312. [LOW] `try_claim_estimate_slot` override path doesn't warn on missing document
+**Checked 2026-10-22:** overage_billing_disabled path replaced by is_estimate_cap_exempt branch in services/estimate_quota.py; the `if result:` still has no warning when the document is gone.
+
 **Where:** `platform/services/estimate_quota.py:76`
 
 **Issue:** When `company.overage_billing_disabled` is true, `find_one_and_update` returning `None` (document gone mid-request) is silently ignored — the in-memory counter is stale but `True` is returned. No log entry makes this invisible in operational monitoring.
@@ -729,6 +706,8 @@ the three twin-file pairs (Materials/Activities tables, Categories/Units tabs,
 the settings tabs).
 
 ### 144. [MEDIUM] Alternating row color computed inline twice
+**Checked 2026-10-22:** Now duplicated between MaterialsTable.tsx:312 and ActivitiesTable.tsx:302 (not WorkItemInlineContent).
+
 **Files**:
 - [portal/src/components/estimates/MaterialsTable.tsx](../../portal/src/components/estimates/MaterialsTable.tsx)
 - [portal/src/components/estimates/WorkItemInlineContent.tsx](../../portal/src/components/estimates/WorkItemInlineContent.tsx) (Activities table)
@@ -742,22 +721,6 @@ parity) but the rule is in two places.
 
 Fix: extract a shared `getRowBg(idx: number)` helper into a small
 utility module or co-locate it where both tables can import it.
-
-### 219. [MEDIUM] `VALID_PLAN_KEYS` duplicates `PLAN_LOOKUP_KEYS` from `billing-plans.ts`
-**File**: [portal/src/pages/OnboardingPage.tsx:21-25](../../portal/src/pages/OnboardingPage.tsx)
-**Severity**: MEDIUM
-
-The new `VALID_PLAN_KEYS` set added by [#205](code-review-followups-archive.md)
-hardcodes the three plan lookup keys, but
-`portal/src/lib/billing-plans.ts:136-140` already exports
-`PLAN_LOOKUP_KEYS: PlanLookupKey[]`. Two lists to keep in sync — adding
-a fourth plan in `billing-plans.ts` would silently reject the new key
-during localStorage hydration without a single line in this file
-indicating why.
-
-Fix: `import { PLAN_LOOKUP_KEYS } from "../lib/billing-plans"` and
-derive `const VALID_PLAN_KEYS: ReadonlySet<string> = new Set(PLAN_LOOKUP_KEYS)`.
-Roll into the next OnboardingPage edit.
 
 ### 302. [MEDIUM] TYPE_CHECKING stub blocks duplicate signatures from sibling mixins
 **Where:** `agents/estimate/crud_handlers.py:95-179` (19 stubs) and `agents/estimate/work_item_handlers.py:65-91` (4 stubs).
@@ -781,6 +744,8 @@ are deliberate and cross-referenced in comments, but the format string
 (or one helper accepting both input types) from a neutral module.
 
 ### 337. [MEDIUM] Materials Categories/Units tabs are twin files, worsened by this change
+**Checked 2026-10-22:** Files are components/materials/MaterialCategoriesTab.tsx and MaterialUnitsTab.tsx (settings/DivisionsTab.tsx is a third twin).
+
 *Update 2026-10-17:* both moved to `portal/src/components/materials/`, and the Units tab lost its reload state, handler and modal, so the twins are now about half as large. The shared row/table/dialog code is still duplicated.
 
 `portal/src/components/settings/MaterialCategoriesTab.tsx` and
@@ -803,6 +768,8 @@ is being outgrown, the fix is a shared partial injected at build time rather tha
 workaround — that is a separate refactor covering the whole footer, not just the icons.
 
 ### 542. [MEDIUM] portal/tests/InventoryGapsAccordion.test.tsx:96 — `spanOf` test helper duplicated across two files
+**Checked 2026-10-22:** tests/helpers/ has no grid helper; spanOf in InventoryGapsAccordion.test.tsx and LineItemAccordion.test.tsx, stubViewport in 6+ test files.
+
 
 An identical `spanOf(row, label)` helper (parse `col-span-N` off the cell carrying a field label)
 now exists in both `InventoryGapsAccordion.test.tsx` and `LineItemAccordion.test.tsx`, as does a
@@ -829,6 +796,8 @@ the file for the wider subject. Merging is preferable — both describes are abo
 layout, arrived at by different routes.
 
 ### 83. [LOW] Inconsistent ID extraction across settings tab components
+**Checked 2026-10-22:** Files now in components/materials/ (Categories, Units) and settings/DivisionsTab.tsx; .id! still used.
+
 **Files**: [portal/src/components/settings/DivisionsTab.tsx](../../portal/src/components/settings/DivisionsTab.tsx),
 [portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx),
 [portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx)
@@ -845,6 +814,8 @@ Fix: switch to `extractEntityId(...)` for consistency with `RateCardsTab`.
 ~6 call sites across the three files.
 
 ### 148. [LOW] Three near-identical settings tabs
+**Checked 2026-10-22:** Files now in components/materials/ and settings/DivisionsTab.tsx.
+
 **Files**:
 - [portal/src/components/settings/MaterialCategoriesTab.tsx](../../portal/src/components/settings/MaterialCategoriesTab.tsx)
 - [portal/src/components/settings/MaterialUnitsTab.tsx](../../portal/src/components/settings/MaterialUnitsTab.tsx)
@@ -906,13 +877,6 @@ Fix: refactor to a single `ensure_price(...)` driver that takes the
 Price-create kwargs plus a per-shape `drift_check(existing_full)` callable.
 Low risk, but defer until we add a fourth Price shape — premature otherwise.
 
-### 292. [LOW] `RowActionsMenu` has two near-identical menu-item buttons
-**Where:** `portal/src/components/common/RowActionsMenu.tsx` — the Move up and Move down `<button>` blocks differ only in icon, label, and onClick.
-
-**Issue:** Minor duplication. Refactor only worthwhile if a fourth/fifth menu item lands.
-
-**Fix:** Extract a small `<MenuItem icon={…} label={…} disabled={…} onClick={…} />` helper if the menu grows.
-
 ### 315. [LOW] Duplicate `normalizeEstimateStatus` definition (pre-existing)
 **Where:** `portal/src/pages/EstimatesPage.tsx:33` vs `portal/src/lib/estimateStatus.ts`
 
@@ -929,6 +893,8 @@ conscious tradeoff, not a bug.
 surfacing them from an API. Note kept so a future guide edit remembers to update the UI strings too.
 
 ### 398. [LOW] portal — duplicated staff-session persistence block in App.tsx + LoginPage.tsx
+**Checked 2026-10-22:** Login path moved to lib/auth/postAuthRouting.ts:43 (routeAfterAuthentication); the duplicate staff block is now App.tsx:136 vs postAuthRouting.ts, no longer LoginPage.tsx.
+
 Both `onIdTokenChanged` (App.tsx) and `handleLogin` (LoginPage.tsx) build the same staff `AuthUser` object and call `setCurrentUser` / session helpers inline. Extract a shared `persistStaffSession(authData)` helper (mirroring `resolvePostLoginRoute` in `src/lib/staffAuth.ts`) and wire both call sites through it.
 
 ### 463. [LOW] portal/src/pages/auth/LoginPage.tsx:330 — the two banner action blocks are duplicated markup
@@ -941,6 +907,8 @@ will drift.
 extract a small `BannerAction` wrapper carrying the shared classes.
 
 ### 479. [LOW] portal/src/components/estimates/AddMaterialGapDialog.tsx:435, portal/src/pages/MaterialsPage.tsx:923 — unit-column width is now a magic literal in three places
+**Checked 2026-10-22:** AddMaterialGapDialog.tsx now uses percentage columns (SIZE_COL_UNIT); remaining px literals are MaterialsPage.tsx:1273 (w-[180px]) and the estimate tables' min-w.
+
 The same conceptual column is sized `w-[240px]`, `w-[180px]`, and `w-[160px]` across three
 tables, each tuned by hand to a different font size. Nothing ties them together, so the
 next unit added to the catalog requires finding and re-deriving all three independently —
@@ -968,6 +936,8 @@ treatment has to be made twice and can silently drift.
 both tables' headers.
 
 ### 744. [LOW] `_UNLINK_REDIRECT` duplicates `out_of_chat._UNLINK`
+**Checked 2026-10-22:** Texts have since diverged (delete_confirmation._UNLINK_REDIRECT adds 'so I haven't deleted anything' and a {noun} tail); only the shared first sentences remain duplicated.
+
 `platform/agents/conversation/delete_confirmation.py:59` — The same user-facing unlink redirect text lives in two modules and will drift. (review 2026-09-27 #74)
 
 **Suggested fix:** Export one constant from out_of_chat.py and import it here.
@@ -1003,6 +973,8 @@ both tables' headers.
 **Suggested fix:** One `ratio_query(ask, subject, period)` in `metric_ratio_shapes`, used by both.
 
 ### 1335. [LOW] MapleComposer's session-error and voice-error strips copy `ComposerNotice`, and the voice strip isn't announced
+**Checked 2026-10-22:** Voice strip still lacks role=alert; the file-error strip already uses ComposerNotice.
+
 `portal/src/components/Layout/MapleComposer.tsx:82` — L82–109 repeat the helper's markup; the voice strip has no `role="alert"`, so a screen reader doesn't announce it. Older code, hence LOW. (Maple attachments review round 3, 2026-10-19, #44, deferred)
 
 **Suggested fix:** Use `ComposerNotice` for both (dismiss labels "Dismiss" and "Dismiss voice error").
@@ -1104,22 +1076,6 @@ affordance that was just deliberately removed.
 overflow state already tracked (`edges.above || edges.below`, plus a `hasOverflow` flag) so short
 notes do not each add a tab stop.
 
-### 110. ~~[LOW] `FeedbackPanel` error message has no live-region announcement~~ — RESOLVED 2026-10-19
-
-**Resolved 2026-10-19:** both components it named are gone. `FeedbackPanel.tsx` went when Support absorbed the Trello Feedback panel (2026-07-02), and `ChangeLogPanel.tsx` was deleted when What's New moved to a dialog beside the notification bell. Its replacement, `portal/src/components/notifications/WhatsNewDialog.tsx`, renders its load error with `role="alert"`. Move to the archive in the next cleanup.
-
-**File**: [portal/src/components/common/FeedbackPanel.tsx:169](../../portal/src/components/common/FeedbackPanel.tsx)
-**Severity**: LOW (accessibility)
-
-The submission-error div is a plain `<div className="text-xs text-red-600">{error}</div>`.
-Screen readers don't announce it when it appears, so a visually impaired
-user gets no audible signal that submission failed — they have to walk the
-DOM to find out why nothing happened.
-
-Fix: add `role="alert"` (or `aria-live="polite"`) to the error div. The
-same applies to `ChangeLogPanel.tsx:166`, which uses the identical
-pattern.
-
 ### 173. [LOW] `<input>` in `AdjustTotalDialog` uses `aria-label`, not a real `<label>`
 **Severity**: LOW
 `AdjustTotalDialog.tsx:65–73` — the visible "Adjust Amount" text comes
@@ -1140,18 +1096,6 @@ glance at or tweak the field before clicking Set.
 
 Fix: hold a `useRef` on the input and call `inputRef.current?.focus()`
 inside the Reset handler. Tiny UX polish.
-
-### 177. [LOW] Grand Total contrast borderline at small text sizes
-**Severity**: LOW
-`portal/src/pages/NewEstimateWithActivityPage.tsx:1273` — the new
-`bg-total-bg` (`#38A776`) with `text-white` measures ~3.03:1. Passes WCAG
-AA only via the large-bold exemption (text is `text-lg font-bold`).
-Acceptable here, but if the same token is reused for normal-weight or
-smaller text it will fail AA.
-
-Fix: if reuse is needed, define a darker variant (e.g.
-`--total-bg-strong: #2E8A60`) for normal-weight text. Or document on the
-token in `theme.css` that it's only safe for large-bold copy.
 
 ### 264. [LOW] Description label not programmatically associated with the editor
 `portal/src/pages/NewEstimateWithActivityPage.tsx:1036` and
@@ -1246,6 +1190,8 @@ more places.
 selected", and set `aria-haspopup` to match the rendered role.
 
 ### 530. [LOW] portal/src/pages/TasksPage.tsx:104 — `md:order-first` makes DOM order disagree with visual order
+**Checked 2026-10-22:** Rewritten in components/tasks/TaskCard.tsx (order-first at all widths, documented as intentional in the file header); no longer in TasksPage.tsx.
+
 The task card's thumbnail now renders after the text block and is pulled back to the left with
 `md:order-first`. Above 768px the visual sequence is photo→text while the DOM sequence is
 text→photo, so a screen reader hears the task title and metadata before the photo it sits beside
@@ -1258,17 +1204,14 @@ would mean duplicating the subtree — worse. If it is worth cleaning up, drop `
 instead keep the thumbnail first in the DOM with `order-last md:order-none`, so the visual reorder
 happens on the phone (where the image is genuinely secondary) rather than on desktop.
 
-### 601. [LOW] Doc-image loading placeholder's aria-label is ignored
-`portal/src/components/estimates/DocImagePicker.tsx:18` — A `div` with `aria-label` and no role is not announced, so screen readers get nothing while a kept image loads or after it fails. The remove badge still names the file, hence LOW.
-
-**Suggested fix:** Add `role="img"` to the placeholder.
-
 ### 602. [LOW] Keyboard focus is lost after deleting a doc version
 `portal/src/components/estimates/DocVersionList.tsx:43` — The delete-confirm modal returns focus to the trash button, whose row no longer exists, so focus lands on `<body>`.
 
 **Suggested fix:** When `versions` shrinks, move focus to the next row's trash button or to the "Generated versions" heading (`tabIndex={-1}`).
 
 ### 757. [LOW] The `role="status"` live region is added to the page already containing its text
+**Checked 2026-10-22:** Region moved to components/Layout/MapleComposer.tsx:65 (openQuestion status div); AiPanel.tsx:233 has another conditional role=status ('Opening chat…').
+
 `portal/src/components/Layout/AiPanel.tsx:432` — `{openQuestion && <div role="status">…}` mounts the region with its text in one render; NVDA/JAWS generally don't announce a region that appears already filled. (review 2026-09-27 #87)
 
 **Suggested fix:** Always render an empty `<div role="status" aria-live="polite">` and toggle only its contents.
@@ -1294,6 +1237,8 @@ Phone/tablet layout issues, plus the `sm` (640px) vs documented `md` (768px)
 breakpoint inconsistency — now at four call sites and best fixed in one pass.
 
 ### 285. [MEDIUM] Proliferating `@[Xrem]` container-query thresholds in DashboardPage
+**Checked 2026-10-22:** Thresholds now 14, 18, 20, 24, 32, 48rem (26rem gone from DashboardPage; 26rem is in PipelineStatusChart); no shared constant or rationale comments.
+
 
 `portal/src/pages/DashboardPage.tsx` — the responsive pass introduced
 breakpoints at 14rem, 18rem, 20rem, 24rem, 26rem, 32rem, and 48rem with no
@@ -1328,22 +1273,6 @@ out of React state — write transform/opacity directly to drawer/backdrop refs
 inside `onSwipeMove` (optionally rAF-throttled) and keep state only for the
 settled open/closed transitions.
 
-### 548. [MEDIUM] portal/src/lib/onboardingSteps.ts:79 — the desktop progress row may now wrap
-
-The two longest labels in the set replaced two of the shortest: `percentages` went "Defaults" →
-"Percentages" and `plan` went "Plan" → "Choose Plan". The desktop `StepIndicator` renders all eight
-labels in one `flex` row with seven 24px connector rules and `gap-2`, inside a `max-w-3xl` (768px)
-container that itself sits inside `px-4`. Estimated to land within a few pixels of the available
-736px. It will not overflow horizontally — the label `<span>`s have no `whitespace-nowrap`, so they
-wrap — but one or two labels going to two lines would make the dot row ragged. jsdom does no layout,
-so no test can catch this, and `/onboarding` is behind `firebaseAuth.currentUser` so it was not
-visually verified.
-
-**Suggested fix:** needs a look at ≥1024px width first. If it wraps: either shorten `plan` back
-toward "Plan" in `STEP_LABELS` (the card title stays "Choose Your Plan" — they are already
-independent), or widen `containerWidthClass` in `OnboardingPage.tsx` from `max-w-3xl` to `max-w-4xl`
-for the non-plan steps.
-
 ### 147. [LOW] `MaterialsPage` mobile card popup-clip fix is scoped
 **File**: [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx)
 
@@ -1359,6 +1288,8 @@ Fix: if/when that case appears, switch popups to render via React
 portal so they aren't subject to ancestor clipping.
 
 ### 287. [LOW] `min-h-[60px]` on vertical status labels may clip long words
+**Checked 2026-10-22:** Now at PipelineStatusChart.tsx:159, still min-h-[60px].
+
 
 `portal/src/components/dashboard/PipelineStatusChart.tsx:140` — `Completed`
 rotated to `writing-mode: vertical-rl` is ~54-58px tall, so 60px is tight.
@@ -1412,6 +1343,8 @@ TypeError.
 or wrap the subscribe/unsubscribe pair in a small helper so both call sites stay in step.
 
 ### 544. [LOW] portal/src/components/estimates/InventoryGapsPanel.tsx:121 — two matchMedia subscriptions per panel
+**Checked 2026-10-22:** Now InventoryGapsPanel.tsx:114 and :227, still two useIsBelowSm calls.
+
 
 `MaterialGapsTable` and `RoleGapsTable` each call `useIsBelowSm()`, so one panel registers two
 listeners for the same query and re-renders both subtrees on every resize across 640px. Harmless at
@@ -1423,6 +1356,8 @@ Hooks. Best folded into the `MaterialGapRow` / `RoleGapRow` extraction above, wh
 these props.
 
 ### 413. [LOW] portal/src/index.css:39 — overscroll-behavior-x: none is global, not mobile-only
+**Checked 2026-10-22:** Rule is in portal/src/styles/index.css:181 under @layer base, still global.
+
 `portal/src/styles/index.css` now (moved from `src/index.css`). Its comment explains the Android swipe and the `@layer base` placement, not the desktop side effect below — so the decision is still open (reopened 2026-10-18 after the consolidation closed it).
 Besides suppressing Chrome-on-Android overscroll navigation (the intent), this also disables two-finger trackpad back/forward swipe on desktop Chrome/Edge app-wide. Usually desirable in an SPA (prevents accidental back-nav losing form state), but it should be a deliberate UX decision, not a side effect.
 **Suggested fix:** Keep if intended (recommended); otherwise scope it inside an `@media (pointer: coarse)` block.
@@ -1490,11 +1425,6 @@ Both prompts gained another rule (reverse + now labor-time). Still clear, but th
 
 **Suggested fix:** Fold each bullet into its home section and delete the duplicates. This owes a parity run (#846).
 
-### 899. [MEDIUM] "while a work item is in play" is undefined
-`platform/prompts/maple_planner.py:131` — Line 111 says a catalog price is settable (update_material); line 131 sends "set the price of pavers to $4.25" to the estimate line when a work item is "in play". A user with an estimate open who means the catalog price gets the line changed. (review 2026-10-11 #79, deferred)
-
-**Suggested fix:** Define it: "a work item in focus in the state, or named in the message". Add one contrasting catalog example, and cover both in the parity run.
-
 ### 979. [LOW] The by-division card rule is said twice
 `platform/prompts/maple_planner.py:156` — "'the breakdown of estimates by division(s)' is dashboard {card: by_division}" repeats the rule a few clauses earlier. (review 2026-10-13 round 2 #79, deferred)
 
@@ -1557,6 +1487,8 @@ research path is worse, that is a reason to improve the prompt context, not to
 bring back copying.
 
 ### 746. [LOW] Linking rewrites the whole `contacts` array
+**Checked 2026-10-22:** Still read-modify-write at record_links.py:153 (link_contact_reply); docstring still says the write is the property agent's
+
 `platform/agents/conversation/record_links.py:141` — `fresh.set({"contacts": [*fresh.contacts, id]})` reads, modifies and writes, so a concurrent link (another turn or a portal edit) is overwritten. The docstring (13-14) says the write goes through the property agent; it doesn't. (review 2026-09-27 #76)
 
 **Suggested fix:** Use `{"$addToSet": {"contacts": contact.id}}` with an `updated_at` `$set`, and correct the docstring.
@@ -1572,6 +1504,8 @@ bring back copying.
 **Suggested fix:** Make them module functions in `agents/estimate/crud_helpers.py` (`estimate_summary(estimate)`, `estimate_list_entry(summary)`), keep the mixin methods as one-line wrappers for today's callers, and drop the `helpers` parameter and the executor's `_estimate_agent` lookup for the list.
 
 ### 846. [HIGH] Planner: owed verification after phase 8
+**Checked 2026-10-22:** Parity run and G1-G35 reference rerun are done (code-review-followups.md:61); still owed: task statuses in the parity state (plan_turn called without planner_task_statuses), acceptance corpus on the planner pipeline, acceptance conversations for the ~250 unchecked reference rows
+
 
 **File**: [tests/test_planner_parity_live.py:66](../../platform/tests/test_planner_parity_live.py), [tests/maple_conversations/](../../platform/tests/maple_conversations/)
 **Severity**: HIGH
@@ -1633,6 +1567,8 @@ phrasings, all as intended, but that's not the parity run. Owed:
 **Suggested fix:** `{list_estimates, filter:{statuses:[Lost]}, total}` with no Lost estimates → that text and count 0.
 
 ### 861. [MEDIUM] The comparison said-back for average/largest/smallest, and "smallest", are untested
+**Checked 2026-10-22:** said_back wording changed ('I can't rank by ... yet'); by_month/ranking for average/largest tested (test_planner_metric_shapes.py:45-53), the comparison fall-through and 'smallest' still untested
+
 `platform/agents/estimate/metric_ratios.py:58` — Edge case. The fall-through arm, and every "smallest" entry, are never used by a test. (review 2026-10-11 #35, deferred)
 
 **Suggested fix:** `said_back(_metric(metric="average", compare="quarter", status="sold", period="quarter"))` == the "I can't compare average estimates yet…" text, and smallest ranking → "I can't rank by smallest estimate yet.".
@@ -1673,6 +1609,8 @@ phrasings, all as intended, but that's not the parity run. Owed:
 **Suggested fix:** `asyncio.run(_metric(metric{average, by_month}, …))` → the response equals the `said_back` text and the operation is "refusal".
 
 ### 874. [MEDIUM] Notes on a work item or a catalog record are only reached through the gate
+**Checked 2026-10-22:** Material parent covered (tests/test_planner_material_catalog_ops.py:722-735, test_planner_execute_files.py:1562); the work_item list_notes arm of no_notes_feed is not driven (only via delete)
+
 `platform/agents/planner/execute_links.py:199` — Edge case. The `said_reply(no_notes_feed(domain))` arm isn't driven. (review 2026-10-11 #49, deferred)
 
 **Suggested fix:** `list_notes` with a material parent → NOTES_NOT_ON_CATALOG_MESSAGE; with a work_item parent → WORK_ITEM_NOTES_IN_APP.
@@ -1702,11 +1640,6 @@ phrasings, all as intended, but that's not the parity run. Owed:
 
 **Suggested fix:** Return NO_FIGURE only when `before_tax` is set; otherwise ask "Which list or figure would you like …?". Tests for both shapes.
 
-### 882. [MEDIUM] `_redo_list`'s period fallback is untested
-`platform/agents/planner/followups.py:123` — Edge case. (review 2026-10-11 #57, deferred)
-
-**Suggested fix:** `_expand(_stored({"op":"list_tasks"}), {"op":"redo_last","period":"last_month"}) == "followup:redo_last.list_tasks.period"`.
-
 ### 883. [MEDIUM] A link side by listed or viewed with no kind is resolved as the focus kind
 `platform/agents/planner/schema.py:386` — The validator now allows any non-name side without a domain. `resolve_ref` then uses `active_entity_domain`, which a list doesn't set. So "link the second one to Elm House" after a contact list asks the wrong question. Only focus (and step) were meant. (review 2026-10-11 #58, deferred)
 
@@ -1728,6 +1661,8 @@ phrasings, all as intended, but that's not the parity run. Owed:
 **Suggested fix:** Word it from the user's word ("won"/"sold") as today does. On the answer, rewrite deterministically (keep the plan, drop `sold` or `statuses` per the reply). Test: "won" → the question says "won"; answer "Review" → statuses [Review], sold false.
 
 ### 888. [MEDIUM] Policy reason strings matched by literal copies
+**Checked 2026-10-22:** Partly done: OVERAGE_REASON, CONVERT_REASON, REPRICE_REASON, DATE_AS_STATUS_PREFIX are constants now; 'a write through a stale focus...', 'a delete always asks first', 'nothing was asked', bare-yes and 'question expired' reasons are still literal copies in asks.py
+
 `platform/agents/planner/asks.py:316` — `_CONFIRMING` and `_other_question` copy six policy.py reason strings. Rewording one in policy.py silently turns those turns into the `ask:other` fallback. (review 2026-10-11 #63, deferred)
 
 **Suggested fix:** Export them as constants from policy.py (STALE_WRITE_ASKS, DELETE_ASKS, NOTHING_ASKED, BARE_YES_NOTHING_ASKED, QUESTION_EXPIRED_PREFIX, DATE_AS_STATUS_PREFIX) and import them in both files.
@@ -1762,20 +1697,10 @@ phrasings, all as intended, but that's not the parity run. Owed:
 
 **Suggested fix:** `_pick(world, {"by":"added"}).status == "unresolved"`, or remove the branch with a comment.
 
-### 896. [MEDIUM] The override's absolute out-of-bounds arm is untested
-`platform/agents/planner/schema_edits.py:112` — The override replaces the base validator, and nothing asserts that a value of 600 (markup) still raises. (review 2026-10-11 #71, deferred)
-
-**Suggested fix:** `pytest.raises(ValidationError)` for `{set_work_item_percentage, field: markup, value: 600}`.
-
 ### 897. [MEDIUM] The retry's failure arms are untested, and the first error is lost
 `platform/agents/planner/planner.py:132` — Edge cases: the retry timing out or hitting an LLM error, and `_tool_error`'s missing-id fallback. A failed retry also drops the first invalid plan's raw args and error, which the shadow log exists to show. (review 2026-10-11 #72, deferred)
 
 **Suggested fix:** When the retry yields no plan, keep the first `raw` and combine the errors (`f"{second} after {first}"`). Tests: invalid then a timeout → the error starts with "timeout" and raw is the first args; a tool call with no id → `tool_call_id == "plan"`.
-
-### 900. [MEDIUM] The unsaid question at turn level is untested
-`platform/agents/planner/turn.py:283` — Edge case. `said.without_unsaid` returning text, which becomes a kept question through `run_planner_turn`, is only tested at the `said` level. (review 2026-10-11 #80, deferred)
-
-**Suggested fix:** Wire `list_estimates {sold, statuses:[Review]}` with "how many won estimates in review?" → the response is the question, and an open question carries REPLAN_KEY.
 
 ### 901. [MEDIUM] A question asked on a confirmed yes being kept is untested
 `platform/agents/planner/turn.py:123` — Edge case. The overage-yes test asserts only the response prefix. (review 2026-10-11 #81, deferred)
@@ -1943,11 +1868,15 @@ phrasings, all as intended, but that's not the parity run. Owed:
 **Suggested fix:** `as_template(plan, "not-an-id")` returns the same plan.
 
 ### 947. [MEDIUM] Planner: "add Bob as the contact on E0042" can create a new Bob
+**Checked 2026-10-22:** policy.py has no create_contact/link duplicate check; only a prompt line (maple_planner.py:211)
+
 `platform/prompts/maple_planner.py:140` — In one of four parity runs (2026-10-12) the planner planned `create_contact {Bob}` + `link` where the others asked "Which Bob?". Nothing checks the company for a contact already named that before the create, so a user with a Bob may get a second one linked to the estimate. Today's contact create asks for missing fields before it writes, which may stop it, but the plan itself is wrong.
 
 **Suggested fix:** In the policy, a `create_contact` planned beside a `link` whose name matches one or more of the company's contacts → link that contact (one match) or ask which (several), as the `link` does for a name; a test with a seeded "Bob Lee" and this plan.
 
 ### 948. [MEDIUM] Planner: a property create beside a link doesn't check the address exists
+**Checked 2026-10-22:** policy.py has no create_property/link check; prompt-only fix at maple_planner.py:211
+
 `platform/agents/planner/policy.py` — "the property for this quote is 123 Main St" was planned as `create_property {street}` + `link` in one of five parity runs (2026-10-12). Today's property create has no duplicate check, so the turn adds a second "123 Main St" and links it. Fixed in the prompt only ("link to it by name — create_property only when the user asks for a new one"), which the model can still miss.
 
 **Suggested fix:** In the policy, a `create_property` whose street or name matches a company property, planned beside a `link` to its step → link the existing property instead; a test with a seeded property and this plan. An explicit "add a property at …" keeps today's behaviour.
@@ -1958,6 +1887,8 @@ phrasings, all as intended, but that's not the parity run. Owed:
 **Suggested fix:** In the policy (which loads the estimate), a price-only `update_material` by focus whose `material_query` matches no line on the work item in focus, with no work item named → the catalog's `update_material {price}`; a test with a seeded work item holding mulch and the plan for concrete blocks.
 
 ### 952. [MEDIUM] Reference row fails 2 runs in 3: "create a task for the fence work item, which is late" [wi]
+**Checked 2026-10-22:** Live-model flakiness; cannot be settled from code. Reference row now at maple-phrasing-reference.md:796
+
 `documentation/development/maple-phrasing-reference.md:769` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as an acted create_task where the row asks first in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
@@ -1965,6 +1896,8 @@ phrasings, all as intended, but that's not the parity run. Owed:
 Re-run 3× on 2026-10-13: asked 1 of 3; the other two acted (create_task). Still open — and the row's `ask` is worth reading again: the message asks plainly for a task.
 
 ### 960. [MEDIUM] Reference row fails 2 runs in 3: "don't forget to call Bob Lee tomorrow" [none]
+**Checked 2026-10-22:** Live-model flakiness; cannot be settled from code. Reference row now at :3154
+
 `documentation/development/maple-phrasing-reference.md:2994` — In the 2026-10-13 live reference check (1,464 rows, then two re-runs of the 39 failures) the planner planned it as a clarify instead of create_task in two of three runs — intermittent, so it answers it right only some of the time.
 
 **Suggested fix:** Read the row's raw plans from a reference check (`platform/tests/test_zz_reference_check.py`, copied from the session's `run_check_template.py`); fix with a pure correction (`agents/planner/as_asked.py` or `said.py`) or a prompt line, add a unit test, and re-run the row 3× with the reference checker.
@@ -1972,32 +1905,37 @@ Re-run 3× on 2026-10-13: asked 1 of 3; the other two acted (create_task). Still
 Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would you like me to create a task to call Bob Lee tomorrow?" — an extra question, never a wrong write. Still open.
 
 ### 1064. [MEDIUM] Reference row asks or reads another way: "add mulch to the front patio work item" [wi]
+**Checked 2026-10-22:** Live-model flakiness; reference row now at :836
+
 `documentation/development/maple-phrasing-reference.md:814` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner asked which estimate to add the mulch to ("I don't see a front patio work item") instead of edit_estimate; it agreed 1 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
 
 **Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
 
 ### 1065. [MEDIUM] Reference row asks or reads another way: "this month vs last month" [est]
+**Checked 2026-10-22:** Live-model flakiness; reference row now at :1413
+
 `documentation/development/maple-phrasing-reference.md:1371` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner planned a follow-up (redo_last) with nothing before it, so it asked "What would you like to see for this month?" instead of the metric comparison; it agreed 1 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
 
 **Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
 
 ### 1066. [MEDIUM] Reference row asks or reads another way: "tasks by person" [none]
+**Checked 2026-10-22:** Live-model flakiness; reference row now at :2352
+
 `documentation/development/maple-phrasing-reference.md:2209` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner asked whether to count tasks by person or list one person's instead of task_count by assignee; it agreed 1 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
 
 **Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
 
 ### 1067. [MEDIUM] Reference row asks or reads another way: "rename the fence task to edging by property" [none]
+**Checked 2026-10-22:** Live-model flakiness; reference row now at :2361
+
 `documentation/development/maple-phrasing-reference.md:2218` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner asked whether "by property" is part of the new name instead of the update_task rename; it agreed 1 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
 
 **Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
 
 ### 1068. [MEDIUM] Reference row asks or reads another way: "and mulch materials?" [none]
+**Checked 2026-10-22:** Live-model flakiness; reference row now at :1989
+
 `documentation/development/maple-phrasing-reference.md:1868` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner planned a follow-up (redo_last) with nothing before it, so it asked what to know about mulch instead of list_materials; it agreed 2 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
-
-**Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
-
-### 1069. [MEDIUM] Reference row asks or reads another way: "what properties does {contact} own?" [none]
-`documentation/development/maple-phrasing-reference.md:2499` — In the 2026-10-14 live reference run, and re-run 3× the same day through the turn's corrections, the planner planned get_contact instead of list_properties filter.owner; it agreed 2 of 3. Never a wrong write — at worst a question. (reference run 2026-10-14, deferred)
 
 **Suggested fix:** Re-run the row live 3× through the turn's corrections (`plan_turn` then `turn._prepared`, scored with `tests/planner_parity/score.score`); fix with a narrow correction (`agents/planner/as_asked.py` / `said.py`) or a prompt line, add a unit test, and re-run the row 3×.
 
@@ -2017,26 +1955,36 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Use `metric_periods`' month names (expose `_MONTH_NAMES` as `MONTH_NAMES`) in `_dated_said_back`.
 
 ### 965. [LOW] The user guide's exclusion line omits the smallest
+**Checked 2026-10-22:** Line moved to platform/user_guides/users_guide.md:813 ('a total, an average or the biggest estimate')
+
 `platform/user_guides/users_guide.md:696` — "a total, an average or the biggest" — `_left_out` accepts the smallest estimate too.
 
 **Suggested fix:** Add "or the smallest".
 
 ### 981. [LOW] The "in 2025" row carries another row's history
+**Checked 2026-10-22:** Row is now at maple-phrasing-reference.md:1393 and still carries the old 'since January' fallback text
+
 `documentation/development/maple-phrasing-reference.md:1342` — the old "since January" fallback text and nested italics read as if "in 2025" still falls back. (review 2026-10-13 round 2 #81, deferred)
 
 **Suggested fix:** "✅ the planner handles it — was a gap: that calendar year on the user's clock — *"in 2025"*; a year still to come, or one beside a comparison's own periods, is said back *(2026-10-13; before: looked up as a name, review 2026-09-30 #1)*".
 
 ### 982. [LOW] Comment says ratios by month match totals by month
+**Checked 2026-10-22:** Comment now at metric_ratio_shapes.py:162, unchanged
+
 `platform/agents/estimate/metric_ratio_shapes.py:138` — "as a total's by month is" — totals by month from the LLM tier default to this year; the ratio doesn't. (review 2026-10-13 round 2 #82, deferred)
 
 **Suggested fix:** "All time is from the first month with anything (review 2026-10-13 #107)." — drop the comparison.
 
 ### 996. [LOW] Prose still says the new scopes and "just the won ones" are unsupported
+**Checked 2026-10-22:** Prose now at maple-phrasing-reference.md:1331 and :187, both unchanged
+
 `documentation/development/maple-phrasing-reference.md:1279` — the §1.12 bullet "A scope the choices can't hold is never guessed: excluding Elm House, since January, in 2025 …" contradicts rows 1340–1342; line 167 ("'Just the won ones' after a metric answer is not supported yet (decision 13)") contradicts row 1450 and `followups.figure_status_said`. (review 2026-10-13 round 3 #44, deferred)
 
 **Suggested fix:** Reword 1279 as today's rules tier only, the planner reading all three; annotate line 167 as decision 18's was.
 
 ### 997. [LOW] The win-rate-by-value row says "including tax" only
+**Checked 2026-10-22:** Row now at maple-phrasing-reference.md:1478
+
 `documentation/development/maple-phrasing-reference.md:1427` — the code and CLAUDE.md answer "before tax" when it is said. (review 2026-10-13 round 5 #29, deferred)
 
 **Suggested fix:** Add "— before tax when said".
@@ -2057,6 +2005,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Read only the clause that carries the change (split at sentence ends and before a question word); the write is asked only when its own clause ends in "?" or opens with a question word.
 
 ### 1002. [MEDIUM] Lowercase or long estimate names in "my margin on the … job" are the company's
+**Checked 2026-10-22:** Regex now at as_asked.py:174-192 (_PLAIN_WORD / {0,4}); unchanged
+
 `platform/agents/planner/as_asked.py:137` — "what's my margin on the city of austin job?" (lowercase "of" is excluded) and "…on the Smith Front Yard Sod Install job?" (over the `{0,4}` cap) answer the company's margin with the estimate open and planned. (review 2026-10-13 round 7 #10, deferred: word rules frozen)
 
 **Suggested fix:** Exclude time words (month/year/quarter/week/season) instead of "of"; raise the cap to ~8.
@@ -2097,6 +2047,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Have `_nameless_line_held` report "not there" and `ask` return `Said` with the executor's "I couldn't find …" text.
 
 ### 1017. [LOW] The new-or-open question puts "the" before the scope whatever its wording
+**Checked 2026-10-22:** Partly done 2026-10-14 (article no longer doubled, as_asked._ARTICLE_RE); 'the {scope}' prefix still unquoted at as_asked.py:144
+
 `platform/agents/planner/as_asked.py:118` — a parity-set scope reads "A new estimate for the installing 200 sq ft of pavers, …"; a scope opening with "a" reads "the a cedar fence". (review 2026-10-13 round 8 #15, deferred)
 
 **Suggested fix:** Quote the scope (`for "{scope}"`) instead of prefixing "the".
@@ -2104,11 +2056,15 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Partly done 2026-10-14:** the model's own article no longer doubles ("the a new cedar fence" → "the new cedar fence", `as_asked._ARTICLE_RE`, review round 13). A scope that isn't a noun phrase ("the installing 200 sq ft of pavers") is still open.
 
 ### 1019. [LOW] Stale line citations after `estimate_asked` was removed
+**Checked 2026-10-22:** Citations in code-review-followups.md still stale (#1002 still cites :137); moot if line cites are dropped when the backlog is pruned
+
 `documentation/development/code-review-followups.md` — #1002 cites `as_asked.py:137` (the regex is now at :152–156), #1010 ":136" (now :149), #986 / #987 / #988 :77 / :105 / :201 (now :124 / :162 / :285). (review 2026-10-13 round 8 #17, deferred)
 
 **Suggested fix:** Update the five line numbers.
 
 ### 1020. [LOW] §1.3 rows 586 / 588 don't say what the user sees with an estimate open
+**Checked 2026-10-22:** Reference rows have moved (section 1.3 starts at line 606); no note added
+
 `documentation/development/maple-phrasing-reference.md:586` — they read `create_estimate` ✅ (right as raw plans), but with an estimate open and the work planned onto it several of their phrasings get the new-or-open question (row 594). (review 2026-10-13 round 8 #18, deferred)
 
 **Suggested fix:** Note on both rows: "with an estimate open and the work planned onto it, asked as row 594".
@@ -2138,34 +2094,6 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Needs Simon's call: (a) add `answer` and `repeat` to `followups._NOTHING_ASKED` (recommended; cancel and start_over are requests, per #1078's decision for figures), or (b) accept it. Test: parametrize `test_a_follow_ups_reply_alone_or_beside_thanks_is_the_turn` with the ops chosen.
 
-### 1089. ~~[HIGH] "title: Call the supplier" plans a task search instead of the task's create~~ — RESOLVED 2026-10-18
-
-**Resolved 2026-10-18:** a prompt line's counter-case in `prompts/maple_planner.py` (the task line): a title alone ("title: Call the supplier") is a new task, `create_task {fields: {title}}`, never a search. Live 3×: the row agrees 3/3 (was 1/3). The neighbours hold 3/3 ("create a task called / with title …", "new task: …", "add a task to …", "show me Call the supplier's details", "what's the Call the supplier task's due date?", "tell me about task Call the supplier"). "update Call the supplier's description" varies as it did before the change (6/8 after, 2/3 before; one miss is a clarify asking what it should say). Owes the next parity run.
-`platform/prompts/maple_planner.py` — Reference row `title: Call the supplier` (`create_task` fields.title) is planned `list_tasks {filter: {search: "Call the supplier"}}` 3 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The task is never created; the user gets a search of their tasks instead. Likely a side effect of this batch's possessive-task-title line ("Call the supplier's description / details / due date" → `update_task` / `get_task` by name), which taught the model to read "Call the supplier" as a task's name. A regression, so fixed — not explained.
-
-**Suggested fix:** Narrow the prompt line to the possessive it was written for (a task named with "'s" and a field), or add the counter-case ("title: X" alone is a new task with that title → `create_task`). Probe the row and its neighbours live 3× (the possessive rows 2319/2320/2325, "show me Call the supplier's details", #1091) before and after.
-
-### 1090. ~~[MEDIUM] "How much does Polymeric sand cost?" plans a material list instead of the material~~ — RESOLVED 2026-10-18
-
-**Resolved 2026-10-18:** the materials-cost line in `prompts/maple_planner.py` now splits the two readings: an estimate's materials by price is `list_materials {filter: {related, price}}`, and one material named ("how much does Polymeric sand cost?") is `get_material {field: price}`, never a list. Live 3×: the row agrees 3/3 (was 2/3). "how much does 50 lb of Polymeric sand cost?", "how much does Black Mulch cost?", "how much does mulch cost?" (still `list_materials`) and "which of E0042's materials cost over $10?" all hold 3/3. Review round 1 #1 added the counter-case — a kind of material ("how much does mulch cost?") lists the matches — re-probed live 3×: Polymeric sand, 50 lb of Polymeric sand, mulch, Black Mulch and E0042's materials over $10 all hold 3/3. Owes the next parity run.
-`platform/prompts/maple_planner.py` — Reference row (`get_material`) is planned `list_materials` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The reply is a list rather than the one material's prices — a different shape, not wrong data. Likely pulled by this batch's line "Asking what materials cost is a read, never material_cost … list_materials {filter: {related: E0042, price: …}}", which was meant for an estimate's lines.
-
-**Suggested fix:** Narrow that line to an estimate's materials ("which of E0042's materials cost over $10?") and say one material named is `get_material`. Probe live 3× with its neighbours (rows 468, 470, "how much is mulch?").
-
-### 1091. ~~[MEDIUM] "show me the task at 14 Birch Rd" plans a task list instead of the task~~ — RESOLVED 2026-10-18
-
-**Resolved 2026-10-18:** re-checked live after #1089's fix, as the entry asked: `get_task` 3/3 before the prompt change and 3/3 after. Nothing to change.
-`platform/prompts/maple_planner.py` — Reference row (`get_task`) is planned `list_tasks` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. Read-only: the user sees the property's tasks rather than the one. Possibly the same pull as #1089.
-
-**Suggested fix:** Re-check after #1089's fix; if it still varies, a prompt example ("the task at <property>" is that property's one task, `get_task`) or explain it (a property's task list holds the task asked for).
-
-### 1092. ~~[MEDIUM] "what's in my backlog?" plans an estimate list instead of the Backlog card~~ — RESOLVED 2026-10-18
-
-**Resolved 2026-10-18:** the backlog example in `prompts/maple_planner.py` now names "what's in my backlog?" and "how big is my backlog?" as `dashboard {card: backlog}`, next to the line that keeps "which estimates are in my backlog?" a list (Won + Scheduled). Live 3×: the row agrees 3/3 (was 0/3). "which estimates are in my backlog?" (still the list), "what's the backlog value?", "backlog?", "i'd like to see my backlog" and "how is the backlog value calculated?" (help) all hold 3/3. Owes the next parity run.
-`platform/prompts/maple_planner.py` — Reference row (`dashboard` card=backlog) is planned `list_estimates` 2 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×); it agreed in the run before. The list's estimates vs the card's figure — not wrong data, but the backlog question has one answer in the dashboard. Possibly nudged by the new amount line, which leads with `list_estimates` examples.
-
-**Suggested fix:** Check what `list_estimates` the model planned (the backlog reading of commit 1ad8dd0 — Won + Scheduled — must hold either way); then a prompt example or an `as_asked` correction like `pipeline_card` for "backlog", or explain it if the list answers it as the card does.
-
 ### 1093. [LOW] "how's my pipeline looking?" is sometimes planned as a figure
 `platform/agents/planner/as_asked.py:151` — Planned `metric` 1 of 3 (parity run 2026-10-14, after commit 034eeb0; each re-checked live 3×) where the row expects the Pipeline card. `as_asked.pipeline_card` turns a single total figure said with "pipeline" into the card before anything runs, so the user likely gets the card either way — unverified for the exact plan the model wrote.
 
@@ -2187,21 +2115,22 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Confirm the two replies' value match on a seeded world, then add an `explained.py` entry; or move the row's plan to the list's total if that reply reads better.
 
 ### 1099. [LOW] Pseudo-operation key in `_SUGGESTION_MAP`
+**Checked 2026-10-22:** still present at agents/orchestrator/suggestions.py:64
+
 `platform/agents/orchestrator/suggestions.py:64` — `("Estimate Agent", "create_estimate_with_property")` is not an operation any agent or planner emits; the map is otherwise keyed by real (agent, operation) pairs, so a reader (or a future test walking the map against the agents' operations) would take it for one. No behavioural consequence.
 
 **Suggested fix:** Hold the two chips in a module constant `_CREATE_ESTIMATE_LINKED_SUGGESTIONS: List[str]` beside `_HELP_SUGGESTIONS`, and in `get_suggestions` return `list(_CREATE_ESTIMATE_LINKED_SUGGESTIONS)` from the `_created_estimate_has_property` branch instead of rewriting `key`; drop the map entry.
 
 ### 1123. [LOW] Material price filters disagree for sizes with no recorded price
+**Checked 2026-10-22:** code now at agents/material/service.py _fetch_list_materials (name-hint branch filters _material_to_dict price None); DB side still $ifNull price,cost at services/material_catalog.py:399
+
 `platform/agents/material/service.py:1635` — The database filter treats an unrecorded price as cost (`$ifNull: [price, cost]`); the name-hint branch filters `_material_to_dict`'s `price: None` and skips the size, so "materials under $20" and "gravel materials under $20" can disagree.
 
 **Suggested fix:** Filter on `EffectiveSize.price` (already falls back to cost) in the name-hint branch. Related: #1086.
 
-### 1124. [LOW] The estimate agent builds an unused materials JSON every generation
-`platform/agents/estimate/service.py:511` — `inventory["materials"]` is a `json.dumps(indent=2)` of the whole visible catalog (~400 rows) built every generation; the generation prompt has no placeholder for it.
-
-**Suggested fix:** Drop `materials_str` and the `available_materials=` kwarg at service.py:1031.
-
 ### 1125. [LOW] Material name matches silently capped at 200
+**Checked 2026-10-22:** cap is _NAME_MATCH_LIMIT=200 in agents/material/service.py:113
+
 `platform/agents/material/service.py:103` — "How many materials named 'a'" with a name hint counts a capped list (also cross_resource.py:88, work_item_field_handlers.py:120).
 
 **Suggested fix:** Use `count_effective(search=name_hint)` for counts, or say "200+" at the cap.
@@ -2212,6 +2141,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Add Plan-format rows, e.g. `change the price of {material} to $5` [Member] → refuse `not_permitted`; `delete the material {standard}` → `delete_material` (hides); `rename {standard} to X` → refused.
 
 ### 1165. [MEDIUM] Untested edge cases in `price_standard`
+**Checked 2026-10-22:** price_standard now agents/material/catalog_writes.py; only the empty-patch case is tested
+
 `platform/agents/material/catalog_writes.py:113` — 404 for not found / not a standard (124); `MaterialNotFound` race → 404 (131); `CatalogError`/`ValueError` → 422 (133). (review 2026-10-16 round 2 #100, deferred)
 
 **Suggested fix:** Unit tests over stubbed `get_effective`/`set_sizes_pricing`.
@@ -2257,6 +2188,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** A sizeless row gets no default size and price 0.
 
 ### 1220. [LOW] A Member who renames a standard via Maple is told about prices
+**Checked 2026-10-22:** role check still runs first in price_standard (catalog_writes.py); STANDARD_MATERIAL_REFUSAL still ends with the cost-and-price sentence
+
 `platform/agents/material/catalog_writes.py:121` — The role check runs before the structural refusal. (review 2026-10-16 round 2 #155, deferred)
 
 **Suggested fix:** Run the structural checks first; drop "You can still change its cost and price." for non-managers.
@@ -2267,16 +2200,15 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Diff against the loaded material's sizes; only sizes the turn changed become writes.
 
 ### 1222. [LOW] Maple's hide-on-delete has no Owner/Admin check of its own
+**Checked 2026-10-22:** _delete_material_via_api (service.py ~833) still calls set_hidden with no role check
+
 `platform/agents/material/service.py:751` — Relies on upstream gates only; a new caller would hide without the gate. (review 2026-10-16 round 2 #158, deferred)
 
 **Suggested fix:** Check the role before `set_hidden` and raise `MaterialWriteRefused(403, …)`.
 
-### 1223. [LOW] The prefilter's premise is miscounted (needs your call)
-`platform/agents/estimate/catalog_prefilter.py:4` — Docstrings say 376 rows; the seed is 369 size rows grouping into 150 materials, so with a 200 threshold a migrated company with <50 own materials never prefilters. (review 2026-10-16 round 2 #159, deferred)
-
-**Suggested fix:** Needs your call: (a) correct the docstrings to 150 and keep 200 — my pick, a 150-row scan was fine; (b) lower the threshold to ~120.
-
 ### 1225. [LOW] The 200 name-match cap is defined three times
+**Checked 2026-10-22:** definitions now at material/service.py:113 (_NAME_MATCH_LIMIT), cross_resource.py:89 (_MATERIAL_NAME_MATCHES), estimate/work_item_field_handlers.py:120 (_MATERIAL_MATCH_LIMIT)
+
 `platform/agents/material/service.py:63` — Also cross_resource.py:88 and work_item_field_handlers.py:120. (review 2026-10-16 round 2 #161, deferred)
 
 **Suggested fix:** One `NAME_MATCH_LIMIT` in services/material_catalog, imported by all three.
@@ -2287,21 +2219,18 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Say a 404 as "I couldn't find the material '{name}'." (classifies as not_found/material); add a test_maple_outcomes row.
 
 ### 1243. [LOW] `_NOT_EDITABLE` copies the route's refusal text
+**Checked 2026-10-22:** constant still duplicated at catalog_writes.py:31 and routers/material_helpers/standard.py:38
+
 `platform/agents/material/catalog_writes.py:31` — The string is typed in both places (also routers/material_helpers/standard.py:38). (review 2026-10-17 round 3 #28, deferred)
 
 **Suggested fix:** Make it a public constant beside `_SIZES_FIXED` in services/material_catalog_writes.py and import it in both.
 
 ### 1249. [LOW] `assert_manager_role` hard-codes the Owner/Admin set
+**Checked 2026-10-22:** agents/role_utils.py:67 still uses {UserRole.OWNER, UserRole.ADMIN} (and _ELEVATED_ROLES strings at :18)
+
 `platform/agents/role_utils.py:63` — `MANAGER_ROLES` now defines it once. (review 2026-10-17 round 3 #34, deferred)
 
 **Suggested fix:** `if not user or user.role not in MANAGER_ROLES:`.
-
-### 1252. ~~[MEDIUM] Maple's size rebuild fills an unrecorded price with the cost, so a Member's description edit can be refused~~ — RESOLVED 2026-10-18
-
-**Resolved 2026-10-18:** `_material_payload_from_fields` rebuilds a stored size with no recorded price as `price: None`, so an edit that doesn't touch the sizes matches the snapshot and carries no `sizes`. When the sizes are written, `_keep_selling_at_cost` sends an untouched unpriced size at its cost, as the portal does (a null price would be marked up by the server). A size whose cost changed still has its price dropped and is priced from the markup. Tests (`tests/test_maple_material_catalog_writes.py`, #1252 block): a Member describes and renames such a material, and its sizes stay as stored; an Owner's description edit leaves the size unpriced; an Owner's price edit of another size keeps it selling at its cost; an Owner's cost edit of it prices it from the markup.
-`platform/agents/material/service.py` `_material_payload_from_fields` — For a company material whose size has no recorded price, the rebuilt sizes fall back to the cost, so they differ from the stored snapshot and every edit carries `sizes`. A Member's rename or description edit is then refused as a price change ("Only owners and admins can change material prices and sizes."). Only affects materials saved without a price. Found while fixing review 2026-10-17 round 3 #1.
-
-**Suggested fix:** Rebuild existing sizes with their stored price as-is (keep `None`), so an edit that doesn't touch sizes carries no `sizes`. Test: a Member describes a company material whose size has no price.
 
 ### 1256. [MEDIUM] Untested edge case in `_check_add_size_guard`: a cost given as a string
 `platform/agents/material/service.py:2432` — `_parse_cost`'s string arm. (review 2026-10-17 round 4 #21, deferred)
@@ -2359,6 +2288,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** For reads, list each matching size ("Topsoil in 4 is $1.50; in 4\" is $3.00.").
 
 ### 1301. [MEDIUM] Untested edge case in `_stored_size_entries`: a stored size with a blank label
+**Checked 2026-10-22:** function now at agents/material/service.py:~120 (_stored_size_entries)
+
 `platform/agents/material/service.py:144` — A stored size whose label is blank is left out of the rebuild, so a sizes write would drop it. No test drives that arm (moved code). Not a list, a non-dict item and a missing unit are covered by the create path, #1258 and the unmapped-unit standard test. (review 2026-10-18, #1252 round 2 #2, deferred)
 
 **Suggested fix:** Add a dict-in/dict-out test next to the no-price-no-cost one: `existing_payload={"sizes": [{"size": "  ", "price": 4.0, "cost": 3.0}, {"size": "y", "price": 6.0, "cost": 5.0, "unit": "u1"}]}` with `{"size": "y", "price": 7.0}` → only "y" in the returned sizes.
@@ -2379,6 +2310,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Make `schema.Plan.model_validate` raise on the rebuild → the original plan comes back unchanged.
 
 ### 1309. [MEDIUM] Untested edge cases in `_ask_split_files`
+**Checked 2026-10-22:** the 'another confirm beside it' arm of confirm._ask_split_files is tested (test_planner_execute_files.py:1152); the stale arm and previous_files count are not
+
 `platform/agents/planner/confirm.py:257` — Edge cases: L267 — the `stale` arm returning "confirm:files_with_others"; L269 and `files_on_several` L354 — the count taken from `previous_files`. (Maple attachments review round 3, 2026-10-19, #18, deferred)
 
 **Suggested fix:** Call with a non-empty stale list → "confirm:files_with_others"; with `_ctx(world, files="previous")` the question reads "all 2 files" and `files_on_several(plan, ctx) == [1]`.
@@ -2404,6 +2337,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Treat an action as "with others" when `set(a.reasons) - {SPLIT_FILES_REASON}` is non-empty.
 
 ### 1324. [LOW] A kept plan carries files it never uses, and kept attaches skip the already-on guard
+**Checked 2026-10-22:** entry's own note stands: files-only-when-used is done (execute_files.uses_files); kept record still doesn't carry filed_on
+
 `platform/agents/planner/execute_files.py:96` — `confirm.keep` stores files for every kept plan ("delete T3?" just after a photo), and the yes stretches their window a turn, dropping `filed_on`. Conversely `already_on` is False whenever kept files are set, so a kept attach to a record already holding them copies twice. (Maple attachments review round 3, 2026-10-19, #33, deferred)
 
 **Suggested fix:** Store files only when an action `wants_files`; store `filed_on` beside them in the record; `already_on` reads it when kept files are set; `carry_kept_files` carries it.
@@ -2416,6 +2351,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Add `"task": task.model_dump(mode="json", by_alias=True)` to `result`, as `update_task_reply` does.
 
 ### 1341. [LOW] Phrasing reference §10.11: the ALREADY_ON row contradicts the prompt, and rows are missing
+**Checked 2026-10-22:** row still says reply ends with ALREADY_ON; create_estimate still absent from the section's attach ops
+
 `documentation/development/maple-phrasing-reference.md:3087` — The prompt steers "add a note to it: bring the ladder" to `attach: false` (a plain note), with ALREADY_ON only as the executor's backstop, but the row says the reply ends with it. Missing rows: the overage yes carrying the PDF, the answer to a question from a create made from a file (planned again), and the split "no". The §10.11 intro omits `create_estimate` from the attach ops. (Maple attachments review round 3, 2026-10-19, #50, deferred)
 
 **Suggested fix:** Reword that row (plan `add_note`, no attach; ALREADY_ON only if attach is planned); add the three rows; add `create_estimate` to the intro.
@@ -2651,6 +2588,8 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** Split into $set (keys that were present) and $unset (keys that were absent).
 
 ### 1416. [LOW] undo._SKIP names fields that don't exist
+**Checked 2026-10-22:** Task model field is converting_since; _SKIP in undo.py still lists converting_at and revision_id
+
 `platform/agents/planner/undo.py:56` — No model has `converting_at` or `revision_id`; Task's field is `converting_since`. (review 2026-10-21 #146, deferred)
 
 **Suggested fix:** Use `converting_since` and drop `revision_id`.
@@ -2691,11 +2630,15 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 **Suggested fix:** When the target is hidden, add "and it'll show in your materials again".
 
 ### 1426. [LOW] The category turn-on reply ignores standards kept hidden for a name
+**Checked 2026-10-22:** set_standard_category reply (execute_catalog.py) puts hidden_for_name only in the audit metadata, not the reply
+
 `platform/agents/planner/execute_catalog.py:199` — "they're in your lists now" is said even when some stayed hidden because a company material holds the name; the REST toggle reports them. (review 2026-10-21 #156, deferred)
 
 **Suggested fix:** Append "<names> stayed hidden — one of your own materials has its name." when `result.hidden_for_name` is set.
 
 ### 1428. [MEDIUM] `_is_where` (now `_delete_said`): the no-name arm untested
+**Checked 2026-10-22:** _is_where is now as_asked_files._delete_said
+
 `platform/agents/planner/as_asked_files.py:108` — Edge case: a delete with no name (by focus, listed) beside an attach is taken as the removal's and dropped. (review 2026-10-21 round 5 #4, deferred. Its arm (b), a removal with an empty place, went with the place check: round 7 #1 replaced it with `_delete_said`, which keeps a delete only when the message says its record is deleted.)
 
 **Suggested fix:** [update_task attach, delete_task {by: focus}] with "attach this to T0042 and remove the photo from that task" → ["update_task"].
@@ -2780,6 +2723,8 @@ Fix: change to `raise HTTPException(404, "Template not found")` and update
 the parallel routers in the same PR.
 
 ### 490. [MEDIUM] Same-field conflicts are still silent — the conflict-detection phase
+**Checked 2026-10-22:** Portal builder work-item saves send base_version (NewEstimateWithActivityPage.tsx:1166) but the field auto-save/whole-save and ConflictNotice are not wired; persist_fields still writes no audit entry (services/sparse_update.py:139).
+
 Two writers changing the **same** field still resolve to whoever saves last,
 with no detection and no signal to either user. Sparse writes shrink the
 exposure to genuinely overlapping edits; they do not remove it.
@@ -2854,6 +2799,8 @@ change-detector missed a case. Leave alone unless profiling shows latency.
 Filed so we don't re-litigate.
 
 ### 67. [LOW] `PydanticObjectId(company)` returns 500 on garbage input
+**Checked 2026-10-22:** Divisions and material_categories list routes now return 422 on a bad ?company= (divisions.py:46-49, material_categories.py:71-74); estimates list/analytics (estimates.py:458,519,767), contacts, equipments, labours, properties still raise on bad ids.
+
 **File**: [platform/routers/divisions.py:44](../../platform/routers/divisions.py)
 **Severity**: LOW
 
@@ -2974,6 +2921,8 @@ same time — `company` is already loaded on line 410, so it costs no extra quer
 `company_archived=_is_archived(company)`. Until then, no change.
 
 ### 468. [LOW] platform/routers/tasks.py — `POST`/`PUT /tasks/` still bind the raw `Task` Document
+**Checked 2026-10-22:** PUT /tasks/{id} now binds the sparse UpdateTaskRequest (routers/tasks.py:276), so the silent full-replace/exclude-set data loss is gone; POST /tasks/ still binds the raw Task and overwrites server-owned fields by hand (create_task).
+
 There is no `TaskCreate`/`TaskUpdate` Pydantic schema, so PUT is a full-replace bind: every
 field a client omits resets to its model default. The exclude set at `routers/tasks.py`
 is now eight entries long (`readable_id`, `title`, `task_date`, `photos`, `estimate`,
@@ -3025,16 +2974,22 @@ geocode and note it in the comment.
 **Suggested fix:** Decided 2026-09-23: option (b), a delayed sweep, was chosen as the real fix but deferred because it needs a scheduled job. Mark candidate paths on version delete instead of deleting them, and have a sweep delete ones still unreferenced by any version after ~15 minutes.
 
 ### 1100. [MEDIUM] Dead route: POST /materials/load-standard (keep until the new portal ships)
+**Checked 2026-10-22:** The stage-2 portal is now on origin/release (no materials/load-standard or unpaged list caller there; portal/src/api/resources.ts has only materialsApi.page), so deletion is unblocked but not done: route still at routers/material_overrides.py:79.
+
 `platform/routers/materials.py:362` — The new portal no longer calls it — only tests do (review 2026-10-16 #69). Deferred, not deleted: the portal on `release` still calls it, and the platform deploys first, so removing it now would break the live Materials page until the portal ships.
 
 **Suggested fix:** Delete it with its tests (test_material_overrides_api.py, test_material_bootstrap.py's load-standard cases) in the stage-6 cleanup, once the stage-2 portal is on `release`.
 
 ### 1101. [MEDIUM] Dead branch: GET /materials bare-array response, unbounded (keep until the new portal ships)
+**Checked 2026-10-22:** The stage-2 portal is on origin/release and only calls materialsApi.page, so the bare-array branch can go; still present at routers/materials.py (get_materials, all-None branch).
+
 `platform/routers/materials.py:293` — The new portal always sends page and page_size; the no-parameter branch streams the whole effective catalog (376+ standards plus the company's own) with no cap (review 2026-10-16 #70). Deferred: the portal on `release` still calls `materialsApi.list` without paging.
 
 **Suggested fix:** Once the stage-2 portal is on `release`, make paging the only shape and update test_material_api.py, test_material_bootstrap.py and test_resources_rbac.py.
 
 ### 1111. [LOW] NaN and Infinity accepted as a material cost or price
+**Checked 2026-10-22:** CSV upload (upload.py:_checked_amount) and PATCH /pricing / PUT on a standard (material_catalog_writes._price_value) now refuse NaN/Inf; create, PUT on a company material and common.to_float still accept them.
+
 `platform/routers/materials.py:105` — JSON/pydantic floats and `_to_float("nan")` accept them in PATCH /pricing, PUT, create and CSV cells; NaN passes the `< 0` check and is stored (Owner/Admin, own company only).
 
 **Suggested fix:** `Field(allow_inf_nan=False)` on SizePricing / MaterialSizeCost / the PUT model, and `math.isfinite` in `_to_float`.
@@ -3060,6 +3015,8 @@ geocode and note it in the comment.
 **Suggested fix:** Call `_require_manager` first, or drop `action` from the reply for non-managers.
 
 ### 1128. [MEDIUM] Dead route: POST /billing/enterprise-contact has no caller
+**Checked 2026-10-22:** Portal caller already deleted; route still at routers/billing.py:512 with tests/test_billing_enterprise_contact.py.
+
 `platform/routers/billing.py` — The portal's EnterpriseContactModal was unreachable (its last caller went in 53c6072) and was deleted on 2026-10-16 with `billingApi.enterpriseContact` (review 2026-10-16 #52). The platform route and its Brevo send remain with no caller; a route may still have external callers, so it wasn't deleted with the portal side.
 
 **Suggested fix:** Decide whether Enterprise inquiries come back (wire a contact form into the plan picker's Enterprise option) or go for good — then delete the route, its request model and its tests.
@@ -3070,6 +3027,8 @@ geocode and note it in the comment.
 **Suggested fix:** Monkeypatch `set_sizes_pricing` to raise `MaterialNotFound` for one standard; its rows are errors, the other standard is priced, custom rows written.
 
 ### 1143. [MEDIUM] Untested edge case in `_checked_amount`: non-finite
+**Checked 2026-10-22:** The service-level write path tests nan/inf (tests/test_material_catalog_write_edges.py:111,246) but no upload row test asserts 'Cost must be a number'.
+
 `platform/routers/material_helpers/upload.py:121` — "nan"/"inf" should give "Cost must be a number"; untested. (review 2026-10-16 round 2 #78, deferred)
 
 **Suggested fix:** Add nan and inf rows to the row-error parametrize.
@@ -3165,10 +3124,11 @@ geocode and note it in the comment.
 **Suggested fix:** Needs Simon's call. Either (a) answer the Firebase throttle with the generic 200 message and log the warning (hides the account; the real user gets no hint), or (b) keep the 429 but word it exactly like our own limiter ("Too many requests. Please try again later.") so it reads as the per-address limit any email can hit. Recommended: (b).
 
 ### 1329. [LOW] Maple uploads hold their bytes in memory while queued for a read slot
+**Checked 2026-11-01:** still open at `routers/agents.py:962`. Production runs on a 512 MB instance that idles around 260 MB and restarted out of memory on 2026-10-29 and 2026-10-31, so the up-to-300MB per-user buffer is more than its headroom. In the queue's top ten since 2026-11-01.
+
 `platform/routers/agents.py:950` — `await file.read()` runs before `store_attachment` waits on the 4 read slots, so up to 30 uploads per user (300MB) can sit in RAM though Starlette spooled them to disk. (Maple attachments review round 3, 2026-10-19, #38, deferred)
 
 **Suggested fix:** A `_buffer_slot` semaphore (2×READ_CONCURRENCY) around `file.read()` + `store_attachment`.
-
 
 
 ### 1439. [LOW] The email-only verification resend answers differently under a throttle or outage
@@ -3440,17 +3400,6 @@ Fix: optional safety net at app startup — if
 or abort. Or change the Settings field to `str | None = None` and
 assert non-None at the use site for prod environments.
 
-### 359. [LOW] platform/services/company_bootstrap.py:68 — (name, unit) lookup key assumes canonical unit casing
-`existing_by_key` is keyed by `(doc.name, doc.unit)` where `doc.unit` is the LabourUnit
-str-enum, and looked up with the template's raw `unit` string. It works today only because
-default_labours.csv uses exactly "Hourly" (verified). If a future seed row used an
-alias/lowercase unit ("hour"), the key would miss on rerun and insert a DUPLICATE role
-instead of overwriting. The legacy find_one had the same latent gap, so this is not a
-regression — but the in-memory key makes the casing assumption implicit.
-**Suggested fix:** Normalize the template unit when building/looking up the key, e.g. key
-on `LabourUnit.from_string(template["unit"])` on both sides, so alias/case variants resolve
-to the same enum. (Or assert the seed CSV uses canonical unit values.)
-
 ### 372. [LOW] platform/services/translation.py:712 — unbounded concurrency in `asyncio.gather`
 One LLM call is fired per segment with no concurrency cap. In practice `suggestions` is a small fixed UI set (~3-4 chips) so fan-out is caller-bounded, but there is no structural guard; a future caller passing a large `suggestions` list would launch that many simultaneous LLM calls (rate-limit / burst-cost risk).
 **Suggested fix:** Optional — bound it with a `Semaphore` or cap the number of translated chips if suggestion counts could ever grow. Not needed at current call sites.
@@ -3549,13 +3498,6 @@ row count first — this may be years away.
 
 **Suggested fix:** When `image.mode == "RGB"` and `image.info["transparency"]` has any component above 255, scale the key down to 8-bit (`>> 8`) before the convert to RGBA. Test: a 16-bit RGB PNG with a magenta key comes out with no magenta pixels.
 
-### 817. ~~[MEDIUM] Sentry ships frame locals — token claims and chat messages — with every `logger.exception`~~ — RESOLVED 2026-10-18
-
-**Resolved 2026-10-18:** your decision — drop all locals. `_init_sentry` in `platform/main.py` passes `include_local_variables=False`, so every event keeps its stack and loses every frame's variables, and `max_request_body_size="never"`, because the FastAPI integration also attached the JSON body (the `/agents/orchestrate` chat message) as `request.data` — `send_default_pii=False` gates only cookies and headers (review round 1). `tests/test_sentry_init.py`: production init turns locals and request bodies off (and keeps `send_default_pii=False`); Sentry isn't started outside production or without a DSN; an exception captured through a client built from those options keeps its frames and carries no `vars`. The template instantiation's type-only log (`routers/agent_helpers/template_estimate.py:183`, #318) stays, its comment now giving the reason that holds — the exception's message can hold the estimate's values, as in the edit executor's type-only logs (`agents/estimate/edit_executor.py:420/426`, #619). The brevo rule keeps its "never `logger.exception`", its reason restated: a Brevo error's message can echo the contact email (`.claude/rules/brevo.md`).
-`platform/main.py:59` — `sentry_sdk.init` leaves `include_local_variables` at its default (True; SDK 2.70), and `send_default_pii=False` does not strip frame variables. The default scrubber denylists exact keys such as `token`, not `decoded_token`, `message` or `context_payload`. So each of the ~29 `logger.exception` calls on Maple paths (`routers/agents.py:1828` among them) can send the user's Firebase claims (uid, email), their chat message and conversation state to Sentry. The estimate edit executor and the template instantiation (#318) log the exception type only for this reason, but that costs the stack. Found reviewing #318 (review 2026-10-05 #1).
-
-**Suggested fix:** Needs your decision. Either set `include_local_variables=False` in `sentry_sdk.init`, which keeps every stack and drops locals everywhere (my pick: one line, covers all sites, and the type-only logs could go back to full tracebacks); or keep locals and add an `EventScrubber` denylist for `decoded_token`, `message`, `context_payload`, `chat_history` and the user/email names — narrower, but every new local name is a new leak.
-
 ### 857. [MEDIUM] Public `or_join`'s empty and two-item arms are untested
 `platform/services/estimate_status.py:98` — Edge case, unreachable today (every status allows 1 or 3 targets), but the helper is now public. (review 2026-10-11 #31, deferred)
 
@@ -3587,6 +3529,8 @@ row count first — this may be years away.
 **Suggested fix:** Trim/collapse in the pipeline, or store `name_norm` on Material at write time.
 
 ### 1150. [MEDIUM] Untested edge cases in `_validate`
+**Checked 2026-10-22:** _category_ids now accepts a list; the _validate arms (bad source/visibility/price direction) are still untested.
+
 `platform/services/material_catalog.py:437` — Bad `source` (439), `visibility` (441), price direction (444) — the router's Literals stop them first. (review 2026-10-16 round 2 #85, deferred)
 
 **Suggested fix:** Three `pytest.raises(ValueError)` on `list_effective`.
@@ -3602,11 +3546,15 @@ row count first — this may be years away.
 **Suggested fix:** Same setup; `count_effective` returns 0.
 
 ### 1153. [MEDIUM] Untested edge cases in `_category_ids`
+**Checked 2026-10-22:** Category now takes a list of ids; blank string and duplicate-id arms still untested.
+
 `platform/services/material_catalog.py:447` — A blank string means no filter (450); a duplicate id is folded (458). (review 2026-10-16 round 2 #88, deferred)
 
 **Suggested fix:** Assert `category=""` equals no filter and `[id, id]` equals `[id]`.
 
 ### 1154. [MEDIUM] Untested edge cases in `_hide_standards`
+**Checked 2026-10-22:** Pre-hidden twin is covered in tests/test_material_catalog_write_edges.py:398 but the all-already-hidden [] arm and the BulkWriteError retry are not.
+
 `platform/services/material_catalog_writes.py:410` — Every clash already hidden → `[]` (421); the `BulkWriteError` retry (434). (review 2026-10-16 round 2 #89, deferred)
 
 **Suggested fix:** A pre-hidden test and a monkeypatched `bulk_write` raising once.
@@ -3642,6 +3590,8 @@ row count first — this may be years away.
 **Suggested fix:** Same setup; no audit for the second doc.
 
 ### 1161. [MEDIUM] Untested edge cases in `_recheck_identical`
+**Checked 2026-10-22:** Related: tests/test_material_migration.py:456 covers a copy deleted between plan and apply, not the derived_from-added or missing-standard arms.
+
 `platform/services/material_migration.py:301` — Standard missing, or the copy given `derived_from` between plan and apply (318). (review 2026-10-16 round 2 #96, deferred)
 
 **Suggested fix:** Set `derived_from` on a planned identical copy before apply; it's neither deleted nor counted.
@@ -3692,6 +3642,8 @@ row count first — this may be years away.
 **Suggested fix:** Fetch names matching `^<base>( \d+)?$` once and pick the suffix in Python.
 
 ### 1209. [LOW] Every toggle re-reads the seed CSVs from disk (also material_vocabulary.py:89)
+**Checked 2026-10-22:** Loaders now load_default_category_templates / load_default_unit_templates (material_category_bootstrap.py:12, material_unit_bootstrap.py:13), called from standard_category_keys and ensure_standard_vocabulary.
+
 `platform/services/material_catalog_writes.py:502` — Two or three reads per call. (review 2026-10-16 round 2 #144, deferred)
 
 **Suggested fix:** `functools.lru_cache` on the template loaders.
@@ -3727,6 +3679,8 @@ row count first — this may be years away.
 **Suggested fix:** Check the company exists; print an error and return 1.
 
 ### 1254. [MEDIUM] Untested edge cases in `unhide_for_removed_names`
+**Checked 2026-10-22:** Case (c) is partly covered by test_unhide_for_removed_names_ignores_names_nothing_hid; (a) retired-only and (b) other-company override remain untested.
+
 `platform/services/material_catalog_writes.py:531` — (a) A freed name only a retired standard holds stays hidden; (b) another company's flagged override of the same standard is untouched by the update and prune; (c) a name no live standard holds returns `[]`. (review 2026-10-17 round 4 #19, deferred)
 
 **Suggested fix:** One service test per case (b needs a second company).
@@ -3873,6 +3827,8 @@ Fix: widen `handleSaveEstimate` to return
 of the closure reference.
 
 ### 104. [LOW] `TemplateDialog` captures `initialName` only on mount
+**Checked 2026-10-22:** TemplatesPage.tsx is gone; the dialog is now mounted from settings/TemplatesTab.tsx:303 (still key={dialogKey} + isFormOpen gate), so the premise still holds.
+
 File: `portal/src/components/estimates/TemplateDialog.tsx:36`
 **Severity**: LOW
 
@@ -3886,6 +3842,8 @@ Fix: only required if either the key or the gate is removed. If so, sync
 `name` via a `useEffect` on `initialName` change.
 
 ### 105. [LOW] Templates page re-fetches `/companies/{id}` on every mount
+**Checked 2026-10-22:** TemplatesPage is gone; the fetch is now the shared useCompanyDefaults hook (hooks/useCompanyDefaults.ts), still one /companies/{id} GET per mount with no cache.
+
 File: `portal/src/pages/TemplatesPage.tsx:60-74`
 **Severity**: LOW
 
@@ -4045,6 +4003,8 @@ test asserting the contenteditable's parent chain, which pins the assumption at 
 test that breaks on every MDXEditor upgrade.
 
 ### 592. [LOW] The Documents dialog's friendly fallback message never shows for API or network errors
+**Checked 2026-10-22:** Logic moved to components/estimates/useDocumentsForm.ts:56; still shows err.message unless empty.
+
 `portal/src/components/estimates/DocumentsDialog.tsx:102` — The fallback shows only for an empty message, but `performApiRequest` always sets `Request failed (N)` and fetch sets "Failed to fetch", so users see raw text such as "Request failed (413)".
 
 **Suggested fix:** Show the fallback for an `ApiError` with no parsed detail (`/^Request failed \(\d+\)$/`) and for a `TypeError`; otherwise keep `err.message`.
@@ -4070,11 +4030,15 @@ test that breaks on every MDXEditor upgrade.
 **Suggested fix:** Pass the route `estimateId` (or `getEntityId(estimate)` without the `??`), and render `EstimateDocuments` only when the id is non-empty.
 
 ### 597. [LOW] Over-cap image picks don't say which files were skipped
+**Checked 2026-10-22:** useStagedImages.ts is gone; the pick loop is pickAcceptable in lib/useStagedFiles.ts:36 (still breaks at the cap and names no skipped files).
+
 `portal/src/components/estimates/useStagedImages.ts:40` — The loop `break`s on a generic "at most 10 images" message: dropped files aren't named, and later wrong-type or oversize files are never checked or reported.
 
 **Suggested fix:** Don't break; collect the overflow names and report once: `Only 10 images fit; skipped a.jpg, b.jpg.`
 
 ### 598. [LOW] Image pick errors stay on screen after they stop being true
+**Checked 2026-10-22:** useStagedImages.ts is gone; same behaviour in useDocImageDraft.ts (remove does not clear the error).
+
 `portal/src/components/estimates/useStagedImages.ts:45` — The error is cleared only on the next add or submit, so "at most 10 images" stays up after the user frees a slot.
 
 **Suggested fix:** Clear the error in unstage and in the kept-image remove handler.
@@ -4132,6 +4096,8 @@ test that breaks on every MDXEditor upgrade.
 **Suggested fix:** A retry counter bumped after a backoff (or on window `online`) in the effect's deps.
 
 ### 1104. [LOW] A unit id can be stored as a line's unit label
+**Checked 2026-10-22:** Now in hooks/useWorkItemLines.ts:108,119 (unit_name ?? unit), not WorkItemInlineContent.
+
 `portal/src/components/estimates/WorkItemInlineContent.tsx:328` — `unit_name ?? unit` (also :339) falls back to the unit ObjectId when the vocabulary has no name; the server keeps an incoming unit when the catalog's is null (snapshots.py:301).
 
 **Suggested fix:** `unit_name ?? ""` (and `?? row.unit` for a size change).
@@ -4142,6 +4108,8 @@ test that breaks on every MDXEditor upgrade.
 **Suggested fix:** On close reset `options`/`answeredQuery`; compute the query from `searchText` directly when it's "".
 
 ### 1130. [MEDIUM] Untested edge cases in useMaterialCatalog
+**Checked 2026-10-22:** One arm now covered (search when page returns null, tests/useMaterialCatalog.test.tsx 'an empty search'); remember-after-switch, _id-only remember and sync-throw resolve remain.
+
 `portal/src/hooks/useMaterialCatalog.ts:116` — Untested arms: `remember` right after a company switch (empty base); `remember` with only `_id`; `search` when `page` returns null; a resolve that throws synchronously. (review 2026-10-16 round 2 #65, deferred)
 
 **Suggested fix:** One renderHook test per arm.
@@ -4162,6 +4130,8 @@ test that breaks on every MDXEditor upgrade.
 **Suggested fix:** `gapMaterialLine({...effective([]), id: "", _id: "m2", name: ""}, {})` → `material: "m2", name: ""`.
 
 ### 1174. [LOW] Two builders of a line from an effective material
+**Checked 2026-10-22:** Hand-built lines now live in hooks/useWorkItemLines.ts; gapMaterialLine still separate in lib/estimateInventoryGaps.ts.
+
 `portal/src/components/estimates/WorkItemInlineContent.tsx:329` — The picker handlers build lines by hand while the gap path uses `gapMaterialLine`; already diverged on unit (#1104's symptom). (review 2026-10-16 round 2 #109, deferred)
 
 **Suggested fix:** Extract `materialLineFromSize(material, size)` used by all three; fix #1104 there once.
@@ -4182,6 +4152,8 @@ test that breaks on every MDXEditor upgrade.
 **Suggested fix:** Un-export it.
 
 ### 1229. [MEDIUM] Untested edge case: the company answers without a numeric `material_markup`
+**Checked 2026-10-22:** Code moved: company fetch is now useCompanyDefaults/linePricingFromCompany; test.each in tests/NewEstimateWithActivityPage.materialGaps.test.tsx still lacks the {} reply row.
+
 `portal/src/pages/NewEstimateWithActivityPage.tsx:302` — The pending and rejected fetches and markup 25 are tested; a reply lacking the field isn't. (review 2026-10-17 round 3 #14, deferred)
 
 **Suggested fix:** Add `companyMock.mockResolvedValue({})` to the `test.each` table → Price stays blank after blurring Cost.
@@ -4214,27 +4186,6 @@ Found during 2026-07-01 manual dev testing: `onSnapshot` terminates permanently 
 ### 408. [MEDIUM] portal/src/components/dashboard/UpcomingTasksCard.tsx:38 — completed tasks surface in "Upcoming Tasks"
 The card lists tasks from every status column, including the terminal "Done" status. A finished task whose due date has passed will sit at the top of the card in red indefinitely, crowding out genuinely actionable tasks (the card only shows 5). Deferred pending a product decision on whether "Done" tasks belong in the card.
 **Suggested fix:** Fetch task statuses (taskStatusesApi.list), identify the final status column, and exclude tasks in it — or filter in selectDashboardTasks via a passed-in "done" status id.
-
-### 112. ~~[LOW] Replace `isMountedRef`/`fetchTokenRef` race-guards with `AbortController`~~ — RESOLVED 2026-10-19
-
-**Resolved 2026-10-19:** both panels it would migrate are gone. `FeedbackPanel.tsx` was retired into Support (2026-07-02), and `ChangeLogPanel.tsx` was deleted when What's New became `WhatsNewDialog`, which is mounted fresh per open and guards its one fetch with an effect-local `cancelled` flag, with no refs. Teaching `apiRequest` an `AbortSignal` is still a fine idea, but nothing here needs it. Move to the archive in the next cleanup.
-
-**Files**: [portal/src/components/common/ChangeLogPanel.tsx](../../portal/src/components/common/ChangeLogPanel.tsx), [portal/src/components/common/FeedbackPanel.tsx](../../portal/src/components/common/FeedbackPanel.tsx), [portal/src/api/client.ts](../../portal/src/api/client.ts)
-**Severity**: LOW (refactor)
-
-Both panels copy a manual race-guard pattern (`isMountedRef`,
-`submitTokenRef` / `fetchTokenRef`, post-await staleness checks) to drop
-results from superseded fetches. The cleaner shape is `AbortController`
-+ `signal`, but it requires changing the shared API client.
-
-Fix:
-1. Teach `apiRequest` in `portal/src/api/client.ts` to accept an
-   `AbortSignal` and pass it through to `fetch`.
-2. Migrate `ChangeLogPanel` and `FeedbackPanel` together — abort the
-   in-flight request on unmount or on a new submit/fetch, then drop the
-   ref-based guards.
-
-Migrate both call sites in the same PR so the pattern is consistent.
 
 ### 119. [LOW] URL build via string concatenation in widget API client
 **File**: [website/widget/api.ts:36](../../website/widget/api.ts)
@@ -4366,14 +4317,6 @@ oversight.
 
 **Suggested fix:** Set a ref when any local turn completes, and skip the restored `open_question` once it is set.
 
-### 1253. ~~[MEDIUM] Maple's and Support's composers now differ, one tab apart~~ — RESOLVED 2026-10-18
-
-**Resolved 2026-10-18 (Maple attachments):** one shared pill bar, `components/common/ComposerBar` — a leading round control (the "+" that attaches a file), the textbox, trailing controls (Maple's mic), the round send button; Enter is a new line and Cmd/Ctrl+Enter sends; files dragged over it highlight it. `lib/composerStyles` holds the pill's classes for both tabs; Support's new-conversation button sits in the Maple header beside its X, where the Chat tab's New session is (`SupportPanel` renders it into `MapleHeader`'s slot, `headerActions`; Simon 2026-10-19). Tests: `ComposerBar.test.tsx`, `SupportPanel.test.tsx`, `AiPanelComposerLayout.test.tsx`, `AiPanelAttachments.test.tsx`, `AiPanelSupportFlag.test.tsx`.
-
-`portal/src/lib/composerStyles.ts:2` — Maple's composer became a single pill-shaped bar (`components/Layout/MapleComposer.tsx`, Maple chat UI branch `claude/maple-chat-ui-707776`, 2026-10-16), while Support keeps the textbox with a column of three buttons (new conversation, attach, send) styled by `composerStyles`. The file existed to stop drift between the two, which sit one tab apart. The comment now says these styles are Support's and that the design question is open. Fixing it means redesigning Support's input bar, including where its new-conversation and attach buttons go and its Cmd/Ctrl+Return send, which is bigger than the review fix described. (review 2026-10-16 #18)
-
-**Suggested fix:** Decision for Simon. Either give Support the same pill bar (my pick: the two panels sit one tab apart), moving the pill classes into `composerStyles` for both and putting Support's new-conversation button in its panel header as Maple's now is, or accept the difference and keep the comment as it is.
-
 ### 1312. [MEDIUM] Untested edge cases in `thumbUrlFor` / `useThumbUrl`
 `portal/src/components/Layout/MapleAttachmentChips.tsx:16` — Edge cases: (a) L20 — a failed fetch is evicted so a later mount fetches again; no test rejects for a real id; (b) L36 — the `.catch` keeping the name tile; the existing test uses `id: ""`, so `attachmentBlob` never runs; (c) L34/40 — unmounting before the fetch resolves sets no state. (Maple attachments review round 3, 2026-10-19, #21, deferred)
 
@@ -4404,7 +4347,6 @@ oversight.
 
 **Suggested fix:** Always decrement in `onDragLeave`, or reset depth when `active` turns false.
 
-
 ## Portal — settings, billing, onboarding and ops
 
 ### 206. [MEDIUM] Generalize `PlanPickerGrid` button label
@@ -4415,15 +4357,9 @@ oversight.
 
 Fix: ``Select ${plan.displayLabel} Plan`` — or just "Select plan" if displayLabel feels redundant.
 
-### 210. [MEDIUM] `PlanStep` should disable the grid when `companyId` is null
-**File**: `portal/src/components/onboarding/PlanStep.tsx:18-33`
-**Severity**: MEDIUM
-
-If `companyId` is null when the user clicks Select, they see "Missing company context. Please reload and try again." But by step 6, the company was created in step 1 — a missing companyId here is a code-flow bug, not a user-recoverable state. Telling the user to reload is unhelpful.
-
-Fix: pass a `disabled` prop down to `PlanPickerGrid` when `!companyId`. Render an inline "Initializing your account…" notice instead of letting the user click and fail.
-
 ### 82. [LOW] `alert(...)` for save errors in 3 settings tab components
+**Checked 2026-10-22:** Only DivisionsTab.tsx:98 still uses alert (the entry already notes the materials tabs were fixed).
+
 *Update 2026-10-17:* the Materials Categories and Units tabs (now `portal/src/components/materials/`) show a save error under the Name field instead; only `DivisionsTab` still uses `alert`.
 
 **Files**: [portal/src/components/settings/DivisionsTab.tsx](../../portal/src/components/settings/DivisionsTab.tsx) (`handleSaveDivision`),
@@ -4459,15 +4395,9 @@ Fix: small `STATUS_LABELS` map: `active → "Active"`, `past_due → "Past Due"`
 ### 399. [LOW] portal/src/pages/ops/OpsStaffPage.tsx — no per-row pending map
 Row actions share a single pending/loading flag; if parallel edits across rows ever matter, switch to a per-row pending map so one in-flight action doesn't disable controls on unrelated rows.
 
-### 421. [LOW] portal/src/components/settings/BillingTab.tsx:133 — "0 / 0" Tasks row during mixed-version deploys
-If the portal deploys before the platform, subscription responses lack
-`used_tasks`/`included_tasks`; strict `=== null` (correctly) refuses to treat
-`undefined` as unlimited, so the Tasks row renders "0 / 0" until the backend
-ships. Transient and flag-gated.
-**Suggested fix:** Optionally skip the row when `state.included_tasks ===
-undefined`, or deploy platform before (or together with) portal.
-
 ### 538. [LOW] portal/src/components/onboarding/CompanyStep.tsx:549 — the same setting has two names
+**Checked 2026-10-22:** Onboarding no longer has the field (CompanyStep dropped the percentages); platform/user_guides/users_guide.md lines 58 and 1085 still say 'Standard Unbillable'.
+
 
 Onboarding collects this field as "Standard Unbillable (%)" while Settings → Financial now labels
 it "Unbillable Time". A user sets one during setup and later hunts for it under a different name.
@@ -4485,21 +4415,22 @@ and will be resolved as part of the planned onboarding-flow overhaul.
 **Suggested fix:** Clear the error after a successful load regardless of `quiet`.
 
 ### 1129. [MEDIUM] Hand-rolled copy of useToast
+**Checked 2026-10-22:** Component now at components/materials/MaterialCategoriesTab.tsx:49,250.
+
 `portal/src/components/settings/MaterialCategoriesTab.tsx:50` — The tab keeps its own `standardNotice` and renders `<Toast key={text}>`, relying on a null-reset to restart the timer. (review 2026-10-16 round 2 #64, deferred)
 
 **Suggested fix:** `const { showToast, toast } = useToast()`; keep only a `standardError` string for the alert banner.
 
-### 1135. [MEDIUM] Untested edge case: turnOnStandardMaterials failing
-`portal/src/pages/OnboardingPage.tsx:128` — When `setAllStandard` rejects, the flag must stay false, the step show the error, and the last screen not claim the materials are on. (review 2026-10-16 round 2 #70, deferred)
-
-**Suggested fix:** Reject `setAllStandardMock` once; assert the error, then after Skip the completion screen lacks "turned on for you".
-
 ### 1184. [LOW] Markup help text is ambiguous for a cost-only override
+**Checked 2026-10-22:** Text now at FinancialTab.tsx:77 (still 'haven't priced yourself').
+
 `portal/src/components/settings/FinancialTab.tsx:82` — "Applies to every standard material you haven't priced yourself" — a cost you set still gets the markup. (review 2026-10-16 round 2 #119, deferred)
 
 **Suggested fix:** "Applies to every standard material size you haven't set a price for (a cost you set gets the markup too)."
 
 ### 1233. [MEDIUM] Untested edge cases in applyStandardToggle
+**Checked 2026-10-22:** Component now at components/materials/MaterialCategoriesTab.tsx:153; neither arm tested.
+
 `portal/src/components/settings/MaterialCategoriesTab.tsx:176` — (a) The `togglingStandardRef` early return (the busy test is stopped by the switch's own `if (!busy)`); (b) `result?.hidden_for_name ?? []` when the toggle answers null. (review 2026-10-17 round 3 #18, deferred)
 
 **Suggested fix:** (a) Pending PATCH, then "Turn on all" in the same tick → one write; (b) PATCH resolves null → switch applied, no toast, list refreshed.
@@ -4618,14 +4549,11 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 **Suggested fix:** Mount it with `key={standardMaterial.id}` and initialise state from props; drop the effect.
 
 ### 1134. [MEDIUM] Untested edge cases in write/changes
+**Checked 2026-10-22:** negative price arm now covered (MaterialsPageStandardEdit 'a negative price is refused'); other arms still untested
+
 `portal/src/components/materials/StandardMaterialDialog.tsx:60` — Untested arms: a negative price; `if (!row) return []`; `onClose` ignored while busy; the "Standard $x" hint hidden when equal or null; no description/category_name. (review 2026-10-16 round 2 #69, deferred)
 
 **Suggested fix:** One test per arm.
-
-### 1136. [MEDIUM] Untested edge cases in getCategoryName
-`portal/src/pages/MaterialsPage.tsx:343` — Untested arms: no category and an unknown id → "Unknown". (review 2026-10-16 round 2 #71, deferred)
-
-**Suggested fix:** One test each.
 
 ### 1137. [MEDIUM] Untested edge cases in the deep-link effect
 `portal/src/pages/MaterialsPage.tsx:262` — Untested arms: unmount while `get` is pending (`cancelled`); `found.name ?? ""`. (review 2026-10-16 round 2 #72, deferred)
@@ -4633,6 +4561,8 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 **Suggested fix:** One test each.
 
 ### 1138. [MEDIUM] Untested edge case in duplicateMaterial: a null copy
+**Checked 2026-10-22:** row Duplicate answered with null is exercised in MaterialsPageMenus 'a row action in flight' but with no no-highlight/no-error assertion; dialog 'no copy' arm covered
+
 `portal/src/pages/MaterialsPage.tsx:640` — Untested. (review 2026-10-16 round 2 #73, deferred)
 
 **Suggested fix:** `duplicateMock` → null; no highlight, no error.
@@ -4702,20 +4632,6 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 
 **Suggested fix:** Record the flag from `onInput` too, or read `validity.badInput` from refs when Save is pressed.
 
-### 1251. ~~[MEDIUM] Materials page sends the price as the cost when Cost is blank~~ — RESOLVED 2026-10-18
-
-**Resolved 2026-10-18:** `handleSubmit` refuses a save when a labelled size row has no valid cost ("Cost is required for all material sizes."), checked before anything is sent and only when the sizes changed, like the unit check. The row is never skipped (an edit would delete the size). The cost is now `Number(size.cost)`, with no fallback to the price, and the Cost input is `required`. Tests (`portal/tests/MaterialsPageForm.test.tsx`, #1251 block): an edit's added size with a price and no cost is refused with nothing sent; a new material's second row likewise, though the first is complete; Cost is `required` and Price is not; a blank unlabelled row is still skipped.
-`portal/src/pages/MaterialsPage.tsx` — `cost = costProvided ? parsedCost : (price ?? NaN)`: unlike the gap dialog, the page's Cost field isn't `required`, so a size row with a label and a price but no cost stores the price as the catalog cost — the coercion `.claude/rules/pricing.md` forbids. Removing the fallback alone would silently drop the row (and on edit delete the size). Found while fixing review 2026-10-17 round 3 #7/#8.
-
-**Suggested fix:** Refuse the save with a per-row "Cost is required" error (and mark the Cost input `required`), then use `cost: parsedCost`. Test: a row with a price and no cost is refused and nothing is sent.
-
-### 1260. [LOW] Cost-fill rounding can be a cent off the server's markup price
-`portal/src/lib/materials.ts:25` — `Math.round(x*100)/100` rounds halves up; the server's `round(x, 2)` rounds half-even (cost 2.10 at 25%: portal 2.63, server 2.62). (review 2026-10-17 round 4 #25, deferred)
-
-**Suggested fix:** Show the markup price as a placeholder and send null so the server's `markup_price` is the only rounding.
-
-**Resolved 2026-10-22:** `portal/src/lib/money.ts::roundToCent` rounds half-even like the platform's `round(x, 2)`; `markupPrice` (and the new `labourRate`) use it, so the portal's figure matches the server's at an exact half-cent (`tests/money.test.ts`, `tests/materials.test.ts`). Done in the Work Item cost → price change.
-
 ### 1278. [MEDIUM] Dead arms: `"price_recorded" in size` and `"source" in material`
 `portal/src/pages/MaterialsPage.tsx:741` — `openEditMaterial` widened to `Material | EffectiveMaterial`, but both callers pass an `EffectiveMaterial`, so the `in` checks' false arms can't run. (review 2026-10-17 round 5 #14, deferred)
 
@@ -4760,7 +4676,6 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 `portal/src/components/tasks/TaskDialog.tsx:98` — Edge case: L770 — the staged PDF tile (`PdfTile`) isn't asserted; deleting the arm renders a broken `<img>` with tests green. (Maple attachments review round 3, 2026-10-19, #27, deferred)
 
 **Suggested fix:** In "a staged PDF uploads the original file", assert the name "quote.pdf" shows and no img has that alt.
-
 
 ## Website
 
@@ -4868,23 +4783,9 @@ couple of DOM helpers — but it is scope beyond an SEO change.
 
 ## Tests and tooling
 
-### 220. [MEDIUM] Onboarding plan-persistence test reimplements `readPersistedPlanKey`
-**File**: [portal/tests/onboardingPlanPersistence.test.tsx:11-17](../../portal/tests/onboardingPlanPersistence.test.tsx)
-**Severity**: MEDIUM
-
-The new test landed alongside [#205](code-review-followups-archive.md)
-defines its own copy of `readPersistedPlanKey` and `VALID_PLAN_KEYS`
-rather than importing from `OnboardingPage.tsx`. If the production
-validation changes (e.g., adds `plan_enterprise` or tightens
-acceptance), the test still passes against the old logic and gives
-false confidence.
-
-Fix: extract `readPersistedPlanKey` (and `VALID_PLAN_KEYS`) into a
-small `portal/src/lib/onboardingPlanStorage.ts` helper, export it, and
-have both `OnboardingPage.tsx` and the test import from there. Drives
-both sides from one source.
-
 ### 300. [MEDIUM] 17 near-identical `assert client.portal is not None` lines across 10 test files
+**Checked 2026-10-22:** portal_call helper now exists in tests/_portal.py but 58 inline `assert client.portal is not None` remain across ~24 files (count/file list stale)
+
 **Where:** `tests/test_audit_integration.py`, `test_change_logs_api.py`, `test_company_api.py`, `test_divisions_api.py`, `test_feedback_anonymous.py`, `test_feedback_api.py`, `test_property_api.py`, `test_rate_card_bootstrap.py`, `test_resources_rbac.py`, `test_template_api.py`.
 
 **Issue:** The #93 fix added 17 sites of `assert client.portal is not None  # TestClient context manager guarantees a portal (mypy hygiene)`. Comment string is identical at each site. DRY violation flagged in the code review of that batch — the original #93 entry mentioned "a thin `_get_portal()` helper" as the alternative but it was rejected as larger touch (touching every `.call` site in 10 files).
@@ -4904,6 +4805,8 @@ Tests then take `portal: BlockingPortal` and call `portal.call(_fn)` instead of 
 No test coverage for the 409 conflict path, or for status-filter/pagination edge cases (empty page, out-of-range offset, invalid status value).
 
 ### 507. [MEDIUM] portal/src/lib/estimateCode.ts + platform/services/readable_id.py — a cross-language contract test was not added
+**Checked 2026-10-22:** platform test_estimate_api.py::test_decorated_and_spoken_forms_reach_the_same_row already drives decorated forms through GET /estimates?search; no portal-coupled contract test; product call still pending
+
 `normalizeEstimateCode` reimplements `normalize_estimate_readable_id` in a second
 language. The drift-detection half of the review finding **was** applied: both
 files now carry a comment naming the other's test file, and the two suites
@@ -4936,6 +4839,8 @@ Fix: at module load, assert that every entry in
 matrix; raise `ValueError` on mismatch. ~5 lines.
 
 ### 113. [LOW] Test bypass `FIREBASE_AUTH_DISABLED=true` hides unauthenticated paths
+**Checked 2026-10-22:** ad-hoc tests set firebase_auth_disabled False (test_firebase_auth.py, test_auth_email.py) but no shared fixture applied per router family
+
 **File**: [platform/tests/conftest.py:7](../../platform/tests/conftest.py)
 **Severity**: LOW (testing infra)
 
@@ -4969,28 +4874,6 @@ broader tooling refresh — don't tack it onto a feature branch, since
 the Vite 8 / Vitest 4 migrations may surface config and plugin changes
 across the portal.
 
-### 277. [LOW] Pydantic 2.11 deprecation warning surfaces in async tests
-Six warnings per test run from
-`lazy_model/parser/new.py:110` — "Accessing the 'model_fields' attribute on
-the instance is deprecated. Instead, you should access this attribute from
-the model class. Deprecated in Pydantic V2.11 to be removed in V3.0."
-
-Not introduced by these tests; it's a third-party (`lazy_model`)
-compatibility gap with Pydantic 2.11. Surfaced because the new async tests
-exercise Beanie model loading paths. Will break when Pydantic V3 lands
-(currently slated for a 2026-Q3+ release).
-
-Fix: bump `lazy_model` when an upstream release addresses the deprecation,
-or pin Pydantic to <2.11 until then. Track upstream
-[BAMR-team/lazy-model](https://github.com/roman-right/lazy-model).
-
-### 341. [LOW] New reload API tests don't wrap cleanup in `try/finally`
-The reload tests in `tests/test_material_categories_api.py` /
-`test_material_units_api.py` follow the file's existing trailing-`# Cleanup`
-convention, so a mid-test assertion failure skips the API cleanup calls.
-`conftest`'s by-company teardown backstops it, so this is cosmetic. Fix only if
-these files grow: fixture-based cleanup.
-
 ### 351. [LOW] `React.ReactNode` referenced without explicit React import in MapleMarkdown.test.tsx
 `portal/tests/MapleMarkdown.test.tsx:13` — `renderInRouter` types
 its `node` param as `React.ReactNode` but the file doesn't
@@ -4999,18 +4882,6 @@ today via the global `React` namespace from `@types/react`, but
 breaks if the project ever tightens `tsconfig.compilerOptions.types`
 or removes the global declaration. Fix: `import type { ReactNode }
 from "react"` and reference `ReactNode` directly.
-
-### 361. [LOW] portal/src/pages/OnboardingPage.tsx:140 — back-nav wiring isn't covered by a test
-The new `onBack={() => goToStep(1)}` on the Contacts step and the
-`companyId`/`onCompanyUpdated` props are untested at the page level. The meaningful logic
-(create-vs-update, prefill) is covered in `CompanyStepEdit.test.tsx`; this is just one-line
-glue, but the navigation contract has no regression guard.
-**Suggested fix:** Optional — `OnboardingPage` needs firebase mocking to render (no existing
-pattern), so low-value to test directly. Acceptable to leave given the branch logic is
-covered.
-
-### 396. [LOW] platform/services/ops_verification.py — no Firebase-failure unit test
-No test simulates a Firebase Admin SDK failure (e.g. `firebase_admin_auth.get_user_by_email` raising something other than `UserNotFoundError`) to verify the verification flow degrades safely.
 
 ### 397. [LOW] platform/services/staff_service.py — no email-failure provisioning branch test
 `provision_staff_user` swallows `send_password_reset_email` failures (logs a warning, continues) but no test exercises that branch to confirm the staff record is still created.
@@ -5026,6 +4897,8 @@ int-only, but the block-carving regex is now written twice).
 helper used by both the fixture and the nullable-field test.
 
 ### 432. [LOW] CLAUDE.md — the bandit baseline is a hardcoded "13" and will drift
+**Checked 2026-10-22:** CLAUDE.md now says 11 B110 (was 13) - the hardcoded number has drifted as predicted
+
 Logged 2026-07-27 from the second `/code-review` pass. The bandit section added
 to CLAUDE.md states "Known baseline: 13 B110 findings" and tells the reader a
 count above 13 means their change added one. As the B110 sweep (entry above)
@@ -5037,6 +4910,8 @@ delta itself instead of a human-maintained integer in prose. The second is
 better if the B110 sweep is going to be gradual.
 
 ### 440. [LOW] platform — untested branches and one simulated test premise
+**Checked 2026-10-22:** estimate-deleted branch of _write_link now covered (test_agent_helpers_pending_property_link.py:602); other parts open
+
 Three small gaps, none behavioral: (a) the `resolution["error"]` path and the
 estimate-deleted branch of `_write_link` have no covering test — both are simple
 early returns with no state mutation; (b) there is no router-level end-to-end
@@ -5101,27 +4976,6 @@ than novel — but it posts to a live Brevo account.
 **Suggested fix:** a test is optional given the sibling precedent; if one is wanted, the
 meaningful assertion is that a dry run performs zero HTTP calls, which is the property that
 makes the script safe to hand to someone else.
-
-### 503. [LOW] platform/tests/ — `asyncio.run` in unit tests runs on a different loop than Beanie's client
-`tests/conftest.py` initializes Beanie through the session-scoped TestClient, so
-the Motor client is bound to that client's portal loop. Any test that drives an
-endpoint with `asyncio.run(...)` creates a fresh loop, and every DB call from it
-fails with "Future attached to a different loop". Two files were affected
-(`test_orchestrator_endpoint.py`, `test_agents_api.py`) and both are now stubbed
-at the persistence boundary, which is the right answer for *those* tests — they
-are unit tests of routing, and real coverage lives in `test_conversation_api.py`.
-
-The general trap remains: any future test that reaches for the DB through
-`asyncio.run` will fail silently or noisily depending on whether the caller logs,
-and the failure looks like a product bug rather than a harness one. Note that
-tests using `portal_call(client, ...)` are fine — they run on the right loop, and
-`TestReadableIdEndToEnd` genuinely exercises persistence that way.
-
-**Suggested fix:** either a conftest guard that fails loudly when a Beanie call
-is made from a loop other than the client's, or a documented `portal_call`
-convention for any test that needs the DB. The guard is more work but catches it
-at the point of the mistake; a note in `CLAUDE.md`'s testing section is the cheap
-version.
 
 ### 514. [LOW] platform/tests/test_brevo_lifecycle_reconcile.py — function-level imports break the file's convention
 The DB-backed replay-date tests import `datetime`, `GoogleDocsVersion` and
@@ -5263,6 +5117,8 @@ total row count rather than blank-row count.
 **Suggested fix:** Add a schema test: `{"op": "list_properties", "count": True, "filter": {"owner": "x", "count": False}}` validates to `count is True` and a filter without `count`.
 
 ### 827. [MEDIUM] `_metric`'s no-ask guard is untested
+**Checked 2026-10-22:** _metric now lives in platform/agents/planner/execute_figures.py, not execute.py
+
 `platform/agents/planner/execute.py:681` — (Edge case — a defensive guard no caller reaches.) `_metric` raises `ValueError` when `metric_ask` returns None — unreachable through `execute` because the gate stops such a plan, but it is the executor's guard if `_metric` is ever reached another way. No test. (review 2026-10-08 (2c) branch audit #12, deferred)
 
 **Suggested fix:** Call `execute._metric(schema.Metric(shape="ranking"), context={}, message_en="m", get_processor=lambda _l: None)` under `pytest.raises(ValueError)`.
@@ -5348,16 +5204,22 @@ total row count rather than blank-row count.
 **Suggested fix:** Report tests for both values, and say on `Turn` what `()` means.
 
 ### 980. [LOW] The year guard reads the machine's local clock
+**Checked 2026-10-22:** now corpus.py:2539
+
 `platform/tests/maple_conversations/corpus.py:2534` — `date.today().year - 1` vs Maple's UTC-default clock — wrong for a few hours around New Year west of UTC. (review 2026-10-13 round 2 #80, deferred)
 
 **Suggested fix:** `datetime.now(timezone.utc).year - 1`.
 
 ### 995. [LOW] Step 5's heading still forbids the grouping Step 2b.5 now allows
+**Checked 2026-10-22:** heading now at .claude/commands/code-review.md:405
+
 `.claude/commands/code-review.md:269` — "Every finding gets its own number — no grouping, no exceptions" and "Do not collapse findings into … a bullet list under one index" contradict the per-function edge-case group; only the closing paragraph carves it out. (review 2026-10-13 round 3 #43, deferred)
 
 **Suggested fix:** Retitle "Every finding gets its own number — one exception" and add "(except edge-case coverage arms grouped per function, Step 2b.5)" to the lead.
 
 ### 1018. [LOW] A round-7 test pins the needless question #1000 tracks
+**Checked 2026-10-22:** now test_planner_as_asked.py:698
+
 `platform/tests/test_planner_as_asked.py:640` — "add the fence to the new estimate, we need a quote out today" is asserted to be asked; fixing #1000 breaks it. (review 2026-10-13 round 8 #16, deferred)
 
 **Suggested fix:** Drop the message from the parametrize, or move it to a strict xfail tagged #1000.
@@ -5393,11 +5255,15 @@ total row count rather than blank-row count.
 **Suggested fix:** A template finalize with `property_label="X"` and a `find_one` that must not be awaited.
 
 ### 1030. [MEDIUM] `plan_row`: three arms untested
+**Checked 2026-10-22:** per #1039 only the de-dup-alternates arm is left untested
+
 `platform/scripts/phrasing_reference_rows.py:359` — Edge case: de-duplicating alternates in one cell, appending unreadable rows to `rows`, and the `expect or "gap"` fallback (was "supported" until review round 13 #34) all survive. (review round 13 #14, deferred)
 
 **Suggested fix:** One parser test per arm on a sample table.
 
 ### 1031. [MEDIUM] `heading`: two arms untested
+**Checked 2026-10-22:** per #1039 the heading-reset arm is now tested; the level-3 inherits-parent-default arm is not
+
 `platform/scripts/phrasing_reference_rows.py:290` — Edge case: the table reset on a heading, and a level-3 heading inheriting its parent's default (legacy), survive. (review round 13 #15, deferred)
 
 **Suggested fix:** Two sample-table tests.
@@ -5408,6 +5274,8 @@ total row count rather than blank-row count.
 **Suggested fix:** Two unreadable rows → no "two plans" problem; a repeated problem → reported once.
 
 ### 1034. [MEDIUM] `reference_cases` / `_scored_on_its_plan`: legacy rows and two fields untested
+**Checked 2026-10-22:** legacy rows are now ~3, not 53 (see #1039)
+
 `platform/tests/planner_parity/cases.py:116` — Edge case: dropping every legacy row (plan None, 53 live cases) survives, and `expect_agent` / `note` are never asserted. (review round 13 #18, deferred)
 
 **Suggested fix:** A sample with a legacy checked row → one Case with its agent and note.
@@ -5423,6 +5291,8 @@ total row count rather than blank-row count.
 **Suggested fix:** Assert the whole response (`f"{summary}\n\n{PROPERTY_GONE_MESSAGE}"`) and `error == "Property not found"` in both files. Whether `success` should be False is the user's call — keeping True, as the generation-failure reply does, and pinning it is the suggestion.
 
 ### 1038. [LOW] "Phrasing (turn by turn)" holds standalone rows
+**Checked 2026-10-22:** table header now at maple-phrasing-reference.md:1177, rows :1187/:1195
+
 `platform/scripts/phrasing_reference_rows.py:62` — That table (reference :1150) marks every row as a reply to the turn before, including the standalone "add Bob as the contact on E0042" (:1169) and "lower the tax on Patio by 15%" (:1161); so is the material table's first turn (:1880). They lose only a "ran" check, and their `why` is wrong. (review round 14 #21, deferred)
 
 **Suggested fix:** Move those rows out of the turn table (as Plan rows of their section), or tag turn rows per row.
@@ -5443,6 +5313,8 @@ total row count rather than blank-row count.
 **Suggested fix:** Add "the fields named are checked against the schema; scoring them is phase 6".
 
 ### 1042. [LOW] The second "total for Smith" row needs a state the tests can't build
+**Checked 2026-10-22:** reference rows now :1397/:1398
+
 `documentation/development/maple-phrasing-reference.md:1354` — Rows 1353 and 1354 have the same phrasing, state and plan but different data (one estimate titled Smith vs two); the second is silently merged into the first case instead of listed as not checked. (review round 14 #28, deferred)
 
 **Suggested fix:** Write the data as a state the case can't build (e.g. "(two estimates titled Smith)", which the reader sets aside), or make it a conversation row.
@@ -5478,6 +5350,8 @@ total row count rather than blank-row count.
 **Suggested fix:** Accept it and explain any such row in `explained.py` if one flips (no such row exists yet); or let an extra write whose ref is `by: step` to the matched action pass.
 
 ### 1054. [LOW] `_TURN_HEADER` misses "Turns"
+**Checked 2026-10-22:** _TURN_HEADER is scripts/phrasing_reference_rows.py:64; the 'Turns' header is at reference :3091
+
 `platform/scripts/phrasing_reference_rows.py:64` — The plural header at reference :2934 isn't matched. Its rows are unchecked anyway (arrows), so it is harmless today. (review round 15 #21, deferred)
 
 **Suggested fix:** `turns?`.
@@ -5503,11 +5377,15 @@ total row count rather than blank-row count.
 **Suggested fix:** (a) Add `[{"op": "social"}]` to `test_a_follow_ups_reply_alone_or_beside_thanks_is_the_turn`. (b) `_plan(_WON, {"op": "redo_last", "before_tax": True}, {"op": "show_more"})` with a stored count list → `said == NO_FIGURE + "\n\n" + NOTHING_MORE`.
 
 ### 1083. [MEDIUM] `_said_above`: the arm where `clarifying_question` differs from `response` is untested
+**Checked 2026-10-22:** _said_above was rewritten (agents/planner/turn.py:506); the differing-clarifying_question arm is still untested
+
 `platform/agents/planner/turn.py:487` — Edge case. At :496, a multi-action reply (`execute._combined`) sets `clarifying_question` to one sub-reply's question, not the whole response, and it must be left as is. Mutant M14 (always replaced) survives. (review round 28 #3, deferred)
 
 **Suggested fix:** `_said_above(PlannerTurn({"response": "Done.\n\nWhich property?", "needs_clarification": True, "clarifying_question": "Which property?"}), None, "x")` keeps `clarifying_question == "Which property?"`, and the response starts "x\n\n".
 
 ### 1084. [MEDIUM] `_expanded_amounts`: the Reply path's `after` join looks unreachable
+**Checked 2026-10-22:** _expanded_amounts now at agents/planner/turn.py:477; the `after` join at :492
+
 `platform/agents/planner/turn.py:458` — Edge case (a defensive guard). At :473, `_joined(note, left.text, after)`: `after` is set only beside an action that isn't a follow-up or a thanks, and the first `_figure_left_out` already removed every planned figure carrying an amount, so `rest` can't be None while `after` is set. Mutant M16 survives. (review round 28 #4, deferred)
 
 **Suggested fix:** Drop `after` from that join, with a comment that it can't be set there (simpler), or add a test if a path reaches it. (Since review round 28 #1, a follow-up that made a read also counts as something that runs — re-check reachability with that.)
@@ -5528,6 +5406,8 @@ total row count rather than blank-row count.
 **Suggested fix:** Reproduce with `PARITY_SOURCES=reference PARITY_LIMIT=20`; close the planner client at the end of `test_corpora_parity` (or `await` its `aclose`) and check `rules_tier`'s teardown; add a timeout around the teardown, so the run always ends with its verdict.
 
 ### 1240. [LOW] `console.error` spy never restored
+**Checked 2026-10-22:** still the only console.error spy at line 195; no restore
+
 `portal/tests/NewEstimateWithActivityPage.materialGaps.test.tsx:196` — Later tests run with console.error muted. (review 2026-10-17 round 3 #25, deferred)
 
 **Suggested fix:** `afterEach(() => vi.restoreAllMocks())`, or `.mockRestore()` in the test.
@@ -5558,6 +5438,8 @@ total row count rather than blank-row count.
 **Suggested fix:** (a) Header-only CSV with backfill_property_coordinates spied: 200, empty lists, spy not called. (b) Upload contact1 twice for one address; assert len(contacts) == 1. (c) Monkeypatch create_note_as to raise; assert the "Property saved, but its note could not be saved" prefix.
 
 ### 1294. [MEDIUM] upload_labours_csv: untested edge-case arms
+**Checked 2026-10-22:** labour upload is now keyed by name only (routers/labours.py ~316-351), so the name+unit and raw-string-unit arms are reworded; no header-only/phase-3 failure test exists
+
 `platform/routers/labours.py:142` — Edge cases: L197 — a header-only CSV; L239 — a raw-string unit on a stored Labour (defensive); L264 — the same name+unit twice in one CSV (the second row updates the first); L265 — a write failing in phase 3 → row error. The review's fifth arm (a missing Company → 404) is gone: the same day's fix #2 runs `assert_user_company_access` first, which refuses a missing company with 403. (Sentry fixes review 2026-10-17 #45, deferred)
 
 **Suggested fix:** (a) "name,unit,cost\n" → 200, "Uploaded 0 labour entries". (b) L239: no test; mark it defensive with a comment. (c) Rows "Dup,Hourly,10" and "Dup,Hourly,20" → the same id twice, stored cost 20.0. (d) Monkeypatch Labour.insert to raise → errors[0]["row"] == 2.
@@ -5666,13 +5548,6 @@ total row count rather than blank-row count.
 `platform/scripts/prune_firebase_users.py:128` — Edge case: line 146, the "No email — kept, check these by hand" listing. `plan_deletions` is tested for no-email users, but no `_run` test includes one, so the listing — and that they never reach `delete_auth_users` — isn't checked end to end. (review 2026-10-20 Firebase split #16, deferred)
 
 **Suggested fix:** add `AuthUser("ghost", None)` to the harness's auth users, run with `apply=True`, assert `"ghost" not in h.deleted` and the output contains "No email".
-
-### 1363. [LOW] .claude/launch.json: machine-specific dev configs from the Work Item cost-column check — RESOLVED 2026-10-21
-**RESOLVED 2026-10-21** — dropped while syncing the branch with main: main had added an equivalent `platform-8002` + `portal-5176` pair, so the branch's `launch.json` now matches main. Move to the archive in the next cleanup.
-
-`.claude/launch.json:61` — `platform-8011-cors-5175` hardcodes `/Users/simmy/Development/3Maples/platform`, and both it and `portal-5175` were added only to run a worktree's portal beside the main checkout's (5173/5174 and 8001 were taken, and the :8000 platform's CORS allow-list stops at 5174). The file is tracked in the workspace repo, so committing them ships configs that won't run on another machine. (review 2026-10-21 #10, deferred)
-
-**Suggested fix:** revert `.claude/launch.json` once manual testing of the cost columns is done (`git checkout -- .claude/launch.json` from the worktree root) and leave it out of the commit.
 
 ### 1436. [MEDIUM] `test_vocabulary_unique_names.py` fails after the planner and Maple suites in one run
 `platform/tests/test_vocabulary_unique_names.py` — It passes alone (14 of 14). Run after `test_maple_conversations.py`, `test_maple_refusal_is_final.py` and the `test_planner_*` files (the set that imports the material catalog), 11 to 13 of its tests fail with 401s and `KeyError: '_id'`, and a different neighbour fails on each run (`estimate-delete-listed-row-not-the-open-one`, `list_templates` paging, `show me the notes for 12 Oak St`). `main` at 9945d94 fails the same way, so it isn't a regression. The 401s suggest a test removes or changes the shared test user its `X-Test-Email` header names. (found 2026-10-20 while checking #60)
@@ -5804,20 +5679,6 @@ Specific instances:
 Case-by-case judgment. Only refactor if it actually simplifies the reader's
 job; don't chase stylistic purity.
 
-### 32. [MEDIUM] `hasattr(l.unit, "value")` defensive check with unclear motivation
-**File**: `routers/labours.py:202`
-**Severity**: MEDIUM
-
-`existing_by_key = {(l.name, l.unit.value if hasattr(l.unit, "value") else l.unit): l for l in candidates}` —
-the `Labour.unit` field is typed as `LabourUnit` enum in the model, so
-`.value` should always work. The `hasattr` fallback either (a) defends
-against legacy string-valued rows in prod, or (b) is defensive coding
-without cause. If (a), document it; if (b), drop it.
-
-Fix: grep production data once to check whether any `Labour` rows have
-`unit` stored as a raw string. If none, simplify to `l.unit.value`. If
-some, add a one-line comment and file a data-migration task.
-
 ### 70. [MEDIUM] Missing type hints in `backfill_material_units.py` helpers
 **File**: [platform/scripts/db/backfill_material_units.py:50, 68](../../platform/scripts/db/backfill_material_units.py)
 **Severity**: MEDIUM (script context, not production code)
@@ -5871,6 +5732,8 @@ can get. Fix: update the comment to match the 8rem floor, or add
 actually wanted alongside the cell floor.
 
 ### 34. [LOW] Missing type hint on `existing_by_key` dict
+**Checked 2026-10-22:** labours.py upload was rewritten (no existing_by_key); equipments.py:136 still `existing_by_key = {}` unannotated
+
 **Files**: `routers/equipments.py:136`, `routers/labours.py:193`
 **Severity**: LOW
 
@@ -5961,6 +5824,8 @@ explicit tuple is documentary, so this is style-only. Don't fix in
 isolation; roll into any future address-service edit.
 
 ### 186. [LOW] Non-null assertion on `call.payload` in `handleStatusChange`
+**Checked 2026-10-22:** now NewEstimateWithActivityPage.tsx:776
+
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx:478](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: LOW (type safety)
 
@@ -5987,6 +5852,8 @@ discriminator. ~10 lines in `lib/estimateStatus.ts` plus one cleanup at
 the call site.
 
 ### 187. [LOW] Redundant `&& property` truthy check in property-info card
+**Checked 2026-10-22:** now portal/src/pages/NewEstimateWithActivityPage.tsx:1485
+
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx:1080](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
 **Severity**: LOW (dead code)
 
@@ -6033,6 +5900,8 @@ A 5% reduction is visually indistinguishable from full opacity. The intent is cl
 Fix: `opacity-70` or remove `dimWhenComingSoon` if the "Coming Soon" badge is enough.
 
 ### 233. [LOW] `_LABEL_PATTERNS` is a mutable class-level dict
+**Checked 2026-10-22:** moved to platform/agents/property/text_helpers.py:62; still a plain Dict[str, List[str]]
+
 **File**: [platform/agents/property/service.py:375](../../platform/agents/property/service.py)
 **Severity**: LOW
 
@@ -6220,6 +6089,8 @@ keeps the two halves of the file symmetrical. Worth doing next time the estimate
 half of that file is touched.
 
 ### 532. [LOW] portal/src/pages/MaterialsPage.tsx:774 — `justify-between` row left with a single child
+**Checked 2026-10-22:** Row is now at portal/src/pages/MaterialsPage.tsx:1081; still a single child.
+
 With the actions menu removed from the mobile card, this row holds only the "Show Sizes" toggle,
 so `justify-between` no longer distributes anything. Renders correctly (the button sits left) but
 the class now misdescribes the layout.
@@ -6236,18 +6107,6 @@ governs everything in the file — misleading for the next reader choosing betwe
 **Suggested fix:** extend the header to name both gates and say when to reach for each —
 `useIsPhone` for `md:`-stacked layouts, `useIsBelowSm` for `sm:`-stacked ones — with the rule that
 the JS gate must match the breakpoint in the component's Tailwind classes.
-
-### 549. [LOW] portal/src/components/onboarding/CsvUploadStep.tsx:29 — required props that two of the three modes ignore
-
-`sampleCsvUrl` and `onUpload` are non-optional, but `infoOnly` and `standardOnly` never read either —
-the sample link and the file input are both inside the `infoOnly || standardOnly ? null :` branch. So
-`OnboardingPage` passes `sampleCsvUrl={MATERIALS_SAMPLE_CSV_URL}` and a live `onUpload` to screens
-that cannot upload, which reads as though they can.
-
-**Suggested fix:** make both optional and have the normal-mode branch require them (a discriminated
-union on the mode would be most honest, but optional props plus the existing branch guard is enough).
-Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sites in
-`OnboardingPage.tsx`.
 
 ### 571. [LOW] "5,000" hard-coded in the additional-info 422 message
 `platform/routers/estimate_documents.py:117` — The message duplicates `MAX_ADDITIONAL_INFO_CHARS`, so the two can drift.
@@ -6365,6 +6224,8 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** Remove the final empty line so the file ends with a single newline after `return [by_id[i] for i in ids if i in by_id]`.
 
 ### 820. [LOW] The planner design's §5.1 still treats langchain's cache support as unknown
+**Checked 2026-10-22:** Passage is now at documentation/development/plans/2026-10-02-maple-planner-shadow-design.md:634 and still says the key's survival is unknown.
+
 `documentation/development/plans/2026-10-02-maple-planner-shadow-design.md:445` — "Getting it onto the wire" says it is not known whether langchain-openai 1.6.6 keeps a content-block breakpoint, and plans a raw `AsyncOpenAI` fallback (step 6a). Step 0 established it does: `ChatOpenAI` has a `prompt_cache_options` field and `_format_message_content` keeps `prompt_cache_breakpoint`, pinned by `platform/tests/test_llm_prompt_cache.py`. The plan describes a fallback that will never be needed. (review 2026-10-07 #8)
 
 **Suggested fix:** Replace the two "Getting it onto the wire" bullets with: "langchain-openai 1.6.6 supports both natively (`ChatOpenAI.prompt_cache_options`; `prompt_cache_breakpoint` on a text block), pinned by `tests/test_llm_prompt_cache.py`", and reduce step 6a to the live `cached_tokens > 0` check.
@@ -6410,11 +6271,15 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** `-> FrozenSet[str]` (return a frozenset) plus a one-line docstring.
 
 ### 970. [LOW] CLAUDE.md's metric-tail sentence leads with today's behaviour
+**Checked 2026-10-22:** Sentence now lives in .claude/rules/maple.md:304 (CLAUDE.md no longer holds it); still leads with the say-back.
+
 `CLAUDE.md:661` — "a tail it cannot read … is said back" comes first; a skim reads the opposite of what the planner does (it reads year, since and excluding).
 
 **Suggested fix:** Lead with the planner's reading and keep today's say-back as the exception for what neither reads.
 
 ### 977. [LOW] Several new entries point at the wrong line
+**Checked 2026-10-22:** #955/#958/#959 are archived; #962/#966/#967/#969/#970 remain with stale citations.
+
 `documentation/development/code-review-followups.md:2236` — #955 → 1932 (not 2969), #958 → 2331, #959 → 2437, #962 → confirm.py:336, #966 → followups.py:446, #967 → metric_ratio_shapes.py:123, #969 → planner.py:171, #970 → CLAUDE.md:662. (review 2026-10-13 round 2 #77, deferred)
 
 **Suggested fix:** Update those references.
@@ -6425,31 +6290,36 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** Move it between the 1,091 and 957 rows.
 
 ### 999. [LOW] Said.py and followups.py module docstrings don't match the code
+**Checked 2026-10-22:** said.py's docstring has been rewritten as a domain list (corrections moved to said_* modules); followups.py's docstring still says the turn 'falls back to today's'.
+
 `platform/agents/planner/said.py:1` — said.py's list omits `_role_field`, `_jobs_are_properties`, `_no_pronoun_record`, `_without_material_name`; followups.py still says a turn "falls back to today's" (MAPLE_PLANNER_ONLY no longer does) and omits `figure_status_said`, `asked_about_tax`, `sold_word_kept`, `tax_lead`. (review 2026-10-13 round 5 #31, deferred)
 
 **Suggested fix:** One bullet per missing correction or reader; say what planner-only does instead of the fallback.
 
-### 1043. [LOW] "Said back" comments beside the updated ratio comment
-`platform/agents/estimate/command_grammar.py:370` — Lines 370, 371 and 376 still say ranked and by-month ratios are said back, just below line 349, which round 13 updated to "answered". (review round 14 #20, deferred)
-
-**Suggested fix:** Reword them to "answered (Simon 2026-10-13)".
-
 ### 1044. [LOW] #952 and #960 cite the old reference lines again
+**Checked 2026-10-22:** #952 row is now at maple-phrasing-reference.md:796 and #960 at :3154; entries still cite :769 and :2994.
+
 `documentation/development/code-review-followups.md` — Lines shifted with round 13's how-to edit: #952's row is now :772 (cited :769), #960's :2997 (cited :2994) — and round 14 moved nothing above them. (review round 14 #22, deferred)
 
 **Suggested fix:** Cite the rows by phrasing as well as line, so the next shift doesn't stale them; :772 and :2997 today.
 
 ### 1055. [LOW] #1023–#1027 cite stale lines
+**Checked 2026-10-22:** estimate_gathering.py defs are now at :315, :330, :353, :405, :436; entries still cite the older lines.
+
 `documentation/development/code-review-followups.md` — The estimate_gathering.py citations (:309, :324, :347, :399, :430) moved with round 14's `property_gone`: the defs are now at :315, :330, :353, :405 and :436. (review round 15 #18, deferred)
 
 **Suggested fix:** Cite the def lines.
 
 ### 1056. [LOW] #1038 is off by one
+**Checked 2026-10-22:** Table is now at maple-phrasing-reference.md:1177; _TURN_HEADER at scripts/phrasing_reference_rows.py:64.
+
 `documentation/development/code-review-followups.md` — The table is at reference :1151 (cited :1150), and `_TURN_HEADER` at script :64 (cited :62). (review round 15 #19, deferred)
 
 **Suggested fix:** Correct both.
 
 ### 1060. [LOW] CLAUDE.md doesn't name the backlog as a second "Won status alone" reading
+**Checked 2026-10-22:** CLAUDE.md lines moved to .claude/rules/maple.md:218 and :443; neither mentions the Won+Scheduled backlog reading.
+
 `CLAUDE.md:576` — CLAUDE.md says only "status won" said outright is the Won status alone ("one pattern for both, WON_STATUS_SAID_RE", and :784's "the Won status alone only when said"). Lists now also read it when the backlog is planned as Won + Scheduled. (review round 16 #8, deferred)
 
 **Suggested fix:** One clause at both places: "… or, in a list, the backlog planned as Won + Scheduled (`said.won_alone`); the reading rides on the read (`EstimateFilter.won_alone`, planner-internal)".
@@ -6459,22 +6329,9 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 
 **Suggested fix:** Name them.
 
-### 1076. [LOW] #1071's suggested fix can't work
-`documentation/development/code-review-followups.md` — #1071 suggests a `_reply_rules` entry for AMOUNT_UNREAD, but the say-back goes out as a `social` meta envelope (as told_not_to's reply does), and `services/maple_outcomes._classify` returns None for `intent == "social"` before reaching `_reply_rules`, so that entry would never be read. (review round 21 #7, deferred)
-
-**Suggested fix:** Rewrite #1071: give the say-back its own intent or envelope, or pass a planned `Outcome("cant_narrow", "amount")` through `PlannerTurn` to `_planned_outcome`; then the CONSTANT_CASES row.
-
-### 1079. [LOW] Stale and missing locations in #1071, #1076, #1077
-`documentation/development/code-review-followups.md:2471` — #1071 still cites `unread_scope.py:40`; AMOUNT_UNREAD is now at :30. #1076 and #1077 name the followups file with no line (#1071 is at :2470, #1070 at :2463). (review round 22 #8, deferred)
-
-**Suggested fix:** Change #1071 to `unread_scope.py:30`, and add `:2470` and `:2463` to #1076 and #1077.
-
-### 1107. [LOW] TemplateDialog indentation slip
-`portal/src/components/estimates/TemplateDialog.tsx:192` — `people={people}` is indented four spaces deeper than its sibling props, left over from removing the `materials` prop.
-
-**Suggested fix:** Re-indent it.
-
 ### 1116. [LOW] routers/materials.py style
+**Checked 2026-10-22:** Partly done: _MANAGER_ROLES is gone (MANAGER_ROLES exported from models and used in material_helpers/common.py); bare 'standard' at routers/materials.py:369/446, no SOURCE_STANDARD constant, and docstrings on _remove_unused_custom/_audit_toggle missing.
+
 `platform/routers/materials.py:181` — `_MANAGER_ROLES` re-declares the set in `dependencies.assert_is_manager`; `"standard"` is a bare literal at :534/:785/:857/:993; `_company_param`, `_same_amount`, `_remove_unused_custom`, `_standard_refusal`, `_audit`, `_audit_toggle` and the new request models lack docstrings.
 
 **Suggested fix:** Export one `MANAGER_ROLES` from dependencies, add `SOURCE_STANDARD` to material_catalog, add one-line docstrings.
@@ -6485,6 +6342,8 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** Remove both.
 
 ### 1121. [LOW] Missing annotations and docstrings in the material vocabulary and migration script
+**Checked 2026-10-22:** Script helpers are now annotated (migrate_materials_to_standard.py:53,60) and standard_unit_keys is gone; _ensure still has unannotated `model` and bare `list`, and no docstring.
+
 `platform/services/material_vocabulary.py:101` — `_ensure(model, …, templates: list, …)` has an unannotated model and a bare list; scripts/migrate_materials_to_standard.py:45,52 `_plan_line(plan)` / `_report_line(report)` are unannotated; `standard_unit_keys` has no docstring.
 
 **Suggested fix:** `model: Type[Document]`, `templates: List[Dict[str, Any]]`, typed plan/report, one-line docstring.
@@ -6495,14 +6354,11 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** Drop it from `__all__`.
 
 ### 1126. [LOW] Missing docstrings and a bare set in catalog matching
+**Checked 2026-10-22:** _best_scored now has a docstring and _word_keys is gone; `named` and `_find` still lack docstrings.
+
 `platform/agents/estimate/catalog_matching.py:475` — `_best_scored`, catalog_names.py:122 `named` and record_names.py:88 `_find` have no docstrings; `_word_keys` returns a bare `set`.
 
 **Suggested fix:** One-line docstrings; `Set[str]`.
-
-### 1185. [LOW] Stray second blank line
-`portal/src/pages/OnboardingPage.tsx:58` — Added by this change. (review 2026-10-16 round 2 #120, deferred)
-
-**Suggested fix:** Delete it.
 
 ### 1197. [LOW] Missing docstrings in upload.py
 `platform/routers/material_helpers/upload.py:88` — `_parse_row`, `_add_custom_row` (221), `cell`. (review 2026-10-16 round 2 #132, deferred)
@@ -6515,6 +6371,8 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** Add one.
 
 ### 1199. [LOW] `LineItemSnapshots.material` lacks a docstring; `_fetch_material_snapshots` takes a bare set
+**Checked 2026-10-22:** LineItemSnapshots and _fetch_material_snapshots now have docstrings; `material_ids: set` is still bare.
+
 `platform/routers/estimate_helpers/snapshots.py:60` — Style. (review 2026-10-16 round 2 #134, deferred)
 
 **Suggested fix:** Docstring; `Set[str]`.
@@ -6530,6 +6388,8 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** Move them to the module top.
 
 ### 1210. [LOW] Type hints widened to Any
+**Checked 2026-10-22:** Line numbers moved (services/template_bootstrap.py:70,122,218); hints still Any.
+
 `platform/services/template_bootstrap.py:65` — At :65, :77, :125, :217. (review 2026-10-16 round 2 #145, deferred)
 
 **Suggested fix:** `EffectiveMaterial`, `EffectiveSize`, `Mapping[str, EffectiveMaterial]`.
@@ -6540,6 +6400,8 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** One-line docstrings.
 
 ### 1212. [LOW] Missing docstrings in material_catalog_writes.py
+**Checked 2026-10-22:** _Unset no longer exists; the other listed items still lack docstrings.
+
 `platform/services/material_catalog_writes.py:1` — ToggleResult, `_Unset`, `_company_oid`, `_standard_doc`, `_effective`, `_assert_standard_showable`, `_next_copy_name`. (review 2026-10-16 round 2 #147, deferred)
 
 **Suggested fix:** One-line docstrings.
@@ -6585,6 +6447,8 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** Normalise to two.
 
 ### 1227. [LOW] `_best_by_name(agent, …)` has no type on `agent`
+**Checked 2026-10-22:** Function now has a docstring; `agent` is still untyped.
+
 `platform/agents/estimate/tools.py:50` — Style. (review 2026-10-16 round 2 #163, deferred)
 
 **Suggested fix:** `agent: Any`.
@@ -6600,6 +6464,8 @@ Then drop the dead `sampleCsvUrl`/`onUpload` props from the three phone call sit
 **Suggested fix:** "at the company's markup (10% here)".
 
 ### 1244. [LOW] The new reply models have no docstrings
+**Checked 2026-10-22:** ResetStandardOut no longer exists; MaterialPageOut, UploadRowError, UploadOut, StandardToggleOut still lack docstrings.
+
 `platform/routers/material_helpers/common.py:95` — `MaterialPageOut`, `ResetStandardOut`, `UploadRowError`, `UploadOut` (and `StandardToggleOut`, material_categories.py:237). (review 2026-10-17 round 3 #29, deferred)
 
 **Suggested fix:** One-line docstrings naming the route each answers.
