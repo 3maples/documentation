@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-10-29
+**Last updated:** 2026-11-03
 
 ### Recent changes
 
@@ -3333,6 +3333,13 @@ Match via `HELP_ENUM_KEYWORDS` + `HELP_QUESTION_CUES` (`intents.py:309-322`). `H
 
 Match via `HELP_INSTRUCTIONAL_PATTERNS` (`intents.py:337`): `how do i`, `how can i`, `how to`, `how would i`, `how should i`, `steps to`, `step by step`, `process for`, `process to`, `guide for`, `guide to`, `explain how`, `show me how`, `walk me through`, `what are the steps`, `what's the process`.
 
+**How a how-to is answered** *(2026-11-03)*: for something Maple can do in chat, the chat way
+first (one example sentence to say to her), then the page way in a line, linked
+(`[Settings → Financial](/settings?tab=financial)` — the in-app guide prompt lists the only
+paths), and an offer to do it now ("Want me to start one?"). A user whose account or company is
+under a week old gets a note after the guide (`help_handler.NEW_USER_KEY`): assume nothing is set
+up and walk §5.16 step by step. Live check on request: `tests/test_maple_help_new_user_live.py`.
+
 When an instructional pattern hits, `detect_topic()` tries to match an action keyword (`create`, `update`, `delete`, `list`, `get`, `find`, `add`, `edit`, `remove`) and a domain keyword (`contact(s)`, `estimate`/`quote(s)`, `property`/`properties`, `material(s)`, `labour`/`labor`). Result is a `how_to_<action>_<domain>` topic; falls back to `how_to_manage_<domain>s` if only domain matched, or `how_to_use_system` if neither.
 
 ### Full how-to (action + domain matched)
@@ -3412,6 +3419,33 @@ The personal-question detector is deliberately **topic-keyed** so product-capabi
 | `good morning` / `good afternoon` / `good evening` | `social` | ✅ canned |
 | `hola` / `buenos días` | `social` | ✅ canned — Spanish, defense-in-depth |
 | `Hi Maple!` / `hello Maple` | `social` | ✅ said back to Maple's opening greeting (the first line of a new chat): "Hi!" and the question her greeting closed with, else "What would you like to do?" — the portal sends the greeting with the first message and the server keeps it as her first chat line (`client_context.record_opening`, `text_utils.greeting_after_opening`); anywhere else, the canned reply above *(2026-10-29)* |
+
+### Answering Maple's opening *(2026-11-03)*
+
+The platform composes the opening (`GET /agents/opening`, `agents/conversation/opening.py`): a
+new account's welcome, else a greeting by name and the one thing worth a look, ending with one
+question ("You have 2 overdue tasks assigned to you. Want to see them?"). The portal sends the
+highlight's kind back with the first message (`opening_request`), and the server keeps the request
+it stands for on the opening's line — always one the server builds, never the client's text.
+
+The router answers these before the planner runs (`routers/agents.py`, after `append_user_turn`),
+so they are not Plan rows — the parity run can't set up the opening line; the tests are
+`tests/test_maple_opening.py::TestAnswerToOpening` and `tests/test_orchestrate_client_context.py`:
+
+- **A yes right after an opening that asked** — "yes", "sure", "yes please", "go ahead", "show me",
+  "let's see them" — runs the opening's request as if typed: *Show my overdue tasks*
+  (`list_tasks`), *Show my estimates in Review* (`list_estimates`), *Show me estimate E0042*
+  (`get_estimate`), *How much have we sold this month?* (`metric`), *Create a contact* /
+  *Create an estimate* for the setup offers. The transcript keeps the user's own word.
+- **"hi", Maple's "Hi! Want to see them?", then "yes"** — still the opening's request (one
+  greeting between them is allowed). **Tapping the opening's own first chip** is its yes too.
+- **A yes to "You're at Birch House … Want to see the tasks?"** runs *Show the open tasks here*
+  (or *Show the estimates here*) with Birch House pinned as "here" by id — a property's name never
+  enters the request.
+- **A no right after it** — "no", "not now", "maybe later", "no thanks" — is
+  `OPENING_DECLINED`: "No problem — what would you like to do instead?"
+- **A yes after an opening that only asked "What would you like to do?"**, or a turn later, is a
+  stray yes (`NOT_WAITING`), as before; a request ("list contacts") is never an answer.
 
 ### Personal questions — `personal` help topic (LLM, persona-answered)
 
