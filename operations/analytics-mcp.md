@@ -177,7 +177,7 @@ Example questions:
   before 2026-10-28 held the Firebase UID until
   `scripts/backfill_audit_user_ids.py` ran on that environment.
 - **`source` is the channel a change came through**: `maple` (and its
-  agents), `mcp` (a customer's API key, once the tenant MCP server ships; nothing writes it yet), `stripe` (a webhook that moved the plan; nothing else from Stripe is audited), a script's
+  agents), `mcp` (a customer's API key on the customer server at `/mcp`), `stripe` (a webhook that moved the plan; nothing else from Stripe is audited), a script's
   name, or none for the portal. `audit_vocabulary` lists them.
 - Unanswered Maple turns are kept 180 days; Maple turns and credits are kept
   with the LLM calls.
@@ -194,7 +194,7 @@ who asked, which tool, with what arguments, how many rows came back.
 
 | You see | Why | Fix |
 |---|---|---|
-| HTTP 404 | The server is off in this environment | Set `MCP_SERVER_ENABLED=true` on that environment's platform service |
+| HTTP 404 | The server is off in this environment | Set `MCP_SERVER_ENABLED=true` on that environment's platform service (it starts the customer server at `/mcp` too) |
 | HTTP 401 | Missing, mistyped, revoked or expired key, or the staff account is disabled | Check the header is `Authorization: Bearer 3m_mcp_…`; issue a new key |
 | HTTP 429 | More than 120 requests a minute on this key, or 600 from one address | Wait a minute; ask fewer, broader questions |
 | "include_details needs an ops_admin or root key" | Your role can't see details | Ask without details, or use a senior key |

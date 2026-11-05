@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1458**. Never
+- **Entries are numbered and permanent.** Next free number: **1486**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -111,18 +111,18 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 
 | Lines | File | Note |
 |------:|------|------|
-| 4,103 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | 4,098 on 2026-10-28 (+7: Maple's status rows, MCP enhancements release one); +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push); 4,022 on 2026-10-05 (+5 that day: `_create_estimate_from_template(audit=)`); 4,089 on 2026-10-06 (+67: tax in the dashboard's figures and a list's total); 4,144 on 2026-10-08 (+55, switchover phase 4d: the property link's write and reply split out as `_apply_estimate_property` for the planner); 4,163 on 2026-10-09 (+19, switchover phase 6b: today's template apply's tail split out as `_add_template_work_item`); +4 on 2026-10-10 (phase 7d: the dashboard's summary card in `dashboard_reply`) |
+| 4,107 | [platform/agents/estimate/crud_handlers.py](../../platform/agents/estimate/crud_handlers.py) | 4,107 on 2026-11-04 (+4: an applied template's lines get fresh ids, customer MCP server); 4,098 on 2026-10-28 (+7: Maple's status rows, MCP enhancements release one); +27 on 2026-09-29 (sold estimates; the question reader went to its own `list_query.py`); no clean seam; −176 on 2026-09-23 when the notes sub-op moved to `note_handlers.py`; +60 on 2026-09-24 (multi-turn estimate editing: title offer, open-work-item check), +63 over the review passes; +78 on 2026-09-25 routing convergence (the listed-command dispatcher `_dispatch_listed_command` replaced the cascade) ; +354 by 2026-09-27 over the routing-convergence review rounds — **next step:** move `_dispatch_listed_command` into its own `listed_dispatch.py` mixin; +112 on 2026-09-27 (multi-turn push); 4,022 on 2026-10-05 (+5 that day: `_create_estimate_from_template(audit=)`); 4,089 on 2026-10-06 (+67: tax in the dashboard's figures and a list's total); 4,144 on 2026-10-08 (+55, switchover phase 4d: the property link's write and reply split out as `_apply_estimate_property` for the planner); 4,163 on 2026-10-09 (+19, switchover phase 6b: today's template apply's tail split out as `_add_template_work_item`); +4 on 2026-10-10 (phase 7d: the dashboard's summary card in `dashboard_reply`) |
 | 3,661 | [platform/agents/orchestrator/service.py](../../platform/agents/orchestrator/service.py) | no clean seam; `process()` is a 282-line god-method. +120 on 2026-09-24 for the estimate conversation lanes; 2026-09-25 routing convergence deleted `_is_work_item_edit`, `_answers_estimate_question` and the inferred-material lane but added `_route_listed_command`, `_route_note_to_a_named_record` and the fenced context (+42 net); +70 by 2026-09-27 — **next step:** move those two routes and `_names_an_anchored_line` into `agents/orchestrator/estimate_rules.py`; +155 on 2026-09-27 (multi-turn push: cross-record joins, dashboard, named creates) |
 | 3,641 | [platform/agents/material/service.py](../../platform/agents/material/service.py) | 3,611 on 2026-10-17 (review rounds 4–5: size-label refusals and the planner's size read); 3,565 on 2026-10-16 (shared material catalog: reads through `services/material_catalog`, Owner/Admin gates, standard hides; −108 in the review fixes as the standard price write moved to `agents/material/catalog_writes.py`); 3,483 on 2026-10-10 (+27 over 3,456, switchover phase 7d: `material_sizes_reply` shared with today's size command, `materials_on_estimate_reply` and `_estimate_materials_reply`); +366 on 2026-09-27 (multi-turn push: size commands, one-question creates); +123 in the 2026-09-27/28 review fixes (3,087 at `main` then) — the material in focus, size-label refusals, "which material?". `_handle_size_command` is 107 lines — split into `_resolve_size_target(...)`, `_render_size_read(...)` and `_size_command_fields(...)` (review 2026-09-27 #29) |
 | 2,859 | [platform/agents/property/service.py](../../platform/agents/property/service.py) | +170 since Aug; +70 on 2026-09-27; 2,823 on 2026-10-10 (switchover phase 7d part 2: `properties_using_reply`, the cross list's words split out as `_cross_response`, and `_estimate_linked_reply` and `_joined_properties_reply` split out of `_list_properties_by_cross_resource`, which is now under 50 lines) |
-| 2,679 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | +123 on 2026-09-27 |
+| 2,682 | [platform/agents/contact/service.py](../../platform/agents/contact/service.py) | 2,682 on 2026-11-04 (+3: `properties_unlinked` on Maple's contact delete); +123 on 2026-09-27 |
 | 2,541 | [platform/routers/agents.py](../../platform/routers/agents.py) | +26 on 2026-09-24 (open-question short-cuts; fourth pass #18); −36 on 2026-09-25 (the release heuristic and the Estimate branches of the awaited-value override and pending fallback moved into `open_question.py`); +11 by 2026-09-27. was `orchestrate_agent_endpoint` at 607 lines; +221 on 2026-09-27 (open question, conversation store, page signals); the endpoint body is now `_orchestrate_turn` (#689), 729 lines (functions table); re-measured 2,227 on 2026-10-07 (+63 that day, from 2,164: the turn id and the unanswered tracker's hooks on the finalize closure, the early exits and the 500 path — review 2026-10-07 #4, deferred); 2,541 on 2026-11-01 (+3, Maple location awareness: the phone's position read as the property here) |
 | 2,515 | [portal/src/pages/SettingsPage.tsx](../../portal/src/pages/SettingsPage.tsx) | **next step: extract `CompanyTab`** to finish the split already begun |
 | 2,236 | [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx) | logged twice at stale counts (1,861 / 1,927); +133 on 2026-09-24 for Maple sync (announce, reload guard, deferred reload), more over the review passes for the estimate-switch guards, the load-error state and the autosave rollback; +56 on 2026-09-25 (merge-by-id work-item saves, delete-on-screen, Retry focus) — a `useMapleEstimateSync` hook is the natural seam; 2,268 on 2026-10-16 (shared material catalog: `useMaterialCatalog` replaces the loaded list, and the gap-name lookup was removed in review) |
 | 1,852 | [platform/agents/text_utils.py](../../platform/agents/text_utils.py) | +78 on 2026-09-24, +156 by 2026-09-27. **Next step:** move the command-head helpers (`strip_dictated_payload`, `strip_assigned_value`, `is_pronoun_targeted_edit`) into `agents/command_head.py`, re-exported from here (review 2026-09-24 #73); +89 on 2026-09-27 |
 | 1,819 | [platform/agents/labour/service.py](../../platform/agents/labour/service.py) | +42 on 2026-09-27; 1,712 on 2026-10-10 (+27, switchover phase 7d: `roles_on_estimate_reply`, the per-estimate list's reply split out as `_estimate_labours_reply` so the planner passes its own estimate) |
 | 1,693 | [portal/src/pages/MaterialsPage.tsx](../../portal/src/pages/MaterialsPage.tsx) | 1,696 on 2026-10-17 (+18 in review round 2's fixes; component ~1,540); 1,678 on 2026-10-16 (shared material catalog stage 2: server paging, filters, standard pricing and the page/row menus; −41 in the review fixes when the result notices moved to `lib/materialNotices.ts`). The component function is ~1,450 lines — **next step:** move the toolbar (search, filters, sort) and the page menu with its three modals into `components/materials/` |
-| 1,558 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | 1,558 on 2026-10-28 (+22: the status-change row on the PUT, MCP enhancements release one); −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
+| 1,594 | [platform/routers/estimates.py](../../platform/routers/estimates.py) | 1,594 on 2026-11-04 review round 2 (+18: the create route's credit check and `estimate.create` attribution); 1,576 on 2026-11-04 (+18: the customer MCP server's archive rule, quota read and line ids, net of the duplicate's quota refusal and the user lookups folded into `_find_token_user` / `_raise_quota_refusal`); 1,558 on 2026-10-28 (+22: the status-change row on the PUT, MCP enhancements release one); −122 on 2026-09-23 (doc endpoints moved to `routers/estimate_documents.py`); +20 on 2026-09-22 for #490's conditional write; −35 on 2026-09-25 (delete rule and cascade moved to `services/estimate_delete.py`); `update_estimate` is most of the file's weight (see below) |
 | 1,543 | [website/index.html](../../website/index.html) | first measured 2026-10-22; the single-page site (footer icon duplication is #456) |
 | 1,411 | [platform/routers/auth.py](../../platform/routers/auth.py) | **highest-value split** — see below. 1,406 on 2026-10-28 (+48: the account-lifecycle audit rows, MCP enhancements release one). 1,360 on 2026-10-23 (+42: the email-only resend endpoint and signup's `created` flag, auth screens review). 1,224 on 2026-10-17 (+14: the Firebase throttle → 429 on the verification and password-reset routes, PYTHON-W) |
 | 1,319 | [platform/agents/estimate/llm_pipeline.py](../../platform/agents/estimate/llm_pipeline.py) | −153 by 2026-09-27 |
@@ -130,7 +130,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 1,274 | [platform/agents/estimate/text_helpers.py](../../platform/agents/estimate/text_helpers.py) | +11 on 2026-09-27 |
 | 1,255 | [portal/src/pages/ContactsPage.tsx](../../portal/src/pages/ContactsPage.tsx) | logged twice; two shared-component extractions already landed |
 | 1,205 | [platform/agents/task/text_helpers.py](../../platform/agents/task/text_helpers.py) | **crossed the line 2026-09-27** (was 745): the multi-turn push added task verbs, create clauses and due phrases; +65 on 2026-09-28 for the target-first field shapes and `restated_field_value`. **Next step:** `agents/task/due_dates.py` (`parse_due_date_value`, the month/relative-date regexes, `parse_due_phrase`), `agents/task/verbs.py` (the `_DUE_CHANGE` / `_STATUS_VERB` / `_GIVE` / `_UNASSIGN` / `_PROPERTY_*` patterns and the `detect_*` functions) and `agents/task/create_parsing.py` (`_CREATE_LEAD`, `is_task_create_request`, `split_create_clauses`), re-exported from here (review 2026-09-27 #46); 1,205 on 2026-11-01 (+3, Maple location awareness: a created task's property) |
-| 1,179 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27; 1,102 on 2026-10-05 (+14 for the save failure's outage/bug split, #619); 1,176 on 2026-10-13 (+74: the nameless-line helpers — `_nameless_line`, `_current_index` / `_original_index`, `_batch_line`, `_removed_line`, `_forget_shifted_lines`; review 2026-10-13 rounds 4–5) |
+| 1,192 | [platform/agents/estimate/edit_executor.py](../../platform/agents/estimate/edit_executor.py) | 1,192 on 2026-11-04 (+13: lines named by `line_id`, and the division guess's requested name, for the customer MCP server); new 2026-09-24, over the line after three review passes (third pass #29); +83 on 2026-09-25 (`_command`, stale-target confirmation); +39 by 2026-09-27. **Next step:** move the confirmations (`_confirm_removal`, `_confirm_division_guess`, `_confirm_target`, `_stash_edit_confirmation`) and target resolution (`_pin_targets`, `_resolve_target`) into `edit_targets.py`; +7 on 2026-09-27; 1,102 on 2026-10-05 (+14 for the save failure's outage/bug split, #619); 1,176 on 2026-10-13 (+74: the nameless-line helpers — `_nameless_line`, `_current_index` / `_original_index`, `_batch_line`, `_removed_line`, `_forget_shifted_lines`; review 2026-10-13 rounds 4–5) |
 | 1,171 | [platform/agents/equipment/service.py](../../platform/agents/equipment/service.py) | +22 on 2026-09-27 |
 | 1,171 | [platform/agents/estimate/work_item_handlers.py](../../platform/agents/estimate/work_item_handlers.py) | +48 over the 2026-09-24 review passes; +15 by 2026-09-27 |
 | 1,108 | [platform/agents/estimate/command_grammar.py](../../platform/agents/estimate/command_grammar.py) | the written command list (design 2026-09-25), first measured 2026-10-06 at 1,060 (1,108 re-measured 2026-10-14, review round 13 #35); +23 that day (tax: `_M_TAX`, the "of my estimates" and bare-total lookaheads, the "how much are my estimates worth" and headless total-value entries). **Next step:** move each family of entries (metric, line, ranking / by month / comparison, ratio) into `grammar_metrics.py` and keep `_CORE` here as their concatenation |
@@ -144,6 +144,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 910 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838); 906 on 2026-10-19 (+22: the What's New buttons beside the bell — they move with the sidebar and drawer extractions), then 885 when the user menu moved into `UserMenuItems.tsx`, then 901 on 2026-10-20 (+16: the What's New dot on three buttons and its hook). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx`; 910 on 2026-11-01 (+5, Maple location awareness: the location watch started from the textbox's focus or a recording) |
 | 890 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. 2026-10-21: +41 for per-request connections (`_request_builder`), `_load_credentials_info` and the sharing delegates; the sharing logic itself went to `services/google_drive_sharing.py`. 2026-10-26: −30 — `share_document` and the `grant_writer` / `revoke_writer` delegates replaced by `open_link_editing` / `close_link_access` / `modified_time`. 2026-11-01: +37 for text-block markdown in estimate docs (3ca456c; the formatter itself is `services/doc_markdown.py`). Still 90 over |
 | 861 | [platform/services/material_catalog_writes.py](../../platform/services/material_catalog_writes.py) | **crossed the line 2026-10-21** (795 → 801): `next_copy_name` for Maple's copy offer (gap plan 2026-10-19 D2; review 2026-10-21 #83). **Next step:** move the copy helpers (`duplicate`, `next_copy_name`, `_next_copy_name`) into a `material_catalog_copies.py` re-exported from `material_catalog` — it joins the reader/writer import cycle, so it wants its own change |
+| 847 | [platform/models/estimate.py](../../platform/models/estimate.py) | 847 after review round 3 (+10: `lines_missing_ids` / `with_stored_line_ids`, shared with `Template`); **crossed the line 2026-11-04** (789 → 837, customer MCP server review round 2: `LINE_ID_PATTERN`, `_stored_line_id` and `JobItem._stored_line_ids`, so a line stored without an id loads with the same id every time). **Next step:** the line models (`MaterialItem`, `ActivityItem`, `LINE_ID_PATTERN`, `_stored_line_id`) into `models/estimate_lines.py`, re-exported from `models/estimate` |
 | 812 | [platform/agents/task/operations.py](../../platform/agents/task/operations.py) | **crossed the line 2026-10-08** (was 774): `_handle_task_due_change` moved in beside the other sub-handlers (switchover phase 4b). **Next step:** the convert flow (`_handle_convert_task`, `_perform_conversion`, `_convert_error_copy`, about 175 lines) into `agents/task/convert.py` as a `TaskConvertBase` layer (review 2026-10-08 (4b) #22, deferred) |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
@@ -158,7 +159,7 @@ fixtures — but these are past the point of scanning.
 | Lines | File |
 |------:|------|
 | 6,564 | platform/tests/test_estimate_agent.py |
-| 5,676 | platform/tests/test_estimate_api.py |
+| 6,048 | platform/tests/test_estimate_api.py (6,048 on 2026-11-04: customer MCP server, its two review rounds) |
 | 4,370 | platform/tests/test_orchestrator_endpoint.py |
 | 2,839 | platform/tests/test_material_agent.py |
 | 2,743 | platform/tests/test_contact_agent.py |
@@ -172,7 +173,7 @@ fixtures — but these are past the point of scanning.
 | 1,473 | platform/tests/test_text_utils.py |
 | 1,401 | platform/tests/test_maple_task_crud.py |
 | 1,379 | portal/tests/TaskDialog.test.tsx |
-| 1,364 | platform/tests/test_tasks_api.py |
+| 1,399 | platform/tests/test_tasks_api.py (+35 on 2026-11-04, customer MCP server) |
 | 1,211 | platform/tests/test_cross_resource_joins.py |
 | 1,193 | platform/tests/test_estimate_gathering.py (823 when listed; +76 on 2026-10-14 for the property-gone reply and its 404 match, review rounds 13 #3 / 14 #8–#9, #17, #23; +268 on 2026-10-12 for the created reply's property follow-up and every finalize branch — the seam is `TestFinalizeGatheringStashedProperty` + the helper classes → `tests/test_estimate_gathering_finalize.py`) |
 | 1,192 | platform/tests/test_estimate_edit_executor.py (890 when listed; +204 in the planner gap-fixing change, review round 13 #26) |
@@ -184,21 +185,21 @@ fixtures — but these are past the point of scanning.
 | 1,037 | platform/tests/conftest.py |
 | 989 | platform/tests/test_command_grammar.py (first listed 2026-10-22) |
 | 987 | platform/tests/test_planner_said.py (553 before 2026-10-13; the review's said.py split moved new cases to `test_planner_said_corrections.py` — split the rest along `said_metrics` / `said_tasks` / `said_resize` / `said_guards`, review 2026-10-13 #141, deferred) |
-| 978 | platform/tests/test_task_convert_api.py |
+| 1,113 | platform/tests/test_task_convert_api.py (1,113 on 2026-11-04: Convert billing and the credits gate) |
 | 973 | portal/tests/TasksPage.test.tsx |
 | 957 | platform/tests/test_user_api.py |
 | 951 | platform/tests/test_maple_estimate_targeting.py |
 | 944 | platform/tests/test_labour_agent.py |
 | 909 | platform/tests/test_maple_work_item_edits.py |
-| 896 | platform/tests/test_company_api.py |
+| 922 | platform/tests/test_company_api.py (+26 on 2026-11-04: an infinite markup refused) |
 | 889 | platform/tests/test_maple_listed_positional_reference.py |
-| 861 | [platform/tests/test_material_overrides_api.py](../../platform/tests/test_material_overrides_api.py) | new 2026-10-16 with the shared material catalog; crossed 800 in review round 3. **Next step:** move the reset/load-standard and upload sections into `test_material_standard_bulk_api.py` (review 2026-10-17 round 3 #13) |
+| 863 | [platform/tests/test_material_overrides_api.py](../../platform/tests/test_material_overrides_api.py) | 863 on 2026-11-04 (+2); new 2026-10-16 with the shared material catalog; crossed 800 in review round 3. **Next step:** move the reset/load-standard and upload sections into `test_material_standard_bulk_api.py` (review 2026-10-17 round 3 #13) |
 | 857 | platform/tests/test_planner_execute_figures.py (543 → 857 in the planner gap-fixing change — review round 13 #25) |
 | 855 | platform/tests/test_address_service.py (first listed 2026-10-22) |
 | 848 | platform/tests/test_planner_policy.py (first listed 2026-10-22) |
 | 846 | platform/tests/test_planner_followups.py (first listed 2026-10-22) |
 | 815 | platform/tests/test_agents_api.py |
-| 808 | platform/tests/test_llm_usage_tracking.py |
+| 887 | platform/tests/test_llm_usage_tracking.py (+79 on 2026-11-04: the Responses-API model name and the create and convert billing tests) |
 
 `test_llm_usage_tracking.py` (added 2026-10-07, review #4, deferred) crossed 800 with the
 prompt-caching and credits tests; its seam is `TestCachedTokenPricing` + `TestCredits` →
@@ -216,7 +217,7 @@ seams that already exist as separate classes.
 | 998 | `_orchestrate_turn` — routers/agents.py:1165 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) Re-measured 822 on 2026-10-07; +28 that day (794 → 822) for the unanswered tracker's `_track_unanswered` closure and the crash-record hand-off. Re-measured 965 on 2026-10-13 (+7 in the planner gap-fixing change for the request as typed and the overage carry; the rest is older drift — review 2026-10-13 round 5 #32). Re-measured 995 at :1152 on 2026-10-19, Maple attachments round 3 (965 → 995). 998 at :1165 on 2026-11-01 (996 on main; +2, the phone's position read as the property here). |
 | 82 | `PhotoViewer` — portal/src/components/tasks/TaskPhotoGrid.tsx:111 (2026-10-19, review round 2 #29 for Maple attachments: `ViewerMedia` and `ViewerNav` extracted, 136 → 82, below the 128 it started at. What's left is the dialog shell, the focus effect and its comments: next, lift the focus/keyboard effect into a `useViewerKeys` hook) |
 | 54 | `store_attachment` — platform/services/maple_attachments.py:263 (new 2026-10-19, over 50 since the round-2 reorder — Maple attachments round 3 #11. Extract the validate/decode branch into `_prepare_upload(content, content_type, filename)` returning (normalized, name, kind, to_read, read_type, thumbnail); `store_attachment` drops to ~30 lines) |
-| 87 | `upload_task_photo` — platform/routers/tasks.py:504 (first measured 2026-10-19: 74 → 87 for the PDF branch — Maple attachments round 3 #12. Extract the three per-type store branches into `_store_task_media(file, declared_type) -> (file_id, thumb_id, filename, normalized_type, size_bytes)`) |
+| 96 | `upload_task_photo` — platform/routers/tasks.py:526 (96 on 2026-11-04, re-measured; first measured 2026-10-19: 74 → 87 for the PDF branch — Maple attachments round 3 #12. Extract the three per-type store branches into `_store_task_media(file, declared_type) -> (file_id, thumb_id, filename, normalized_type, size_bytes)`) |
 | 398 | `SupportPanel` — portal/src/components/common/SupportPanel.tsx:96 (first measured 2026-10-19 — it shrank in the Maple attachments change, ~420 → 398, but had no row; round 3 #13. Extract the composer block and its staging state into `SupportComposer`) |
 | 53 | `update_material` — platform/routers/materials.py:345 (2026-10-17; the rename-unhide pushed it over. Extract `_validate_patch(existing, patch, user)` — review round 4 #16) |
 | 124 | `_build_sizes_from_fields` — platform/agents/material/text_helpers.py:379 (edited 2026-10-17; +8 in review rounds 5–6 for the unit said with a price or cost. Split per op: `_remove_size`, `_rename_size`, `_set_size_unit`, `_set_size_price`, `_set_size_cost` — round 4 #17) |
@@ -237,14 +238,14 @@ seams that already exist as separate classes.
 | 116 | `create_estimate_tools` — platform/agents/estimate/tools.py:84 (the factory holding the tool closures; 171 → 116 on 2026-10-16 when `_best_by_name` / `_match_entry` / `_material_row` came out — review 2026-10-16 #117) |
 | 63 | `_handle_create_material` — platform/agents/material/service.py:1328 (107 → 63 on 2026-10-16, review #117; the category/unit resolution is the next cut) |
 | 53 | `_finalize_update_material` — platform/agents/material/service.py:2615 (79 → 53 on 2026-10-16, review #117) |
-| 387 | `update_estimate` — routers/estimates.py:953 (387 on 2026-10-28, +22 over 365 for the status-change row beside ESTIMATE_UPDATE — the helper below is now owed; grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation, +5 on 2026-10-01 for the tenant checks; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
-| 124 | `create_estimate` — routers/estimates.py:299 (first measured 2026-10-01: 118 before, +6 for the property and line checks before the slot claim. Extract `_assert_create_refs(company_obj_id, payload)` — tenant batch 1 review #2) |
-| 99 | `duplicate_estimate` — routers/estimates.py:790 (first measured 2026-10-01: 93 before, +6 to drop another company's property from the copy; extract the clone into `_clone_estimate(source, user_email)`) |
+| 394 | `update_estimate` — routers/estimates.py:1022 (394 on 2026-11-04, +7: the archive permission and the echoed line ids; the user is now looked up once for both checks; 387 on 2026-10-28, +22 over 365 for the status-change row beside ESTIMATE_UPDATE — the helper below is now owed; grew ~18 lines on 2026-09-22 for #490's conditional write + 409 translation, +5 on 2026-10-01 for the tenant checks; the next thing added here should come out as a helper, e.g. `_write_estimate_update(existing, update_data, base_version)`, rather than grow the body) |
+| 116 | `create_estimate` — routers/estimates.py:349 (116 on 2026-11-04 review round 2, +11: the credit check and the `estimate.create` context for a generated create; 105 on 2026-11-04: the 402/429 block moved to `_raise_quota_refusal`; first measured 2026-10-01: 118 before, +6 for the property and line checks before the slot claim. Extract `_assert_create_refs(company_obj_id, payload)` — tenant batch 1 review #2) |
+| 86 | `duplicate_estimate` — routers/estimates.py:824 (86 on 2026-11-04: `_raise_quota_refusal` and `_find_token_user`; first measured 2026-10-01: 93 before, +6 to drop another company's property from the copy; extract the clone into `_clone_estimate(source, user_email)`) |
 | 195 | `run_task_conversion` — services/task_convert.py:45 (first measured 2026-10-01: 191 before, +4 for the property check before the slot claim; split into claim / generate-and-save / file-photos / link-or-delete helpers) |
-| 62 | `update_task` — routers/tasks.py:308 (first measured 2026-10-01: 59 before, +3 for the property check. Add `_assert_property_belongs_to_company(property_id, company)` beside `_assert_status_belongs_to_company` and use it in both task routes — tenant batch 1 review #3) |
-| 57 | `create_task` — routers/tasks.py:98 (first measured 2026-10-01: 56 before, +1; the same helper — tenant batch 1 review #4) |
-| 76 | `archive_estimate` — routers/estimates.py:1394 (first measured 2026-10-01, ~+1 for moving the tenant 404 ahead of the status answer — tenant batch 2 review #1. Extract `_archive_actor(decoded_token, estimate) -> User` — the email/user lookup, the tenant 404 and the creator-or-Owner/Admin check — shared with `unarchive_estimate`) |
-| 76 | `unarchive_estimate` — routers/estimates.py:1473 (first measured 2026-10-01; a near-copy of `archive_estimate`'s authorization block — the same `_archive_actor` helper — tenant batch 2 review #2) |
+| 62 | `update_task` — routers/tasks.py:319 (first measured 2026-10-01: 59 before, +3 for the property check. Add `_assert_property_belongs_to_company(property_id, company)` beside `_assert_status_belongs_to_company` and use it in both task routes — tenant batch 1 review #3) |
+| 57 | `create_task` — routers/tasks.py:105 (first measured 2026-10-01: 56 before, +1; the same helper — tenant batch 1 review #4) |
+| 59 | `archive_estimate` — routers/estimates.py:1469 (59 on 2026-11-04: the lookup is `_token_user`, the rule `may_archive_estimate`; first measured 2026-10-01, ~+1 for moving the tenant 404 ahead of the status answer — tenant batch 2 review #1. Extract `_archive_actor(decoded_token, estimate) -> User` — the email/user lookup, the tenant 404 and the creator-or-Owner/Admin check — shared with `unarchive_estimate`) |
+| 62 | `unarchive_estimate` — routers/estimates.py:1531 (62 on 2026-11-04, same helpers as `archive_estimate`; first measured 2026-10-01; a near-copy of `archive_estimate`'s authorization block — the same `_archive_actor` helper — tenant batch 2 review #2) |
 | 82 | `sync_payment_method` — routers/billing.py:457 (82 on 2026-10-28, +15 for the PAYMENT_METHOD_UPDATE row; 61 before 2026-10-01, +6 for the card-ownership 404 — tenant batch 2 review #3. Move the Stripe calls into `_make_default_card(stripe, company, payment_method_id) -> (brand, last4)`) |
 | 277 | `handle_pending_property_link_confirmation` — routers/agent_helpers/pending_property_link.py:141 |
 | ~270 | `OnboardingPage` component body — portal/src/pages/OnboardingPage.tsx:84 |
@@ -332,8 +333,8 @@ seams that already exist as separate classes.
 | 53 | `_created_reply` — routers/agent_helpers/estimate_gathering.py:436 (new 2026-10-12 in the property-link fix; move the legacy follow-up stash (`PENDING_ESTIMATE_FOLLOW_UP_KEY`) into `_stash_follow_up(...)`, which `create_estimate_reply` can share — review round 13 #4) |
 | 53 | `ask_to_rewrite` — platform/agents/conversation/record_names.py:211 (50 → 53 in the planner gap-fixing change, `answers=`; build the record in a `_rewrite_record(...)` helper beside `_rewrite_flags` — review round 13 #21) |
 | 51 | `_seed_mixed` — platform/tests/test_metric_ratio_shapes.py:267 (new in the planner gap-fixing change; split into `_seed_sold_side` / `_seed_lost_side` — review round 13 #22) |
-| 177 | `upload_contacts_csv` — platform/routers/contacts.py:104 (first measured 2026-10-17, Sentry fixes review #38. Extract a `_header_or_400(reader, required, known)` shared by the four CSV uploads, and `_upsert_contact_row(normalized, company_id, user)`) |
-| 184 | `upload_properties_csv` — platform/routers/properties.py:140 (first measured 2026-10-17, review #39. The shared header check, then `_upsert_property_row(...)`) |
+| 177 | `upload_contacts_csv` — platform/routers/contacts.py:106 (first measured 2026-10-17, Sentry fixes review #38. Extract a `_header_or_400(reader, required, known)` shared by the four CSV uploads, and `_upsert_contact_row(normalized, company_id, user)`) |
+| 184 | `upload_properties_csv` — platform/routers/properties.py:141 (first measured 2026-10-17, review #39. The shared header check, then `_upsert_property_row(...)`) |
 | 148 | `upload_labours_csv` — platform/routers/labours.py:142 (first measured 2026-10-17 at 150, review #40; 148 after the Company read moved into the access check. The shared header check, then `_parse_labour_rows` / `_write_labours` for its two phases) |
 | 130 | `upload_equipments_csv` — platform/routers/equipments.py:63 (first measured 2026-10-17, review #41. The same split as `upload_labours_csv`) |
 | 76 | `delegate_generic` — platform/routers/agent_helpers/delegate_generic.py:31 (+6 on 2026-10-17 for the confidence fallback, PYTHON-V; review #42. Move the optional follow-up merge, L60-76, into `_merge_optional_follow_up(...)`) |
@@ -382,6 +383,10 @@ Fix: two-step. (a) Add a one-shot backfill script under
 on write (override `__init__` / validator so any create or update lowercases
 the field). (c) Replace the regex with `User.find_one(User.email == email)`.
 Don't do (c) before (a) — a stray capitalized row would silently fail auth.
+
+**Also (2026-11-04):** the estimate routes' own copies (PUT, delete, archive,
+unarchive, duplicate) are now one helper, `_find_token_user` in
+`routers/estimates.py`, with the same regex. Step (c) replaces it there too.
 
 ### 33. [MEDIUM] `$in` × `$in` bulk-fetch over-fetches the cross-product
 **Files**: `routers/equipments.py:138-144`, `routers/labours.py:195-201`
@@ -493,6 +498,7 @@ is wanted) or drop the call entirely and just build items from
 concern is that the next reader will assume reconciliation is happening.
 
 ### 62. [LOW] Python-side sort in `get_material_categories` / `get_material_units`
+**Checked 2026-11-04:** the customer MCP list tools now page in Mongo with a case-insensitive collation (`toolkit.paged`); the two REST list routes named here still sort in Python.
 **Files**: [platform/routers/material_categories.py:48](../../platform/routers/material_categories.py),
 [platform/routers/material_units.py:49](../../platform/routers/material_units.py)
 **Severity**: LOW (cleanliness, not performance)
@@ -1487,6 +1493,7 @@ research path is worse, that is a reason to improve the prompt context, not to
 bring back copying.
 
 ### 746. [LOW] Linking rewrites the whole `contacts` array
+**RESOLVED 2026-11-04:** Linking and unlinking go through `services/property_contacts.link_contact` / `unlink_contact` (`$addToSet` / `$pull`); the module docstring now says so.
 **Checked 2026-10-22:** Still read-modify-write at record_links.py:153 (link_contact_reply); docstring still says the write is the property agent's
 
 `platform/agents/conversation/record_links.py:141` — `fresh.set({"contacts": [*fresh.contacts, id]})` reads, modifies and writes, so a concurrent link (another turn or a portal edit) is overwritten. The docstring (13-14) says the write goes through the property agent; it doesn't. (review 2026-09-27 #76)
@@ -2691,6 +2698,7 @@ behavior; (ii) or revert to the pre-fix error behavior by omitting the
 the caller can see what actually happened (materials.py already does this).
 
 ### 75. [MEDIUM] `CardItem.easy/standard/hard` unbounded
+**Checked 2026-11-04, still open:** `Field(gt=0)` on the stored `CardItem` would make any saved card holding a 0 fail to load (list, get and the MCP tools), and the portal's blank row starts at 0 (`portal/src/lib/rateCards.ts` `createBlankCardItem`; `validateRateCardForm` refuses only negatives; `RateCardsTab.tsx` ~405–431 turns a blank into 0 with `parseFloat(...) || 0`). A safe fix: validate `> 0` on create and PUT only, count stored zeros on Dev and prod first, and change the portal's blank default, validation and inputs in the same release.
 **File**: [platform/models/rate_card.py:26-28](../../platform/models/rate_card.py)
 **Severity**: MEDIUM
 **Why it's MEDIUM**: pre-existing — predates the unit-Literal change. But
@@ -2706,6 +2714,7 @@ helper text. Coordinate with whoever owns the Effort Calculator's
 zero-handling so we don't change semantics underneath.
 
 ### 103. [MEDIUM] `delete_template` returns 200 on non-existent id
+**RESOLVED 2026-11-04:** DELETE of a missing template, role, task, contact or property now answers 404 (and so does another company's, through `dependencies.own_record`). In the portal, deleting a contact or property someone already deleted now shows "… not found" in the dialog instead of closing it.
 File: `platform/routers/templates.py:158-160`
 **Severity**: MEDIUM
 
@@ -2990,6 +2999,7 @@ geocode and note it in the comment.
 **Suggested fix:** Once the stage-2 portal is on `release`, make paging the only shape and update test_material_api.py, test_material_bootstrap.py and test_resources_rbac.py.
 
 ### 1111. [LOW] NaN and Infinity accepted as a material cost or price
+**RESOLVED 2026-11-04:** `routers/material_helpers/common.to_float` refuses NaN and Infinity, so create and PUT on a company material answer 422 (the material agent shares the helper); CSV and pricing already refused them. Tested in `tests/test_material_api.py` with raw JSON bodies.
 **Checked 2026-10-22:** CSV upload (upload.py:_checked_amount) and PATCH /pricing / PUT on a standard (material_catalog_writes._price_value) now refuse NaN/Inf; create, PUT on a company material and common.to_float still accept them.
 
 `platform/routers/materials.py:105` — JSON/pydantic floats and `_to_float("nan")` accept them in PATCH /pricing, PUT, create and CSV cells; NaN passes the `< 0` check and is stored (Owner/Admin, own company only).
@@ -3137,6 +3147,16 @@ geocode and note it in the comment.
 `platform/routers/auth.py:685` — `/auth/resend-verification-request` answers 200 alike for unknown, already-verified and sent. But Firebase's TOO_MANY_ATTEMPTS_TRY_LATER (→ 429), and a Brevo failure (→ 502) after a successful lookup, can only happen for an existing account, so a caller can tell under throttle or outage. This is the same pattern as #1298 for password reset, at the endpoint added 2026-10-23 when the Resend verification page dropped its password. LOW because it needs a throttle or outage to show. (Auth screens review 2026-10-23 #9, deferred: the fix is a product call.)
 
 **Suggested fix:** Decide alongside #1298. Either answer the generic 200 for both the throttle and the delivery failure (logging them as now), or keep the honest 429/502 for usability. Keep the two endpoints consistent, whichever is picked; today both give the honest answer.
+
+### 1484. [LOW] Onboarding accepts a NaN percentage, or an infinite markup (review 2026-11-04, customer MCP server round 3)
+`platform/routers/auth.py:1200` — `_parse_float` and `_check_percentage_bounds` test `value < lower or value > upper`, and both comparisons are False for NaN, so "nan" passes all six percentages, `tax_rate` included (checked); "inf" passes the two with no ceiling, `material_markup` and `default_profit_margin`. Round 3 closed this for PUT /companies and the MCP `update_company`, but onboarding has its own parser. A company can start with a NaN tax rate or burden, or an infinite material markup (every standard material's price infinite).
+
+**Suggested fix:** A `math.isfinite` check in `_check_percentage_bounds`, refusing like the other bounds; test an onboarding submit with "nan" for tax_rate and "inf" for material_markup → both refused, nothing stored.
+
+### 1485. [MEDIUM] A validation error on an infinite or NaN input answers 500, not 422 (review 2026-11-04, customer MCP server round 3)
+`platform/main.py` — FastAPI's default `RequestValidationError` handler echoes the bad input in its 422 body, and JSON can't encode `inf` or `NaN`, so the response itself raises ("Out of range float values are not JSON compliant"): the caller gets a 500 and Sentry an event. Reached by any bounded float sent as `Infinity` or `NaN` in a raw body, e.g. `tax_rate: Infinity` (above its 100 ceiling) or `routers/addresses.py`'s `allow_inf_nan=False` lat/lng. Round 3 checked wages and markups in their handlers to avoid it.
+
+**Suggested fix:** A `RequestValidationError` handler in `main.py` that returns FastAPI's usual 422 shape with the echoed `input` values made JSON-safe (non-finite floats as strings); test a raw body with `"tax_rate": Infinity` → 422.
 
 ## Platform — services, scripts and integrations
 
@@ -5597,6 +5617,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Upload twice and assert the second COMPANY_LOGO_UPLOAD row has `replaced: true`.
 
 ### 1447. [LOW] `actor_of`: a plain-string role is untested (review 2026-10-28, MCP enhancements release one)
+**RESOLVED 2026-11-04:** `tests/test_audit_service.py::test_actor_of_takes_a_plain_string_role` (customer MCP review fixes).
 `platform/services/audit_service.py:47` — Edge case. Line 56 handles a `role` without `.value`, and no test passes one.
 
 **Suggested fix:** Call `actor_of` on a `SimpleNamespace(email=..., id=..., role="Admin")` and assert `_user_role == "Admin"`.
@@ -5607,6 +5628,7 @@ total row count rather than blank-row count.
 **Suggested fix:** When cancellation or a plan change ships, let `_post_subscription_event` in `tests/test_audit_coverage.py` take the event type. Start the company on `plan_pro`, post `customer.subscription.deleted`, and assert one row with metadata `{"from": "plan_pro", "to": "plan_free", "event_type": "customer.subscription.deleted", "source": "stripe"}`.
 
 ### 1449. [LOW] `resolve_user_api_key`: the missing-company arm is untested (review 2026-10-29, MCP enhancements release two)
+**RESOLVED 2026-11-04:** `tests/test_user_api_keys.py::test_a_key_whose_company_is_gone_resolves_to_nothing` (customer MCP review fixes).
 `platform/services/user_api_keys.py:109` — Edge case. Line 125: the user still points at the key's company, but that company document is gone, so the function returns None. No test deletes the company.
 
 **Suggested fix:** Issue a key, delete the Company document (leaving the user's `company` set), and assert `resolve_user_api_key` returns None.
@@ -5644,6 +5666,174 @@ total row count rather than blank-row count.
 `platform/tests/test_text_blocks_api.py:145` — Edge case. `test_each_change_writes_an_audit_row` checks each row's action, resource and before/after state, but not `user_id`, `user_email` or `user_role`. Those are the fields the 2026-10-30 switch to `actor_of(user)` set. If a later edit passed the wrong user or dropped `decoded_token`, the rows would name nobody or the wrong person and the test would still pass. `actor_of` has its own test (`test_audit_actor.py::test_actor_of_user`); only this router's wiring goes unchecked.
 
 **Suggested fix:** Look up the signed-in user's Mongo id (as `test_audit_coverage.py::_user_id` does). Then assert on the create, update and delete rows that `user_id` is that id, `user_email` is the signed-in email and `user_role` is "Owner".
+
+### 1458. [LOW] `assert_estimate_quota_open`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/routers/estimates.py:332` — Edge case: L335 the "blocked" arm (quota met with a card on file → 429) is never driven; only the no-card 402 is.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/routers/estimates.py:335`; the blocked arm is L341.
+
+**Suggested fix:** generate_estimate with confirm, quota met, default_payment_method_last4="4242" → ToolError "reset at the start of your next billing period"; no model call, daily count 0.
+
+### 1459. [LOW] `removed_work_items`: edge arms untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/estimate_edits.py:168` — Edge cases: L175-176 a non-removal command in the same batch is skipped; L181 a removal naming no loaded item adds nothing (job_item_ids == []).
+
+**Suggested fix:** Unconfirmed [set_title, remove_work_item position 2] → job_item_ids == [that item]; [add_work_item "Temp", remove_work_item "Temp"] → job_item_ids == [].
+
+### 1460. [LOW] `edit_estimate`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_estimates.py:609` — Edge case: L623 `or "work items"` — the confirm wording when no loaded work item is named.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_estimates.py:610`; the fallback is L624.
+
+**Suggested fix:** With #54's second test, assert "remove work items from estimate" in `would`.
+
+### 1461. [LOW] `_assign`: edge arms untested (review 2026-11-04, customer MCP server)
+`platform/scripts/backfill_line_ids.py:52` — Edge cases: L56-57 the estimate deleted between a missed write and the re-read (skipped count); L59-60 a concurrent save gave every line an id meanwhile ((0, 0)).
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/scripts/backfill_line_ids.py:58`; the arms are L62-63 and L66-67.
+
+**Suggested fix:** With _MissingWrites(misses=1), delete the estimate in the first update_one → lines_skipped == its missing lines; with misses=1, $set every line id in the first update_one → assigned 0, skipped 0.
+
+### 1462. [LOW] `_main`: edge arms untested (review 2026-11-04, customer MCP server)
+`platform/scripts/backfill_line_ids.py:89` — Edge cases: L91-92 the APPLIED output; L93-94 the skipped-lines line. Only the dry run's output is tested.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/scripts/backfill_line_ids.py:96`; the arms are L99-101 and L102-103.
+
+**Suggested fix:** _main(True) with init_db patched → "[APPLIED] line ids assigned:" and no --apply hint; with _MissingWrites(10_000) → "lines skipped".
+
+### 1463. [LOW] `_main`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/scripts/pull_dangling_property_contacts.py:85` — Edge case: L85-95 the --apply output ("[APPLIED]", "changed", "pulled", no "Nothing written"); only the dry run's is tested.
+
+**Suggested fix:** _main(True) with init_db stubbed → "[APPLIED]" in output, "Nothing written" absent, the dangling id pulled.
+
+### 1464. [LOW] `sdk_logging_left_alone`: edge arms untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/shared.py:181` — Edge case (moved code, untested before too): no test checks building a server leaves root logging handlers alone or that `sdk_server.configure_logging` is restored, including when the build raises.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/shared.py:189`.
+
+**Suggested fix:** (a) record root handlers and configure_logging, call new_server("t", "x"), assert both unchanged; (b) raise inside the block and assert configure_logging is the original.
+
+### 1465. [LOW] `_masked`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/shared.py:122` — Edge case: L124 a nested masked key with an empty value (`{"op": "add_work_item", "description": ""}`) is kept as "" rather than "<text>"; only top-level empties are tested.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/shared.py:124`; the arm is L126.
+
+**Suggested fix:** Add that command to the nested-masking test's commands and assert it is recorded with description "".
+
+### 1466. [LOW] `_empty`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/shared.py:116` — Edge case: L119 `{}` counts as empty (new: the old staff filter kept it); no test passes `{}`.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/shared.py:118`; the arm is L121.
+
+**Suggested fix:** Add `"filters": {}` to test_staff_call_arguments_are_kept_as_sent_with_zeros' input; expected output unchanged.
+
+### 1467. [LOW] `record`: edge arms untested and unreached (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/toolkit.py:164` — Edge case (defensive): L166 the `dict(doc)` arm; L167-168 the `_id` → `id` rename. Every caller passes a Beanie document.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/toolkit.py:171`; the arms are L173 and L174-175.
+
+**Suggested fix:** Test `record({"_id": "abc", "name": "x"}) == {"id": "abc", "name": "x"}`, or narrow record to documents and delete both arms.
+
+### 1468. [LOW] `_with_tie_breaker`: the sort=None arm is untested and unreached (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/toolkit.py:197` — Edge case (defensive): L201 `if sort is None` (sort by `_id` alone) — no caller or test passes sort=None to `paged`. (Moved here from `paged`'s own `if sort is not None` by review round 2's tie-breaker fix, #34; the toolkit tests now use `paged`'s default serializer, so that half of the original entry is covered.)
+
+**Suggested fix:** Make `sort` a required keyword on `paged` and drop the arm, or test `paged(..., sort=None)` orders by `_id`.
+
+### 1469. [LOW] `_line_ids`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_setup.py:90` — Edge case: L93 an activity with no role is skipped; every test activity has a role.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_setup.py:97`; the arm is L100.
+
+**Suggested fix:** create_template(activities=[{"name": "Haul", "rate": 10, "effort": 1}]) → saved, role None.
+
+### 1470. [LOW] `reset_people_role`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_people_roles.py:236` — Edge case: L243-245 a role whose standard_key has left the standard list gets NOT_STANDARD_DETAIL; only an untagged role is tested.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_people_roles.py:237`; the arm is L245-246.
+
+**Suggested fix:** Insert a Labour with standard_key="test-retired-key"; reset_people_role(confirm=True) → "Only a standard role", wage unchanged.
+
+### 1471. [LOW] `company_view`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_company.py:47` — Edge case: L52 `plan_lookup_key or "plan_free"`; the fixture always sets plan_pro.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_company.py:51`; the fallback is L56.
+
+**Suggested fix:** plan_lookup_key None → get_company plan == "plan_free".
+
+### 1472. [LOW] `whoami`: edge arms untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_company.py:81` — Edge cases: L88 the "plan_free" fallback; L93 tasks_enabled is never asserted.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_company.py:85`; the arms are L92 and L97.
+
+**Suggested fix:** plan_lookup_key None → company.plan "plan_free"; monkeypatch settings.tasks_enabled True/False → whoami's tasks_enabled matches.
+
+### 1473. [LOW] `own_record`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/dependencies.py:190` — Edge case: L195 a malformed id with a real company (formerly a Beanie error, now 404); test_own_record.py sends "not-an-id" only with company None.
+
+**Suggested fix:** own_record(MaterialCategory, "not-an-id", PydanticObjectId(), what="X") → 404 "X not found".
+
+### 1474. [LOW] `_contact_search`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_contacts.py:110` — Edge case: L113 a whitespace-only search gives no filter.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:111`; the arm is L114.
+
+**Suggested fix:** list_contacts(search="   ") → the unfiltered total.
+
+### 1475. [LOW] `get_contact`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_contacts.py:137` — Edge case: L142-143 more than 50 linked properties — `properties` capped, `properties_total` the full count.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:139`; the arm is L143-145.
+
+**Suggested fix:** Monkeypatch _CONTACT_PROPERTIES_SHOWN to 1, link two properties → one listed, properties_total 2.
+
+### 1476. [LOW] `list_properties`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_contacts.py:250` — Edge case: L260 a whitespace-only search is ignored.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:252`; the arm is L262.
+
+**Suggested fix:** list_properties(search="  ") → the unfiltered total.
+
+### 1477. [LOW] `create_property`: edge arms untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_contacts.py:295` — Edge cases: L312 the blank street/city/prov_state refusal; L286 duplicate contact_ids stored once.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:297`; the blank refusal is L314, the dedupe `_contact_ids` at L286.
+
+**Suggested fix:** (a) street="  " → "street: must not be blank", nothing made; (b) contact_ids=[ana, ana] → contacts == [ana].
+
+### 1478. [LOW] `update_property`: edge arms untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_contacts.py:354` — Edge cases: L376 a malformed id in contact_ids → "Contact not found" before any lookup; duplicates collapse to one.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:356`; the arm is L378.
+
+**Suggested fix:** (a) contact_ids=["nope"] → "Contact not found", unchanged; (b) [ana, ana] → [ana].
+
+### 1479. [LOW] `delete_note`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_notes.py:141` — Edge case: L153 a body over 60 characters is cut to 57 + "..." in the confirm question.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_notes.py:147`; the cut is L159.
+
+**Suggested fix:** An 80-character note → `would` holds the first 57 characters and "...".
+
+### 1480. [LOW] `task_view`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_tasks.py:70` — Edge case: L75 a status id not among the company's statuses → `status` the raw id, `status_name` None.
+
+**Suggested fix:** Raw-set a task's status to a fresh ObjectId → get_task returns that id and status_name None.
+
+### 1481. [LOW] `_task`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_tasks.py:93` — Edge case: L97-98 a blank code → "Task not found" with no query.
+
+**Suggested fix:** get_task(task_id="  ") → "Task not found".
+
+### 1482. [LOW] `_task_conditions`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_tasks.py:136` — Edge case: L146-147 a search that yields no condition (whitespace only) lists everything. (Moved out of `list_tasks` by review round 2's #21.)
+
+**Suggested fix:** list_tasks(search="  ") → the unfiltered total.
+
+### 1483. [LOW] `convert_task_to_estimate`: edge arm untested (review 2026-11-04, customer MCP server)
+`platform/mcp_server/company/tools_tasks.py:332` — Edge case: L346-351 billing overage and delete_task together → both clauses in one question; tests drive each alone.
+
+**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_tasks.py:340`; the arm is L354-359.
+
+**Suggested fix:** estimate_bills_overage True, delete_task=True, no confirm → `would` has "extra estimate" and "delete the task"; no estimate made.
 
 ## Codebase hygiene (batchable)
 
