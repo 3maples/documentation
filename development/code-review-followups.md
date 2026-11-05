@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1486**. Never
+- **Entries are numbered and permanent.** Next free number: **1502**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -5834,6 +5834,86 @@ total row count rather than blank-row count.
 **Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_tasks.py:340`; the arm is L354-359.
 
 **Suggested fix:** estimate_bills_overage True, delete_task=True, no confirm → `would` has "extra estimate" and "delete the task"; no estimate made.
+
+### 1486. [LOW] `_property_named`: edge arm untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:69` — Edge case: a company id that isn't an ObjectId (L73) returns None.
+
+**Suggested fix:** Test that `await _property_named("not-an-id", "Oak House")` is None.
+
+### 1487. [LOW] `_remembered`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:80` — Edge cases: a remembered place that isn't a dict (L82), and one with a missing field or a non-number latitude (L86), both return None.
+
+**Suggested fix:** Test `_remembered({WEATHER_PLACE_KEY: "x"})` is None, and `_remembered({WEATHER_PLACE_KEY: {"latitude": "x"}})` is None.
+
+### 1488. [LOW] `_at_phone`: edge arm untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:90` — Edge case: a property here with no name, only a street (L95), is named by its street ("at 12 Oak St").
+
+**Suggested fix:** Test a turn with HERE_KEY `{"id": ..., "name": "", "street": "12 Oak St", "stale": False}` and the reply starts "Today at 12 Oak St:".
+
+### 1489. [LOW] `_weekend`: edge arm untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:164` — Edge case: when today is Sunday (L168), "this weekend" is Sunday alone.
+
+**Suggested fix:** Test `_weekend` on days starting on a Sunday and assert it returns one day.
+
+### 1490. [LOW] `_driest`: edge arm untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:180` — Edge case: exactly one dry day says "Driest day:", singular (L186).
+
+**Suggested fix:** Test `_driest` on a week with one day under 30% and assert the text starts "Driest day:".
+
+### 1491. [LOW] `plain_reply`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:189` — Edge cases: (a) "now" with no days (L197, no tip after it); (b) "tomorrow" with only today's forecast (L204, falls back to today); (c) no days, with current conditions, when "now" wasn't asked (L211); (d) no days and no current conditions (L209, returns UNAVAILABLE).
+
+**Suggested fix:** One test per arm: (a) starts "Right now" with no tip text; (b) starts "Today"; (c) starts "Right now"; (d) equals UNAVAILABLE.
+
+### 1492. [LOW] `get_wording_llm`: edge arm untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:247` — Edge case: the flag is on but there's no OpenAI key (L250), so it returns None.
+
+**Suggested fix:** Test with the flag on and `openai_api_key=""` that it returns None.
+
+### 1493. [LOW] `facts`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:259` — Edge cases: no current conditions (L266) leaves out the "Right now" line, and no days (L277) leaves out the "Days:" line.
+
+**Suggested fix:** Two tests on `facts()`: `now=None` has no "Right now:" line; `days=[]` has no "Days:" line.
+
+### 1494. [LOW] `_company_country`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:317` — Edge cases: an id that isn't an ObjectId (L320) and a missing company (L322) both return None.
+
+**Suggested fix:** Two tests: "not-an-id" returns None, and a fresh unused ObjectId returns None.
+
+### 1495. [LOW] `_one_day`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/agents/planner/execute_weather.py:154` — Edge cases: a day with no rain chance (L156) has no rain clause, and an amount under the threshold (L158) has no "about".
+
+**Suggested fix:** Two tests on `plain_reply(..., "today")`: `rain_chance=None` has no "chance of rain"; `rain_amount=0.3` mm has no "about".
+
+### 1496. [LOW] `_get_json`: error arms untested (review 2026-11-05, Maple weather)
+`platform/services/weather.py:105` — Edge cases: an HTTP error such as the 403 seen live on 2026-11-04, and a body that isn't JSON (L113), both return None and log without the URL.
+
+**Suggested fix:** With `_google_over_http` in `tests/test_weather_service.py` (added by the 2026-11-05 fixes), a 403 handler and a non-JSON 200 should both return None. Assert the logged warning contains no "key".
+
+### 1497. [LOW] `get_forecast`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/services/weather.py:125` — Edge cases: (a) the days call fails but current conditions parse (L149), giving a Forecast with no days; (b) the cache at `_CACHE_MAX` is cleared (L152). (The time-zone arm in the review is gone: #7 of the review deleted `Forecast.time_zone`.)
+
+**Suggested fix:** Two tests: (a) days returns None and now parses, so `forecast.days == []` and `forecast.now` is set; (b) `_CACHE_MAX + 1` positions leave the cache with one entry.
+
+### 1498. [LOW] `_first_place`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/services/weather.py:162` — Edge cases: a result that isn't a dict (L166) is skipped, and a result without `formatted_address` (L173) is labelled with the text said.
+
+**Suggested fix:** Two tests: results `["x", {valid}]` gives the valid place; a result with no `formatted_address` gives `label` == the text said.
+
+### 1499. [LOW] `geocode_place`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/services/weather.py:179` — Edge cases: no key, or blank text (L187), return None without a call.
+
+**Suggested fix:** Two tests asserting None and no `_get_json` call: key "" with text "Guelph", and key set with text "   ".
+
+### 1500. [LOW] `_day`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/services/weather.py:245` — Edge cases: a day with only a night condition (L259) takes the night's text, and a day with no precipitation data (L262) gives `rain_chance` and `rain_amount` None.
+
+**Suggested fix:** Two parse tests on a single `forecastDays` entry.
+
+### 1501. [LOW] `here_position`: edge arms untested (review 2026-11-05, Maple weather)
+`platform/agents/conversation/here.py:80` — Edge cases: a stored position that isn't a dict, or has a non-number field (L87), returns None.
+
+**Suggested fix:** Test `here_position({POSITION_KEY: "x"})` is None, and `here_position({POSITION_KEY: {"latitude": "x", "longitude": 1}})` is None.
 
 ## Codebase hygiene (batchable)
 

@@ -2,9 +2,15 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-11-03
+**Last updated:** 2026-11-04
 
 ### Recent changes
+
+**2026-11-04 (the weather, Simon):** Maple answers the weather — now, today,
+tomorrow, the weekend or the week — where the user's phone is, at a property or
+a place named, or the last place said in the chat, and asks where when she
+can't tell. Her reply carries one note for the work (rain on seeding, sod and
+concrete; frost on planting; wind on spraying; heat on the crew) (new §8.6).
 
 **2026-10-23 (location and same-address links, Simon):** Maple knows where the
 user is. On a phone the portal sends the device's position, and the property
@@ -2777,6 +2783,42 @@ user at 14 Birch Rd with nothing in focus (`tests/planner_parity/cases.py`).
 | `who's the contact here?` / `who lives here?` [here] | `get_property` field=contacts | ✅ |
 | `add a note here: gate code 4411` [here] | `add_note` parent.domain=property | ✅ |
 | `create a task to fix the gate` [here] | `create_task` | ✅ then offers the property here as a yes/no — *"You're at 14 Birch Rd — want me to link T0042 to it?"*; a yes links it (`agents/planner/link_offers.py`) |
+
+## 8.6 The weather *(2026-11-04)*
+
+Weather matters to the work — seeding, sod, concrete, spraying, the crew in
+the heat — so Maple reads the forecast (Simon, 2026-11-04). The numbers are
+Google's Weather API on the Maps key (`services/weather.py`: now and seven days,
+°F and mph for a US company, °C and km/h otherwise); Maple words them in her
+own voice with one note for the work, answering a job asked about directly
+("can we pour concrete Saturday?"), and never changes a number
+(`agents/planner/execute_weather.py`). Without the model the same facts are said
+in fixed words with a rule-picked tip (*"Today at Oak House: Light rain, a high of
+9°C and a low of 3°C, with a 70% chance of rain (about 4.5 mm). Rain's likely —
+not the day for seeding, laying sod or pouring concrete."*).
+
+Where, first found wins: a place said — one of the company's properties by
+name or street, else a place on the map (the company's country first, so
+"London" is London, Ontario for a Canadian company); the phone's position this
+turn, to about a kilometre, named by the property it's at when it's at one
+(§8.5 — any fix within a few kilometres, not only 200 m); the last place said
+in this chat. With none, or "here" said on a desktop, Maple asks *"Happy to
+check the sky for you — where are you working? Give me a city or one of your
+properties."* and plans the question again with the answer; a place the map
+can't find is said and asked again. No forecast (the API refused, a rate
+limit) is said plainly: *"I couldn't get the forecast just now — try me again in
+a few minutes."*
+
+| Phrasing | Plan | Status |
+|---|---|---|
+| `what's the weather?` / `what's the forecast like here?` [here] | `weather` | ✅ the phone's position, said as at the property here |
+| `what's the weather?` | `weather` | ✅ with no position and no place said in the chat, Maple asks where |
+| `is it going to rain tomorrow?` | `weather` when=tomorrow | ✅ |
+| `how windy is it in Guelph right now?` | `weather` place=Guelph when=now | ✅ |
+| `weather at Elm House this weekend` | `weather` when=weekend | ✅ a property's own coordinates |
+| `will it freeze this week?` / `can we pour concrete on Saturday?` | `weather` when=week | ✅ the week's days; the reply answers the day asked |
+| `should we lay sod today or wait?` | `weather` | ✅ |
+| `how much do rain barrels cost?` | `list_materials` | ✅ a product, not the weather |
 
 ---
 
