@@ -193,9 +193,9 @@ fixtures — but these are past the point of scanning.
 | 909 | platform/tests/test_maple_work_item_edits.py |
 | 922 | platform/tests/test_company_api.py (+26 on 2026-11-04: an infinite markup refused) |
 | 889 | platform/tests/test_maple_listed_positional_reference.py |
+| 874 | platform/tests/test_address_service.py (first listed 2026-10-22 at 855; +19 on 2026-11-06 when the Places API (New) move added `post` to its fakes — the new Places tests went to `test_address_places_new.py`) |
 | 863 | [platform/tests/test_material_overrides_api.py](../../platform/tests/test_material_overrides_api.py) | 863 on 2026-11-04 (+2); new 2026-10-16 with the shared material catalog; crossed 800 in review round 3. **Next step:** move the reset/load-standard and upload sections into `test_material_standard_bulk_api.py` (review 2026-10-17 round 3 #13) |
 | 857 | platform/tests/test_planner_execute_figures.py (543 → 857 in the planner gap-fixing change — review round 13 #25) |
-| 855 | platform/tests/test_address_service.py (first listed 2026-10-22) |
 | 848 | platform/tests/test_planner_policy.py (first listed 2026-10-22) |
 | 846 | platform/tests/test_planner_followups.py (first listed 2026-10-22) |
 | 815 | platform/tests/test_agents_api.py |
@@ -590,6 +590,7 @@ propagate. Apply the same shape to other migration scripts in one pass.
 
 ### 184. [MEDIUM] `response.json()` decode errors no longer caught in `address_service.py`
 **Checked 2026-10-22:** Line numbers stale: unguarded response.json() now at address_service.py:368, :411, :465 (autocomplete/details/geocode); :508 already catches ValueError.
+**Checked 2026-11-06:** autocomplete and place details (moved to Places API (New)) now catch ValueError. Still unguarded: `geocode_lat_lng` and the geocode call in `normalize_address_parts`.
 
 **File**: [platform/services/address_service.py:366, :409, :468](../../platform/services/address_service.py)
 **Severity**: MEDIUM (behaviour change)
