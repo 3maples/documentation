@@ -8,8 +8,9 @@ enhancements; parts one and two, the API keys and the staff server's move to
 server: [analytics-mcp.md](analytics-mcp.md).
 
 Endpoint: `https://api.3maples.ai/mcp` (Dev: `https://api-dev.3maples.ai/mcp`).
-Transport: streamable HTTP, stateless, JSON responses. Auth: a user API key
-(`3m_app_…`) as a bearer token — no OAuth sign-in.
+Transport: streamable HTTP, stateless, JSON responses. Auth: **signing in**
+(OAuth 2.1 — the app opens 3Maples, the person approves it) or a user API key
+(`3m_app_…`) as a bearer token, for scripts and apps that can't sign in.
 
 ## Turning it on
 
@@ -25,6 +26,58 @@ live with the release).
 | `MCP_IP_RATE_LIMIT_PER_MINUTE` | 600 | requests per address, before the key lookup |
 | `MCP_MAX_PAGE_SIZE` | 200 | rows per list call |
 | `MCP_ACCESS_LOG_RETENTION_DAYS` | 395 | how long the per-call access log is kept |
+| `API_PUBLIC_URL` | unset | the API's own address (`https://api.3maples.ai`, no trailing slash); unset, sign-in is off |
+| `OAUTH_IP_RATE_LIMIT_PER_MINUTE` | 60 | requests per address to the sign-in routes |
+
+Sign-in also needs `APP_BASE_URL` to be this environment's portal:
+`/authorize` sends the person to `<APP_BASE_URL>/connect`.
+
+## Signing in (OAuth)
+
+Added 2026-11-06 so that setting up is "paste the address, sign in". Code:
+`platform/services/oauth.py` (the rules), `services/oauth_provider.py` (the
+MCP SDK's provider interface), `mcp_server/oauth_app.py` (the routes),
+`routers/oauth.py` (the consent page's API and connected-apps lists), portal
+`src/pages/auth/ConnectPage.tsx`.
+
+1. The app calls `/mcp` with no token. The 401's `WWW-Authenticate` names
+   `resource_metadata="<api>/.well-known/oauth-protected-resource/mcp"`
+   (RFC 9728), which names this API as the authorization server.
+2. The app reads `/.well-known/oauth-authorization-server` and registers
+   itself at `/register` (RFC 7591). **Every client is public**: whatever it
+   asks for, it is stored with `token_endpoint_auth_method: none` and no
+   secret — anyone can register, so a secret would prove nothing. PKCE (S256)
+   and an exact redirect match do. Redirects may be https, plain http only to
+   `localhost` / `127.0.0.1` / `[::1]`, or an app's own scheme (`cursor://`);
+   never `javascript:`, `data:`, `file:` or with a fragment. A client nobody
+   approves is deleted after 30 days.
+3. `/authorize` saves the request (10 minutes) and sends the browser to
+   `<APP_BASE_URL>/connect?request=…`. Signed out, the portal sends them to
+   sign in first and back (`/login?next=`).
+4. The page shows the app's name, where it gets access (a website's host, or
+   an app's own scheme written as `myapp://host` so it can't pass for that
+   website), and who it will act as. **"Allow it to make changes" starts
+   ticked** (Simon 2026-11-06) unless the app asked only for the `read`
+   scope; unticked, the connection is read-only. One person has at most one
+   live connection per app and server (a unique index). Approve or Deny
+   sends the browser back to the app with a code or `access_denied` (and
+   `iss`, RFC 9207).
+5. The app swaps the code (5 minutes, once) at `/token` for an access token
+   (`3m_oat_…`, an hour) and a refresh token (`3m_ort_…`, 30 days, rotated on
+   every use). **A spent code or refresh token presented again by its app
+   revokes the connection** — it was copied. `/revoke` with either token disconnects it.
+
+A **connection** acts as its person *now*, like a key: every call re-reads the
+user and company; leaving the company, being removed, moving company or the
+company closing stops it, and leaving revokes it for good (the five places
+that revoke keys revoke connections too). The person's role limits every write
+as usual. One person and one app make one connection — signing in again
+updates it.
+
+People see and disconnect their apps in **Settings → Account → Your connected
+apps**; Owners and Admins also see every app in the company. Only hashes of
+codes and tokens are stored (`oauth_tokens`), with the requests
+(`oauth_requests`), clients (`oauth_clients`) and connections (`oauth_grants`).
 
 ## Keys
 
@@ -37,7 +90,17 @@ below with the new key filled in.
 
 ## Connecting
 
-Claude Code:
+**By signing in** (most apps): add the server address, then sign in to 3Maples
+and approve when the app asks. Settings → Account shows the same steps.
+
+- claude.ai and Claude Desktop: **Settings → Connectors → Add custom
+  connector**, URL `https://api.3maples.ai/mcp`, no headers.
+- Claude Code: `claude mcp add --transport http 3maples https://api.3maples.ai/mcp`,
+  then `/mcp` → 3maples → authenticate.
+- Cursor or `.mcp.json`: `{ "mcpServers": { "3maples": { "type": "http", "url": "https://api.3maples.ai/mcp" } } }`.
+- ChatGPT and others: add it as a custom connector / MCP server with that URL.
+
+**With a key** (scripts, CI, apps that only send a header) — Claude Code:
 
 ```bash
 claude mcp add --transport http 3maples https://api.3maples.ai/mcp --header "Authorization: Bearer 3m_app_…"
@@ -164,9 +227,12 @@ adds), and reads skip the missing contacts.
 ## Auditing
 
 Every change an agent makes is on the company's audit trail like a portal
-change, with the key's user as the actor and `source: mcp`. Every call (reads
+change, with the key's or connection's user as the actor and `source: mcp`.
+Connecting, connecting again and disconnecting an app write
+`OAUTH_CONNECTION_CREATE` / `_UPDATE` / `_REVOKE` on the company (app name and
+scope, never a token). Every call (reads
 too) also writes an `mcp_access_logs` row with `kind: "company"`, the user, the
-company, the key, the tool, its arguments (free text, search terms, estimate
+company, the key (`api_key`) or connection (`oauth_grant`), the tool, its arguments (free text, search terms, estimate
 titles, a property's name, and people's names, emails, phones and street
 addresses recorded as `<text>`, nested ones too; empty arguments left out),
 rows returned, duration and any error. Customers can't read the access log;
@@ -177,10 +243,16 @@ staff can in the database.
 | Symptom | Cause | Fix |
 |---|---|---|
 | HTTP 404 | The servers are off in this environment | `MCP_SERVER_ENABLED=true` |
-| 401 "A valid 3Maples API key is required" | Unknown, revoked or expired key; the user left the company; the company is closed | Make a new key in Settings → Account |
+| 401 "A valid 3Maples API key is required" | Unknown, revoked or expired key or sign-in; the user left the company; the company is closed | Sign in again from the app, or make a new key in Settings → Account |
+| The app never offers to sign in; `/.well-known/oauth-authorization-server` is 404 | `API_PUBLIC_URL` unset on this environment | Set it (no trailing slash) |
+| `/connect` says "This sign-in link has expired" | More than 10 minutes passed, or it was already used | Start again from the app |
+| `/connect` says to sign in with a staff account / not a staff account | The app asked for the other server (`resource`) | Sign in with the right account, or fix the app's URL |
+| Tool error "… this connection is read-only" | "Allow it to make changes" was unticked, or the app asked only for `read` and the box was left unticked | Reconnect the app and tick it |
+| A browser-based tool (e.g. MCP Inspector) can't finish signing in; the browser console shows a CORS error on `/token` or `/register` | The app's CORS allow-list (`CORS_ORIGINS`) covers the portal only, and it answers those preflights before the OAuth routes do (accepted 2026-11-06: supported apps — Claude, Claude Code, Cursor, ChatGPT — sign in from their servers or desktop, not a web page) | Use a desktop or server-side client, or an API key |
 | Tool error "… used its 50 AI calls through the API for today" | The daily AI cap | Wait for midnight UTC, or raise `MCP_COMPANY_AI_DAILY_LIMIT` |
 | Tool error "… Maple credits …" | The company is out of credits (no card), the user hasn't accepted overage, or the company hit the Maple hard cap | Add a card, or accept in 3Maples; for the hard cap, contact 3Maples support |
 | 401 "Staff keys are accepted at /mcp/internal" | A staff `3m_mcp_` key | Use the staff server |
 | 429 "Too many requests for this API key / company" | A limit above | Wait a minute |
+| 429 on `/token`, `/authorize` or `/register` for many users at once | A hosted connector (claude.ai, ChatGPT) calls the sign-in routes from the provider's own servers, so all its users share a few addresses and one `OAUTH_IP_RATE_LIMIT_PER_MINUTE` allowance. At 60, that's roughly 12 sign-ins in the same minute, or about 3,600 connections refreshing hourly per provider address (accepted 2026-11-06: far above today's usage) | Raise `OAUTH_IP_RATE_LIMIT_PER_MINUTE` on Render (no release needed) |
 | Tool error "… this API key is read-only" | A `read` key on a write tool | Make a `read_write` key |
 | Tool error "Tasks isn't turned on for this account" | `TASKS_ENABLED` is off on this environment (platform-wide) | `TASKS_ENABLED=true` on the platform service |

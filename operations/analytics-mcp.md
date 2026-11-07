@@ -9,6 +9,17 @@ Rules for anyone changing it: `.claude/rules/mcp-analytics.md`.
 
 Endpoint: `https://api.3maples.ai/mcp/internal`
 
+**Two ways in** (2026-11-06): sign in with your staff account (no key — add the
+URL to the app and approve it on 3Maples' `/connect` page when it asks), or a
+staff API key (below), for scripts and apps that can't sign in. Sign-in needs
+`API_PUBLIC_URL` set on the platform; how it works is in
+[company-mcp.md](company-mcp.md#signing-in-oauth) — the staff server uses the
+same routes. A staff sign-in only reads (no "allow changes" box), acts as the
+staff member with their current role, stops when the account is disabled, and
+opens `/mcp/internal` only (its token starts `3m_ost_`; `/mcp` refuses it).
+Root sees and disconnects every staff member's signed-in apps in the same
+dialog as their keys (ops Staff page → API keys).
+
 ---
 
 ## 1. Get an API key
@@ -44,7 +55,8 @@ environment variable or a secrets manager, never in a repository or a chat.
 ## 2. Connect a client
 
 The server speaks Streamable HTTP and takes the key as a bearer token:
-`Authorization: Bearer 3m_mcp_…`. It has no OAuth sign-in.
+`Authorization: Bearer 3m_mcp_…` — or, with no key, the app signs you in
+(see the top of this page).
 
 **Smoke test first** (any shell; a 200 with a list of tools means the key and
 the endpoint both work):
@@ -88,9 +100,9 @@ Setting up the MCP connection in Claude Desktop:
 
 1. **Settings → Connectors → Add custom connector.**
 2. **Name:** `3maples-operations`. **URL:** `https://api.3maples.ai/mcp/internal`
-3. **Authentication:** choose **No sign-in**. Don't choose a sign-in option: this
-   server has no OAuth, so a sign-in attempt would just fail.
-4. **Request headers:** add
+3. **Signing in:** add no headers; save, then connect, and sign in with your
+   staff account on the 3Maples page that opens.
+4. **With a key instead:** choose **No sign-in** and add a request header
    - name `Authorization`
    - value `Bearer 3m_mcp_…` (the word `Bearer`, a space, then your key)
 5. Save, then turn the connector on in a chat's tools menu.
@@ -195,7 +207,8 @@ who asked, which tool, with what arguments, how many rows came back.
 | You see | Why | Fix |
 |---|---|---|
 | HTTP 404 | The server is off in this environment | Set `MCP_SERVER_ENABLED=true` on that environment's platform service (it starts the customer server at `/mcp` too) |
-| HTTP 401 | Missing, mistyped, revoked or expired key, or the staff account is disabled | Check the header is `Authorization: Bearer 3m_mcp_…`; issue a new key |
+| HTTP 401 | Missing, mistyped, revoked or expired key or sign-in, or the staff account is disabled | Check the header is `Authorization: Bearer 3m_mcp_…`; issue a new key, or sign in again from the app |
+| `/connect` says "This connects a 3Maples company…" | The app was pointed at `/mcp` | Point it at `/mcp/internal` |
 | HTTP 429 | More than 120 requests a minute on this key, or 600 from one address | Wait a minute; ask fewer, broader questions |
 | "include_details needs an ops_admin or root key" | Your role can't see details | Ask without details, or use a senior key |
 | "deleted_maple_session needs an ops_admin or root key" | A transcript is all customer words | Use a senior key |

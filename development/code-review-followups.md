@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1502**. Never
+- **Entries are numbered and permanent.** Next free number: **1522**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -5916,6 +5916,106 @@ total row count rather than blank-row count.
 `platform/agents/conversation/here.py:80` — Edge cases: a stored position that isn't a dict, or has a non-number field (L87), returns None.
 
 **Suggested fix:** Test `here_position({POSITION_KEY: "x"})` is None, and `here_position({POSITION_KEY: {"latitude": "x", "longitude": 1}})` is None.
+
+### 1502. [LOW] `redirect_problem` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #21)
+`platform/services/oauth.py:140` — Edge cases: line 145, something that isn't a URL (no scheme, e.g. "callback"); line 151, an https URI with no host ("https:///cb").
+
+**Suggested fix:** Add both to the `test_unsafe_redirects_are_refused` parametrize list (`"callback"`, `"https:///cb"`), each expecting 400 `invalid_redirect_uri`.
+
+### 1503. [LOW] `register_client` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #22)
+`platform/services/oauth.py:188` — Edge cases: line 192, more than MAX_REDIRECT_URIS (10) redirect URIs; line 201, a blank or over-long client_name (trimmed to 80, blank → None, which shows "An AI app").
+
+**Suggested fix:** (a) Register with 11 loopback URIs and assert 400 `invalid_redirect_uri`. (b) Register with `client_name=" "` and assert the consent page's `client_name` == "An AI app". (c) Register with a 200-character name and assert the response's `client_name` has 80 characters.
+
+### 1504. [LOW] `audience_of_resource` trailing-slash arm untested (review 2026-11-06, MCP OAuth sign-in #23)
+`platform/services/oauth.py:128` — Edge case: line 133, `resource=".../mcp/"` with a trailing slash must still name the customer server.
+
+**Suggested fix:** Authorize with `resource=COMPANY_RESOURCE + "/"`, then approve and assert the token opens /mcp.
+
+### 1505. [LOW] `account_for` mixed-case email arm untested (review 2026-11-06, MCP OAuth sign-in #24)
+`platform/services/oauth.py:292` — Edge case: lines 295/299, a Firebase email in different case from the stored User email ("Member@X.com") must still find the user.
+
+**Suggested fix:** Call `consent` with `as_email(email.upper())` and assert `account.email` is the lowercased address and `problem` is None.
+
+### 1506. [LOW] `approve` edge-case arm untested (review 2026-11-06, MCP OAuth sign-in #25)
+`platform/services/oauth.py:344` — Edge case: line 356, the client record is gone (TTL or a manual delete) when the person approves, so the grant is named "An AI app".
+
+**Suggested fix:** Start a request, delete its OAuthClient, approve, and assert the grant's `client_name` == "An AI app".
+
+### 1507. [LOW] `exchange_authorization_code` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #26)
+`platform/services/oauth_provider.py:83` — Edge cases: line 86, the code row vanished between load and exchange; lines 89-90, the connection was revoked between approval and the code exchange ("the connection was revoked").
+
+**Suggested fix:** (a) Approve, revoke the grant through DELETE /oauth/connections/{id}, then exchange the code; assert 400 `invalid_grant`. (b) Delete the code row with a monkeypatched `find_token` returning None on the second call; assert 400.
+
+### 1508. [LOW] `load_refresh_token` edge-case arm untested (review 2026-11-06, MCP OAuth sign-in #27)
+`platform/services/oauth_provider.py:93` — Edge case: line 101, refreshing after the connection was disconnected in Settings.
+
+**Suggested fix:** Connect, DELETE the connection, then POST /token `grant_type=refresh_token`; assert 400 `invalid_grant`. The tokens are deleted, so this also covers the `row is None` arm.
+
+### 1509. [LOW] `exchange_refresh_token` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #28)
+`platform/services/oauth_provider.py:107` — Edge cases: line 110, the row is gone after load; lines 112-115, losing the spend race (two refreshes at once), which revokes the connection; lines 117-118, the grant revoked after load.
+
+**Suggested fix:** Unit-test the provider directly. Load a StoredRefreshToken, call `oauth.spend(row)` yourself, then call `exchange_refresh_token`; assert TokenError("invalid_grant") and the grant revoked. Repeat with the grant revoked first and with the row deleted.
+
+### 1510. [LOW] `resolve_company_token` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #29)
+`platform/services/oauth.py:517` — Edge cases: line 522, a company-audience grant with no `user`; line 525, the user deleted outright (`User.get` None).
+
+**Suggested fix:** (a) Connect a member, delete their User document, and assert /mcp is 401. (b) Set the grant's `user` to None and assert 401.
+
+### 1511. [LOW] `resolve_staff_token` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #30)
+`platform/services/oauth.py:534` — Edge cases: line 538, a staff grant with no `staff`; line 541, the StaffUser deleted (the disabled case is tested).
+
+**Suggested fix:** Connect a staff member, delete the StaffUser, and assert /mcp/internal is 401. Separately set the grant's `staff` to None and assert 401.
+
+### 1512. [LOW] `_live_access` audience-mismatch arm untested (review 2026-11-06, MCP OAuth sign-in #31)
+`platform/services/oauth.py:505` — Edge case (a defensive guard no caller can reach today): line 512, a token carrying the company prefix whose grant is a staff grant.
+
+**Suggested fix:** Insert an OAuthToken with the `3m_oat_` prefix pointing at a staff grant, and assert `resolve_company_token` returns None.
+
+### 1513. [LOW] `/revoke` bad-request arm untested (review 2026-11-06, MCP OAuth sign-in #32)
+`platform/mcp_server/oauth_app.py:76` — Edge case: lines 81-83, a POST with no `token` or no `client_id` must be 400 `invalid_request`.
+
+**Suggested fix:** POST /revoke with `data={"client_id": cid}` and then with `data={"token": t}`; assert 400 and `error == "invalid_request"`.
+
+### 1514. [LOW] `OAuthApp._router` rebuild arm untested (review 2026-11-06, MCP OAuth sign-in #33)
+`platform/mcp_server/oauth_app.py:112` — Edge case: line 114, the router is rebuilt when API_PUBLIC_URL changes, so metadata names the new issuer.
+
+**Suggested fix:** GET the metadata, monkeypatch `settings.api_public_url` to "http://localhost:9999", GET it again, and assert `issuer` changed.
+
+### 1515. [LOW] `list_my_connections` no-company arm untested (review 2026-11-06, MCP OAuth sign-in #34)
+`platform/routers/oauth.py:191` — Edge case: lines 200-201, a signed-in customer with no company gets an empty list rather than an error.
+
+**Suggested fix:** Call GET /oauth/connections as a user with `company=None`; assert 200 `{"items": [], "total": 0}`.
+
+### 1516. [LOW] `disconnect` no-company arm untested (review 2026-11-06, MCP OAuth sign-in #35)
+`platform/routers/oauth.py:230` — Edge case: lines 243-244, a customer with no company (or no account) gets 404.
+
+**Suggested fix:** DELETE /oauth/connections/{id} as a user with `company=None`; assert 404 "Connection not found".
+
+### 1517. [LOW] `list_staff_connections` unknown-staff arm untested (review 2026-11-06, MCP OAuth sign-in #36)
+`platform/routers/ops.py:236` — Edge case: `_staff_or_404` for a staff id that doesn't exist.
+
+**Suggested fix:** GET /ops/staff/{random ObjectId}/oauth-connections as root; assert 404 "Staff user not found".
+
+### 1518. [LOW] `redirect_hosts` no-redirect arm untested (review 2026-11-06, MCP OAuth sign-in #37)
+`platform/services/oauth.py:563` — Edge case: line 570, a stored client whose `info` has no redirect_uris, so the listing shows no host.
+
+**Suggested fix:** Unset `info.redirect_uris` on a connected client and assert the connection's `redirect_host` is None in GET /oauth/connections.
+
+### 1519. [LOW] ConnectPage edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #38)
+`portal/src/pages/auth/ConnectPage.tsx:55` — Edge cases: line 45, `getRequest` resolves to null ("Couldn't load this sign-in request…"); line 62, approve or deny replies with no `redirect_url` ("No answer from 3Maples. Try again.").
+
+**Suggested fix:** In ConnectPage.test.tsx: (a) mock `getRequest` → null and expect the load message; (b) mock `approve` → `{}`, click Approve, expect "No answer from 3Maples" and `goTo` not called.
+
+### 1520. [LOW] ConnectionsTable edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #39)
+`portal/src/components/apiKeys/ConnectionsTable.tsx:32` — Edge cases: line 35, the load-error alert ("Failed to load connected apps."); line 42, the loading text; line 81, "Showing the newest N of M apps." when total > shown; line 89, the owner falling back to email, then "Former member".
+
+**Suggested fix:** In ConnectedAppsSection.test.tsx: (a) `listMine` rejects → expect the failure text; (b) a pending promise → expect "Loading connected apps..."; (c) `{items: [one], total: 3}` → expect "Showing the newest 1 of 3 apps."; (d) a company row with `user_name: null, user_email: "a@x.com"` → "a@x.com", and both null → "Former member".
+
+### 1521. [LOW] `ConnectRoute` auth-not-ready arm untested (review 2026-11-06, MCP OAuth sign-in #40)
+`portal/src/App.tsx:96` — Edge case: line 97, /connect while auth is still loading shows the loader instead of bouncing to /login.
+
+**Suggested fix:** In AppAuthRoutes.test.tsx, render /connect with `authReady=false` and assert the loader shows and there's no navigation to /login.
 
 ## Codebase hygiene (batchable)
 
