@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1522**. Never
+- **Entries are numbered and permanent.** Next free number: **1524**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -4464,6 +4464,11 @@ and will be resolved as part of the planned onboarding-flow overhaul.
 
 **Suggested fix:** (a) Pending PATCH, then "Turn on all" in the same tick → one write; (b) PATCH resolves null → switch applied, no toast, list refreshed.
 
+### 1522. [MEDIUM] Customer API keys can't be revoked from the portal while the keys section is hidden — accepted (review 2026-11-06, Settings AI Apps #1)
+`portal/src/components/settings/AiAppsTab.tsx:17` — With ApiKeysSection hidden, no page lists or revokes a customer key (3m_app_). A key made since 1.17.1 (2026-11-04) keeps working until it expires (up to a year) or its user leaves; if one leaks, neither its user nor an Owner/Admin can stop it from the portal.
+
+**Decision (Simon, 2026-11-06):** accepted — no customer has made a key, so option (b): accept the gap and revoke on request through the API. The rejected option (a) was a revoke-only "Your API keys" list shown only to someone with a live key. Revisit when keys come back (render ApiKeysSection in AiAppsTab) or the first customer key appears.
+
 ## Portal — tasks, properties, contacts and materials
 
 ### 494. [MEDIUM] portal/src/pages/EquipmentsPage.tsx:166 — plan committed to including EquipmentsPage; it was skipped, and naive inclusion would break saves
@@ -6007,8 +6012,8 @@ total row count rather than blank-row count.
 
 **Suggested fix:** In ConnectPage.test.tsx: (a) mock `getRequest` → null and expect the load message; (b) mock `approve` → `{}`, click Approve, expect "No answer from 3Maples" and `goTo` not called.
 
-### 1520. [LOW] ConnectionsTable edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #39)
-`portal/src/components/apiKeys/ConnectionsTable.tsx:32` — Edge cases: line 35, the load-error alert ("Failed to load connected apps."); line 42, the loading text; line 81, "Showing the newest N of M apps." when total > shown; line 89, the owner falling back to email, then "Former member".
+### 1520. [LOW] ConnectionsList edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #39)
+`portal/src/components/apiKeys/ConnectionsList.tsx:37` (renamed from ConnectionsTable.tsx 2026-11-06, a card per app) — Edge cases: line 40, the load-error alert ("Failed to load connected apps."); line 47, the loading text; line 86, "Showing the newest N of M apps." when total > shown; line 102, the owner falling back to email, then "Former member".
 
 **Suggested fix:** In ConnectedAppsSection.test.tsx: (a) `listMine` rejects → expect the failure text; (b) a pending promise → expect "Loading connected apps..."; (c) `{items: [one], total: 3}` → expect "Showing the newest 1 of 3 apps."; (d) a company row with `user_name: null, user_email: "a@x.com"` → "a@x.com", and both null → "Former member".
 
@@ -6016,6 +6021,11 @@ total row count rather than blank-row count.
 `portal/src/App.tsx:96` — Edge case: line 97, /connect while auth is still loading shows the loader instead of bouncing to /login.
 
 **Suggested fix:** In AppAuthRoutes.test.tsx, render /connect with `authReady=false` and assert the loader shows and there's no navigation to /login.
+
+### 1523. [LOW] ConnectPage staff disconnect note untested — won't fix (review 2026-11-06, Settings AI Apps #4)
+`portal/src/pages/auth/ConnectPage.tsx:27` — Edge case: line 162, the staff-audience arm of the disconnect note ("A root admin can disconnect it on the ops Staff page.") has no test; the company arm has one.
+
+**Decision (Simon, 2026-11-06):** ignore. The suggested test (assert that text in ConnectPage.test.tsx's staff-audience test) is not wanted; close this in the next cleanup pass.
 
 ## Codebase hygiene (batchable)
 

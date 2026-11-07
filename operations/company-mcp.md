@@ -74,24 +74,31 @@ that revoke keys revoke connections too). The person's role limits every write
 as usual. One person and one app make one connection — signing in again
 updates it.
 
-People see and disconnect their apps in **Settings → Account → Your connected
-apps**; Owners and Admins also see every app in the company. Only hashes of
+People see and disconnect their apps in **Settings → AI Apps → Your connected
+apps** (its own tab since 2026-11-06); Owners and Admins also see every app in the company. Only hashes of
 codes and tokens are stored (`oauth_tokens`), with the requests
 (`oauth_requests`), clients (`oauth_clients`) and connections (`oauth_grants`).
 
 ## Keys
 
-Each user makes their own in **Settings → Account → API keys**: scope `read`
-(default) or `read_write`, a year at most, ten active per user. Owners and
-Admins see and revoke every key in the company. A key acts as its user with
-their role at the moment of each call; it stops when the user leaves the
-company or the company closes. The same page shows the connection snippets
-below with the new key filled in.
+**Hidden in the portal since 2026-11-06**: signing in is the one way Settings
+→ AI Apps shows. The key routes (`/api-keys`) and keys made before still
+work; `ApiKeysSection` is kept and comes back by rendering it in
+`AiAppsTab` again. Until then nobody can make, see or revoke a customer key
+in the portal, so a key made before runs until it expires (a year at most) or
+its user leaves.
+
+When shown, each user makes their own in the **API keys** section:
+scope `read` (default) or `read_write`, a year at most, ten active per user.
+Owners and Admins see and revoke every key in the company. A key acts as its
+user with their role at the moment of each call; it stops when the user
+leaves the company or the company closes. The same page shows the connection
+snippets below with the new key filled in.
 
 ## Connecting
 
 **By signing in** (most apps): add the server address, then sign in to 3Maples
-and approve when the app asks. Settings → Account shows the same steps.
+and approve when the app asks. Settings → AI Apps shows the same steps.
 
 - claude.ai and Claude Desktop: **Settings → Connectors → Add custom
   connector**, URL `https://api.3maples.ai/mcp`, no headers.
@@ -243,7 +250,7 @@ staff can in the database.
 | Symptom | Cause | Fix |
 |---|---|---|
 | HTTP 404 | The servers are off in this environment | `MCP_SERVER_ENABLED=true` |
-| 401 "A valid 3Maples API key is required" | Unknown, revoked or expired key or sign-in; the user left the company; the company is closed | Sign in again from the app, or make a new key in Settings → Account |
+| 401 "A valid 3Maples API key is required" | Unknown, revoked or expired key or sign-in; the user left the company; the company is closed | Sign in again from the app (the portal no longer makes keys; see Keys) |
 | The app never offers to sign in; `/.well-known/oauth-authorization-server` is 404 | `API_PUBLIC_URL` unset on this environment | Set it (no trailing slash) |
 | `/connect` says "This sign-in link has expired" | More than 10 minutes passed, or it was already used | Start again from the app |
 | `/connect` says to sign in with a staff account / not a staff account | The app asked for the other server (`resource`) | Sign in with the right account, or fix the app's URL |
