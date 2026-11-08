@@ -24,6 +24,7 @@ Plans are versioned alongside the code so they stay discoverable, shareable, and
 | [2026-10-15-shared-material-catalog-design.md](2026-10-15-shared-material-catalog-design.md) | Shared standard material catalog: overrides, hide/duplicate, category opt-in, paged search |
 | [2026-10-15-shared-material-catalog-stage1-plan.md](2026-10-15-shared-material-catalog-stage1-plan.md) | Shared material catalog stage 1: platform models, catalog service, API, readers, migration |
 | [2026-10-15-shared-material-catalog-stage2-plan.md](2026-10-15-shared-material-catalog-stage2-plan.md) | Shared material catalog stage 2: portal materials page, category opt-in, onboarding, server-searched pickers |
+| [2026-11-06-document-template-builder-v1-plan.md](2026-11-06-document-template-builder-v1-plan.md) | Document editor v1: one block editor builds company templates (Settings) and per-estimate documents (Documents hub), then generates the Google Doc |
 
 ## Naming convention
 
