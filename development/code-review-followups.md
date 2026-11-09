@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1524**. Never
+- **Entries are numbered and permanent.** Next free number: **1605**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -142,9 +142,10 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 922 | [portal/src/components/tasks/TaskDialog.tsx](../../portal/src/components/tasks/TaskDialog.tsx) | **crossed the line** — was on Watch at 793; +73 on 2026-09-22 for #490's conflict handling. **Next step:** extract that state machine (`PendingConflict`, `saveThen`, `reportSaveFailure`, the Reload handler) into a `useConflictResolution` hook beside `ConflictNotice` — deliberately deferred until the estimate builder is wired, so a second caller shapes its API |
 | 912 | [platform/agents/orchestrator/intents.py](../../platform/agents/orchestrator/intents.py) | +36 on 2026-09-27 |
 | 910 | [portal/src/components/Layout/PortalLayout.tsx](../../portal/src/components/Layout/PortalLayout.tsx) | logged **three** times (894 / 878 / 838); 906 on 2026-10-19 (+22: the What's New buttons beside the bell — they move with the sidebar and drawer extractions), then 885 when the user menu moved into `UserMenuItems.tsx`, then 901 on 2026-10-20 (+16: the What's New dot on three buttons and its hook). Next: extract `PortalSidebar.tsx` (lines 398-580) with one `{company, user, unreadCount, isCollapsed, ...handlers}` prop object, then `MobileNavDrawer.tsx`; 910 on 2026-11-01 (+5, Maple location awareness: the location watch started from the textbox's focus or a recording) |
-| 890 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. 2026-10-21: +41 for per-request connections (`_request_builder`), `_load_credentials_info` and the sharing delegates; the sharing logic itself went to `services/google_drive_sharing.py`. 2026-10-26: −30 — `share_document` and the `grant_writer` / `revoke_writer` delegates replaced by `open_link_editing` / `close_link_access` / `modified_time`. 2026-11-01: +37 for text-block markdown in estimate docs (3ca456c; the formatter itself is `services/doc_markdown.py`). Still 90 over |
+| 900 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. 2026-10-21: +41 for per-request connections (`_request_builder`), `_load_credentials_info` and the sharing delegates; the sharing logic itself went to `services/google_drive_sharing.py`. 2026-10-26: −30 — `share_document` and the `grant_writer` / `revoke_writer` delegates replaced by `open_link_editing` / `close_link_access` / `modified_time`. 2026-11-01: +37 for text-block markdown in estimate docs (3ca456c; the formatter itself is `services/doc_markdown.py`). Still 90 over 2026-11-08: +10 net for `copy_style_base` (document templates), which now reuses `_copy_template`. |
 | 861 | [platform/services/material_catalog_writes.py](../../platform/services/material_catalog_writes.py) | **crossed the line 2026-10-21** (795 → 801): `next_copy_name` for Maple's copy offer (gap plan 2026-10-19 D2; review 2026-10-21 #83). **Next step:** move the copy helpers (`duplicate`, `next_copy_name`, `_next_copy_name`) into a `material_catalog_copies.py` re-exported from `material_catalog` — it joins the reader/writer import cycle, so it wants its own change |
 | 847 | [platform/models/estimate.py](../../platform/models/estimate.py) | 847 after review round 3 (+10: `lines_missing_ids` / `with_stored_line_ids`, shared with `Template`); **crossed the line 2026-11-04** (789 → 837, customer MCP server review round 2: `LINE_ID_PATTERN`, `_stored_line_id` and `JobItem._stored_line_ids`, so a line stored without an id loads with the same id every time). **Next step:** the line models (`MaterialItem`, `ActivityItem`, `LINE_ID_PATTERN`, `_stored_line_id`) into `models/estimate_lines.py`, re-exported from `models/estimate` |
+| 807 | [platform/routers/estimate_documents.py](../../platform/routers/estimate_documents.py) | **crossed the line 2026-11-08** (749 → 814): document templates' editor branch of draft and generate, then the review's function splits (`_planned_inputs`, `_build_next_doc`); 826 after round 2 (`client_ids` on `_plan_images`); 807 after round 3 trimmed `generate_google_doc`'s docstring. The editor's routes are the natural seam: move the layout draft/generate helpers to `routers/estimate_helpers/doc_layout.py` |
 | 812 | [platform/agents/task/operations.py](../../platform/agents/task/operations.py) | **crossed the line 2026-10-08** (was 774): `_handle_task_due_change` moved in beside the other sub-handlers (switchover phase 4b). **Next step:** the convert flow (`_handle_convert_task`, `_perform_conversion`, `_convert_error_copy`, about 175 lines) into `agents/task/convert.py` as a `TaskConvertBase` layer (review 2026-10-08 (4b) #22, deferred) |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
@@ -213,6 +214,7 @@ seams that already exist as separate classes.
 
 | Lines | Function |
 |------:|----------|
+| 236 | `App` — portal/src/App.tsx:134 (first measured 2026-11-08, document templates review round 3 #6; pre-existing, +4 for the two editor routes. Seam: move the `<Routes>` block into `AppRoutes()`) |
 | 74 | `TaskStatusesTab` — portal/src/components/tasks/TaskStatusesTab.tsx:22 (2026-10-21: moved from Settings to the Tasks page's Statuses tab and split over three review rounds, ~292 → 74 — the table, row, both dialogs and the `useTaskStatuses` hook came out. What's left is the header and the two dialog mounts. **Next step:** pull the dialog mounts into `TaskStatusDialogs` if it grows again — review 2026-10-21 round 3 #3) |
 | 998 | `_orchestrate_turn` — routers/agents.py:1165 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) Re-measured 822 on 2026-10-07; +28 that day (794 → 822) for the unanswered tracker's `_track_unanswered` closure and the crash-record hand-off. Re-measured 965 on 2026-10-13 (+7 in the planner gap-fixing change for the request as typed and the overage carry; the rest is older drift — review 2026-10-13 round 5 #32). Re-measured 995 at :1152 on 2026-10-19, Maple attachments round 3 (965 → 995). 998 at :1165 on 2026-11-01 (996 on main; +2, the phone's position read as the property here). |
 | 82 | `PhotoViewer` — portal/src/components/tasks/TaskPhotoGrid.tsx:111 (2026-10-19, review round 2 #29 for Maple attachments: `ViewerMedia` and `ViewerNav` extracted, 136 → 82, below the 128 it started at. What's left is the dialog shell, the focus effect and its comments: next, lift the focus/keyboard effect into a `useViewerKeys` hook) |
@@ -557,6 +559,13 @@ now.
 `platform/services/ops_queries.py:559` — `list_new_users` now takes `stage` / `offset` / `limit` and the MCP tool pages and caps it (review 2026-10-22 #16, fixed in part). The query itself still loads every unverified, company-less and mid-onboarding user ever. With `live_verification` on (the `/ops/new-users` route), it also runs one Firebase lookup over all of them, because a verified orphan is dropped only after its live verification is known. The rows are then sliced in Python. This grows with spam signups. (review 2026-10-22 #16, remainder deferred: a full fix moves the orphan and verification classification into the query, which is larger than the finding described.)
 
 **Suggested fix:** Classify in Mongo first. Put the never-joined and orphan conditions (`company: None` with `_id` in the ever-joined set, or `has_ever_joined_company`) and the onboarding-incomplete companies into the query, page there with `skip` / `limit`, and run the live Firebase lookup on the page's rows only. Add `page` / `page_size` to the route; the portal page already shows "N of total".
+
+### 1590. [LOW] The Documents hub fetches the full doc context only for division ids (review 2026-11-08, document templates #170)
+`portal/src/components/estimates/DocumentsHub.tsx:63` — `docContext` builds company, property and contacts on the server; the hub reads only `division_ids`.
+
+**Suggested fix:** Pass the estimate's division ids as a prop and drop the call. Deferred 2026-11-08: the estimate page holds only division names (the work items' `division` strings), and the server maps names to ids (`routers/estimate_document_layouts.py:68`), so the hub would need a divisions request instead; worth it only with a lighter server route that returns just the ids.
+
+**RESOLVED 2026-11-08:** Templates no longer have divisions (Simon; D3 revised). The hub doesn't call `docContext`, and `DocContext` has no `division_ids`.
 
 ## Silently swallowed errors
 
@@ -4815,6 +4824,11 @@ pre-existing errors it surfaces. Option B: accept the status quo. A is the bette
 `portal/` proves the pattern and the website now carries real logic in TS rather than a
 couple of DOM helpers — but it is scope beyond an SEO change.
 
+### 1604. [LOW] The AI Apps page publishes Grok steps nobody has tried (review 2026-11-08, document templates round 9 #7)
+`website/ai-apps.html:513` — The Grok section tells customers how to connect grok.com (Connectors → New Connector → Custom) and Grok Bot, and the privacy policy now names Grok. `documentation/operations/company-mcp.md:117` says neither route has been tried on a live account (2026-11-07), and the Grok Bot redirect (`cursor://anysphere.cursor-mcp/oauth/callback`, accepted by `services/oauth.py`) is known only from third-party reports. A wrong menu name or redirect would reach customers on a public page.
+
+**Suggested fix:** Connect grok.com to Dev (and a Grok Bot if one is to hand) before the website ships, correct any step that differs, then drop the "not tried" line from `company-mcp.md`. Or ship as is and accept the risk (Simon's call).
+
 ## Tests and tooling
 
 ### 300. [MEDIUM] 17 near-identical `assert client.portal is not None` lines across 10 test files
@@ -6026,6 +6040,407 @@ total row count rather than blank-row count.
 `portal/src/pages/auth/ConnectPage.tsx:27` — Edge case: line 162, the staff-audience arm of the disconnect note ("A root admin can disconnect it on the ops Staff page.") has no test; the company arm has one.
 
 **Decision (Simon, 2026-11-06):** ignore. The suggested test (assert that text in ConnectPage.test.tsx's staff-audience test) is not wanted; close this in the next cleanup pass.
+
+### 1524. [LOW] build_doc_context / company_lines / _fields edge cases untested (review 2026-11-08, document templates #175)
+`platform/services/document_templates/context.py:180` — Edge cases: a contact with no name dropped (194); first contact's blank phone/email uses the second's (108–111); no phone → None (199); no property → address None (201); blank company phone → None (132); empty logo_url → None (127); CUSTOMER_NAME/CATEGORY/COMPANY_CONTACT None (146/147/154); blank division skipped (119–120).
+
+**Suggested fix:** Unit tests with in-memory models: nameless + named contacts; no contacts and no property; company phone "  " and logo ""; divisions "" and "X"; no divisions → CATEGORY None.
+
+### 1525. [LOW] _execute / _status error arms untested (review 2026-11-08, document templates #176)
+`platform/services/document_templates/docs_composer.py:146` — Edge cases: non-429 re-raised (150–151); a second 429 raises (154); `_status` reading `resp.status` (113); non-int status → None (116–117).
+
+**Suggested fix:** batchUpdate raising 500 → raises; 429 twice → raises after one retry; `_status(resp.status=429) == 429`; `_status(status_code="x") is None`.
+
+### 1526. [LOW] compose_into / _clear_body / _logo_request / writers edge cases untested (review 2026-11-08, document templates #177)
+`platform/services/document_templates/docs_composer.py:565` — Edge cases: unknown block type → ComposeError (578–579); single empty paragraph skips the delete (535); logo with no size → 72pt (553); small logo scale 1 (550); second Company block keeps no second logo (320); customer with nothing printable prints no heading (343–344); signature with no party prints nothing (458–459).
+
+**Suggested fix:** One test per arm as listed (model_construct type "x"; FakeDocument(("",)); `_logo_request` without size; 100×50 logo; two company blocks → one "[img]"; empty CustomerLines; signature with both off).
+
+### 1527. [LOW] compose failure cleanup untested (review 2026-11-08, document templates #178)
+`platform/services/document_templates/generate.py:13` — Edge cases: compose_into raises → doc trashed, error re-raised (24–29); trash also raises → warning, original error propagates (27–28).
+
+**Suggested fix:** Stub drive whose compose fails; assert `trash_document(doc_id)` and the error; again with trash raising.
+
+### 1528. [LOW] resolve_started_from edge cases untested (review 2026-11-08, document templates #179)
+`platform/routers/estimate_helpers/doc_layout.py:106` — Edge cases: no `started_from` keeps the draft's (114); invalid JSON → 422 (117–118); non-ObjectId id → 404 (134).
+
+**Suggested fix:** Save twice without started_from and assert it's kept; `"{bad"` → 422; `{"kind":"template","id":"nope"}` → 404.
+
+### 1529. [LOW] parse_blocks / _check_new_ids / _photos_in_print_order / _library_copies / version_blocks edge cases untested (review 2026-11-08, document templates #180)
+**Update 2026-11-08 (round 2 #8):** the over-`MAX_DOC_IMAGES` arm in `_photos_in_print_order` was deleted (unreachable after `validate_layout`'s cap); drop it from this entry.
+`platform/routers/estimate_helpers/doc_layout.py:84` — Edge cases: bad blocks JSON/shape → 422 (87–88); upload with no id → 400 (190–191); duplicate new ids → 400 (192); new id clashing with the current draft (97–98); over MAX_DOC_IMAGES → 400 (214–216); library read failure → 502 (169–171); saved_text with missing content dropped (79).
+
+**Suggested fix:** One test per arm as listed (bad JSON; spec without id; two specs same id; reuse a draft photo id; `MAX_DOC_IMAGES=1` with 2; fake_store read raising; `version_blocks()` with empty `saved_texts`).
+
+### 1530. [LOW] create_doc_from_layout / build_layout_doc / compose_input failure arms untested (review 2026-11-08, document templates #181)
+`platform/routers/estimate_helpers/doc_layout.py:274` — Edge cases: create raises → 500 "Failed to create document." (289–291); build failure discards new blobs and re-raises (313–315); compose_input drops a photo id not in `images` (261).
+
+**Suggested fix:** Patch `create_estimate_from_style_base` to raise with one upload → 500 and the blob in `fake_store.deleted`; compose_input with an absent id → empty images list.
+
+### 1531. [LOW] the old dialog's draft stores no layout (untested) (review 2026-11-08, document templates #182)
+`platform/routers/estimate_documents.py:567` — Edge cases: no test asserts `blocks is None` and `started_from is None` for a draft saved from today's dialog (607).
+
+**Suggested fix:** Flag on, `_save_draft(info="x")`; assert both None.
+
+### 1532. [LOW] get_doc_start edge cases untested (review 2026-11-08, document templates #183)
+`platform/routers/estimate_document_layouts.py:72` — Edge cases: `source=template` with no id or a missing ObjectId → 404 (87/94); a legacy draft opens as Standard Estimate with its photos (101–102); `_named_photos` drops an unnamed image (52).
+
+**Suggested fix:** `?source=template` → 404; `&id=<FAKE_ID>` → 404; legacy draft with info and a photo → Notes text and the image id; `_named_photos([], [img]) == []`.
+
+### 1533. [LOW] _free_copy_name edge cases untested (review 2026-11-08, document templates #184)
+`platform/routers/document_templates.py:263` — Edge cases: long names truncated to fit (269); every candidate taken → 409 (272).
+
+**Suggested fix:** Duplicate a max-length name, assert length and prefix; cap at 1 with "Copy of X" taken → 409.
+
+### 1534. [LOW] update_document_template edge cases untested (review 2026-11-08, document templates #185)
+`platform/routers/document_templates.py:377` — Edge cases: concurrent save between read and replace (`matched_count == 0`) → 409 (425–430); "someone else" fallback (392); PUT/DELETE on `builtin:nope` → 404 (189–190).
+
+**Suggested fix:** Patch `replace_one` to match 0 → 409 VERSION_CONFLICT; `updated_by_email=None` with a stale version → "someone else"; `builtin:nope` → 404.
+
+### 1535. [LOW] Save as template, duplicate and set-default edge cases untested (review 2026-11-08, document templates #186)
+`platform/routers/document_templates.py:342` — Edge cases: the cap on from-estimate (355) and duplicate (463) → 409; audit metadata `from_estimate_id` (365), `duplicated_from` (475), `previous_default_id` (490) never asserted; set-default `builtin:nope` → 404.
+
+**Suggested fix:** Cap 1 with one template → both 409; read the audit rows and assert each key; set-default `builtin:nope` → 404.
+
+### 1536. [LOW] _clean_name non-string arm untested (review 2026-11-08, document templates #187)
+`platform/routers/document_templates.py:54` — Edge cases: a non-string name passes through to the str check (55–56).
+
+**Suggested fix:** POST `{"name": 5, "blocks": []}` → 422.
+
+### 1537. [LOW] upload / file / delete / list edge cases untested (review 2026-11-08, document templates #188)
+`platform/routers/document_images.py:119` — Edge cases: DuplicateKeyError race deletes blobs → 409 (165–167); missing stored file → 404 (182–183); blob delete failure still 200 (227–229); case-insensitive sort (116).
+
+**Suggested fix:** Patch insert to raise DuplicateKeyError; pop the blob and GET file; make `delete_doc_images` raise; upload "b" and "A" and assert order.
+
+### 1538. [LOW] _first_error / _clean_text / library_image_ids edge cases untested (review 2026-11-08, document templates #189)
+`platform/services/document_templates/blocks.py:146` — Edge cases: empty loc → message only (149); non-string text (31–32); a non-dict or id-less library ref skipped (183–184).
+
+**Suggested fix:** model_construct props as a list → "Block 1 (text):"; text=5 → LayoutError; `library_image_ids` with `["x", {"image_id": ""}]` → [].
+
+### 1539. [LOW] draft_layout started_from fallback untested (review 2026-11-08, document templates #190)
+`platform/services/document_templates/legacy.py:46` — Edge cases: blocks with no `started_from` → STANDARD_START (48).
+
+**Suggested fix:** `DocDraft(blocks=[divider], started_from=None)` → `STANDARD_START`.
+
+### 1540. [LOW] linked_texts edge cases untested (review 2026-11-08, document templates #191)
+`platform/services/document_templates/refs.py:32` — Edge cases: a gone Text Block left out (39–40); a non-ObjectId filtered (36); no links → {} with no query (37–38).
+
+**Suggested fix:** `linked_texts(company, [saved_text FAKE_ID, saved_text "nope"]) == {}` and `linked_texts(company, []) == {}`.
+
+### 1541. [LOW] caller_with_templates with no company untested (review 2026-11-08, document templates #192)
+`platform/services/document_templates/access.py:31` — Edge cases: `user.company is None` → 404 before the lookup (34).
+
+**Suggested fix:** Call it with `User(company=None, …)` and the flag on; assert 404.
+
+### 1542. [LOW] EstimateDocument edge cases untested (review 2026-11-08, document templates #193)
+`portal/src/pages/EstimateDocumentEditorPage.tsx:68` — Edge cases: save response without `doc_draft` → "saved" (121); `draft.blocks` missing (116); blank template name (145); response without a name (149); Owner arm of `isManager` (84); manager on a phone (196); title without `estimate_id` (184); busy labels and disabled buttons (164/168); "1 block" (233).
+
+**Suggested fix:** One test per arm: `{doc_draft:null}` → "Draft saved."; draft without blocks keeps order; empty name → not called; `{}` → typed name; Owner shows the button; phone hides it; heading "Document · Backyard patio"; held save → "Saving..." and both disabled; one block → "· 1 block".
+
+### 1543. [LOW] useDocumentLoad edge cases untested (review 2026-11-08, document templates #194)
+`portal/src/pages/EstimateDocumentEditorPage.tsx:36` — Edge cases: unknown `source=` falls back (47); null start/context (50, see #163); load failure message (56).
+
+**Suggested fix:** `?source=bogus` with a draft → `docStart("est1","draft")`; `docStart` → null; `estimates.get` rejecting → "Estimate not found".
+
+### 1544. [LOW] the page's flag edge cases untested (review 2026-11-08, document templates #195)
+`portal/src/pages/EstimateDocumentEditorPage.tsx:250` — Edge cases: `getCompany` rejecting → off notice (256); loading state (258).
+
+**Suggested fix:** Reject → "Document templates aren't turned on"; hold → "Opening the document...".
+
+### 1545. [LOW] TemplateEditor edge cases untested (review 2026-11-08, document templates #196)
+**Checked 2026-11-08:** the divisions arm went with the division settings; the others moved into `useTemplateActions` and `TemplateTopBar`.
+`portal/src/pages/DocumentTemplateEditorPage.tsx:46` — Edge cases: `duplicate` → null (`components/documentEditor/useTemplateActions.ts:26`); setDefault guard and catch (`useTemplateActions.ts:63`/`68`); Save disabled when clean (`TemplateTopBar.tsx:60`); "Saving..." (`TemplateTopBar.tsx:62`); "1 block" (`DocumentTemplateEditorPage.tsx:87`).
+
+**Suggested fix:** duplicate null → no navigation; reject setDefault → alert; clean → Save disabled; held update → "Saving..."; one block → "1 block · sample data".
+
+### 1546. [LOW] TemplateDetails and DivisionChecks edge cases untested (review 2026-11-08, document templates #197)
+`portal/src/pages/DocumentTemplateEditorPage.tsx:56` — Edge cases: no divisions hint (80); unticking removes (46).
+
+**Suggested fix:** `divisionsApi.list` → `[]` → hint; untick d1 and Save → `suggested_division_ids: []`.
+
+**RESOLVED 2026-11-08:** The division settings were removed (templates aren't tied to divisions), so `DivisionChecks` and the hint are gone.
+
+### 1547. [LOW] the page's gate edge cases untested (review 2026-11-08, document templates #198)
+`portal/src/pages/DocumentTemplateEditorPage.tsx:220` — Edge cases: Admin arm (224); `getCompany` rejecting (231); loading (236).
+
+**Suggested fix:** Admin opens the editor; reject → "aren't turned on"; hold → "Opening the template...".
+
+### 1548. [LOW] useTemplateEditor edge cases untested (review 2026-11-08, document templates #199)
+`portal/src/components/documentEditor/useTemplateEditor.ts:33` — Edge cases: no reload after a create moves the URL (46); new from an existing copies its description (60); `get` → null (58); `update` → null keeps the version (100); `create` → null error (103).
+
+**Suggested fix:** Assert `get` not called with the new id; `new?from=t1` description; null get → empty; null update then save → same version; null create → "Couldn't save the template.".
+
+### 1549. [LOW] useDocumentTemplatesOn edge cases untested (review 2026-11-08, document templates #200)
+`portal/src/components/documentEditor/useDocumentTemplatesOn.ts:11` — Edge cases: `getCompany` rejecting → false (19); empty COMPANY_ID → false with no lookup (24).
+
+**Suggested fix:** renderHook with a rejecting `getCompany` → false; `COMPANY_ID = ""` → false and not called.
+
+### 1550. [LOW] SettingsPage flag edge cases untested (review 2026-11-08, document templates #201)
+`portal/src/pages/SettingsPage.tsx:328` — Edge cases: Admin arm of `canManageTabs` (328); company read failing keeps Text Blocks (341).
+
+**Suggested fix:** Admin → "Documents" tab; reject `/companies/co_test` → "Text Blocks" and no "Documents".
+
+### 1551. [LOW] TextBlocksTab description edge cases untested (review 2026-11-08, document templates #202)
+`portal/src/components/settings/TextBlocksTab.tsx:55` — Edge cases: neither the default nor DocumentTemplatesTab's custom description is asserted.
+
+**Suggested fix:** Assert the default text in TextBlocksTab.test and "every template using it follows" in DocumentTemplatesTab.test.
+
+### 1552. [LOW] useStartOptions edge cases untested (review 2026-11-08, document templates #203)
+`portal/src/components/estimates/DocumentsHub.tsx:54` — Edge cases: templates list failing (62); `docContext` failing (65); "Loading templates…" (194); "Built-in" badge (75).
+
+**Suggested fix:** Reject list → the message with Blank and Version 2 still offered; reject docContext → Alpha before Patio; hold → loading text; Standard label has "Built-in".
+
+### 1553. [LOW] DocumentsHub edge cases untested (review 2026-11-08, document templates #204)
+`portal/src/components/estimates/DocumentsHub.tsx:131` — Edge cases: a picked key that vanished falls back (140); `!chosen` guard (148); draft without `started_from` → "Draft" (176); Close → `onClose` (158).
+
+**Suggested fix:** Draft without started_from → exactly "Draft"; Close → `onClose` called; remove versions after picking → Blank checked.
+
+### 1554. [LOW] savedLine and createdOn edge cases untested (review 2026-11-08, document templates #205)
+`portal/src/components/estimates/DocumentsHub.tsx:38` — Edge cases: no `saved_by` (42); invalid `saved_at` (40); version without/invalid `created_at` (47).
+
+**Suggested fix:** `saved_by: null` → "saved ·"; `saved_at: "x"` → "saved by Ana"; no created_at → note is just "from Alpha".
+
+### 1555. [LOW] edited() edge cases untested (review 2026-11-08, document templates #206)
+`portal/src/components/settings/DocumentTemplatesTab.tsx:19` — Edge cases: built-in or no `updated_at` → "—" (20); invalid date (22); no email (23).
+
+**Suggested fix:** Standard row → "—"; `updated_at: "x"` → "dana"; no email → date only.
+
+### 1556. [LOW] DocumentTemplatesTab edge cases untested (review 2026-11-08, document templates #207)
+**Checked 2026-11-08:** the "no divisions" arm went with the Divisions column.
+`portal/src/components/settings/DocumentTemplatesTab.tsx:140` — Edge cases: description line (73); loading (163); delete Cancel (179); buttons disabled while busy (45/50).
+
+**Suggested fix:** Assert the description; hold list → loading; Delete → Cancel → not removed; hold duplicate → buttons disabled.
+
+### 1557. [LOW] useDocumentTemplatesAdmin edge cases untested (review 2026-11-08, document templates #208)
+**Checked 2026-11-08:** the divisions arm went with the hook's division load.
+`portal/src/components/settings/useDocumentTemplatesAdmin.ts:33` — Edge cases: failed delete keeps the confirm (64); `!toDelete` guard (62); setDefault with list null (59); `active` false loads nothing (25).
+
+**Suggested fix:** Reject remove → dialog open with "x"; `active={false}` → list not called.
+
+### 1558. [LOW] DocumentEditor edge cases untested (review 2026-11-08, document templates #209)
+`portal/src/components/documentEditor/DocumentEditor.tsx:63` — Edge cases: Escape with a dialog open (86); drop line (97); drop with no target (104); non-block target (106); DragOverlay label (178); phone with nothing selected (140).
+
+**Suggested fix:** Escape in Save-as-template keeps the selection; drag helper with `over: null` and an unknown id adds nothing; phone → no "Edit block" before selecting.
+
+### 1559. [LOW] ReadinessBar edge cases untested (review 2026-11-08, document templates #210)
+`portal/src/components/documentEditor/ReadinessBar.tsx:11` — Edge cases: "1 thing to check" (18); a document-level warning has no name button (41).
+
+**Suggested fix:** One warning → singular; no Estimate block → that warning has no button.
+
+### 1560. [LOW] ImageSection edge cases untested (review 2026-11-08, document templates #211)
+`portal/src/components/documentEditor/BlockPalette.tsx:108` — Edge cases: blank name does nothing (124); chooser closed with no file (162); "No images yet." (166).
+
+**Suggested fix:** Clear name and save → not called; empty FileList → no dialog; list `[]` → text.
+
+### 1561. [LOW] BlockPalette edge cases untested (review 2026-11-08, document templates #212)
+`portal/src/components/documentEditor/BlockPalette.tsx:213` — Edge cases: library load error alert (226); in-sheet instruction (218); disabled item's title (46).
+
+**Suggested fix:** Reject textBlocks list → alert; phone sheet → "Tap a block to add it"; "Add Estimate block" title text.
+
+### 1562. [LOW] BlockCard edge cases untested (review 2026-11-08, document templates #213)
+`portal/src/components/documentEditor/LayoutCanvas.tsx:46` — Edge cases: click in a read-only built-in (50); focus selects (61); Move up and end-disabled (92/96); no drag handle on a phone (87); drop line (73).
+
+**Suggested fix:** Built-in click → no selection; focus → selected; first up disabled, last down disabled, Customer up reorders; phone → no "Drag".
+
+### 1563. [LOW] LayoutCanvas and EndDropZone edge cases untested (review 2026-11-08, document templates #214)
+`portal/src/components/documentEditor/LayoutCanvas.tsx:149` — Edge cases: page click read-only (155); empty-page hint (136); no end zone read-only (168); no footer (171).
+
+**Suggested fix:** Blank template → hint; built-in → no hint or zone.
+
+### 1564. [LOW] CompanyView edge cases untested (review 2026-11-08, document templates #215)
+`portal/src/components/documentEditor/BlockView.tsx:73` — Edge cases: label "none" (76); logo without size → 72pt (84); missing address/phone/email/website skipped (93–96).
+
+**Suggested fix:** "none" → no h1; logo without size → 72pt; website shown / absent.
+
+### 1565. [LOW] CustomerView edge cases untested (review 2026-11-08, document templates #216)
+`portal/src/components/documentEditor/BlockView.tsx:102` — Edge cases: all options off → "nothing to print" (111); no names (106).
+
+**Suggested fix:** Untick all four → that text; `names: []` → no names line.
+
+### 1566. [LOW] EstimateView edge cases untested (review 2026-11-08, document templates #217)
+`portal/src/components/documentEditor/BlockView.tsx:120` — Edge cases: divisions shown/skipped (135); description as markdown (136); no work items → no table (139); tax note off (165).
+
+**Suggested fix:** Template context → "Division: Design/Build" and the description; `work_items: []` → no table; `show_tax_note: false` → no note.
+
+### 1567. [LOW] TextView edge cases untested (review 2026-11-08, document templates #218)
+`portal/src/components/documentEditor/BlockView.tsx:172` — Edge cases: empty unselected → "Empty Text block: it won't print." (197); "Prints as (sample data)" vs "Prints as" (189).
+
+**Suggested fix:** Deselect an empty Text block → text; template mode with a field → "(sample data)"; document mode → "Prints as".
+
+### 1568. [LOW] SavedTextView edge case untested (review 2026-11-08, document templates #219)
+`portal/src/components/documentEditor/BlockView.tsx:212` — Edge cases: a linked Text Block with empty content (215).
+
+**Suggested fix:** `content: " "` → "“Warranty” is empty: it won't print."
+
+### 1569. [LOW] ImageView edge cases untested (review 2026-11-08, document templates #220)
+`portal/src/components/documentEditor/BlockView.tsx:265` — Edge cases: empty text per mode (281); template "+ photos added on each document" (279); deleted library ref skipped (269); photo id not in pool skipped (276).
+
+**Suggested fix:** Empty block in each mode → its text; library ref to a missing id → the empty text.
+
+### 1570. [LOW] imageRows edge cases untested (review 2026-11-08, document templates #221)
+`portal/src/components/documentEditor/BlockView.tsx:245` — Edge cases: same-size photos share a row up to the column count (249); a size change starts a row (250).
+
+**Suggested fix:** Export and unit-test: medium ×4 + large → rows of 3, 1, 1.
+
+### 1571. [LOW] SignatureView edge cases untested (review 2026-11-08, document templates #222)
+`portal/src/components/documentEditor/BlockView.tsx:304` — Edge cases: no parties → "Signature: choose who signs." (308); printed name or date off (317/318).
+
+**Suggested fix:** Untick both → that text; `date: false` → no "Date:".
+
+### 1572. [LOW] LibraryThumb and PhotoThumb edge case untested (review 2026-11-08, document templates #223)
+`portal/src/components/documentEditor/BlockView.tsx:224` — Edge cases: the grey placeholder while loading (232/260).
+
+**Suggested fix:** Hold `documentImagesApi.file` → a `role="img"` placeholder named after the image.
+
+### 1573. [LOW] DividerView and BlockView switch edge cases untested (review 2026-11-08, document templates #224)
+`portal/src/components/documentEditor/BlockView.tsx:325` — Edge cases: green divider (326); Page break "New page" (352); Spacer heights (364).
+
+**Suggested fix:** green → rgb(46,107,61); Page break → "New page"; Spacer large → 48pt.
+
+### 1574. [LOW] DocMarkdown renderers untested (review 2026-11-08, document templates #225)
+`portal/src/components/documentEditor/DocMarkdown.tsx:14` — Edge cases: h1/h2/h3, ul/ol and link renderers aren't exercised.
+
+**Suggested fix:** Render "# A\n\n- b\n\n[c](http://x)" → 20pt h1, disc list, "c" as a styled span.
+
+### 1575. [LOW] BlockOptions edge cases untested (review 2026-11-08, document templates #226)
+`portal/src/components/documentEditor/Inspector.tsx:188` — Edge cases: counter red past 5000 (227); "Deleted Text Block" (236); Page break note (264).
+
+**Suggested fix:** 5001 chars → `text-red-600`; missing link → "Deleted Text Block"; Page break → its note.
+
+### 1576. [LOW] ImageOptions edge cases untested (review 2026-11-08, document templates #227)
+`portal/src/components/documentEditor/Inspector.tsx:129` — Edge cases: "Deleted image" (149); no library → no select (167); template photos hint (178).
+
+**Suggested fix:** Ref to "gone" → "Deleted image"; list `[]` → no select; template mode → the hint.
+
+### 1577. [LOW] BlockPanel edge cases untested (review 2026-11-08, document templates #228)
+`portal/src/components/documentEditor/Inspector.tsx:273` — Edge cases: no Heading for Page break/Spacer (282); cleared heading → null (286); no spacing for Page break (290).
+
+**Suggested fix:** Spacer → no heading field; Page break → no "Space above"; clear Customer heading, Save → `heading: null`.
+
+### 1578. [LOW] Inspector edge cases untested (review 2026-11-08, document templates #229)
+`portal/src/components/documentEditor/Inspector.tsx:306` — Edge cases: selecting a block switches to the Block tab (315); Block tab disabled with none selected (323); "Select a block…" hint (333).
+
+**Suggested fix:** Document tab then click a block → Block tab selected; no selection → disabled and the hint.
+
+### 1579. [LOW] PhotoOptions edge cases untested (review 2026-11-08, document templates #230)
+`portal/src/components/documentEditor/PhotoOptions.tsx:34` — Edge cases: "No photos yet." (49); move up/down disabled at the ends (59/61); kit error alert (94).
+
+**Suggested fix:** Empty block → text; two uploads → end buttons disabled; move first down, Save → order swapped.
+
+### 1580. [LOW] asDraft edge cases untested (review 2026-11-08, document templates #231)
+`portal/src/components/documentEditor/PhotoOptions.tsx:21` — Edge cases: kept and note arms feeding the note picker's already-included count.
+
+**Suggested fix:** With a kept and a note photo placed, open From Notes → that photo marked included and the right room shown.
+
+### 1581. [LOW] useDocumentPhotos edge cases untested (review 2026-11-08, document templates #232)
+`portal/src/components/documentEditor/useDocumentPhotos.ts:28` — Edge cases: `move` out of bounds (81–85); `addNotes` skips placed photos (62–68); past the cap (70); null FileList (54); placing nothing (47); object URLs revoked (16/40/92).
+
+**Suggested fix:** renderHook: same note twice → one photo; 29 placed + 2 picks → one placed and the error; spy `URL.revokeObjectURL` on unmount.
+
+### 1582. [LOW] usePhotoThumb edge cases untested (review 2026-11-08, document templates #233)
+`portal/src/components/documentEditor/usePhotoThumb.ts:7` — Edge cases: kept photo's thumb fetch (9); note photo's (10); no photo (8).
+
+**Suggested fix:** Open a draft with a kept image → `docImageBlob("est1", id, "thumb")`; a note photo → `attachmentBlob(…, "thumb")`.
+
+### 1583. [LOW] useEditorLibraries edge cases untested (review 2026-11-08, document templates #234)
+`portal/src/components/documentEditor/useEditorLibraries.ts:14` — Edge cases: load failure sets `error` (43); null response leaves the list empty (40); `reloadImages` catch (31). (`reloadSavedText` is #54.)
+
+**Suggested fix:** Reject textBlocks list → palette alert; reject images list on reload after an upload → the library message.
+
+### 1584. [LOW] readiness edge cases untested (review 2026-11-08, document templates #235)
+`portal/src/components/documentEditor/readiness.ts:30` — Edge cases: an Image block with library images and no photos is fine (51); the same missing field twice warns once (23).
+
+**Suggested fix:** Library-only Image block → no warning; "{{CUSTOMER_PHONE}} {{CUSTOMER_PHONE}}" → one warning.
+
+### 1585. [LOW] documentPhotos edge cases untested (review 2026-11-08, document templates #236)
+`portal/src/components/documentEditor/documentPhotos.ts:25` — Edge cases: missing size/caption fallback (26); no `URL.createObjectURL` (30); an id not in the pool skipped (54); `photoName` kept/note arms (73/75).
+
+**Suggested fix:** Image without size/caption → `{size:"large", caption:""}`; stub createObjectURL undefined → `""`; block naming "nope" → no images; `photoName` for kept and note.
+
+### 1586. [LOW] layoutReducer edge cases untested (review 2026-11-08, document templates #237)
+`portal/src/components/documentEditor/layoutReducer.ts:50` — Edge cases: `move` unknown/same id (63); `duplicate` unknown (74); `remove` unknown (84); `update`/`updateProps` unknown (46); `add` with a stale `selectedId` appends (54).
+
+**Suggested fix:** Each unknown-id action returns the same state (`toBe`); stale selection + add → appended.
+
+### 1587. [LOW] newBlockId fallback untested (review 2026-11-08, document templates #238)
+`portal/src/components/documentEditor/blockDefaults.ts:70` — Edge cases: no `crypto.randomUUID` (73).
+
+**Suggested fix:** `vi.stubGlobal("crypto", {})` → matches /^[0-9a-f]{32}$/.
+
+### 1588. [LOW] startName edge case untested (review 2026-11-08, document templates #239)
+`portal/src/lib/documentPaths.ts:20` — Edge cases: a version start with no `id` keeps its stored name (21).
+
+**Suggested fix:** `startName({kind:"version", name:"Copy of v1"}) === "Copy of v1"`.
+
+### 1589. [LOW] splitMergeFields edge case untested (review 2026-11-08, document templates #240)
+`portal/src/components/documentEditor/mergeFields.ts:19` — Edge cases: a known field with no MergeFieldDef labels itself by its key (44).
+
+**Suggested fix:** `splitMergeFields("{{X}}", {X: null}, [])` → `[{kind:"missing", key:"X", label:"X"}]`.
+
+### 1591. [LOW] useStartEditor, DraftCard and ReplaceDraftDialog edge cases untested (review 2026-11-08 round 2, document templates #72)
+`portal/src/components/estimates/DocumentsHub.tsx:210` — Edge cases: `onBeforeStart` rejecting is caught as not saved (220–221); the `if (starting) return` guard (214); Continue draft disabled while starting (273); ReplaceDraftDialog's "This estimate has a saved draft (saved by Ana · …)" line (198).
+
+**Suggested fix:** Reject `onBeforeStart` → START_SAVE_FAILED alert, no navigation; hold it with a draft → Continue draft disabled; Start over a draft → dialog text contains "saved by Ana".
+
+### 1592. [LOW] useTemplateEditor and useTemplateLoad edge cases untested (review 2026-11-08 round 2, document templates #73)
+`portal/src/components/documentEditor/useTemplateEditor.ts:118` — Edge cases: a failed save's message clears when another template opens (152); `/new` with no `?from` starts empty without a read (59).
+
+**Suggested fix:** Reject update on t1 → alert, navigate to t2 → no alert; render `/settings/document-templates/new` → no blocks, `templates.get` not called.
+
+### 1593. [LOW] useTemplateActions edge cases untested (review 2026-11-08 round 2, document templates #74)
+`portal/src/components/documentEditor/useTemplateActions.ts:10` — Edge cases: no saved id doesn't read the list (17); a failed list read leaves "Set as default" showing (23).
+
+**Suggested fix:** `/new?from=blank` → `templates.list` not called; reject `templates.list` on t1 → "Set as default" shows, no alert.
+
+### 1594. [LOW] TemplateEditor edge cases untested (review 2026-11-08 round 2, document templates #75)
+`portal/src/pages/DocumentTemplateEditorPage.tsx:106` — Edge cases: `sampleContext` resolving null → "Couldn't open the template." (119); an unsaved new template shows no Set as default (127).
+
+**Suggested fix:** `templates.sampleContext.mockResolvedValue(null)` → that text, no Page region; `/new?from=blank` → no "Set as default".
+
+### 1595. [LOW] useDocumentPhotos edge cases untested (review 2026-11-08 round 2, document templates #76)
+`portal/src/components/documentEditor/useDocumentPhotos.ts:60` — Edge cases: `remove` keeps a photo another block still names (91–92); `room` clamps to 0 past the cap (64); `photoIdsOf` on a non-Image id (68).
+
+**Suggested fix:** renderHook: two Image blocks naming "p1", remove from one → "p1" kept and `revokeObjectURL` not called; 31 library refs → `room === 0`.
+
+### 1596. [LOW] notesNotYetPlaced edge cases untested (review 2026-11-08 round 2, document templates #77)
+`portal/src/components/documentEditor/documentPhotos.ts:52` — Edge cases: a placed upload, and a placed kept photo with no `source_attachment_id`, add nothing to `included` (57–58).
+
+**Suggested fix:** Place an upload and a sourceless kept photo, pick "a1" → `["a1"]`.
+
+### 1597. [LOW] Inspector option components' edge cases untested (review 2026-11-08 round 2, document templates #78)
+`portal/src/components/documentEditor/Inspector.tsx:150` — Edge cases: LibraryRefRow stores a cleared caption as null (173); AddLibraryImage's placeholder adds nothing (188); InsertField's placeholder inserts nothing (117); a field group with no fields gets no optgroup (111).
+
+**Suggested fix:** Type then clear a ref's Caption → `caption: null`; select "" in each select → nothing changes; merge fields with no property group → no "Property" optgroup.
+
+### 1598. [LOW] useEditorDrag edge cases untested (review 2026-11-08 round 2, document templates #79)
+`portal/src/components/documentEditor/useEditorDrag.ts:22` — Edge cases: `onDragEnd` passing ids and `paletteData(...)` into `dropAction` and dispatching (47–48); `onDragCancel` clearing the overlay and drop line (50).
+
+**Suggested fix:** renderHook with a spy dispatch: palette onto "b-customer" → `{type:"add", index:1}`; block onto block → `{type:"move"}`; `onDragOver` then `onDragCancel` → `dropTargetId` and `dragging` null.
+
+### 1599. [LOW] countWarnings, WarningBadge and placedPhotosOf edge cases untested (review 2026-11-08 round 2, document templates #80)
+`portal/src/components/documentEditor/DocumentEditor.tsx:54` — Edge cases: a document-level warning gets no badge (57); two warnings → "2 to check" (LayoutCanvas.tsx:48); placedPhotosOf leaves out pool photos no block names (65).
+
+**Suggested fix:** No Estimate block plus an empty Text block → only the Text block badged; a Text block with two missing fields → "2 to check"; upload into an Image block, remove it, add another → its photo options list nothing.
+
+### 1600. [LOW] the Add sheet closing after adding a block is untested (review 2026-11-08 round 2, document templates #81)
+`portal/src/components/documentEditor/PhoneEditor.tsx:15` — Edge cases: line 45; the phone test never asserts the dialog is gone.
+
+**Suggested fix:** After "Add Divider block" in the sheet, assert `queryByRole("dialog")` is null.
+
+### 1601. [LOW] useLibraryImageActions, UploadImageAction and ImageThumb edge cases untested (review 2026-11-08 round 2, document templates #82)
+`portal/src/components/documentEditor/useLibraryImageActions.ts:15` — Edge cases: Cancel on the name dialog (61); Cancel on the delete confirm (62); confirm busy while deleting (BlockPalette.tsx:166); Upload opening the chooser (138); the input reset so the same file can be picked again (144); ImageThumb's placeholder while loading (102).
+
+**Suggested fix:** Upload → Cancel → no dialog, `upload` not called; Delete → Cancel → `remove` not called; hold `remove` → Delete disabled; click Upload → input click spy called; after an upload the input value is "".
+
+### 1602. [LOW] useSaveAsTemplate, applySavedDraft and request edge cases untested (review 2026-11-08 round 2, document templates #83)
+`portal/src/components/estimateDocument/useDocumentActions.ts:28` — Edge cases: Cancel closes Save as template (45); typing ignored while saving (46); a saved draft's own `started_from` replaces the shown start (64); the `request()` null/busy guards (82/89/105).
+
+**Suggested fix:** Open Save as template → Cancel → no dialog, not called; hold `saveFromEstimate`, type → name unchanged; `saveDocLayout` returning `started_from: {kind:"version", id:"1"}` → "Started from Version 1".
+
+### 1603. [LOW] top bar and DocumentTab edge cases untested (review 2026-11-08 round 2, document templates #84)
+`portal/src/components/estimateDocument/EstimateDocumentTopBar.tsx:46` — Edge cases: `md:pr-20` room for the closed Maple button on the document page (51); the Document tab's "Started from …" text (EstimateDocumentEditorPage.tsx:38).
+
+**Suggested fix:** Header has `md:pr-20` with Maple closed, not open or on a phone; click the Document tab → "Started from Standard Estimate.".
 
 ## Codebase hygiene (batchable)
 

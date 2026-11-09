@@ -3,7 +3,7 @@
 Mockups: https://claude.ai/artifact/6KUnMnk1ww9C9dJAMKpS8p (Settings list, editor in template mode, Documents hub, editor in document mode, sample output). Redrawn 2026-11-07 for one editor.
 PRD: "Document Builder" (14 pp, read in full).
 
-**Status:** Plan, not started.
+**Status:** All 5 steps built (not yet committed); the live spike ran on 2026-11-07 against Dev Drive (results under step 2 below). Steps 3 and 4 are in Simon's manual test (his changes are listed under each). The full platform and portal suites haven't been run yet: they run when Simon asks.
 - **2026-11-06:** reviewed against the code (platform 56e66ff, portal 89dd848).
 - **2026-11-07:** reshaped by Simon three times that day:
   - A template is one top-down list of blocks: no sections, no columns.
@@ -11,6 +11,55 @@ PRD: "Document Builder" (14 pp, read in full).
   - **One editor builds both templates and documents.** A document starts from a blank page, a template or an earlier version, and is then edited block by block with the estimate's data already filled in. This brings the PRD's per-estimate tailoring (A*, B10–B12, F2) into v1.
 - **Q5–Q8** were answered the same day (D15–D18).
 - **Final review, 2026-11-07** (the last section): gaps fixed in place; Q9 and Q10 accepted as D19 and D20. Nothing is open.
+- **Step 1 built, 2026-11-07** (backend models, CRUD, built-ins, starter texts, image library, context endpoints; 42 tests in `tests/document_templates/`). Where it differs from the text below:
+  - The image library has its own router and prefix, `/document-images` (`routers/document_images.py`), so its routes can't collide with `/document-templates/{id}`.
+  - Saved-text create and update were **not** manager-only (only delete was); they are now, matching the Settings tab, which already hid them from Members.
+  - Starter texts are the guide's **13** text and mixed sections (9–21). Sections 1–8 are data, covered by the Company, Customer and Estimate blocks (6 and 8 are v2).
+  - Merge-field keys are today's placeholder names (`{{TITLE}}`, `{{COMPANY_CONTACT}}` …), plus `COMPANY_WEBSITE`, `CUSTOMER_PHONE`, `CUSTOMER_EMAIL`.
+- **Step 2 built, 2026-11-07** (the Docs composer, draft and generate from blocks, the legacy mapping; tested against a Docs simulator, `tests/document_templates/fake_docs.py`, then live through `scripts/spike_document_composer.py`). Choices made in building it:
+  - **No new style-base Doc to set up.** `GOOGLE_DRIVE_STYLE_BASE_ID` is optional; unset, the composer copies today's template and clears its body, keeping its header, footer and styles.
+  - **Writes:** one per batch of tables plus one. In the simulator Standard Estimate with photos takes 3, Full Estimate and Agreement 3 (budget 12).
+  - **The logo** goes into a paragraph reserved at the top of the Company block, in the last batch; if Google can't fetch it, that batch is resent without it.
+  - **New photos carry an id the editor chooses** (`id` on an upload or note image spec, 32 hex), so an Image block can name a photo before it is stored. A photo no block names isn't kept.
+  - **Library images are copied into the document on save** (source `library`) and listed first in their block's `photo_ids`; a saved document's Image blocks hold no library references.
+  - **`GET /estimates/{id}/doc-start?source=blank|template|draft|version`** returns the layout, the start and the photos to carry: the one place legacy drafts and versions map onto Standard Estimate. It and `doc-context` live in `routers/estimate_document_layouts.py`.
+  - A missing merge field prints as nothing; an unknown `{{FIELD}}` prints as typed. Merge values never read as markdown.
+- **Spike, 2026-11-07** (Dev Drive, both built-ins with a logo and 5 photos, PDFs checked page by page):
+  - **Writes and time:** Standard Estimate 3 writes, 3 reads, ~10 s; Full Estimate and Agreement 3 writes, 3 reads, ~10–12 s (5 pages). Well inside the budget of 12. The logo placed on both runs.
+  - **Index rules held:** the work-items table, image rows with captions, bullets in starter texts, page breaks, the signature and the header/footer fields all landed where the simulator put them; nothing in the composer's index arithmetic needed changing.
+  - **Fixed after the first run (tests added):** today's template keeps a logo placeholder picture in its **first-page header**, which today's flow swaps for the logo. It printed as a grey picture above the Company block's logo, so the composer now deletes every picture in the style base's headers. Headings were set with no space above or below; they now keep the style base's Heading 1/2 spacing, and body paragraphs stay tight. The built-ins' Estimate and Image blocks (no heading) start with medium space above, or they printed straight under the block before.
+  - **For step 3's canvas:** headings take the template's Heading 1/2 space; body lines have none; Space above/below is 0 / 12 / 24 / 48 pt. The canvas copies these.
+  - A worktree has no `platform/secrets/`; run the spike with `GOOGLE_DRIVE_CREDENTIALS_PATH` pointing at the main checkout's key.
+- **Step 3 built, 2026-11-07** (template mode: Settings → Document Templates and `/settings/document-templates/:id`). Portal files: `components/documentEditor/` (`DocumentEditor`, `BlockPalette`, `LayoutCanvas`, `BlockView`, `Inspector`, `DocMarkdown`, `layoutReducer`, `blockDefaults`, `mergeFields`, `docStyles`, `useEditorLibraries`, `useTemplateEditor`), `pages/DocumentTemplateEditorPage.tsx`, `components/settings/DocumentTemplatesTab.tsx` + `useDocumentTemplatesAdmin.ts`, `api/documentTemplates.ts`, `api/documentImages.ts`, `lib/documentTemplatesFlag.ts`, `types/documentTemplates.ts`; `VITE_DOCUMENT_TEMPLATES_ENABLED` in `.env.example` (moved up from step 5). Choices made in building it:
+  - **The markdown editor escapes `_` in merge fields** (it saves `{{COMPANY\_NAME}}`). The editor undoes that on every edit (`unescapeMergeFields`), and the composer's field pattern now ignores backslashes in a key too, for text saved any other way (test added).
+  - **Merge fields go in through "Insert a field"** in the inspector (grouped Company / Customer / Property / Estimate, inserted at the cursor through a new `insertMarkdown` on the markdown editor's handle), not `{{` autocomplete, which MDXEditor has no hook for.
+  - **A selected Text or Note block is the markdown editor**, with a "Prints as" preview under it when the text has fields; unselected, it shows as printed, a field with no value as a highlighted `[Missing: …]`.
+  - **Leaving with unsaved changes:** Back asks, and closing the tab warns. Leaving through the app's own menu doesn't ask: the app uses `BrowserRouter`, which has no `useBlocker`. Step 4's document editor has the same limit unless the router changes.
+  - **Flag:** the Settings tab reads the company only while the env flag is on. With both on, Document Templates replaces Text Blocks for Owners and Admins, and a Member sees neither. The editor route is always registered; the page itself refuses Members, a phone, and the flag off.
+  - **Set as default** shows in the editor's top bar for a saved template with no unsaved changes; the list's star does the same.
+- **Revised after Simon's first test, 2026-11-07** (D8, D16, D20, D4 above):
+  - **Text Blocks are linked, not copied** (`saved_text` blocks). Templates and drafts check the link is the company's (`services/document_templates/refs.py`, 404 otherwise); deleting a Text Block a template links is a 409 naming the templates (`routers/text_blocks.py`); the composer prints the Text Block's content as it is at Generate (`ComposeInput.saved_texts`), and the version stores it as a typed Text block (`LayoutPlan.version_blocks`). A link to a deleted Text Block prints nothing and shows as deleted on the canvas.
+  - **Text Blocks are managed under the templates** on Settings → Document Templates (the Text Blocks list, reused); the palette only inserts them.
+  - **Starter texts, `GET /document-templates/starter-texts` and Full Estimate and Agreement are gone.** `TextProps` lost `source_text_block_id` / `source_starter_key` (unknown keys are dropped on read, so templates saved during testing still load).
+  - **Layout:** the editor fills the content area (`h-full`, white); the centre is a grey desk with a Letter-sized white sheet. The top bar is the top-bar height and leaves room for the floating Maple button while the panel is closed.
+  - **Deselect:** a click anywhere off a block on the page or the desk deselects it, and so does Escape. Clicks in the palette and the options panel don't (the palette adds under the selected block; the options panel edits it).
+  - **Bug found in testing:** an empty template description crashed the save (a 500 the browser showed as "Failed to fetch"): the 500-character cap was applied to `None`. Fixed in `routers/document_templates.py`, with tests.
+
+- **Step 4 built, 2026-11-08** (document mode). Portal: `pages/EstimateDocumentEditorPage.tsx` at `/estimates/:id/document?source=blank|template|draft|version&id=`; `components/estimates/DocumentsHub.tsx`; in `components/documentEditor/`: `documentPhotos.ts`, `useDocumentPhotos.ts`, `PhotoOptions.tsx`, `usePhotoThumb.ts`, `readiness.ts`, `ReadinessBar.tsx`, `startChoices.ts`, `useDocumentTemplatesOn.ts`; `lib/documentPaths.ts`. No platform change: step 2 built the routes. Choices made in building it:
+  - **The hub is `DocumentsDialog` when document templates are on for the company;** today's dialog is untouched otherwise (it reads the company only while the env flag is on). The hub lists the versions (each with "From <start>"), the draft ("Continue draft", who saved it and when), and "Start a document": every template (D3 as revised: the company default picked), then Blank, then "Copy of vN" newest first. Starting while a draft exists asks ("Keep the draft" / "Start over"); the draft is replaced only when the new document is saved or generated.
+  - **Back and a finished Generate return to `/estimates/:id/with-activity?documents=1`,** which opens the hub once the estimate has loaded and then drops the flag from the address.
+  - **Photos:** one pool per document; each photo keeps its own size and caption (as today's `DocImage`), and an Image block names its photos in order. They're added in the selected Image block's options (Upload, From Notes, From Property, reusing the dialog's note picker and checks, one 30-photo cap across the document) and ordered there with up / down. A save reloads the layout and photos from the stored draft, so library images copied in by the server show as photos.
+  - **Readiness** (never blocks): no Estimate block; an empty Note; a merge field with no value (Text, Note and linked Text Blocks); a linked Text Block that was deleted; an Image block with no images. A bar under the top bar counts them and lists them (a name there selects the block); each block gets a badge.
+  - **Save as template** (Owners and Admins, tablet and desktop): a name prompt; a clash or the 20-template cap shows in it and it stays open.
+  - **Phone (D15):** the page only, fitted to the screen; "Add a block" and "Edit block" open as bottom sheets; blocks move with up / down (no drag); Save draft and Generate sit in a bottom bar. Template mode stays tablet and desktop.
+  - **Leaving with unsaved changes:** as in template mode, Back asks and closing the tab warns; the app's own menu doesn't ask.
+
+- **After Simon's test of step 4, 2026-11-08:**
+  - **The Note block is gone** (D11, D17). Server: `note` left `BlockType`, the registry, the composer and Save as template; Standard Estimate's Notes is a Text block (`std-notes`), and `legacy.py` puts an old document's notes there. A document from the editor stores `additional_info` as empty: its text is in its blocks. Portal: the palette, the options, readiness ("This Text block is empty") and the types follow. Nothing on Dev had saved a Note block, so no data changes.
+  - **The hub's start section is "Generate a new document"** (Simon), with the intro "You can generate a new document using previous settings or choose an available template." It has two groups: **Previous Settings** first (this estimate's earlier versions, newest first, each "Version N · Generated <date> · from <start>"; shown only when there is one), then **Available Templates** (the company's templates by name, Standard Estimate, Blank). The latest version is picked by default; with no versions, the company's default template is (D3 as revised). A start from a version is named "Version N" (was "Copy of vN") in the editor's "Started from" line, the draft and the new version. Versions saved before the rename still stored "Copy of vN", so the portal names a version start by its number (`startName` in `lib/documentPaths.ts`), never by the stored name. **Start** sits beside **Close** in the dialog's footer.
+
+- **Step 5 built, 2026-11-08:** the user guide's section 9.8 (templates, Text Blocks, the image library, generating a document), with pointers from 7.2's Documents and a Documents tab in 7.8; `DOCUMENT_TEMPLATES_ENABLED` and `GOOGLE_DRIVE_STYLE_BASE_ID` in `platform/.env.example`; the rule file `.claude/rules/document-templates.md` and its row in `CLAUDE.md`. Not done: the full test runs (Simon's call).
+- **Maple, 2026-11-08 (Simon):** asked to generate a document, Maple still makes none and now says the steps: today's dialog's (Document Details → Generate document) or, for a company with document templates, the editor's (Generate a new document → Previous Settings or Available Templates → Start → Generate), each with Share → Download PDF for a PDF. `out_of_chat._DOCUMENTS` / `DOCUMENTS_EDITOR`; the company is read in `agents/planner/execute.py` through `access.company_has_document_templates`. The planner's prompt is unchanged, so no parity run is owed.
 
 **Builds on:** [2026-09-23-estimate-documents-dialog-design.md](2026-09-23-estimate-documents-dialog-design.md),
 [2026-10-21-estimate-doc-images-layout.md](2026-10-21-estimate-doc-images-layout.md),
@@ -34,36 +83,38 @@ A template is only a starting point. A document starts from a blank page, a read
 
 Naming: Settings already has **Templates** (work-item templates). The new feature is called **Document Templates** everywhere: collection `document_templates`, route `/document-templates`, tab id `document-templates`.
 
+*Renamed 2026-11-07 (Simon):* the Settings tabs read **Work Items** (was Templates, the work-item templates) and **Documents** (was Document Templates). Only the labels and headings changed: the tab ids stay `templates` and `document-templates`, so links, Maple's page links and the `/templates` redirect keep working. Maple's link list and the user guide say Work Items; the user guide's Documents section comes with step 5.
+
 ## Decisions (2026-11-07)
 
 | # | Question | Decision |
 |---|---|---|
 | D1 | Where the logo lives | **The Company block only.** It inserts `Company.logo_url` inline. The style base carries no image, so nothing replaces "the first image in the doc" any more. |
 | D2 | "Valid until" date | **Not in v1.** Estimates have no such field. |
-| D3 | An estimate's division | An estimate's divisions are its work items' division names (`JobItem.division`), resolved to `Division` ids within the company. Templates with any of them in `suggested_division_ids` are listed first. The **division default** is preselected only when exactly one template is the default for all of them; otherwise the company default is preselected. A division deleted later is dropped from a template's lists when the template is read. |
-| D4 | Deleting a library item a template uses | **Library images only** (narrowed by D16): deleting an image a template uses is refused with a 409 that names the templates. Saved text deletes freely, because templates and documents hold copies. |
+| D3 | An estimate's division | **Revised 2026-11-08 (Simon): templates aren't tied to divisions.** The hub lists every template the company has; the company default is preselected when the estimate has no versions. Templates have no division lists and the doc context no division ids. (First decided: suggested/default-for-division lists ordering and preselecting templates.) |
+| D4 | Deleting a library item a template uses | **Refused with a 409 that names the templates**, for library images and (since D16 was revised) Text Blocks alike. Drafts and versions never block a delete: a version keeps the text it printed, and a draft's link to a deleted Text Block prints nothing. |
 | D6 | Who may do what | **Members** start, edit and generate documents in the editor, including adding blocks and inserting saved text and library images. **Owners and Admins** also create and edit templates, manage the two libraries, and use "Save as template" from a document. Members don't see Settings → Document Templates. |
-| D7 | Sections | **Dropped.** The PRD's 21 guide sections become starter content: the built-in templates and a starter saved-text library. |
-| D8 | Text Blocks | **Move into the editor's palette.** When the flag is on, Settings → Text Blocks goes away; when it's off, the tab stays as it is today. |
+| D7 | Sections | **Dropped.** *(Revised 2026-11-07, Simon: the starter content went too, see D20; owners write their own Text Blocks.)* |
+| D8 | Text Blocks | **Managed on Settings → Document Templates, under the templates; inserted from the editor's palette.** *(Revised 2026-11-07, Simon: was "move into the palette".)* With the flag on, the separate Text Blocks tab goes; with it off, the tab stays as it is today. The palette only inserts them. |
 | D9 | Images | A company **image library** in the palette. In document mode, an Image block also takes photos: upload, from Notes, from Property, as the dialog does today. |
 | D10 | Where block options are set | **In the editor**: on the template as its defaults, and again on each document. *(Revised: was "Builder only".)* |
-| D11 | The Note block | **Typed straight into the block in document mode.** A template's Note block can carry starter text. It doesn't pull estimate notes. |
+| D11 | The Note block | **Dropped** *(2026-11-08, Simon)*: a typed Text block does its job. Standard Estimate has an empty Text block headed "Notes" (`std-notes`), typed into per document; empty, it prints nothing. Notes from documents made in today's dialog open there. |
 | D12 | Style base | **One fixed system style** (today's template minus its body). Not editable per company in v1. |
 | D13 | Layout blocks | **Page break, Divider, Spacer**, plus "Space above / below" on every block. No columns for now. |
 | D14 | Generating | **The editor is the generator** (Simon, 2026-11-07). The Documents dialog shrinks to a hub: the versions list, the saved draft, and "Start a document". |
 | D15 | Phones | **The same editor, page only.** Below tablet width the palette and the inspector open as bottom sheets ("Add a block", "Edit block"), blocks move with up/down buttons instead of drag, and Save draft / Generate sit in a sticky bottom bar. Template mode stays tablet and desktop only (a phone shows a notice). |
-| D16 | Saved text | **Inserting saved text copies it**, in templates and documents alike. The library is a set of snippets: a later edit changes only new inserts, and the inserted copy can be retyped. |
-| D17 | Note vs Text | **Note stays its own block.** It is the only block that raises a "still empty" readiness warning, and its text is the only text Save as template leaves out. |
+| D16 | Text Blocks in a layout | **Inserting a Text Block links it** (block type `saved_text`, props `{text_block_id}`). *(Revised 2026-11-07, Simon: was "copies it".)* The block can't be edited in the editor; changing the Text Block's wording changes every template that links it. The plain **Text** block, typed into on the page, stays. A document prints the Text Block as it reads at Generate, and the version records that text as a typed Text block, so a later edit or delete never changes a version or "Copy of vN". |
+| D17 | Note vs Text | **Superseded by D11's drop** *(2026-11-08)*. Readiness warns about any empty Text block; Save as template keeps typed text and drops only photos. |
 | D18 | Template edits and open drafts | **A draft keeps its own copy of the blocks** from the moment it started. Later template edits never reach an open draft or a version. |
 | D19 | Preview | **The canvas is the preview.** No server HTML renderer, no preview endpoint, no iframe. The canvas is drawn at the Doc's text width with the Doc's fonts, fed by a context endpoint; readiness is computed on the client. The real check is Generate, then Open. |
-| D20 | Starter texts | **Not seeded.** They live in code and show in the palette as a read-only Starter texts group, inserted as copies. "Save to my saved text" copies one into the library (Owners and Admins). |
+| D20 | Starter texts | **Dropped** *(2026-11-07, Simon)*, with the Full Estimate and Agreement built-in made from them. Standard Estimate is the one built-in; owners write their own Text Blocks. |
 
 ## The flow
 
 1. **Estimate → Documents** opens the hub. It has three parts:
    - The **versions** (Open / Share / Delete, as today), each labelled with what it started from.
    - The saved **draft**, if any: "Continue draft · saved 2 min ago by Dana".
-   - **Start a document**: Blank, the company's templates (suggested-for-division first, the default marked), the built-ins, and "Copy of v2" (any earlier version).
+   - **Start a document**: Blank, the company's templates (the default marked), the built-ins, and "Copy of v2" (any earlier version).
 
    Starting a document while a draft exists asks to replace the draft.
 2. The **editor in document mode** opens at `/estimates/:id/document`, a page of its own (the hub is a dialog on the estimate page, `EstimateTitleBar`). It is filled from the chosen start: the template's blocks, or the version's stored layout. The Company, Customer and Estimate blocks show this estimate's live data, and Text blocks show their merge fields resolved. Back, and a finished Generate, return to `/estimates/:id/with-activity?documents=1`, which reopens the hub.
@@ -87,13 +138,13 @@ Every block has an optional **heading** (prints as Heading 2), **Space above / b
 | **Estimate** | Estimate #, title, created date, division, description; the work-items table (summary rows as today: optional # column, description with its recurrence note, amount); grand total; tax-included note | Show/hide each item; table style; number the rows | **at most one** |
 | **Text** | Markdown typed in place (`MarkdownDescriptionEditor`), or saved text from the library; merge fields inserted with `{{` autocomplete | — | any |
 | **Image** | Library images, then (document mode) photos from upload / Notes / Property | Size per image (large / medium / small, as today), caption | any |
-| **Note** | Typed in place in document mode | Starter text (template) | **at most one** |
+| ~~**Note**~~ | *Dropped 2026-11-08 (D11): use a Text block.* | | |
 | **Signature** | Print-and-sign lines (no e-signature) | Customer and/or company; date; printed name | any |
 | **Page break** | Starts a new page | — | any |
 | **Divider** | A horizontal rule | Line weight; colour (gray / brand green) | any |
 | **Spacer** | Empty vertical space | Height: small / medium / large (12 / 24 / 48 pt) | any |
 
-Caps: a Text or Note block holds up to 5,000 characters (today's Notes cap); a document holds up to 30 photos across all its Image blocks (`MAX_DOC_IMAGES`, which keeps the PDF under Drive's 10 MB export cap and generation inside Render's memory).
+Caps: a Text block holds up to 5,000 characters (today's Notes cap); a document holds up to 30 photos across all its Image blocks (`MAX_DOC_IMAGES`, which keeps the PDF under Drive's 10 MB export cap and generation inside Render's memory).
 
 Itemised work items (a Plant and Material Schedule) are v2.
 
@@ -103,13 +154,13 @@ Merge fields are grouped Company / Customer / Property / Estimate. They cover ev
 
 ### Must
 1. **Editor** (`DocumentEditor`), one component in two modes (see Context). On tablet and desktop it has three panes; on a phone, document mode shows the page only (D15):
-   - **Palette:** block types; **Saved text** (insert; Owners and Admins also create / edit / delete in place); **Starter texts** (read-only, from code; insert, or "Save to my saved text" for Owners and Admins); **Images** (insert; Owners and Admins also upload / rename / delete).
+   - **Palette:** block types; **Text Blocks** (insert as a link, D16; managed on Settings → Document Templates, D8); **Images** (insert; Owners and Admins also upload / rename / delete).
    - **Page canvas:** one column of blocks rendered with real content: live data in document mode, sample data in template mode. Drag in from the palette; reorder by drag, keyboard or up/down; select to edit; duplicate; remove; type into Text and Note blocks in place.
-   - **Inspector:** the selected block's options. In document mode, an Image block's inspector also has the photo sources. The **Document** tab holds name, description and division tags in template mode, and the starting point plus readiness in document mode.
+   - **Inspector:** the selected block's options. In document mode, an Image block's inspector also has the photo sources. The **Document** tab holds name and description in template mode, and the starting point plus readiness in document mode.
    - No separate preview (D19): the canvas is drawn at the Doc's text width (468 pt) with the Doc's fonts and heading sizes, and shows each Page break block as a page edge. Automatic page overflow isn't shown.
-2. **Settings → Document Templates** (Owners and Admins, flag on): the list shows name, description, division tags, block count and a Default badge. Actions: New (blank or from a built-in), Edit (opens the editor in template mode), Duplicate, Set default, Delete. Saving uses a version check ("Updated by X, reload").
+2. **Settings → Document Templates** (Owners and Admins, flag on): the list shows name, description, block count and a Default badge. Actions: New (blank or from a built-in), Edit (opens the editor in template mode), Duplicate, Set default, Delete. Saving uses a version check ("Updated by X, reload").
 3. **Documents hub** (the slimmed `DocumentsDialog`), as in The flow.
-4. **Built-in templates:** **Standard Estimate** (= today's output) and **Full Estimate and Agreement**. Both are read-only, and both can be duplicated or used to start a document.
+4. **Built-in template:** **Standard Estimate** (= today's output), read-only; it can be duplicated or used to start a document. (Full Estimate and Agreement was dropped with the starter texts, D20.)
 5. **Generation** from the editor (The flow, steps 5–6). Open, the edit window, PDF and email don't change.
 6. **Flag:** env `DOCUMENT_TEMPLATES_ENABLED` / `VITE_DOCUMENT_TEMPLATES_ENABLED`, plus a per-company `Company.document_templates_enabled`, set by hand like `overage_billing_disabled`. With the flag off, today's dialog, the Text Blocks tab and the template all behave as today.
 7. **Limits:** 20 templates per company; 60 blocks per layout; image library 50 images, each ≤ 5 MB; saved text keeps today's caps (100-character name, 5,000-character content); photos per document as today.
@@ -132,9 +183,7 @@ Merge fields are grouped Company / Customer / Property / Estimate. They cover ev
 ## Starter content
 
 - **Standard Estimate:** Company, Customer, Estimate, Note, Image. The spike checks that its output matches today's doc.
-- **Full Estimate and Agreement:** Standard Estimate, followed by Text blocks for the PRD's guide sections, in the PRD's order (Project identity → Work and pricing → Project conditions → Risk and performance → Approval and support), then a Signature block. Page breaks go between the groups.
-- **Starter texts** (`starter_texts.py`): the same guide sections, one per section, each with the banner "Starter text. Have a local attorney review before use." They are read from code into the palette (D20) and are the source Full Estimate and Agreement is built from. Nothing is written to a company until someone inserts one.
-  - *Content dependency:* product supplies the wording. The code ships with placeholder wording.
+- *Dropped 2026-11-07 (D20):* Full Estimate and Agreement and the 13 starter texts it was built from.
 
 ## Output engine — decided
 
@@ -169,8 +218,6 @@ class DocumentTemplate(Document):            # "document_templates"
     company: PydanticObjectId
     name: str                                # unique per company (index)
     description: Optional[str] = None
-    suggested_division_ids: List[PydanticObjectId] = []
-    default_for_division_ids: List[PydanticObjectId] = []
     schema_version: int = 1
     blocks: List[LayoutBlock]
     version: int = 1                         # optimistic concurrency
@@ -187,7 +234,7 @@ class DocumentImage(Document):               # "document_images": the image libr
 - **Image block props:**
   - `library: [{image_id, size, caption}]`: references in a template.
   - `photo_ids: [str]`: document mode only. The photos themselves stay in the draft's or version's flat `images: List[DocImage]`, as today, and the block lists them by `DocImage.id` in print order. That keeps every piece of blob bookkeeping that exists (shared blobs across versions, `doc_image_trash.py`, `services/estimate_delete.py`, the PDF path) working on the flat list without walking blocks; only the composer reads `photo_ids`. A photo no block lists prints nowhere and is marked for deletion on the next save.
-- **Note block props:** `text`.
+- *(The Note block and its props were dropped on 2026-11-08, D11.)*
 
 Changes to existing models:
 - **`Company`** gains:
@@ -212,7 +259,7 @@ Template ids are strings wherever they're referenced (`builtin:standard`, `built
 1. **Models and config:** the flag; the `Company` fields; `models/document_template.py` (with `LayoutBlock`), `models/document_image.py`; `DocDraft` / `GoogleDocsVersion` fields. Register in `models/__init__.py` and `database.py::DOCUMENT_MODELS`. Audit enums for templates and library images, with matching `ResourceType`s, as `TEXT_BLOCK_*` has.
 2. **`services/document_templates/`:**
    - `blocks.py`: per-type props models, the registry, the "at most one" rule.
-   - `builtin.py`, `starter_texts.py`.
+   - `builtin.py` (Standard Estimate; `starter_texts.py` was dropped, D20).
    - `context.py`: the document context (`DocContext`): the merge-field dictionary, the company / customer / estimate lines and today's summary rows (`_work_item_rows`), built for a real estimate or for the sample one. The composer and the context endpoints both read it, so the canvas and the Doc print the same values.
    - `docs_composer.py`: blocks → batchUpdate requests and named ranges, plus `create_estimate_from_style_base(...)`. This stays out of `google_drive_service.py`, which is already 90 lines over the file-size line.
    - `sample_estimate.py`: the sample `DocContext` for template mode.
@@ -220,7 +267,6 @@ Template ids are strings wherever they're referenced (`builtin:standard`, `built
 3. **`routers/document_templates.py`** (modelled on `routers/text_blocks.py`). Template writes and library writes are manager-only; the reads the editor needs are open to every role. All routes return 404 when the flag is off. Register the router in `main.py`.
    - Templates: list / create / get / update / delete / duplicate / set-default.
    - `GET /sample-context`: the sample `DocContext` (template mode), with the merge-field catalogue.
-   - `GET /starter-texts`: the starter texts, from code.
    - Image library: create / list / rename / delete.
    - `POST /from-estimate/{estimate_id}`: Save as template, manager-only.
 4. **Saved text:** `routers/text_blocks.py` stays the library's API. Writes become manager-only if they aren't already. Delete stays unconditional (D16); only the library-image delete checks templates (D4).
@@ -246,7 +292,7 @@ Template ids are strings wherever they're referenced (`builtin:standard`, `built
 1. `src/lib/documentTemplatesFlag.ts`; `.env.example`.
 2. Types in `src/types/api.ts`; `src/api/documentTemplates.ts`, `src/api/documentImages.ts`.
 3. **Editor** in `components/documentEditor/`:
-   - `DocumentEditor` (mode prop), `BlockPalette`, `SavedTextLibrary` (reusing `TextBlockModals`), `StarterTexts`, `ImageLibrary`
+   - `DocumentEditor` (mode prop), `BlockPalette`, a Text Blocks list (insert only, D8), `ImageLibrary`
    - `LayoutCanvas`, `BlockCard`, the per-type block renderers (shared by both modes, fed sample or live context)
    - `Inspector` and the per-type inspectors; `ImageBlockPhotos` reusing `DocImagePicker` / `useDocImageDraft`
    - `useDocContext` (live or sample), `readiness.ts` (pure: layout + context → warnings keyed by block id)
@@ -277,15 +323,15 @@ Trunk-based: each step lands on `main` through `/commit`, behind the flags (off 
 - **Backend:** `scripts/start_test_mongo.sh`; `./run_tests.sh tests/document_templates tests/estimate_documents`; `./run_ruff.sh`; `./run_mypy.sh`.
 - **Frontend:** `npm test`, `npm run typecheck`, `npm run lint`.
 - **Manual,** with the flags on and Drive enabled:
-  1. Duplicate Full Estimate and Agreement; add a saved text, a starter text and a library image; save; set it as default.
+  1. Add two Text Blocks on Settings → Document Templates. Duplicate Standard Estimate; insert a Text Block, a typed Text block and a library image; save; set it as default. Edit the Text Block's wording: the template shows the new wording. Try deleting it: refused, naming the template.
   2. On an estimate, open Documents → Start from it. The editor shows the estimate's data and the warnings are listed.
-  3. Hide the Website in the Company block, delete one terms block, type a note, add photos to the Image block, then Save draft. Close, reopen and continue the draft.
+  3. Hide the Website in the Company block, remove a Text Block, type a note in the Notes Text block, add photos to the Image block, then Save draft. Close, reopen and continue the draft.
   4. Generate. Open the doc and check the logo, the block order, the hidden item, the photos and the page breaks. Download the PDF.
-  5. Start "Copy of v1": the same layout, with the photos carried.
-  6. Save as template; the photos and the note are left out.
+  5. Generate a new document from Previous Settings → Version 1 (picked by default): the same layout, with the photos carried.
+  6. Save as template; the photos are left out.
   7. As a Member: start, edit and generate. No library writes and no Settings tab.
   8. On a phone: start from a template, type a note, add a photo, move a block with up/down, Generate.
-  9. Edit the template while a draft from it is open: the draft doesn't change (D18). Delete a saved text a template used: the template keeps its copy (D16).
+  9. Edit the template while a draft from it is open: the draft doesn't change (D18). Delete a Text Block a template uses: refused, naming the template (D16).
   10. With the flag off: today's dialog and the Text Blocks tab are back.
 
 ## Risks the spike measures
@@ -305,7 +351,7 @@ Trunk-based: each step lands on `main` through `/commit`, behind the flags (off 
   - The canvas shows library images and photos from their thumbnails, as the dialog does today.
 - **Text safety.** All text is user input. The canvas renders markdown with the same component the app already uses for descriptions (no raw HTML), and the composer sends text, never markup, to the Docs API.
 - **Tenant checks:**
-  - Division ids and image ids in a layout go through `dependencies.assert_company_refs` on every write.
+  - Image and Text Block ids in a layout go through `dependencies.assert_company_refs` on every write.
   - Templates load with `dependencies.own_record`.
   - A `started_from` id resolves within the estimate's company (404 for another company's id and for a missing one alike).
   - Live preview checks the caller's access to the estimate.
@@ -333,7 +379,7 @@ The plan has three renderings of every block: the client canvas, the server HTML
 
 Cost: no page count before generating. If that turns out to matter, the HTML renderer can come back in v2 as it is specified today.
 
-### Q10 → D20. Don't seed starter texts into the company library
+### Q10 → D20. Don't seed starter texts into the company library (superseded: starter texts dropped, see D20)
 
 Seeding 21 texts into every company's saved-text list, on first open, clutters the library of a company that curated its own, needs a "Starter" badge to tell them apart, and the idempotence rule means a renamed starter comes back on the next open.
 
