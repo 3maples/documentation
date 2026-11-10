@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1605**. Never
+- **Entries are numbered and permanent.** Next free number: **1614**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -3797,6 +3797,51 @@ row count first — this may be years away.
 `platform/services/maple_outcomes.py:155` — `CANT_UNDO.split("{")[0]` is "My last change was ", which matches as a substring of unrelated replies. (review 2026-10-21 #139, deferred)
 
 **Suggested fix:** Match the fixed tail after the placeholder.
+
+### 1605. [LOW] Untested edge cases in _load_glibc
+`platform/services/memory_trace.py:84` — Untested edge cases: no libc found (line 88 → None, None); CDLL raising OSError (line 92); a glibc without mallinfo2 (< 2.33, line 93 — stats off, trim kept); no malloc_trim (line 97). (review 2026-11-09 #15, deferred)
+
+**Suggested fix:** Monkeypatch ctypes.util.find_library → None and assert (None, None); ctypes.CDLL raising OSError → (None, None); CDLL returning an object with only malloc_trim → mallinfo2 None, malloc_trim set; and the reverse.
+
+### 1606. [LOW] Untested edge cases in read_anon_and_file
+`platform/services/memory_trace.py:139` — Untested edge cases: a malformed number (ValueError / IndexError, line 153); a rollup missing its Rss or Anonymous line (line 155). (review 2026-11-09 #16, deferred)
+
+**Suggested fix:** Write "Rss: abc kB" → assert (None, None); write only an Rss line → assert (None, None).
+
+### 1607. [LOW] Untested edge case in trim_malloc
+`platform/services/memory_trace.py:125` — Untested edge case: read_rss() returns None before or after the trim (line 134 → None). (review 2026-11-09 #17, deferred)
+
+**Suggested fix:** Patch _malloc_trim with a stub and services.memory_watch.read_rss → None; assert trim_malloc() is None and the stub was called.
+
+### 1608. [LOW] Untested edge cases in memory_trace.start
+`platform/services/memory_trace.py:215` — Untested edge cases: called with tracing off (line 219, returns without tracing); tracemalloc already tracing (line 221, keeps its frame depth). (review 2026-11-09 #18, deferred)
+
+**Suggested fix:** Setting off, tracemalloc stopped: call start(), assert not is_tracing(). With tracemalloc.start(1) running: call start(), assert get_traceback_limit() == 1 and _baseline is set.
+
+### 1609. [LOW] Untested edge case in memory_trace.begin
+`platform/services/memory_trace.py:238` — Untested edge case: the setting on but tracemalloc not tracing (start() never ran or failed) returns None. (review 2026-11-09 #19, deferred)
+
+**Suggested fix:** Setting on, tracemalloc stopped: assert begin(reset_peak=True) is None.
+
+### 1610. [LOW] Untested edge case in memory_trace._short
+`platform/services/memory_trace.py:281` — Untested edge case: a path outside both site-packages and the app root (a stdlib frame like /usr/lib/python3.11/json/decoder.py) is returned unchanged. (review 2026-11-09 #20, deferred)
+
+**Suggested fix:** Assert _short("/usr/lib/python3.11/json/decoder.py") returns it unchanged.
+
+### 1611. [LOW] Untested edge case in memory_watch._begin_trace
+`platform/services/memory_watch.py:324` — Untested edge case (pragma no cover): memory_trace.begin raising is logged as "MEM trace failed to start" and the request goes on. (review 2026-11-09 #22, deferred)
+
+**Suggested fix:** Monkeypatch memory_trace.begin to raise; run a request through the middleware; assert it completes and the failure line is logged.
+
+### 1612. [LOW] Untested edge case in memory_watch._log_request
+`platform/services/memory_watch.py:344` — Untested edge case (pragma no cover): take_reading() raising after the request returns None, which skips the trace as well as the MEM line. (review 2026-11-09 #23, deferred)
+
+**Suggested fix:** Make the second take_reading raise with tracing on; assert "MEM request measurement failed" is logged, no "MEM trace" line, and the request completes.
+
+### 1613. [LOW] Untested edge case in memory_watch.log_startup
+`platform/services/memory_watch.py:379` — Untested edge case: memory_trace.start() raising at startup is logged (line 392) and startup goes on. (review 2026-11-09 #24, deferred)
+
+**Suggested fix:** Setting on, monkeypatch memory_trace.start to raise; call log_startup(); assert "MEM trace failed to start" is logged and nothing escapes.
 
 ## Portal — estimate builder
 
