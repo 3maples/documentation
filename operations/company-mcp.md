@@ -105,6 +105,16 @@ and approve when the app asks. Settings → AI Apps shows the same steps.
 - Claude Code: `claude mcp add --transport http 3maples https://api.3maples.ai/mcp`,
   then `/mcp` → 3maples → authenticate.
 - Cursor or `.mcp.json`: `{ "mcpServers": { "3maples": { "type": "http", "url": "https://api.3maples.ai/mcp" } } }`.
+- Grok (grok.com): **grok.com/connectors → New Connector → Custom**, that URL,
+  then sign in. On Grok Business or Enterprise a team admin adds it first, in
+  console.x.ai → **Grok Business → Connectors → + Add Connector → Other**.
+- Grok Bot: ask the Bot to add an MCP server named `3maples` at that URL, then
+  finish the sign-in it asks for in the browser. Grok Bot reaches remote MCP
+  servers from Cursor's backend and registers a
+  `cursor://anysphere.cursor-mcp/oauth/callback` redirect (per third-party
+  reports; xAI's docs don't say), which `services/oauth.py` accepts. An
+  Enterprise team with the MCP allowlist on has to allow the URL. Neither Grok
+  route has been tried on a live account yet (2026-11-07).
 - ChatGPT and others: add it as a custom connector / MCP server with that URL.
 
 **With a key** (scripts, CI, apps that only send a header) — Claude Code:
@@ -124,7 +134,8 @@ claude.ai and Claude Desktop (custom connector):
 
 1. **Settings → Connectors → Add custom connector.**
 2. **Name:** `3maples`. **URL:** `https://api.3maples.ai/mcp`
-3. **Authentication:** **No sign-in** (the server has no OAuth).
+3. **Authentication:** **No sign-in**. The key in the header does the job
+   instead (to sign in with OAuth, use the steps under **By signing in**).
 4. **Request headers:** name `Authorization`, value `Bearer 3m_app_…`.
 5. Save, then turn the connector on in a chat's tools menu.
 
