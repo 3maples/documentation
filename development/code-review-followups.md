@@ -6175,8 +6175,12 @@ total row count rather than blank-row count.
 
 **Suggested fix:** renderHook with a rejecting `getCompany` → false; `COMPANY_ID = ""` → false and not called.
 
+**RESOLVED 2026-11-08** (per-company flag dropped): the hook is deleted; `documentTemplatesOn()` reads the env flag alone, with no company read.
+
 ### 1550. [LOW] SettingsPage flag edge cases untested (review 2026-11-08, document templates #201)
 `portal/src/pages/SettingsPage.tsx:328` — Edge cases: Admin arm of `canManageTabs` (328); company read failing keeps Text Blocks (341).
+
+**Checked 2026-11-08:** the company-read arm is gone with the per-company flag; only the Admin arm of `canManageTabs` is left.
 
 **Suggested fix:** Admin → "Documents" tab; reject `/companies/co_test` → "Text Blocks" and no "Documents".
 
