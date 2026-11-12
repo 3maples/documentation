@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1645**. Never
+- **Entries are numbered and permanent.** Next free number: **1646**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -4771,6 +4771,11 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 `portal/src/components/tasks/TaskDialog.tsx:98` — Edge case: L770 — the staged PDF tile (`PdfTile`) isn't asserted; deleting the arm renders a broken `<img>` with tests green. (Maple attachments review round 3, 2026-10-19, #27, deferred)
 
 **Suggested fix:** In "a staged PDF uploads the original file", assert the name "quote.pdf" shows and no img has that alt.
+
+### 1645. [LOW] Untested edge case in `TaskAgePill`: the tooltip's two arms
+`portal/src/components/tasks/TaskAgePill.tsx:22` — Edge case: L28 — the `title` ternary has two arms, "Created <day>, due <day>" for a task with a due date and "Created <day>" for one without, and no test asserts either. This logic predates the change; the audit listed it because the archived-task change (no pill for an archived task) edited TaskAgePill. A regression would only change hover text, never what the card shows or counts. (Archived-task pill review, 2026-11-12, #1, deferred)
+
+**Suggested fix:** Add two cases to `tests/TaskAgePill.test.tsx`: `makeTask({ due_date: new Date(2026, 6, 15).toISOString() })` → `expect(pill.getAttribute("title")).toMatch(/^Created .+, due .+$/)`; `makeTask()` with no due date → `expect(pill.getAttribute("title")).not.toMatch(/due/)`.
 
 ## Website
 
