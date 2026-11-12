@@ -2,9 +2,15 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-11-08
+**Last updated:** 2026-11-12
 
 ### Recent changes
+
+**2026-11-12 (the weather at the company's address, Simon):** with no place
+said, no phone position and no place earlier in the chat, Maple reads the
+weather at the company's own address — its street, else its city — and says so
+(*"Today in Guelph, ON (your company's address): …"*); she asks where only when
+the company has no address the map can find (§8.6).
 
 **2026-11-04 (the weather, Simon):** Maple answers the weather — now, today,
 tomorrow, the weekend or the week — where the user's phone is, at a property or
@@ -2802,7 +2808,9 @@ name or street, else a place on the map (the company's country first, so
 "London" is London, Ontario for a Canadian company); the phone's position this
 turn, to about a kilometre, named by the property it's at when it's at one
 (§8.5 — any fix within a few kilometres, not only 200 m); the last place said
-in this chat. With none, or "here" said on a desktop, Maple asks *"Happy to
+in this chat; the company's own address (Simon, 2026-11-12) — its street, else
+its city — looked up on the map once a chat (again if the address changes) and
+said as *"in Guelph, ON (your company's address)"*. With none, or "here" said on a desktop, Maple asks *"Happy to
 check the sky for you — where are you working? Give me a city or one of your
 properties."* and plans the question again with the answer; a place the map
 can't find is said and asked again. No forecast (the API refused, a rate
@@ -2812,7 +2820,7 @@ a few minutes."*
 | Phrasing | Plan | Status |
 |---|---|---|
 | `what's the weather?` / `what's the forecast like here?` [here] | `weather` | ✅ the phone's position, said as at the property here |
-| `what's the weather?` | `weather` | ✅ with no position and no place said in the chat, Maple asks where |
+| `what's the weather?` | `weather` | ✅ with no position and no place said in the chat, the company's address, said as such; Maple asks where only when the company has no address the map finds *(Simon, 2026-11-12 — she asked every desktop user)* |
 | `is it going to rain tomorrow?` | `weather` when=tomorrow | ✅ |
 | `how windy is it in Guelph right now?` | `weather` place=Guelph when=now | ✅ |
 | `weather at Elm House this weekend` | `weather` when=weekend | ✅ a property's own coordinates |
