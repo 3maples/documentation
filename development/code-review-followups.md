@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1644**. Never
+- **Entries are numbered and permanent.** Next free number: **1645**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -4524,6 +4524,11 @@ and will be resolved as part of the planned onboarding-flow overhaul.
 `portal/src/components/settings/AiAppsTab.tsx:17` — With ApiKeysSection hidden, no page lists or revokes a customer key (3m_app_). A key made since 1.17.1 (2026-11-04) keeps working until it expires (up to a year) or its user leaves; if one leaks, neither its user nor an Owner/Admin can stop it from the portal.
 
 **Decision (Simon, 2026-11-06):** accepted — no customer has made a key, so option (b): accept the gap and revoke on request through the API. The rejected option (a) was a revoke-only "Your API keys" list shown only to someone with a live key. Revisit when keys come back (render ApiKeysSection in AiAppsTab) or the first customer key appears.
+
+### 1644. [LOW] The old portal site keeps serving a frozen build the prod API refuses (review 2026-11-12, old-site deploy cleanup #1)
+`portal/.firebaserc:1` — With the deploy step and the .firebaserc entry gone (2026-11-12), fieldservice-portal-tangz.web.app stays live forever on its last build (index-91bb2c27.js, HTTP 200). Prod CORS already refuses that origin (preflight from it → 400, from app.3maples.ai → 200), so anyone reaching it through an old bookmark or a search result gets an app that loads and then fails every API call. No data risk, which is why this is LOW, not MEDIUM.
+
+**Suggested fix:** Simon's call, done in the console, not by a hand deploy: after the next /release portal, disable the old site (Firebase console → fieldservice-portal-tangz → Hosting → the site's ⋮ menu → Disable site), so it returns 404 instead of a broken app. The alternative, a one-off redirect deploy to app.3maples.ai, needs a hand deploy and so goes against "never deploy by hand".
 
 ## Portal — tasks, properties, contacts and materials
 
