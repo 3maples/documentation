@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1646**. Never
+- **Entries are numbered and permanent.** Next free number: **1648**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -329,7 +329,6 @@ seams that already exist as separate classes.
 | 63 | `list_templates_reply` — agents/template/service.py:282 (new 2026-10-08, phase 2a: moved out of `_handle_list_templates`; extract the envelope into `_templates_envelope(...)` — review 2026-10-08 #13, deferred) |
 | 74 | `execute` — platform/agents/planner/execute.py:519 (+4 on 2026-10-23 for the link offer after a create; 63 until re-measured 2026-10-22, review round 5: the gap plan's undo snapshot around each write; was 46; phase 8 added step pointing and the policy refusal; +4 on 2026-10-11 for the work items of an estimate a create of the plan made, #864. Move the per-action loop body into `_run_action` — review 2026-10-11 #43) |
 | 54 | `_planner_turn` — platform/agents/planner/turn.py:561 (re-measured 2026-10-19, review round 6 #7; +2 on 2026-10-19, review round 5 #1: records whether the plan that ran uses the files; 2026-10-19: the body moved here under a new 18-line `run_planner_turn` wrapper that keeps a question's files, review round 3 #8 / round 4 #11; was `run_planner_turn` at :521; :507 until 2026-10-14, #906; :465 until re-measured 2026-10-14, review round 27 #9; 58 at :390 until re-measured 2026-10-14, review round 13 #35; new 2026-10-11: a kept question's writes and the template step, #844/#843; +1 for review 2026-10-11 #8; +2 for the menu handed on, 2026-10-12. Move the `ran_before` step into `_without_ran(plan, ran_before, result, context, message_en)` beside `_as_template` — review 2026-10-11 #10, deferred) |
-| 51 | `list_reply` — platform/agents/conversation/record_lists.py:99 (new 2026-10-11: the `within` filter, #845. Move the query building into `_rows(ask, company)` — review 2026-10-11 #11, deferred) |
 | 76 | `_redo_read` — platform/agents/planner/followups.py:187 (the old `_redo` body, renamed when `_redo` became its amount wrapper — review round 26 #4, 2026-10-14; 73 at :157 and 75 at :152 before, review round 13 #35; was 44; +4 on 2026-10-12 for a notes list and a list's total before tax; +11 on 2026-10-13 (a status a win rate can't take, the exclusion dropped on a subject swap; round 3 #45); a dispatch table of `_redo_metric` / `_redo_dashboard` / `_redo_estimates` / `_redo_get`, as `_redo_list` is — review 2026-10-11 #74) |
 | 60 | `_refine` — platform/agents/planner/followups.py:368 (+6 on 2026-10-14 for an amount and a card's amount — review round 26 #4; 54 at :317, :198 until re-measured 2026-10-14, review round 13 #35; was 41; +2 on 2026-10-13; split the guards into `_refine_refusal(op, change)` — review 2026-10-11 #75) |
 | 54 | `resolve_work_item` — platform/agents/planner/resolve.py:386 (was 49; move the `by == "name"` arm and its retry into `_work_item_by_name` — review 2026-10-11 #76) |
@@ -556,6 +555,8 @@ now.
 `platform/agents/planner/execute_catalog.py:247` — page_size=50 while `_LIST_MAX` is 10. (review 2026-10-21 #154, deferred)
 
 **Suggested fix:** page_size=_LIST_MAX.
+
+**RESOLVED 2026-11-12** (ten to a page, Simon): `list_by_source` reads one page, `page_size=paging.PAGE_SIZE`, from where "show more" left off; `_LIST_MAX` is gone.
 
 ### 1437. [MEDIUM] The New Users page still loads every candidate and asks Firebase for all of them
 `platform/services/ops_queries.py:559` — `list_new_users` now takes `stage` / `offset` / `limit` and the MCP tool pages and caps it (review 2026-10-22 #16, fixed in part). The query itself still loads every unverified, company-less and mid-onboarding user ever. With `live_verification` on (the `/ops/new-users` route), it also runs one Firebase lookup over all of them, because a verified orphan is dropped only after its live verification is known. The rows are then sliced in Python. This grows with spam signups. (review 2026-10-22 #16, remainder deferred: a full fix moves the orphan and verification classification into the query, which is larger than the finding described.)
@@ -2687,6 +2688,16 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 `platform/agents/planner/policy.py:414` — "make the excavation activity 8 hours" after "show me estimate E0001" names no work item, and the planner's state doesn't list each work item's lines, so the model sometimes plans work item 2; the executor says "I couldn't find a activity matching "excavation" on "Back lawn seeding"" and writes nothing. Two of four live runs (acceptance 2026-10-22, `estimate-activity-lines-by-rule`, now in `explained.py`).
 
 **Suggested fix:** in `resolve_work_items`, when the message names no work item and a line command's name is on exactly one work item of the estimate, point the command at that work item (asking first, as a guessed target is); several or none stay as planned. Test with the corpus's est_patio world.
+
+### 1646. [MEDIUM] Today's estimate list still shows 20
+`platform/agents/estimate/crud_handlers.py:1670` — When the planner falls back to today's pipeline, `_handle_list_estimates` still lists `_ESTIMATE_LIST_PAGE_SIZE` (20) estimates (`text_helpers.py:94`) with no "show more". The request "limit them to 10 per screen" (Simon 2026-11-12) holds on the planner path only; the fallback is rare, but there a list still shows 20. (review 2026-11-12 #2, deferred)
+
+**Suggested fix:** Needs Simon's call. (a) Leave it and say in `maple.md` that today's lists don't page — preferred: the planner is the default and today's pipeline goes at the switchover. (b) `_ESTIMATE_LIST_PAGE_SIZE = 10` with "the Estimates page has the rest" (it also clamps "my 15 latest estimates" to 10 there). (c) Page it by `LIST_PAGE_KEY`, as today's task list does.
+
+### 1647. [MEDIUM] Today's city/role list still shows up to 25
+`platform/agents/conversation/record_lists.py:159` — Answered by `routers/agents.py:1820` (`handle_list_ask`), `paged` is False, so the list shows up to 25 rows. Kept on purpose (that path can't "show more"), but it misses the 10-per-screen rule (Simon 2026-11-12). (review 2026-11-12 #3, deferred)
+
+**Suggested fix:** Same call as #1646. (a) Leave it, documented in `maple.md` — preferred. (b) `max_items=10` with a line saying there are more. (c) Record a `LIST_PAGE_KEY` page so today's "show more" replays it.
 
 ## Platform — API, models and data
 

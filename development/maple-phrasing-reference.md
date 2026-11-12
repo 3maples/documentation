@@ -6,6 +6,12 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 
 ### Recent changes
 
+**2026-11-12 (ten to a page, Simon):** every list of records stops at 10 and
+says how far it got — *"That's 1–10 of 25 — say "show more" for the next 10."*
+— and "show more" brings the next 10. Estimate lists showed 20 a page; materials
+listed by source or hidden stopped at 10 and sent the rest to the Materials
+page; contacts and properties narrowed by city or role showed up to 25 (§10.9).
+
 **2026-11-12 (the weather at the company's address, Simon):** with no place
 said, no phone position and no place earlier in the chat, Maple reads the
 weather at the company's own address — its street, else its city — and says so
@@ -450,7 +456,7 @@ estimate".
 
 | Phrasing | Plan | Status |
 |---|---|---|
-| `show me my estimates` [est] | `list_estimates` | ✅ grammar entry list_estimates |
+| `show me my estimates` [est] | `list_estimates` | ✅ grammar entry list_estimates; 10 a page, newest first, then "show more" *(Simon 2026-11-12 — 20 a page before)* |
 | `how many estimates do I have?` [est] | `list_estimates` count | ✅ grammar entry list_estimates |
 | `open {EST}` [est] | `get_estimate` | ✅ grammar entry get_estimate |
 | `show me the estimate for the Smith property` [est] | `list_estimates` | ✅ the property's estimates — it may have several |
@@ -1623,7 +1629,7 @@ These routed but reached no record until 2026-09-27: the agent couldn't read a n
 |---|---|---|
 | `find properties named Toronto` / `search for properties matching Toronto` | `list_properties` filter.text=Toronto | ✅ |
 | `how many properties are in Toronto?` | `list_properties` count filter.city=Toronto | ✅ *"You have 2 properties in Toronto."* (2026-09-27, #687: every property was counted) |
-| `show me properties in Toronto` | `list_properties` filter.city=Toronto | ✅ *(2026-09-27, #687: every property was listed)* |
+| `show me properties in Toronto` | `list_properties` filter.city=Toronto | ✅ 10 a page, then "show more" *(Simon 2026-11-12 — up to 25 at once before)* *(2026-09-27, #687: every property was listed)* |
 | `list properties in Guelph` | `list_properties` filter.city=Guelph | ✅ |
 | `properties matching Elm in Toronto` | `list_properties` filter.text=Elm filter.city=Toronto | ✅ *(2026-10-11, #845 — fell back)* |
 | `how many properties does Ana Lee own in Toronto?` | `list_properties` count filter.owner filter.city=Toronto | ✅ *(2026-10-11, #845 — fell back)* |
@@ -1742,10 +1748,10 @@ Routed, but found no one until 2026-09-27 — see §2.3.
 | `find contacts named Smith` / `search for contacts matching Smith` | `list_contacts` filter.name=Smith | ✅ |
 | `show contacts in Toronto` | `list_contacts` filter.city=Toronto | ✅ *(2026-09-27, #687: city and role filters; the list came back unfiltered)* |
 | `how many contacts are in Guelph?` | `list_contacts` count filter.city=Guelph | ✅ *(2026-09-27, #687)* |
-| `list homeowners` | `list_contacts` filter.role | ✅ *(2026-09-27, #687)* |
+| `list homeowners` | `list_contacts` filter.role | ✅ 10 a page, then "show more" *(Simon 2026-11-12)* *(2026-09-27, #687)* |
 | `show me the property managers` | `list_contacts` filter.role=Manager | ✅ *(2026-09-27, #687)* |
 | `which contacts are administrators?` | `list_contacts` filter.role=Administrator | ✅ *(2026-09-27, #687)* |
-| `list homeowners in Guelph` | `list_contacts` filter.role filter.city=Guelph | ✅ *(2026-09-27, #687)* |
+| `list homeowners in Guelph` | `list_contacts` filter.role filter.city=Guelph | ✅ 10 a page, then "show more" *(Simon 2026-11-12)* *(2026-09-27, #687)* |
 | `contacts named Ana in Toronto` | `list_contacts` filter.name=Ana filter.city=Toronto | ✅ a name beside them too *(2026-10-11, #845 — fell back)* |
 | `home owners named Di` | `list_contacts` filter.name=Di filter.role | ✅ a name beside them too *(2026-10-11, #845 — fell back)* |
 | `is there a contact named Bob?` | `list_contacts` filter.name=Bob | ✅ a yes/no about a record is the list it would be in *(2026-10-19 review — probed live, §13.1)* |
@@ -1869,11 +1875,11 @@ material is stage 4 of the catalog plan — done 2026-10-19, below
 |---|---|---|
 | `hide Black Mulch` / `hide the Black Mulch material from my list` | `hide_material` | ✅ asked first — *"Hide Black Mulch from your materials? You can show it again any time. (yes/no)"* — then hidden from lists, pickers and Maple; standard or the company's own; Owner/Admin — G1 (gap plan 2026-10-19, closed the same day) |
 | `show Black Mulch again` / `unhide Black Mulch` | `show_material` | ✅ found among the hidden materials and shown again, no question; one that isn't hidden is said so; Owner/Admin — G2 (gap plan 2026-10-19, closed the same day) |
-| `which materials have I hidden?` / `show my hidden materials` | `list_materials` filter.hidden | ✅ the hidden ones, named so "the second one" picks from them — G3 (gap plan 2026-10-19, closed the same day) |
+| `which materials have I hidden?` / `show my hidden materials` | `list_materials` filter.hidden | ✅ the hidden ones, named so "the second one" picks from them — G3 (gap plan 2026-10-19, closed the same day); 10 a page, then "show more" *(Simon 2026-11-12 — the rest went to the Materials page before)* |
 | `unhide all my materials` | `show_material` all | ✅ asked first, then every hidden material shown again (the Materials page's unhide-all); one whose name the company's own material holds stays hidden and is named — G4 (gap plan 2026-10-19, closed the same day) |
 | `reset Black Mulch to the standard price` / `go back to the standard price for Black Mulch` | `reset_material` | ✅ asked first, then the company's own costs, prices and hide dropped; the company's own material is refused — *"… is your own material, so there's no standard to reset it to."* — G5 (gap plan 2026-10-19, closed the same day) |
 | `is Black Mulch a standard material?` | `get_material` field=source | ✅ *"Black Mulch is a standard material, from 3Maples' list — you can hide it, or change its cost and price."* / *"… is your own material."* — G6 (gap plan 2026-10-19, closed the same day) |
-| `which of my materials are standard?` / `list my custom materials` | `list_materials` filter.source | ✅ standard or the company's own; beside a category, price or estimate it is said back — G7 (gap plan 2026-10-19, closed the same day) |
+| `which of my materials are standard?` / `list my custom materials` | `list_materials` filter.source | ✅ standard or the company's own; beside a category, price or estimate it is said back — G7 (gap plan 2026-10-19, closed the same day); 10 a page, then "show more" *(Simon 2026-11-12 — the rest went to the Materials page before)* |
 | `turn on the Irrigation standard materials` / `stop showing standard materials in Soil` | `set_standard_category` | ✅ asked first, then the category's standard materials on or off (per-item hides kept); a category with no standard materials is said so; Load Standard stays the redirect for loading them all — G8 (gap plan 2026-10-19, closed the same day) |
 | `add a 2 yd size to Black Mulch` | `update_material` fields.add_size fields.size | ✅ refused with the offer of a copy (D2, Simon 2026-10-19): *"Black Mulch is a standard material, so its sizes can't change. Want me to make you a copy — Black Mulch copy — and add the size there? (yes/no)"*; the yes makes the copy and changes it; Owner/Admin — G9 (gap plan 2026-10-19, closed the same day) |
 | `make me a copy of Black Mulch` | `copy_material` | ✅ a standard material copied as the company's own, "Black Mulch copy"; a copy of the company's own material stays the app's (§9.8); Owner/Admin *(gap plan 2026-10-19, D2)* |
@@ -3248,7 +3254,7 @@ question (#740, 2026-10-04).
 
 ## 10.9 "Show more" *(2026-09-27)*
 
-A list that stops short of the whole result says how far it got and remembers where it stopped (`agents/conversation/paging.py`). On the next turn, `show more` / `more` / `next page` / `the rest` / `keep going` replays the same request — filters included — from there. Good for one turn; with no longer list open, Maple says so. Tasks page this way today (§7.5); other lists can adopt the same helper.
+A list that stops short of the whole result says how far it got and remembers where it stopped (`agents/conversation/paging.py`). On the next turn, `show more` / `more` / `next page` / `the rest` / `keep going` replays the same request — filters included — from there. Good for one turn; with no longer list open, Maple says so. Every list the planner shows pages this way, 10 at a time (`paging.PAGE_SIZE`) — tasks (§7.5), estimates, contacts, properties (by city or role too), materials (by source or hidden too), roles, templates; a ranking pages by the number it shows (5 unless one is said) *(Simon 2026-11-12: "limit them to 10 per screen")*. A number asked ("my 15 latest estimates") is the whole answer, not a page.
 
 | Phrasing | Plan | Status |
 |---|---|---|
