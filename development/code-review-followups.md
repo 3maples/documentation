@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1614**. Never
+- **Entries are numbered and permanent.** Next free number: **1644**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -145,7 +145,7 @@ Guideline is 800 lines per file and 50 per function (CLAUDE.md).
 | 900 | [platform/services/google_drive_service.py](../../platform/services/google_drive_service.py) | 2026-09-23: image placement moved to `services/google_doc_images.py` (was 910 at peak); `create_estimate_from_template` split into helpers. 2026-10-21: +41 for per-request connections (`_request_builder`), `_load_credentials_info` and the sharing delegates; the sharing logic itself went to `services/google_drive_sharing.py`. 2026-10-26: −30 — `share_document` and the `grant_writer` / `revoke_writer` delegates replaced by `open_link_editing` / `close_link_access` / `modified_time`. 2026-11-01: +37 for text-block markdown in estimate docs (3ca456c; the formatter itself is `services/doc_markdown.py`). Still 90 over 2026-11-08: +10 net for `copy_style_base` (document templates), which now reuses `_copy_template`. |
 | 861 | [platform/services/material_catalog_writes.py](../../platform/services/material_catalog_writes.py) | **crossed the line 2026-10-21** (795 → 801): `next_copy_name` for Maple's copy offer (gap plan 2026-10-19 D2; review 2026-10-21 #83). **Next step:** move the copy helpers (`duplicate`, `next_copy_name`, `_next_copy_name`) into a `material_catalog_copies.py` re-exported from `material_catalog` — it joins the reader/writer import cycle, so it wants its own change |
 | 847 | [platform/models/estimate.py](../../platform/models/estimate.py) | 847 after review round 3 (+10: `lines_missing_ids` / `with_stored_line_ids`, shared with `Template`); **crossed the line 2026-11-04** (789 → 837, customer MCP server review round 2: `LINE_ID_PATTERN`, `_stored_line_id` and `JobItem._stored_line_ids`, so a line stored without an id loads with the same id every time). **Next step:** the line models (`MaterialItem`, `ActivityItem`, `LINE_ID_PATTERN`, `_stored_line_id`) into `models/estimate_lines.py`, re-exported from `models/estimate` |
-| 807 | [platform/routers/estimate_documents.py](../../platform/routers/estimate_documents.py) | **crossed the line 2026-11-08** (749 → 814): document templates' editor branch of draft and generate, then the review's function splits (`_planned_inputs`, `_build_next_doc`); 826 after round 2 (`client_ids` on `_plan_images`); 807 after round 3 trimmed `generate_google_doc`'s docstring. The editor's routes are the natural seam: move the layout draft/generate helpers to `routers/estimate_helpers/doc_layout.py` |
+| 817 | [platform/routers/estimate_documents.py](../../platform/routers/estimate_documents.py) | **crossed the line 2026-11-08** (749 → 814): document templates' editor branch of draft and generate, then the review's function splits (`_planned_inputs`, `_build_next_doc`); 826 after round 2 (`client_ids` on `_plan_images`); 807 after round 3 trimmed `generate_google_doc`'s docstring; 817 on 2026-11-11 (+10: the "library" photo spec in `_plan_images`). The editor's routes are the natural seam: move the layout draft/generate helpers to `routers/estimate_helpers/doc_layout.py` |
 | 812 | [platform/agents/task/operations.py](../../platform/agents/task/operations.py) | **crossed the line 2026-10-08** (was 774): `_handle_task_due_change` moved in beside the other sub-handlers (switchover phase 4b). **Next step:** the convert flow (`_handle_convert_task`, `_perform_conversion`, `_convert_error_copy`, about 175 lines) into `agents/task/convert.py` as a `TaskConvertBase` layer (review 2026-10-08 (4b) #22, deferred) |
 
 **Highest-value split, unchanged:** `routers/auth.py` → extract the invitation
@@ -189,6 +189,7 @@ fixtures — but these are past the point of scanning.
 | 1,113 | platform/tests/test_task_convert_api.py (1,113 on 2026-11-04: Convert billing and the credits gate) |
 | 973 | portal/tests/TasksPage.test.tsx |
 | 957 | platform/tests/test_user_api.py |
+| 952 | portal/tests/DocumentsDialog.test.tsx (first listed 2026-11-12, document templates review round 3 #2: 949 at HEAD, +3. Split: move the image tests — the kept-image reconciliation, size and pick errors — into `DocumentsDialogImages.test.tsx` with a shared render helper) |
 | 951 | platform/tests/test_maple_estimate_targeting.py |
 | 944 | platform/tests/test_labour_agent.py |
 | 909 | platform/tests/test_maple_work_item_edits.py |
@@ -354,6 +355,7 @@ seams that already exist as separate classes.
 | 114 | `update_user` — routers/users.py:208 (first measured 2026-10-28: 91 → 114 for the separate role-change row — review 2026-10-28, MCP enhancements release one (audit gaps) #18. Move the role-change and generic rows into `_audit_user_update(http_request, decoded_token, user_id, company_id, before, after, action, is_removal)`) |
 | 140 | `create_audit_log` — services/audit_service.py:175 (first measured 2026-10-28: 124 → 140 for the actor resolution — review 2026-10-28, MCP enhancements release one (audit gaps) #19. Extract `async def _resolve_actor(decoded_token, user_id, user_email, user_role) -> Tuple[...]`, the block that turns any shape into the Mongo user id) |
 | 163 | `_handle_update_estimate_status_transition` — agents/estimate/crud_handlers.py:3594 (first measured 2026-10-28: 162 → 163, the `audit=False` comment — review 2026-10-28, MCP enhancements release one (audit gaps) #20. Split into three helpers: the send gate, the write, and the reply) |
+| 142 | `InfoTooltip` component body — portal/src/components/ui/InfoTooltip.tsx:38 (first measured 2026-11-12, document templates review round 3 #1; pre-existing, 7 lines shorter after the shared `clampedLeft`. Seam: a `useInfoTip` hook in the same file owning the open state, the hover-delay timer, the click toggle and the Escape / outside-pointer / reflow dismissal effect (lines 46–118); the component keeps its refs, the positioning layout effect and the JSX) |
 
 #### Watch
 
@@ -6087,16 +6089,19 @@ total row count rather than blank-row count.
 **Decision (Simon, 2026-11-06):** ignore. The suggested test (assert that text in ConnectPage.test.tsx's staff-audience test) is not wanted; close this in the next cleanup pass.
 
 ### 1524. [LOW] build_doc_context / company_lines / _fields edge cases untested (review 2026-11-08, document templates #175)
+**Update 2026-11-12 (review 2026-11-11):** with no property, `property_name` and `property_city` are None and `property_address_lines` is `[]` too (context.py `build_doc_context`); test those with the no-property arm.
 `platform/services/document_templates/context.py:180` — Edge cases: a contact with no name dropped (194); first contact's blank phone/email uses the second's (108–111); no phone → None (199); no property → address None (201); blank company phone → None (132); empty logo_url → None (127); CUSTOMER_NAME/CATEGORY/COMPANY_CONTACT None (146/147/154); blank division skipped (119–120).
 
 **Suggested fix:** Unit tests with in-memory models: nameless + named contacts; no contacts and no property; company phone "  " and logo ""; divisions "" and "X"; no divisions → CATEGORY None.
 
 ### 1525. [LOW] _execute / _status error arms untested (review 2026-11-08, document templates #176)
+**Update 2026-11-12:** `_execute` and `_status` moved to `docs_writer.py` (:115, :47).
 `platform/services/document_templates/docs_composer.py:146` — Edge cases: non-429 re-raised (150–151); a second 429 raises (154); `_status` reading `resp.status` (113); non-int status → None (116–117).
 
 **Suggested fix:** batchUpdate raising 500 → raises; 429 twice → raises after one retry; `_status(resp.status=429) == 429`; `_status(status_code="x") is None`.
 
 ### 1526. [LOW] compose_into / _clear_body / _logo_request / writers edge cases untested (review 2026-11-08, document templates #177)
+**Update 2026-11-12 (review 2026-11-11):** the "customer with nothing printable prints no heading" arm is gone (the Customer block has no heading since 2026-11-11); the second-logo arm is now per segment (`_write_company`). The composer's writer moved to `docs_writer.py`.
 `platform/services/document_templates/docs_composer.py:565` — Edge cases: unknown block type → ComposeError (578–579); single empty paragraph skips the delete (535); logo with no size → 72pt (553); small logo scale 1 (550); second Company block keeps no second logo (320); customer with nothing printable prints no heading (343–344); signature with no party prints nothing (458–459).
 
 **Suggested fix:** One test per arm as listed (model_construct type "x"; FakeDocument(("",)); `_logo_request` without size; 100×50 logo; two company blocks → one "[img]"; empty CustomerLines; signature with both off).
@@ -6112,6 +6117,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Save twice without started_from and assert it's kept; `"{bad"` → 422; `{"kind":"template","id":"nope"}` → 404.
 
 ### 1529. [LOW] parse_blocks / _check_new_ids / _photos_in_print_order / _library_copies / version_blocks edge cases untested (review 2026-11-08, document templates #180)
+**Update 2026-11-12 (review 2026-11-11):** the library read failure → 502 is now also reached from `_plan_images` through `doc_layout.load_library` (a "library" photo spec).
 **Update 2026-11-08 (round 2 #8):** the over-`MAX_DOC_IMAGES` arm in `_photos_in_print_order` was deleted (unreachable after `validate_layout`'s cap); drop it from this entry.
 `platform/routers/estimate_helpers/doc_layout.py:84` — Edge cases: bad blocks JSON/shape → 422 (87–88); upload with no id → 400 (190–191); duplicate new ids → 400 (192); new id clashing with the current draft (97–98); over MAX_DOC_IMAGES → 400 (214–216); library read failure → 502 (169–171); saved_text with missing content dropped (79).
 
@@ -6199,6 +6205,7 @@ total row count rather than blank-row count.
 **Suggested fix:** duplicate null → no navigation; reject setDefault → alert; clean → Save disabled; held update → "Saving..."; one block → "1 block · sample data".
 
 ### 1546. [LOW] TemplateDetails and DivisionChecks edge cases untested (review 2026-11-08, document templates #197)
+**Stale 2026-11-12:** `TemplateDetails` and `DivisionChecks` were removed (review 2026-11-11); archive in the next cleanup pass.
 `portal/src/pages/DocumentTemplateEditorPage.tsx:56` — Edge cases: no divisions hint (80); unticking removes (46).
 
 **Suggested fix:** `divisionsApi.list` → `[]` → hint; untick d1 and Save → `suggested_division_ids: []`.
@@ -6245,6 +6252,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Draft without started_from → exactly "Draft"; Close → `onClose` called; remove versions after picking → Blank checked.
 
 ### 1554. [LOW] savedLine and createdOn edge cases untested (review 2026-11-08, document templates #205)
+**Update 2026-11-12:** `createdOn` was removed (review 2026-11-11); only the `savedLine` arms remain.
 `portal/src/components/estimates/DocumentsHub.tsx:38` — Edge cases: no `saved_by` (42); invalid `saved_at` (40); version without/invalid `created_at` (47).
 
 **Suggested fix:** `saved_by: null` → "saved ·"; `saved_at: "x"` → "saved by Ana"; no created_at → note is just "from Alpha".
@@ -6307,6 +6315,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Untick all four → that text; `names: []` → no names line.
 
 ### 1566. [LOW] EstimateView edge cases untested (review 2026-11-08, document templates #217)
+**Update 2026-11-12:** the divisions and tax-note arms are gone (the Estimate block prints neither since 2026-11-11); the other EstimateView edge cases are #1629.
 `portal/src/components/documentEditor/BlockView.tsx:120` — Edge cases: divisions shown/skipped (135); description as markdown (136); no work items → no table (139); tax note off (165).
 
 **Suggested fix:** Template context → "Division: Design/Build" and the description; `work_items: []` → no table; `show_tax_note: false` → no note.
@@ -6367,6 +6376,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Spacer → no heading field; Page break → no "Space above"; clear Customer heading, Save → `heading: null`.
 
 ### 1578. [LOW] Inspector edge cases untested (review 2026-11-08, document templates #229)
+**Stale 2026-11-12:** the Inspector tabs became SidePanel's Content / Block tabs (tested in documentEditorInspector.test.tsx); archive in the next cleanup pass.
 `portal/src/components/documentEditor/Inspector.tsx:306` — Edge cases: selecting a block switches to the Block tab (315); Block tab disabled with none selected (323); "Select a block…" hint (333).
 
 **Suggested fix:** Document tab then click a block → Block tab selected; no selection → disabled and the hint.
@@ -6477,6 +6487,7 @@ total row count rather than blank-row count.
 **Suggested fix:** After "Add Divider block" in the sheet, assert `queryByRole("dialog")` is null.
 
 ### 1601. [LOW] useLibraryImageActions, UploadImageAction and ImageThumb edge cases untested (review 2026-11-08 round 2, document templates #82)
+**Update 2026-11-12:** the delete Cancel arm is now `useImageDelete` (useLibraryImageActions.ts).
 `portal/src/components/documentEditor/useLibraryImageActions.ts:15` — Edge cases: Cancel on the name dialog (61); Cancel on the delete confirm (62); confirm busy while deleting (BlockPalette.tsx:166); Upload opening the chooser (138); the input reset so the same file can be picked again (144); ImageThumb's placeholder while loading (102).
 
 **Suggested fix:** Upload → Cancel → no dialog, `upload` not called; Delete → Cancel → `remove` not called; hold `remove` → Delete disabled; click Upload → input click spy called; after an upload the input value is "".
@@ -6487,9 +6498,171 @@ total row count rather than blank-row count.
 **Suggested fix:** Open Save as template → Cancel → no dialog, not called; hold `saveFromEstimate`, type → name unchanged; `saveDocLayout` returning `started_from: {kind:"version", id:"1"}` → "Started from Version 1".
 
 ### 1603. [LOW] top bar and DocumentTab edge cases untested (review 2026-11-08 round 2, document templates #84)
+**Update 2026-11-12:** the DocumentTab part is gone (no Document tab since 2026-11-11); only the top bar arm remains.
 `portal/src/components/estimateDocument/EstimateDocumentTopBar.tsx:46` — Edge cases: `md:pr-20` room for the closed Maple button on the document page (51); the Document tab's "Started from …" text (EstimateDocumentEditorPage.tsx:38).
 
 **Suggested fix:** Header has `md:pr-20` with Maple closed, not open or on a phone; click the Document tab → "Started from Standard Estimate.".
+
+### 1614. [LOW] _work_items_and_tax edge cases untested (review 2026-11-11, document templates #28)
+`platform/services/document_templates/context.py:254` — (a) no work items → subtotal "$0.00", tax_total None (loop runs zero times, 260); (b) the + 0.0 negative-zero guard (264).
+
+**Suggested fix:** (a) _estimate(job_items=[]) → SUBTOTAL "$0.00", tax_total None. (b) job_items [0.1, 0.2, 0 @5%], grand_total 0.3 → tax_total "$0.00", not "$-0.00".
+
+### 1615. [LOW] work_item_amounts' tax ≤ −100% arm untested (review 2026-11-11, document templates #29)
+`platform/services/estimate_doc_generator.py:145` — The rate > 0 else arm (153) where the amount stands has no test; nobody enters such a tax.
+
+**Suggested fix:** MagicMock item sub_total=50, tax=-100, recurring=False → [(desc, 50.0, 50.0)], no ZeroDivisionError.
+
+### 1616. [LOW] _doc_description with only the label untested (review 2026-11-11, document templates #30)
+`platform/services/document_templates/context.py:146` — "Work requested:   " → blank → None (153).
+
+**Suggested fix:** Add ("Work requested:   ", None) to test_the_document_drops_the_work_requested_label; assert description and DESCRIPTION None.
+
+### 1617. [LOW] _prepared_by blank and capitalised arms untested (review 2026-11-11, document templates #31)
+`platform/services/document_templates/context.py:273` — Blank created_by → None (276); "System" → None. Only "Sam Lee" and "system" are tested.
+
+**Suggested fix:** Unit test: _prepared_by("  ") is None and _prepared_by("System") is None.
+
+### 1618. [LOW] load_library's invalid-id arm unreachable and untested (review 2026-11-11, document templates #32)
+`platform/routers/estimate_helpers/doc_layout.py:164` — The except (173) for a non-ObjectId id: both callers already validate.
+
+**Suggested fix:** Delete the try/except (my pick), or pytest.raises(HTTPException) on load_library(oid, ["nope"]) → 404.
+
+### 1619. [LOW] library_copy's size or "large" fallback unreachable (review 2026-11-11, document templates #33)
+`platform/routers/estimate_helpers/doc_layout.py:182` — DocImageSpec.size and LibraryImageRef.size both default to "large" (191).
+
+**Suggested fix:** Drop the or "large", or test library_copy(loaded, size=None, caption=None, image_id="a"*32).size == "large".
+
+### 1620. [LOW] version_blocks with a saved_text block missing style keys untested (review 2026-11-11, document templates #34)
+`platform/routers/estimate_helpers/doc_layout.py:86` — Defensive filter (98) for an unvalidated block.
+
+**Suggested fix:** LayoutPlan with a saved_text block {"text_block_id": "t"} and saved_texts {"t": "x"} → version_blocks()[0].props == {"text": "x"}.
+
+### 1621. [LOW] _write_estimate with the description last untested (review 2026-11-11, document templates #35)
+**Update 2026-11-12:** `_write_estimate` is now docs_composer.py:223 (the writer split out to docs_writer.py).
+`platform/services/document_templates/docs_composer.py:536` — Table, tax and total hidden → no gap under the description (553); only the title-last case is tested.
+
+**Suggested fix:** make_block("estimate","e", show_work_items=False, show_tax=False, show_grand_total=False) → description's spaceBelow is 0.
+
+### 1622. [LOW] _work_items_fill before-tax fallback untested (review 2026-11-11, document templates #36)
+**Update 2026-11-12:** `_work_items_fill` is now docs_composer.py:161; a blank cell is now tested (round 2 #1).
+`platform/services/document_templates/docs_composer.py:478` — before_tax with a row whose amount_before_tax is None prints amount (482).
+
+**Suggested fix:** _estimate_context with tax_total "$1.00" and a row without amount_before_tax → that row prints amount.
+
+### 1623. [LOW] _header_target empty-header arm untested (review 2026-11-11, document templates #37)
+**Update 2026-11-12:** `_header_target` is now docs_composer.py:431; its tests moved to test_docs_composer_page_regions.py.
+`platform/services/document_templates/docs_composer.py:744` — An existing empty default header → end = 1 (759).
+
+**Suggested fix:** headers={"default": []}, defaultHeaderId "default" → header lines are the company lines, no segment delete.
+
+### 1624. [LOW] _footer_deletes edge cases untested (review 2026-11-11, document templates #38)
+**Update 2026-11-12:** `_footer_deletes` is now docs_composer.py:487; its tests moved to test_docs_composer_page_regions.py.
+`platform/services/document_templates/docs_composer.py:800` — (a) two page-number paragraphs, the earlier keeps its newline (811); (b) a page-number paragraph after other text deletes the text (822).
+
+**Suggested fix:** (a) footer "PAGE [n]\nof [n]\n" → both kept under the company lines. (b) "Old\nPAGE [n]\n" → "Old" gone, "PAGE [n]" last.
+
+### 1625. [LOW] _footer_requests with every detail hidden untested (review 2026-11-11, document templates #39)
+**Update 2026-11-12:** `_footer_requests` is now docs_composer.py:517; its tests moved to test_docs_composer_page_regions.py.
+`platform/services/document_templates/docs_composer.py:830` — All shows off → no insertText (844); on a footer without a page number, total > 1 (848) false.
+
+**Suggested fix:** All show_* False on the page-number footer → footer_lines == ["PAGE [n] of [n]"]; on {"only": "Old\n"} → empty footer, no updateTextStyle.
+
+### 1626. [LOW] compose_into extra header/footer block arm untested (review 2026-11-11, document templates #40)
+**Update 2026-11-12:** `compose_into` is now docs_composer.py:604.
+`platform/services/document_templates/docs_composer.py:917` — A second header/footer Company block (unvalidated layouts only) isn't skipped by [:1] (936) and prints in the body.
+
+**Suggested fix:** Raise ComposeError there (my pick, can't happen after validate_layout), or test two model_construct header blocks → second's lines in the body.
+
+### 1627. [LOW] _send_last_batch with two logos untested (review 2026-11-11, document templates #41)
+**Update 2026-11-12:** `_send_last_batch` is now docs_composer.py:642.
+`platform/services/document_templates/docs_composer.py:955` — A header and a body Company block both with a logo put two insertInlineImage requests in the last batch (_write_company:452); one failing drops both.
+
+**Suggested fix:** Compose [company placement=header, company] with a logo → two inserts (one segmentId "default"), logo_placed; with fail_on="insertInlineImage" → no [img] in either, both blocks' text present.
+
+### 1628. [LOW] CompanyFooterView edge cases untested (review 2026-11-11, document templates #42)
+`portal/src/components/documentEditor/BlockView.tsx:114` — All details off → "Company footer: nothing to print" (120); phone without email (118); no address_lines (117).
+
+**Suggested fix:** All show_* false → WontPrint text; phone only → "+1 …" without "·"; context without address_lines → no address line.
+
+### 1629. [LOW] EstimateView edge cases untested (review 2026-11-11, document templates #43)
+`portal/src/components/documentEditor/BlockView.tsx:216` — Taxed row without amount_before_tax falls back to amount (223); a description with nothing after it gets no room under it.
+
+**Suggested fix:** Taxed context, one row lacking amount_before_tax → prints amount; description only → wrapper marginBottom "".
+
+### 1630. [LOW] CompanyOptions edge cases untested (review 2026-11-11, document templates #44)
+`portal/src/components/documentEditor/Inspector.tsx:227` — The Body placement note (242); both refusals joined when other blocks hold header and footer (242); the footer note without the logo sentence (245).
+
+**Suggested fix:** Fresh Company block → Body note; header+footer+body blocks → both refusal sentences; footer placement → no "current logo".
+
+### 1631. [LOW] libraryRefsAsPhotos edge case untested (review 2026-11-11, document templates #45)
+`portal/src/components/documentEditor/documentPhotos.ts:51` — An Image block with no refs beside one with refs comes back unchanged (55).
+
+**Suggested fix:** [imageBlock with refs, imageBlock("i2", ["p2"])] → blocks[1] is the same object.
+
+### 1632. [LOW] unsavedLibraryPhotosAsRefs edge cases untested (review 2026-11-11, document templates #46)
+**Update 2026-11-12:** now `libraryPhotosAsRefs`; the blank caption is covered; only "a block's existing refs stay ahead" is still open.
+`portal/src/components/documentEditor/documentPhotos.ts:69` — A blank caption becomes null (73); a block's existing refs stay ahead (75).
+
+**Suggested fix:** Caption "  " → caption null; library [img0] plus unsaved img1 → [img0, img1].
+
+### 1633. [LOW] pickerDraft library arm untested (review 2026-11-11, document templates #47)
+`portal/src/components/documentEditor/PhotoOptions.tsx:26` — A placed library photo is left out of the note picker's draft (31).
+
+**Suggested fix:** Place a library photo, open From Notes → the included count ignores it.
+
+### 1634. [LOW] PhotoOptions with an empty library untested (review 2026-11-11, document templates #48)
+`portal/src/components/documentEditor/PhotoOptions.tsx:102` — No "Add a library image" picker with an empty library (136).
+
+**Suggested fix:** Document mode, libraryImages=[] → no "Add a library image" combobox.
+
+### 1635. [LOW] addLibrary at the cap untested (review 2026-11-11, document templates #49)
+**Update 2026-11-12:** `addLibrary` is now in `photoAdders` (useDocumentPhotos.ts).
+`portal/src/components/documentEditor/useDocumentPhotos.ts:108` — Room 0 sets TOO_MANY_DOC_IMAGES and places nothing (109–110); defensive, the picker is disabled at the cap.
+
+**Suggested fix:** renderHook with 30 placed, addLibrary → error set, photo_ids unchanged.
+
+### 1636. [LOW] imageNameOf edge cases untested (review 2026-11-11, document templates #50)
+`portal/src/components/documentEditor/useLibraryImageActions.ts:12` — ".png" falls back to the whole name; a name over 100 characters is cut (14).
+
+**Suggested fix:** imageNameOf(new File([], ".png")) → ".png"; 150-character name → 100 characters.
+
+### 1637. [LOW] startUploads with no files untested (review 2026-11-11, document templates #51)
+`portal/src/components/documentEditor/useLibraryImageActions.ts:62` — An empty pick does nothing (64).
+
+**Suggested fix:** Fire change with no files → no dialog, upload not called.
+
+### 1638. [LOW] HoverTip edge cases untested (review 2026-11-11, document templates #52)
+**Update 2026-11-12:** HoverTip's logic moved to `useAnchoredTip` (components/ui/anchoredBubble.ts); scroll, focus, the clamp and Escape are now tested; the open-menu trigger and click-hides arms are still open.
+`portal/src/components/common/HoverTip.tsx:15` — No tip over an open menu trigger (25); viewport clamp (37); scroll hides (42); click hides and focus shows (48).
+
+**Suggested fix:** Open Share menu + hover → no tooltip; right-edge rect → left ≤ innerWidth − width − 8; fireEvent.scroll(window) → hidden; click → hidden; focus() → shown.
+
+### 1639. [LOW] unzoomed at zoom 1 untested (review 2026-11-11, document templates #53)
+`portal/src/components/documentEditor/fitWidth.ts:27` — At zoom 1 it returns the same transform (28).
+
+**Suggested fix:** unzoomed(t, 1) is t.
+
+### 1640. [LOW] usePageZoom without ResizeObserver untested (review 2026-11-11, document templates #54)
+`portal/src/components/documentEditor/fitWidth.ts:37` — Without ResizeObserver it measures once (44).
+
+**Suggested fix:** Stub ResizeObserver undefined → zoom measured once, no throw.
+
+### 1641. [LOW] useMergeFields edge cases untested (review 2026-11-11, document templates #55)
+`portal/src/components/settings/useMergeFields.ts:10` — A second wanted=true doesn't fetch again (14) in isolation; a null context gives [] (17).
+
+**Suggested fix:** renderHook toggling wanted → sampleContext once; resolve null → [].
+
+### 1642. [LOW] DocumentsHub edge cases untested (review 2026-11-11, document templates #56)
+**Update 2026-11-12:** the onStartOver-with-no-path arm is now `useReplaceDraft` (DocumentsHub.tsx).
+`portal/src/components/estimates/DocumentsHub.tsx:244` — New draft clears an earlier Open error (267–269); onStartOver with no path (307–310), defensive.
+
+**Suggested fix:** Fail Open (error shown), click New draft → no alert in the pop-up.
+
+### 1643. [LOW] New draft from while starting untested (review 2026-11-11, document templates #57)
+`portal/src/components/estimates/DocVersionList.tsx:44` — New draft from is disabled while a start is saving (73).
+
+**Suggested fix:** Hold onBeforeStart, start once → "New draft from Estimate v2" disabled.
 
 ## Codebase hygiene (batchable)
 
