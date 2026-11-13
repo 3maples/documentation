@@ -6397,7 +6397,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Spacer → no heading field; Page break → no "Space above"; clear Customer heading, Save → `heading: null`.
 
 ### 1578. [LOW] Inspector edge cases untested (review 2026-11-08, document templates #229)
-**Stale 2026-11-12:** the Inspector tabs became SidePanel's Content / Block tabs (tested in documentEditorInspector.test.tsx); archive in the next cleanup pass.
+**Stale 2026-11-12:** the Inspector tabs became SidePanel's Blocks / Detail tabs (Content / Block until renamed 2026-11-12; tested in documentEditorInspector.test.tsx); archive in the next cleanup pass.
 `portal/src/components/documentEditor/Inspector.tsx:306` — Edge cases: selecting a block switches to the Block tab (315); Block tab disabled with none selected (323); "Select a block…" hint (333).
 
 **Suggested fix:** Document tab then click a block → Block tab selected; no selection → disabled and the hint.
@@ -6633,6 +6633,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Place a library photo, open From Notes → the included count ignores it.
 
 ### 1634. [LOW] PhotoOptions with an empty library untested (review 2026-11-11, document templates #48)
+**Update 2026-11-12:** the "Add a library image" dropdown is now the From Library button (`LibraryImagePicker.tsx`); the check is no From Library button with an empty library.
 `portal/src/components/documentEditor/PhotoOptions.tsx:102` — No "Add a library image" picker with an empty library (136).
 
 **Suggested fix:** Document mode, libraryImages=[] → no "Add a library image" combobox.
@@ -6681,6 +6682,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Fail Open (error shown), click New draft → no alert in the pop-up.
 
 ### 1643. [LOW] New draft from while starting untested (review 2026-11-11, document templates #57)
+**Stale 2026-11-12:** New draft from left the version rows (a version is picked in the New draft pop-up, whose Start is tested disabled while starting); archive in the next cleanup pass.
 `portal/src/components/estimates/DocVersionList.tsx:44` — New draft from is disabled while a start is saving (73).
 
 **Suggested fix:** Hold onBeforeStart, start once → "New draft from Estimate v2" disabled.
