@@ -98,7 +98,9 @@ snippets below with the new key filled in.
 ## Connecting
 
 **By signing in** (most apps): add the server address, then sign in to 3Maples
-and approve when the app asks. Settings → AI Apps shows the same steps.
+and approve when the app asks. Settings → AI Apps shows the address and links
+to the website's AI Apps setup guide (https://3maples.com/ai-apps; Dev builds
+link https://maples-website-dev.web.app/ai-apps).
 
 - claude.ai and Claude Desktop: **Settings → Connectors → Add custom
   connector**, URL `https://api.3maples.ai/mcp`, no headers.
