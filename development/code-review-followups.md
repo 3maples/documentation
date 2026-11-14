@@ -183,7 +183,7 @@ fixtures — but these are past the point of scanning.
 | 1,068 | platform/tests/test_planner_said_corrections.py (new in the planner gap-fixing change; split along `said_metrics` / `said_tasks` / `said_resize` — review round 13 #24) |
 | 1,049 | [platform/tests/test_media_blobs.py](../../platform/tests/test_media_blobs.py) | 277 → 889 with Maple attachments (2026-10-19), from the pixel-cap and JPEG scan-walk tests of review rounds 4–6. **Next step:** move those sections and the image builders they share into `tests/test_media_blobs_pixel_caps.py` — a pure move (Maple attachments review round 8 #2) |
 | 1,042 | platform/tests/test_planner_confirm.py (563 → 1,025 in the planner gap-fixing change; split the round-7/8 line-label tests from the question-write tests — review round 13 #23) |
-| 1,037 | platform/tests/conftest.py |
+| 1,087 | platform/tests/conftest.py (1,037 when listed; re-measured 2026-11-14, billing reset review round 4 #6 — about 20 of the 50 new lines are the cleanup's age limit) |
 | 989 | platform/tests/test_command_grammar.py (first listed 2026-10-22) |
 | 987 | platform/tests/test_planner_said.py (553 before 2026-10-13; the review's said.py split moved new cases to `test_planner_said_corrections.py` — split the rest along `said_metrics` / `said_tasks` / `said_resize` / `said_guards`, review 2026-10-13 #141, deferred) |
 | 1,113 | platform/tests/test_task_convert_api.py (1,113 on 2026-11-04: Convert billing and the credits gate) |
@@ -217,6 +217,7 @@ seams that already exist as separate classes.
 |------:|----------|
 | 236 | `App` — portal/src/App.tsx:134 (first measured 2026-11-08, document templates review round 3 #6; pre-existing, +4 for the two editor routes. Seam: move the `<Routes>` block into `AppRoutes()`) |
 | 74 | `TaskStatusesTab` — portal/src/components/tasks/TaskStatusesTab.tsx:22 (2026-10-21: moved from Settings to the Tasks page's Statuses tab and split over three review rounds, ~292 → 74 — the table, row, both dialogs and the `useTaskStatuses` hook came out. What's left is the header and the two dialog mounts. **Next step:** pull the dialog mounts into `TaskStatusDialogs` if it grows again — review 2026-10-21 round 3 #3) |
+| 186 | `_run_test_data_cleanup` — platform/tests/conftest.py:397 (first measured 2026-11-14, billing reset review round 4 #6: pre-existing, +~10 for the age limit that stops one run deleting a concurrent run's data. Split along its own step comments: `_collect_test_companies` / `_delete_company_children` / `_delete_companies_and_users` / `_fallback_sweeps`, each taking `db` and the `old` filter) |
 | 998 | `_orchestrate_turn` — routers/agents.py:1165 (the endpoint body since #689 moved the double-send claim into `orchestrate_agent_endpoint`; was `orchestrate_agent_endpoint` at 607 on 2026-09-27's first measure, +122 over the multi-turn push. The multi-turn design (2026-09-27 §5.1) made its pending handlers answer dispatchers behind one gate — the natural first cut is those dispatchers and the router pre-handlers into `routers/agent_helpers/`) Re-measured 822 on 2026-10-07; +28 that day (794 → 822) for the unanswered tracker's `_track_unanswered` closure and the crash-record hand-off. Re-measured 965 on 2026-10-13 (+7 in the planner gap-fixing change for the request as typed and the overage carry; the rest is older drift — review 2026-10-13 round 5 #32). Re-measured 995 at :1152 on 2026-10-19, Maple attachments round 3 (965 → 995). 998 at :1165 on 2026-11-01 (996 on main; +2, the phone's position read as the property here). |
 | 82 | `PhotoViewer` — portal/src/components/tasks/TaskPhotoGrid.tsx:111 (2026-10-19, review round 2 #29 for Maple attachments: `ViewerMedia` and `ViewerNav` extracted, 136 → 82, below the 128 it started at. What's left is the dialog shell, the focus effect and its comments: next, lift the focus/keyboard effect into a `useViewerKeys` hook) |
 | 54 | `store_attachment` — platform/services/maple_attachments.py:263 (new 2026-10-19, over 50 since the round-2 reorder — Maple attachments round 3 #11. Extract the validate/decode branch into `_prepare_upload(content, content_type, filename)` returning (normalized, name, kind, to_read, read_type, thumbnail); `store_attachment` drops to ~30 lines) |
@@ -2982,6 +2983,8 @@ resources the request named, and Company was not one of them.
 **Suggested fix:** the same treatment — an `UpdateCompanyRequest` DTO on
 `routers/companies.py:220` plus `services/sparse_update.build_patch`/`finalize`,
 and targeted `.set()` calls in the webhook handlers instead of `.save()`.
+
+**Webhook half RESOLVED 2026-11-14** (billing reset fixes): every handler in `services/billing/webhook_handlers.py` writes only the fields it changes (`_set`, one `$set`), and the usage reset is one conditional `$set` (`services/billing/usage_reset.py`); pinned by `tests/test_billing_usage_reset.py::TestHandlersWriteOnlyTheirFields`. The Settings half (`routers/companies.py` DTO, `FinancialTab.tsx`'s stale spread) is still open.
 
 ### 496. [LOW] platform/routers/properties.py:418 — `changed()` gate lost the old whitespace/None normalization
 The old comparison normalized with `str(x or "").strip()`; the new `changed()` compares raw
@@ -6971,6 +6974,8 @@ models at the top. Mixed style.
 
 Fix: move to module-top imports for consistency. Trivial cleanup; bundle
 with the next functional change to this file.
+
+**RESOLVED 2026-11-14:** the per-user reset moved to `services/billing/usage_reset.py`, which imports `User` at the top; `webhook_handlers.py` has no in-function import left.
 
 ### 255. [LOW] Redundant `hover:bg-emerald-600` on current-plan button
 `portal/src/components/billing/PlanPickerGrid.tsx:134` — the
