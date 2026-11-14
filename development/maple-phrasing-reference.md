@@ -2,9 +2,22 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-11-12
+**Last updated:** 2026-11-13
 
 ### Recent changes
+
+**2026-11-13 (AI apps and what's coming, Simon):** "how do I connect ChatGPT?",
+"set up MCP" and the like are help: Maple gives the app's steps from the guide's
+§9.7 and points to https://3maples.com/ai-apps. Asked what's coming next she
+lists the features on the way — multi-language support (translations
+included), scheduling, resourcing, time tracking, task reminders, job
+management, invoicing & payments, QuickBooks and reporting & analytics (the
+guide's §10 "Coming soon");
+asked about one, or to use one ("schedule the crew for Monday"), she says it's
+being worked on and coming soon, and what works today. "Remind me to …" is still
+a task, and the Scheduled status still a status. A refusal of any of these
+as `other`, or as the `billing` or `settings_financial` redirect, is help (`as_asked_reads.coming_or_ai_apps_is_help`)
+(new §11.7).
 
 **2026-11-12 (ten to a page, Simon):** every list of records stops at 10 and
 says how far it got — *"That's 1–10 of 25 — say "show more" for the next 10."*
@@ -3528,6 +3541,33 @@ These read like questions *about* Maple but are really **capability / CRUD** req
 | `how are you able to help me?` | `help` | ✅ (correctly excluded) |
 
 **Persona boundaries** (`agents/maple_persona.py`): flirty messages get a **playful deflection** with **no romantic reciprocation**; explicit or persistent advances drop the humor and redirect to work; AI-identity questions are answered **honestly** (she is an AI); replies stay short and pivot back to the task; she **never** reveals other users' data.
+
+## 11.7 AI apps and what's coming next *(2026-11-13)*
+
+Answered from the guide — §9.7 for connecting an AI app, §10 for what's on the way. The guide
+prompt's rule 7 has Maple say a "Coming soon" feature is being worked on (never steps or a date) and
+list them all when asked what's next; rule 8 sends an AI app's setup to https://3maples.com/ai-apps.
+The planner prompt names these as help, in its readings and in its refusal list; one the model still
+refuses as `other`, or as the `billing` or `settings_financial` redirect, is help all the same — every other
+redirect stands, since its words name a record ("add a Scheduling division", "invite Jordan, our scheduler")
+(`agents/planner/as_asked_reads.coming_or_ai_apps_is_help`).
+
+| Phrasing | Plan | Status |
+|---|---|---|
+| `how do I connect ChatGPT to 3Maples?` / `can I use 3Maples from Claude?` / `does it work with Cursor?` | `help` | ✅ the app's steps and the website's setup page |
+| `set up the MCP server` / `connect my AI app` / `how do I add 3Maples to Grok?` | `help` | ✅ |
+| `what features are coming next?` / `what's on the roadmap?` / `what's coming soon?` | `help` | ✅ lists the guide's §10 "Coming soon": multi-language support, scheduling, resourcing, time tracking, task reminders, job management, invoicing & payments, QuickBooks, reporting & analytics |
+| `can I schedule my crews?` / `schedule the crew for Monday at Elm House` | `help` | ✅ scheduling is on the way — said as a command too |
+| `do you do resource planning?` / `can I see which crew is free next week?` | `help` | ✅ resourcing is on the way |
+| `can my guys track their time?` / `can we clock in and out?` | `help` | ✅ time tracking is on the way |
+| `will I get a reminder when a task is due?` / `can 3Maples send me task reminders?` | `help` | ✅ task reminders are on the way; "remind me to …" makes a task today |
+| `is the app available in Spanish?` / `do you support other languages?` / `can you translate my estimate into Spanish?` | `help` | ✅ multi-language support, translations included, is on the way; Maple already chats in any |
+| `can I invoice my customers from 3Maples?` / `can I take payments from customers?` / `do you integrate with QuickBooks?` | `help` | ✅ on the way |
+| `show me my invoices` | refuse `out_of_chat` `billing` | 🛑 3Maples' own invoices are on the Billing tab — not invoicing customers |
+| `add a Scheduling division` | refuse `out_of_chat` `divisions` | 🛑 a division named Scheduling, not the scheduling feature — the Divisions redirect stands |
+| `invite Jordan, our scheduler, to the team` | refuse `out_of_chat` `team` | 🛑 a teammate who schedules — the Team Members redirect stands |
+| `remind me to call Bob tomorrow` | `create_task` fields.due_date | ✅ a reminder is still a task (§7.2) |
+| `mark {EST} as scheduled` [est] | `set_status` status=Scheduled | ✅ the status, not the scheduling feature (§1.4) |
 
 ---
 
