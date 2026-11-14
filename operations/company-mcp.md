@@ -154,6 +154,53 @@ curl -s https://api.3maples.ai/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"whoami","arguments":{}}}'
 ```
 
+## Listing in the MCP Registry
+
+The public listing at registry.modelcontextprotocol.io comes from
+`platform/mcp_server/company/registry/server.json`: the server's name
+`ai.3maples/mcp`, the address, the setup guide (`https://3maples.com/ai-apps`)
+and the icon. Many community directories (PulseMCP, Glama …) copy their
+listings from the registry. The registry checks only that we own the name's
+domain (`3maples.ai`). It doesn't check the server, and it has no field for
+OAuth: apps find the sign-in through the server's own discovery documents.
+The registry is still in preview, so its data can be reset.
+
+**First publish** (macOS; Apple's LibreSSL has no Ed25519, so use Homebrew's
+openssl):
+
+1. Install the tools: `brew install openssl@3 mcp-publisher`.
+2. Make the signing key outside every repo, and save a copy in the password
+   manager:
+
+   ```bash
+   OPENSSL=/opt/homebrew/opt/openssl@3/bin/openssl
+   KEY=~/.config/3maples/mcp-registry-key.pem
+   mkdir -p ~/.config/3maples && $OPENSSL genpkey -algorithm Ed25519 -out $KEY && chmod 600 $KEY
+   echo "v=MCPv1; k=ed25519; p=$($OPENSSL pkey -in $KEY -pubout -outform DER | tail -c 32 | base64)"
+   ```
+
+3. Add that line as a **TXT record on `3maples.ai` itself** (the apex, not a
+   subdomain). Check it with `dig TXT 3maples.ai +short`. It can take a few
+   minutes to appear.
+4. Sign in to the registry and publish, from the folder holding `server.json`
+   (same shell, so `$OPENSSL` and `$KEY` are still set):
+
+   ```bash
+   cd platform/mcp_server/company/registry
+   MCP_PRIVATE_KEY="$($OPENSSL pkey -in $KEY -noout -text | sed -n '/priv:/,/pub:/p' | sed '1d;$d' | tr -d ' :\n')" \
+     mcp-publisher login dns --domain 3maples.ai
+   mcp-publisher validate
+   mcp-publisher publish
+   ```
+
+5. Check it: `curl "https://registry.modelcontextprotocol.io/v0.1/servers?search=ai.3maples/mcp"`.
+
+**Updating the listing** (new description, icon or address): edit
+`server.json`, raise `version` (`1.0.0` → `1.0.1`), then log in and publish
+again. The version is the listing's own number, not the platform release.
+Leave the TXT record in place. To change keys, add the new record, log in with
+the new key, then remove the old record.
+
 ## What an agent can do (92 tools)
 
 Everything goes through the same rules as the portal: Owner/Admin only where
