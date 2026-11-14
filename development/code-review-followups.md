@@ -33,7 +33,7 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
-- **Entries are numbered and permanent.** Next free number: **1648**. Never
+- **Entries are numbered and permanent.** Next free number: **1649**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -6689,6 +6689,11 @@ total row count rather than blank-row count.
 `portal/src/components/estimates/DocVersionList.tsx:44` — New draft from is disabled while a start is saving (73).
 
 **Suggested fix:** Hold onBeforeStart, start once → "New draft from Estimate v2" disabled.
+
+### 1648. [LOW] Seat-count cron `_main()` with Sentry off untested (review 2026-11-14, Sentry environment name round 2 #1)
+`platform/scripts/snapshot_seat_counts.py:42` — Edge case. The new `tests/test_snapshot_seat_counts.py` only drives `_main()`'s `if settings.sentry_dsn:` true arm (43). The false arm, where no DSN is set and Sentry isn't started, never runs. That only happens without a DSN (locally, or a cron service missing SENTRY_DSN).
+
+**Suggested fix:** Add `test_without_a_dsn_sentry_isnt_started` to `tests/test_snapshot_seat_counts.py`. Use the same stubs, set `sentry_dsn=None`, run `asyncio.run(cron_script._main())`, and assert the `sentry_sdk.init` recorder is empty.
 
 ## Codebase hygiene (batchable)
 
