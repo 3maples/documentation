@@ -33,6 +33,16 @@ entries whose file, line or scope had drifted got a **Checked 2026-10-22** line 
 #4's file tables were re-measured. The archive's 2026-10-22 section lists the moves with the
 evidence checked.
 
+**Coverage policy 2026-11-14** — `/code-review` now checks coverage by behaviour, not branch by
+branch: an untested key flow or critical behaviour is HIGH, an untested secondary flow MEDIUM, and
+an untested edge case is not a finding (`/fix-issues` no longer files one). All 317 open entries
+asking for an edge-case or LOW-graded test were read against that rule. 275 moved to the archive:
+268 edge cases dropped and 7 already marked resolved or stale. 42 stay, each with a **Kept
+2026-11-14** line naming why: the untested arm guards sign-in or revocation, tenant scope, a
+refusal, money, or a write that could lose data. The 37 critical ones and #489 (an untested script
+that writes) were re-graded HIGH and #1532 MEDIUM, and every kept entry is titled by what it guards. 773 remain. **Don't file untested edge cases
+here.** The archive's 2026-11-14 section lists the moves.
+
 - **Entries are numbered and permanent.** Next free number: **1649**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
@@ -1699,20 +1709,10 @@ phrasings, all as intended, but that's not the parity run. Owed:
 
 **Suggested fix:** Reasons `["the question expired (asked over an hour ago)"]` → `found.text == confirm.LOST_TRACK and found.ask is False`.
 
-### 891. [MEDIUM] The fallback text for a subject that matches nothing is untested
-`platform/agents/planner/asks.py:293` — Edge case. When `found.reason` is empty, "Which customer or property did you mean by {said}?" is never tested. (review 2026-10-11 #66, deferred)
-
-**Suggested fix:** `Resolved("name","subject","none")` with no reason → that text and `replace_text == said`.
-
 ### 892. [MEDIUM] The singular "I only listed 1 …" is untested
 `platform/agents/planner/asks.py:271` — Edge case. (review 2026-10-11 #67, deferred)
 
 **Suggested fix:** Reason "row 2 of a list of 1" for a task → "I only listed 1 task — which one did you mean?".
-
-### 893. [MEDIUM] The note question's "that record" fallback is untested
-`platform/agents/planner/asks.py:305` — Edge case. (review 2026-10-11 #68, deferred)
-
-**Suggested fix:** A note ref resolved `via="parent"` with no `parent` ref → "You don't have any notes on that record to delete."
 
 ### 895. [MEDIUM] The `by == "added"` branch is unreachable and untested
 `platform/agents/planner/resolve.py:412` — Edge case. A defensive guard: the policy handles "added" before calling the resolver. (review 2026-10-11 #70, deferred)
@@ -2162,52 +2162,19 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Add Plan-format rows, e.g. `change the price of {material} to $5` [Member] → refuse `not_permitted`; `delete the material {standard}` → `delete_material` (hides); `rename {standard} to X` → refused.
 
-### 1165. [MEDIUM] Untested edge cases in `price_standard`
+### 1165. [HIGH] `price_standard`: the not-a-standard refusal, its race and a catalog error are untested
+**Kept 2026-11-14 (coverage policy):** critical: the refusal on a standard price write, and its race.
 **Checked 2026-10-22:** price_standard now agents/material/catalog_writes.py; only the empty-patch case is tested
 
 `platform/agents/material/catalog_writes.py:113` — 404 for not found / not a standard (124); `MaterialNotFound` race → 404 (131); `CatalogError`/`ValueError` → 422 (133). (review 2026-10-16 round 2 #100, deferred)
 
 **Suggested fix:** Unit tests over stubbed `get_effective`/`set_sizes_pricing`.
 
-### 1166. [MEDIUM] Untested edge cases in `standard_pricing_changes`
+### 1166. [HIGH] `standard_pricing_changes`: clearing an overridden size's price is untested
+**Kept 2026-11-14 (coverage policy):** critical: a price cleared on a write (money).
 `platform/agents/material/catalog_writes.py:78` — Price None on an overridden size clears it (103); a unit given while the size's unit is unmapped passes (95). (review 2026-10-16 round 2 #101, deferred)
 
 **Suggested fix:** One test each.
-
-### 1167. [MEDIUM] Untested edge cases in `_material_to_dict`
-`platform/agents/material/service.py:548` — The dict branch (561); `price_recorded` False → None (558). (review 2026-10-16 round 2 #102, deferred)
-
-**Suggested fix:** Two unit tests.
-
-### 1168. [MEDIUM] Untested edge case in `_resolve_target_material`: invalid company id
-`platform/agents/material/service.py:859` — "No material found for id"; untested. (review 2026-10-16 round 2 #103, deferred)
-
-**Suggested fix:** One test.
-
-### 1169. [MEDIUM] Untested edge cases in `_ask_delete_confirmation`
-`platform/agents/material/service.py:1779` — Empty target id / name (1779/1781). (review 2026-10-16 round 2 #104, deferred)
-
-**Suggested fix:** One test each.
-
-### 1170. [MEDIUM] Untested edge case in `_delete_material_via_api`: an id that resolves to nothing
-`platform/agents/material/service.py:751` — Falls through to the route's 404; untested. (review 2026-10-16 round 2 #105, deferred)
-
-**Suggested fix:** `get_effective` → None and the route raising 404 → `MaterialWriteRefused` 404.
-
-### 1171. [MEDIUM] Untested edge case in `_finish_material_delete`: refused with no name
-`platform/agents/material/service.py:2011` — "that material"; untested. (review 2026-10-16 round 2 #106, deferred)
-
-**Suggested fix:** `_finish_material_delete(id, "")` refused → "…'that material'…".
-
-### 1172. [MEDIUM] Untested edge cases in `lookup_materials`
-`platform/agents/estimate/tools.py:129` — Empty catalog note (129); exception → error key (138). (review 2026-10-16 round 2 #107, deferred)
-
-**Suggested fix:** Empty and raising `iter_effective` cases in test_estimate_tools.py.
-
-### 1173. [MEDIUM] Untested edge case in `_fetch_materials_inventory`: a material with no sizes
-`platform/agents/estimate/service.py:492` — `if m.sizes` false; untested. (review 2026-10-16 round 2 #108, deferred)
-
-**Suggested fix:** A sizeless row gets no default size and price 0.
 
 ### 1220. [LOW] A Member who renames a standard via Maple is told about prices
 **Checked 2026-10-22:** role check still runs first in price_standard (catalog_writes.py); STANDARD_MATERIAL_REFUSAL still ends with the cost-and-price sentence
@@ -2254,45 +2221,29 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** `if not user or user.role not in MANAGER_ROLES:`.
 
-### 1256. [MEDIUM] Untested edge case in `_check_add_size_guard`: a cost given as a string
+### 1256. [HIGH] `_check_add_size_guard`: a cost given as a string is untested
+**Kept 2026-11-14 (coverage policy):** critical: parsing a cost that is stored (money).
 `platform/agents/material/service.py:2432` — `_parse_cost`'s string arm. (review 2026-10-17 round 4 #21, deferred)
 
 **Suggested fix:** One test.
 
-### 1257. [MEDIUM] Untested edge cases in `_build_sizes_from_fields`: price or cost given as strings
+### 1257. [HIGH] `_build_sizes_from_fields`: a price or cost given as a string is untested
+**Kept 2026-11-14 (coverage policy):** critical: parsing a price or cost that is stored (money).
 `platform/agents/material/text_helpers.py:395` — Lines 395, 397. (review 2026-10-17 round 4 #22, deferred)
 
 **Suggested fix:** Dict-in/dict-out tests.
 
-### 1258. [MEDIUM] Untested edge cases in `_material_payload_from_fields`
+### 1258. [HIGH] `_material_payload_from_fields`: an empty `sizes` keeping the stored sizes is untested
+**Kept 2026-11-14 (coverage policy):** critical: an empty `sizes` must not wipe the stored sizes on a write.
 `platform/agents/material/service.py:591` — A non-dict size skipped (591); an empty `sizes` popped (614); a stored size with a price but no cost (604 else). (review 2026-10-17 round 4 #23, deferred)
 
 **Suggested fix:** Dict-in/dict-out tests.
 
-### 1259. [MEDIUM] Untested edge case in `_handle_size_command`: material not found
+### 1259. [MEDIUM] `_handle_size_command`: a material that doesn't exist is untested
+**Kept 2026-11-14 (coverage policy):** secondary: a size command naming a material that does not exist.
 `platform/agents/material/service.py:1943` — Untested. (review 2026-10-17 round 4 #24, deferred)
 
 **Suggested fix:** One test.
-
-### 1270. [MEDIUM] Untested edge cases in `_remove_or_rename_refusal`
-`platform/agents/material/service.py:155` — A rename onto the same label in another case ("bag" → "Bag") returns None; a remove or rename with no size words returns None. Neither is tested. (review 2026-10-17 round 5 #5, deferred)
-
-**Suggested fix:** One test each.
-
-### 1271. [MEDIUM] Untested edge case in `_size_already_there`: no size words
-`platform/agents/material/service.py:2170` — Returns None; untested. (review 2026-10-17 round 5 #6, deferred)
-
-**Suggested fix:** One test.
-
-### 1272. [MEDIUM] Untested edge cases in `_handle_get_material_size_scoped`
-`platform/agents/material/service.py:2714` — A material with no sizes ("Available sizes: none"); a cost or price that isn't a number, shown as "—" (a size with no recorded price); a missing unit, shown as "—". (review 2026-10-17 round 5 #7, deferred)
-
-**Suggested fix:** One test each.
-
-### 1273. [MEDIUM] Untested edge case in `_build_sizes_from_fields`: an added size without `unit_oid`
-`platform/agents/material/text_helpers.py:458` — Today's LLM path resolves the unit only when no price or cost is given, so this case can occur; untested. (review 2026-10-17 round 5 #8, deferred)
-
-**Suggested fix:** A dict-in/dict-out test.
 
 ### 1280. [LOW] An edit that names a shared size only to say which material is refused
 `platform/agents/material/service.py:2562` — `_check_size_label_refusal` runs for any fields carrying `size`, so `{size: "4", description: "screened"}` on a material with `4` and `4"` is refused with "change them on the Materials page" though no size would change. (review 2026-10-17 round 5 #16, deferred)
@@ -2309,44 +2260,13 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** For reads, list each matching size ("Topsoil in 4 is $1.50; in 4\" is $3.00.").
 
-### 1301. [MEDIUM] Untested edge case in `_stored_size_entries`: a stored size with a blank label
+### 1301. [HIGH] `_stored_size_entries`: a sizes write dropping a blank-labelled size is untested
+**Kept 2026-11-14 (coverage policy):** critical: a sizes write drops a stored size with a blank label (data loss).
 **Checked 2026-10-22:** function now at agents/material/service.py:~120 (_stored_size_entries)
 
 `platform/agents/material/service.py:144` — A stored size whose label is blank is left out of the rebuild, so a sizes write would drop it. No test drives that arm (moved code). Not a list, a non-dict item and a missing unit are covered by the create path, #1258 and the unmapped-unit standard test. (review 2026-10-18, #1252 round 2 #2, deferred)
 
 **Suggested fix:** Add a dict-in/dict-out test next to the no-price-no-cost one: `existing_payload={"sizes": [{"size": "  ", "price": 4.0, "cost": 3.0}, {"size": "y", "price": 6.0, "cost": 5.0, "unit": "u1"}]}` with `{"size": "y", "price": 7.0}` → only "y" in the returned sizes.
-
-### 1306. [MEDIUM] Untested edge cases in `note_filed`
-`platform/agents/planner/execute_files.py:132` — Edge cases: L138 — `last_files` not a dict while turn files exist; and neither turn nor previous files (a stale `last_files`). Neither is asserted to leave `filed_on` unset. (Maple attachments review round 3, 2026-10-19, #15, deferred)
-
-**Suggested fix:** `note_filed(ctx, "x", "T1")` on `{TURN_ATTACHMENTS_KEY: [...]}` with no `last_files`, and on `_ctx(files="stale")` → the context is unchanged.
-
-### 1307. [MEDIUM] Untested edge case in `task_write_with_files`: a failed write with files missing
-`platform/agents/planner/execute_files.py:213` — Edge case: L231–233 — a failed write while `missing` is set returns the failure with the missing words appended; the failed-write test has files, so `missing` is empty. (Maple attachments review round 3, 2026-10-19, #16, deferred)
-
-**Suggested fix:** `update_task_reply` returns `{"success": False, "response": "no"}`, run with `_ctx(files="none")` → `"no\n\n" + NO_FILE_ON_MESSAGE_REFUSAL` (or keep a failure bare and assert that).
-
-### 1308. [MEDIUM] Untested edge case in `files_on_the_create`: the rebuilt plan doesn't validate
-`platform/agents/planner/execute_files.py:299` — Edge case: L346–347 — `except ValidationError: return plan` when the rebuilt plan doesn't validate. (Maple attachments review round 3, 2026-10-19, #17, deferred)
-
-**Suggested fix:** Make `schema.Plan.model_validate` raise on the rebuild → the original plan comes back unchanged.
-
-### 1309. [MEDIUM] Untested edge cases in `_ask_split_files`
-**Checked 2026-10-22:** the 'another confirm beside it' arm of confirm._ask_split_files is tested (test_planner_execute_files.py:1152); the stale arm and previous_files count are not
-
-`platform/agents/planner/confirm.py:257` — Edge cases: L267 — the `stale` arm returning "confirm:files_with_others"; L269 and `files_on_several` L354 — the count taken from `previous_files`. (Maple attachments review round 3, 2026-10-19, #18, deferred)
-
-**Suggested fix:** Call with a non-empty stale list → "confirm:files_with_others"; with `_ctx(world, files="previous")` the question reads "all 2 files" and `files_on_several(plan, ctx) == [1]`.
-
-### 1310. [MEDIUM] Untested edge cases in `_discard_unless_saved` and `_create_task`'s label fallback
-`platform/agents/planner/execute_records.py:539` — Edge cases: L547 — no copies, or a bad company id, discards at once; `_create_task` L532 — the "the new task" label fallback when there is no readable id. (Maple attachments review round 3, 2026-10-19, #19, deferred)
-
-**Suggested fix:** `_discard_unless_saved([copy], {"company_id": "x"})` → the blob is gone; `_discard_unless_saved([], ctx)` returns quietly.
-
-### 1311. [MEDIUM] Untested edge case in `add_note`: no parent found
-`platform/agents/planner/execute_links.py:130` — Edge case: L144 — `found is None` passes `onto=None`. (Maple attachments review round 3, 2026-10-19, #20, deferred)
-
-**Suggested fix:** Run with no `parent` ref → RecordNotLoaded.
 
 ### 1322. [LOW] `filed_on` is recorded for a note that was never written
 `platform/agents/planner/execute_links.py:178` — `record_notes._add`'s "I couldn't confirm who you are … can't sign the note" envelope is `success: True`, so the guard passes, the record is noted as holding the files, and a later attach there gets ALREADY_ON. LOW: needs an empty `current_user_email`. (Maple attachments review round 3, 2026-10-19, #31, deferred)
@@ -2379,65 +2299,15 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Reword that row (plan `add_note`, no attach; ALREADY_ON only if attach is planned); add the three rows; add `create_estimate` to the intro.
 
-### 1364. [MEDIUM] Edge case untested: a rename's taken name whose holder is gone
-`platform/agents/labour/service.py:415` — Edge case in `_update_labour_via_api`: L446–447 — the route answered 409 for a taken name but `role_name_holder` finds no holder by the time Maple looks (the holder renamed or deleted in between). The refusal then names the requested name with no hidden hint. No test drives this arm; the taken-name tests always find the holder. (review 2026-10-21 round 5 #1, standard People roles, deferred)
-
-**Suggested fix:** In `test_labour_agent_standard_roles.py`: monkeypatch `agents.labour.service.role_name_holder` to return None, rename "Hedge Pruner" to "Crew Lead" → the reply is `ROLE_NAME_TAKEN_REFUSAL.format(name="Crew Lead")` with no `HIDDEN_ROLE_HINT`.
-
-### 1365. [MEDIUM] file_removal_is_media: edge cases untested
-`platform/agents/planner/as_asked_files.py:70` — Edge cases: (a) a refusal of "other" falling through to the redirect; (b) a refusal of its own (bulk_delete with "delete all photos from my tasks") left; (c) out_of_chat with another capability left. (review 2026-10-21 #95, deferred)
-
-**Suggested fix:** One test per arm: "other" → removes_file; bulk_delete → `is plan`; out_of_chat units → `is plan`.
-
-### 1366. [MEDIUM] named_with_files: edge cases untested
-`platform/agents/planner/as_asked_files.py:99` — Edge cases: (a) more than one action; (b) a target not by name. (review 2026-10-21 #96, deferred)
-
-**Suggested fix:** Two get_task actions → `is plan`; get_task by focus → `is plan`.
-
-### 1367. [MEDIUM] work_item_files_refused: edge cases untested
-`platform/agents/planner/as_asked_files.py:130` — Edge cases: (a) several actions; (b) edit_estimate with no commands; (c) mixed commands. (review 2026-10-21 #97, deferred)
-
-**Suggested fix:** One test per arm, each `is plan`.
-
-### 1368. [MEDIUM] average_rate_is_a_figure: edge cases untested
-`platform/agents/planner/as_asked_reads.py:38` — Edge cases: (a) a refusal reason outside the set; (b) out_of_chat with another capability; (c) nothing refused. (review 2026-10-21 #98, deferred)
-
-**Suggested fix:** Parametrize those three with "what's my average labour rate?" → `is plan`.
-
-### 1369. [MEDIUM] new_template_refused: edge case untested
-`platform/agents/planner/as_asked_reads.py:51` — Edge case: no clarify (already refused, or planned apply_template). (review 2026-10-21 #99, deferred)
-
-**Suggested fix:** list_templates plan with "add a template" → `is plan`.
-
-### 1370. [MEDIUM] stray_yes_writes_nothing: edge case untested
-`platform/agents/planner/as_asked_reads.py:60` — Edge case: no write in the plan ("ok" planned as acknowledge). (review 2026-10-21 #100, deferred)
-
-**Suggested fix:** acknowledge with "ok" → `is plan`.
-
 ### 1371. [MEDIUM] edit_estimate: the work-item file sentence beside a question is untested
 `platform/agents/planner/execute_estimates.py:362` — Edge case: the needs_clarification arm with files on the message; the sentence must not be added to a question. (review 2026-10-21 #101, deferred)
 
 **Suggested fix:** Stub edit_reply to ask, files "this" → WORK_ITEM_NOTE_FILES_REFUSAL not in the reply.
 
-### 1372. [MEDIUM] _work_item_notes_left_files: edge cases untested
-`platform/agents/planner/execute_estimates.py:381` — Edge cases: (a) no commands; (b) mixed command ops; (c) files already filed by an earlier step → False. It reads this message's and a kept plan's files only, not the previous message's (a note with no word of the file would be told it was left off). (review 2026-10-21 #102, deferred)
-
-**Suggested fix:** One direct test per arm, (c) with LAST_FILES_KEY carrying filed_on.
-
 ### 1373. [MEDIUM] _list_notes: a filed-file ask on a task is untested
 `platform/agents/planner/execute_links.py:213` — Edge case: a filed-file ask on a task (the task details path) gets the D3 sentence; no test drives it. (The no-notes-feed refusal is now tested.) (review 2026-10-21 #103, deferred)
 
 **Suggested fix:** A task parent with "what's in the photo on the fence task?" → the reply ends with FILED_FILES_NOT_READ.
-
-### 1374. [MEDIUM] _build_task_details: the creator and file-count edge cases are untested
-`platform/agents/task/base.py:415` — Edge cases: (a) created_by_email None → "- Created by: -"; (b) more than 10 files → " and N more" (older tasks can hold more). (review 2026-10-21 #104, deferred)
-
-**Suggested fix:** A task with no creator → that line; a task with 12 photos → "- Files: 12 — " and "and 2 more".
-
-### 1375. [MEDIUM] list_added: edge cases untested
-`platform/agents/planner/execute_added.py:87` — Edge cases: (a) another filter that's only non-scalar (related beside added) → " anything else"; (b) the "Unnamed contact/property" labels; (c) a period with no start and no end. (review 2026-10-21 #105, deferred)
-
-**Suggested fix:** {added: month, related: Elm House} → "not narrowed by anything else"; a nameless record → the fallback label; remove (c)'s guard if it can't happen.
 
 ### 1376. [MEDIUM] added_in: the all_time arm is untested
 `platform/agents/planner/execute_added.py:15` — Edge case: added "all_time" falls through to the plain list. (review 2026-10-21 #106, deferred)
@@ -2484,37 +2354,30 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Monkeypatch `_after_write` to raise → the entry is {"op": …, "undoable": False}.
 
-### 1385. [MEDIUM] undo._after_write: edge cases untested
+### 1385. [HIGH] undo._after_write: the status-date guard and the other not-undoable arms are untested
+**Kept 2026-11-14 (coverage policy):** critical: the status-date guard that stops an undo writing over a status change.
 `platform/agents/planner/undo.py:183` — Edge cases: op not in WRITES or not written; an estimate whose status changed → undoable False (the status-date guard); an entry over _MAX_KEPT → undoable False; a create whose record isn't found → undoable False. (Changed-nothing is now tested.) (review 2026-10-21 #115, deferred)
 
 **Suggested fix:** One unit test per arm with a stub action/check/result, asserting the stored entry.
-
-### 1386. [MEDIUM] undo.unpacked: edge cases untested
-`platform/agents/planner/undo.py:229` — Edge cases: a loaded value that isn't a dict → {}; a non-str input (looks dead: entries always store a str). (review 2026-10-21 #116, deferred)
-
-**Suggested fix:** Test the first; drop the non-str arm.
 
 ### 1387. [MEDIUM] undo.question: the nothing-kept arm is untested
 `platform/agents/planner/undo.py:303` — Edge case: no entry → None (which makes _ask_undo return "confirm:undo_nothing"). (review 2026-10-21 #117, deferred)
 
 **Suggested fix:** `question({})` is None.
 
-### 1388. [MEDIUM] undo.undo_last: edge cases untested
+### 1388. [HIGH] undo.undo_last: write-backs that fail, match nothing or meet a changed record are untested
+**Kept 2026-11-14 (coverage policy):** critical: undo write paths that fail or match nothing must not report success.
 `platform/agents/planner/undo.py:323` — Edge cases: the entry gone between question and yes → NOTHING_TO_UNDO; the delete of a create failing (a material in use) keeps the entry; the record deleted since → CHANGED_SINCE; the write-back matching nothing (moved between read and write) → CHANGED_SINCE. (review 2026-10-21 #118, deferred)
 
 **Suggested fix:** One test per arm, asserting the reply and whether LAST_WRITE_KEY remains.
-
-### 1389. [MEDIUM] confirm._ask_undo: edge cases untested
-`platform/agents/planner/confirm.py:299` — Edge cases: an undo beside other actions → "confirm:undo_with_others"; no question → "confirm:undo_nothing". (review 2026-10-21 #119, deferred)
-
-**Suggested fix:** A two-action plan (undo_last + get_contact) → that string; an empty context → "confirm:undo_nothing".
 
 ### 1390. [MEDIUM] _check_action: a stray yes planned as an undo is untested
 `platform/agents/planner/policy.py:871` — Edge case: a stray "yes" planned as undo_last should be asked, not run; only a delete is covered. (review 2026-10-21 #120, deferred)
 
 **Suggested fix:** check_plan(undo_last, message "yes", nothing open) → decision "ask".
 
-### 1391. [MEDIUM] execute_catalog._audit: edge cases untested, and most catalog audits unasserted
+### 1391. [HIGH] execute_catalog: most catalog writes' audit entries are unasserted
+**Kept 2026-11-14 (coverage policy):** critical: catalog writes whose audit entries are never asserted.
 `platform/agents/planner/execute_catalog.py:51` — Edge cases: the context-email fallback when no acting user. The hide and the category toggle assert their audit entries; show one, show all, reset and copy don't. (review 2026-10-21 #121, deferred)
 
 **Suggested fix:** Assert the entry (action, resource type, metadata, source maple) in each write test; one with no acting user → user_email from the context.
@@ -2524,30 +2387,23 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 
 **Suggested fix:** Make set_hidden raise MaterialNotFound → that reply and no audit entry.
 
-### 1393. [MEDIUM] show_material: edge cases untested
+### 1393. [HIGH] show_material: the name-taken refusal and a catalog error are untested
+**Kept 2026-11-14 (coverage policy):** critical: the name-taken refusal on a show write.
 `platform/agents/planner/execute_catalog.py:108` — Edge cases: show-all with one shown (singular); kept_hidden with one and several names after some were shown; a single show raising NameTaken; CatalogError. (review 2026-10-21 #123, deferred)
 
 **Suggested fix:** Stub unhide_all to (1, []), (2, ["A", "B"]) and assert each; set_hidden raising NameTaken and MaterialNotFound → the two refusals.
 
-### 1394. [MEDIUM] reset_material: edge cases untested
+### 1394. [HIGH] reset_material: the name-taken refusal and a catalog error are untested
+**Kept 2026-11-14 (coverage policy):** critical: the name-taken refusal on a reset write.
 `platform/agents/planner/execute_catalog.py:150` — Edge cases: NameTaken (a hidden standard whose name a company material now holds); CatalogError. (review 2026-10-21 #124, deferred)
 
 **Suggested fix:** That name clash → "<name> " + NAME_TAKEN_TO_SHOW_REFUSAL; reset_to_standard raising → CATALOG_WRITE_FAILED.
 
-### 1395. [MEDIUM] copy_material: edge cases untested
+### 1395. [HIGH] copy_material: the copy refusals and a copy missing after insert are untested
+**Kept 2026-11-14 (coverage policy):** critical: the refusals on a copy write.
 `platform/agents/planner/execute_catalog.py:171` — Edge cases: CatalogError/ValueError from duplicate (no category or unit, too many copies); the copy not found after insert. (review 2026-10-21 #125, deferred)
 
 **Suggested fix:** duplicate raising ValueError → CATALOG_WRITE_FAILED, no copy; get_effective None → only "I've made …".
-
-### 1396. [MEDIUM] set_standard_category: edge cases untested
-`platform/agents/planner/execute_catalog.py:199` — Edge cases: the category gone between question and yes; CatalogError. (review 2026-10-21 #126, deferred)
-
-**Suggested fix:** Rename the category before the yes → NO_STANDARD_CATEGORY_REFUSAL; the service raising → CATALOG_WRITE_FAILED.
-
-### 1397. [MEDIUM] standard_category: edge cases untested
-`platform/agents/planner/execute_catalog.py:73` — Edge cases: an invalid company id → None; a name in another case or spacing matching through norm_name. (review 2026-10-21 #127, deferred)
-
-**Suggested fix:** `standard_category("not-an-id", "x") is None`; "aggregates  &  base materials" finds Aggregates.
 
 ### 1398. [MEDIUM] source_sentence: the hidden suffix is untested
 `platform/agents/planner/execute_catalog.py:224` — Edge case: the " It's hidden from your lists." suffix. (review 2026-10-21 #128, deferred)
@@ -2563,11 +2419,6 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 `platform/agents/planner/policy.py:771` — Edge case: add_note on a role parent (only a material is tested). (review 2026-10-21 #130, deferred)
 
 **Suggested fix:** add_note {parent: {domain: labour, text: Foreman}} → would_refuse with NOTES_NOT_ON_CATALOG_MESSAGE.
-
-### 1401. [MEDIUM] _ask_catalog: edge cases untested
-`platform/agents/planner/confirm.py:327` — Edge cases: a target with no label ("Okay — I've left  as it is."); the `confirm:{op}` fallthrough. (review 2026-10-21 #131, deferred)
-
-**Suggested fix:** A hand-built check with an unlabelled hide target → assert the wording; remove the fallthrough if no op reaches it.
 
 ### 1402. [MEDIUM] hidden_material_named: the bare-name retry is untested
 `platform/agents/planner/resolve.py:174` — Edge case: the bare-name retry ("the Black Mulch material" → "Black Mulch"). (review 2026-10-21 #132, deferred)
@@ -2664,11 +2515,6 @@ Re-run 3× on 2026-10-13: created the task 1 of 3; the other two asked "Would yo
 `platform/agents/planner/as_asked_files.py:108` — Edge case: a delete with no name (by focus, listed) beside an attach is taken as the removal's and dropped. (review 2026-10-21 round 5 #4, deferred. Its arm (b), a removal with an empty place, went with the place check: round 7 #1 replaced it with `_delete_said`, which keeps a delete only when the message says its record is deleted.)
 
 **Suggested fix:** [update_task attach, delete_task {by: focus}] with "attach this to T0042 and remove the photo from that task" → ["update_task"].
-
-### 1429. [MEDIUM] `_hidden_named`: edge cases untested
-`platform/agents/planner/policy.py:367` — Edge cases: (a) a lookup result other than none / one / several is left as it is (line 378); (b) several visible matches where one is the name said exactly keeps the visible result (line 381), never the hidden lookup. (review 2026-10-21 round 5 #5, deferred)
-
-**Suggested fix:** (a) `_hidden_named(Resolved(..., "unresolved"), "Black Mulch", c)` → the same object; (b) a `several` result with candidates ("X", "X Dyed") for the text "X" → the same object, with `hidden_material_named` monkeypatched to fail if called.
 
 ### 1430. [MEDIUM] `_size_change_applies`: the no-size arm untested
 `platform/agents/planner/policy.py:732` — Edge case. A remove or rename with no size named returns True, so the copy question still stands (line 734); no test drives it. (review 2026-10-21 round 5 #6, deferred)
@@ -3060,42 +2906,17 @@ geocode and note it in the comment.
 
 **Suggested fix:** Decide whether Enterprise inquiries come back (wire a contact form into the plan picker's Enterprise option) or go for good — then delete the route, its request model and its tests.
 
-### 1142. [MEDIUM] Untested edge case in `price_standard_rows`: a failed write
+### 1142. [HIGH] `price_standard_rows`: a failed price write marking its rows as errors is untested
+**Kept 2026-11-14 (coverage policy):** critical: a failed price write must mark its rows as errors, not done.
 `platform/routers/material_helpers/upload.py:190` — `except (CatalogError, ValueError)` making every row of that standard an error is never driven. (review 2026-10-16 round 2 #77, deferred)
 
 **Suggested fix:** Monkeypatch `set_sizes_pricing` to raise `MaterialNotFound` for one standard; its rows are errors, the other standard is priced, custom rows written.
 
-### 1143. [MEDIUM] Untested edge case in `_checked_amount`: non-finite
-**Checked 2026-10-22:** The service-level write path tests nan/inf (tests/test_material_catalog_write_edges.py:111,246) but no upload row test asserts 'Cost must be a number'.
-
-`platform/routers/material_helpers/upload.py:121` — "nan"/"inf" should give "Cost must be a number"; untested. (review 2026-10-16 round 2 #78, deferred)
-
-**Suggested fix:** Add nan and inf rows to the row-error parametrize.
-
-### 1144. [MEDIUM] Untested edge case in `to_float`: a cell holding only "$"
-`platform/routers/material_helpers/common.py:53` — Untested. (review 2026-10-16 round 2 #79, deferred)
-
-**Suggested fix:** Add a custom row with cost "$".
-
-### 1145. [MEDIUM] Untested edge case in `set_material_pricing`: two entries for one size
-`platform/routers/material_overrides.py:187` — The `setdefault(...).update(...)` merge is never driven. (review 2026-10-16 round 2 #80, deferred)
-
-**Suggested fix:** PATCH [{yard, cost 20}, {YARD, price 30}] → yard is (20, 30) in one write.
-
-### 1146. [MEDIUM] Untested edge case in `duplicate_material`: no body
-`platform/routers/material_overrides.py:218` — `body is None` is never driven. (review 2026-10-16 round 2 #81, deferred)
-
-**Suggested fix:** POST /duplicate with no body → "<name> copy".
-
-### 1148. [MEDIUM] Untested edge case: a unit PUT can't set `standard_key`
+### 1148. [HIGH] A unit PUT setting the server-owned `standard_key` is untested
+**Kept 2026-11-14 (coverage policy):** critical: a client must not be able to set the server-owned `standard_key`.
 `platform/routers/material_units.py:110` — Server-ownership is only tested on create. (review 2026-10-16 round 2 #83, deferred)
 
 **Suggested fix:** PUT `standard_key: "tons"` on an unkeyed unit; it stays None.
-
-### 1149. [MEDIUM] Untested edge case in `catalog_http`: the generic 422
-`platform/routers/material_helpers/common.py:36` — Only `UnknownSize` reaches it, via a race. (review 2026-10-16 round 2 #84, deferred)
-
-**Suggested fix:** Unit-test `catalog_http(UnknownSize("x"))` → 422 "x", or map it explicitly.
 
 ### 1186. [LOW] A blank price leaves a pin that equals the current markup price
 `platform/routers/material_helpers/upload.py:146` — Pins are detected as `price != markup_price(cost)`; a pin equal to it stays and won't follow a later markup change. (review 2026-10-16 round 2 #121, deferred)
@@ -3577,88 +3398,13 @@ row count first — this may be years away.
 
 **Suggested fix:** Trim/collapse in the pipeline, or store `name_norm` on Material at write time.
 
-### 1150. [MEDIUM] Untested edge cases in `_validate`
-**Checked 2026-10-22:** _category_ids now accepts a list; the _validate arms (bad source/visibility/price direction) are still untested.
-
-`platform/services/material_catalog.py:437` — Bad `source` (439), `visibility` (441), price direction (444) — the router's Literals stop them first. (review 2026-10-16 round 2 #85, deferred)
-
-**Suggested fix:** Three `pytest.raises(ValueError)` on `list_effective`.
-
-### 1151. [MEDIUM] Untested edge case in `list_effective`: no enabled category with source standard
-`platform/services/material_catalog.py:499` — Untested. (review 2026-10-16 round 2 #86, deferred)
-
-**Suggested fix:** Disable every category; `list_effective(source="standard")` is an empty page.
-
-### 1152. [MEDIUM] Untested edge case in `count_effective`: no enabled category with source standard
-`platform/services/material_catalog.py:526` — Untested. (review 2026-10-16 round 2 #87, deferred)
-
-**Suggested fix:** Same setup; `count_effective` returns 0.
-
-### 1153. [MEDIUM] Untested edge cases in `_category_ids`
-**Checked 2026-10-22:** Category now takes a list of ids; blank string and duplicate-id arms still untested.
-
-`platform/services/material_catalog.py:447` — A blank string means no filter (450); a duplicate id is folded (458). (review 2026-10-16 round 2 #88, deferred)
-
-**Suggested fix:** Assert `category=""` equals no filter and `[id, id]` equals `[id]`.
-
-### 1154. [MEDIUM] Untested edge cases in `_hide_standards`
+### 1154. [HIGH] `_hide_standards`: the retry after a failed bulk write is untested
+**Kept 2026-11-14 (coverage policy):** critical: the retry after a failed bulk write of hides.
 **Checked 2026-10-22:** Pre-hidden twin is covered in tests/test_material_catalog_write_edges.py:398 but the all-already-hidden [] arm and the BulkWriteError retry are not.
 
 `platform/services/material_catalog_writes.py:410` — Every clash already hidden → `[]` (421); the `BulkWriteError` retry (434). (review 2026-10-16 round 2 #89, deferred)
 
 **Suggested fix:** A pre-hidden test and a monkeypatched `bulk_write` raising once.
-
-### 1155. [MEDIUM] Untested edge cases in `hide_name_clashes_for`
-`platform/services/material_catalog_writes.py:455` — Blank names (465); names only retired standards hold (469); a twin already hidden (482). (review 2026-10-16 round 2 #90, deferred)
-
-**Suggested fix:** Direct tests of all three.
-
-### 1156. [MEDIUM] Untested edge case in `set_standard_categories`: a malformed category id
-`platform/services/material_catalog_writes.py:507` — Raises `MaterialNotFound`; the router screens it first. (review 2026-10-16 round 2 #91, deferred)
-
-**Suggested fix:** `set_standard_categories(company, enable=True, category_ids=["nope"])` raises.
-
-### 1157. [MEDIUM] Untested edge case in `_parse_row`: negative cost
-`platform/services/standard_material_seed.py:113` — Untested. (review 2026-10-16 round 2 #92, deferred)
-
-**Suggested fix:** Add the row to `test_bad_rows_are_errors_not_skips` (needle "negative").
-
-### 1158. [MEDIUM] Untested edge case in `_add_to_group`: one name with two keys
-`platform/services/standard_material_seed.py:134` — Untested. (review 2026-10-16 round 2 #93, deferred)
-
-**Suggested fix:** Add the rows to the same parametrize (needle "has key").
-
-### 1159. [MEDIUM] Untested edge case in `_vocabulary_keys`: an unkeyed doc whose key another doc holds
-`platform/services/material_migration.py:136` — (151) untested. (review 2026-10-16 round 2 #94, deferred)
-
-**Suggested fix:** A keyed and an unkeyed "Aggregates"; `keys_to_backfill == 0`.
-
-### 1160. [MEDIUM] Untested edge cases in `_backfill_keys`
-`platform/services/material_migration.py:244` — `key in held` skip (257); `modified_count == 0` race, no audit (262). (review 2026-10-16 round 2 #95, deferred)
-
-**Suggested fix:** Same setup; no audit for the second doc.
-
-### 1161. [MEDIUM] Untested edge cases in `_recheck_identical`
-**Checked 2026-10-22:** Related: tests/test_material_migration.py:456 covers a copy deleted between plan and apply, not the derived_from-added or missing-standard arms.
-
-`platform/services/material_migration.py:301` — Standard missing, or the copy given `derived_from` between plan and apply (318). (review 2026-10-16 round 2 #96, deferred)
-
-**Suggested fix:** Set `derived_from` on a planned identical copy before apply; it's neither deleted nor counted.
-
-### 1162. [MEDIUM] Untested edge case in `_mark_detached`: nothing left unmarked
-`platform/services/material_migration.py:341` — Returns 0 (350); untested. (review 2026-10-16 round 2 #97, deferred)
-
-**Suggested fix:** Assert `detached_marked == 0` in the test above.
-
-### 1163. [MEDIUM] Untested edge cases in `main`
-`platform/scripts/db/load_default_templates.py:30` — Unknown company → 1 (39); non-default template skipped (58); unmatched vs resolved status (62). (review 2026-10-16 round 2 #98, deferred)
-
-**Suggested fix:** Call `main` with `init_db` patched: an unknown id, then a seeded company.
-
-### 1164. [MEDIUM] Untested edge case in `_load_catalog`: an id `resolve_many` drops
-`platform/services/template_bootstrap.py:268` — A race; untested. (review 2026-10-16 round 2 #99, deferred)
-
-**Suggested fix:** Monkeypatch `resolve_many` to drop one id; that line lands in `unmatched_materials`.
 
 ### 1201. [LOW] `hide_name_clashes_for` scans every tenant's materials with regexes
 `platform/services/material_catalog_writes.py:472` — No company filter or index prefix on each applied seed. (review 2026-10-16 round 2 #136, deferred)
@@ -3697,21 +3443,6 @@ row count first — this may be years away.
 
 **Suggested fix:** `functools.lru_cache` on the template loaders.
 
-### 1235. [MEDIUM] Untested edge case in `_run`: no live standards → exit 1
-`platform/scripts/migrate_materials_to_standard.py:71` — The "run the seed first" refusal is never exercised. (review 2026-10-17 round 3 #20, deferred)
-
-**Suggested fix:** Monkeypatch the standards count to 0; assert 1 and the message.
-
-### 1236. [MEDIUM] Untested edge case in `plan_company`: the company document is missing
-`platform/services/material_migration.py:200` — `company_doc or {}` paths never driven. (review 2026-10-17 round 3 #21, deferred)
-
-**Suggested fix:** Plan a fresh `PydanticObjectId()`; empty plan, not migrated, no opt-in.
-
-### 1237. [MEDIUM] Untested edge case: "New or renamed: N name(s)." is printed but never asserted
-`platform/scripts/seed_standard_materials.py:65` — The branch runs in a test but isn't checked. (review 2026-10-17 round 3 #22, deferred)
-
-**Suggested fix:** Assert `"New or renamed: 1 name(s)."` in the applied output.
-
 ### 1246. [LOW] The migration's estimate/template audit names no material ids
 `platform/services/material_migration.py:321` — Only `lines_rewritten` is recorded, so a rewrite can't be traced or undone from the log. (review 2026-10-17 round 3 #31, deferred)
 
@@ -3727,17 +3458,13 @@ row count first — this may be years away.
 
 **Suggested fix:** Check the company exists; print an error and return 1.
 
-### 1254. [MEDIUM] Untested edge cases in `unhide_for_removed_names`
+### 1254. [HIGH] `unhide_for_removed_names`: another company's override staying hidden is untested
+**Kept 2026-11-14 (coverage policy):** critical: tenant scope, another company's override must stay untouched.
 **Checked 2026-10-22:** Case (c) is partly covered by test_unhide_for_removed_names_ignores_names_nothing_hid; (a) retired-only and (b) other-company override remain untested.
 
 `platform/services/material_catalog_writes.py:531` — (a) A freed name only a retired standard holds stays hidden; (b) another company's flagged override of the same standard is untouched by the update and prune; (c) a name no live standard holds returns `[]`. (review 2026-10-17 round 4 #19, deferred)
 
 **Suggested fix:** One service test per case (b needs a second company).
-
-### 1255. [MEDIUM] Untested edge cases in `_lines_naming`
-`platform/services/material_migration.py:285` — `job_items: None`; a None job item or line. (review 2026-10-17 round 4 #20, deferred)
-
-**Suggested fix:** Unit-test `_lines_naming` with `{"job_items": None}` and `{"job_items": [None, {"materials": [None, {"material": id}]}]}`.
 
 ### 1261. [LOW] An unhide can race a create or rename that takes the freed name
 `platform/services/material_catalog_writes.py:546` — The held-names check and the write are separate; a concurrent create of "Gravel" can pass while the standard is still hidden, then the unhide shows it — two rows named "Gravel". (review 2026-10-17 round 4 #26, deferred)
@@ -3759,20 +3486,11 @@ row count first — this may be years away.
 
 **Suggested fix:** Filter with whole-name regexes for the freed names, or use `name_norm` once #1120/#1201 add it.
 
-### 1274. [MEDIUM] Untested edge cases in `release_name_hides_for`
+### 1274. [HIGH] `release_name_hides_for`: releasing each company on its own is untested
+**Kept 2026-11-14 (coverage policy):** critical: tenant scope, each company released on its own.
 `platform/services/material_catalog_writes.py:617` — (a) A company whose every renamed standard now has a held name is left out of the report; (b) two companies — each released on its own, scoped to that company; (c) a renamed standard that is retired; (d) an invalid id dropped. (review 2026-10-17 round 5 #10, deferred)
 
 **Suggested fix:** One service test with two companies (A holds the new name → hidden and absent; B shown), a retired renamed standard that stays hidden, and a garbage id.
-
-### 1275. [MEDIUM] Untested edge case in `_live_standards` / `release_freed_name_hides`: a retired standard
-`platform/services/material_catalog_writes.py:573` — `retired_at: None` keeps the migration from showing a retired standard's flagged hide; no test has one. (review 2026-10-17 round 5 #11, deferred)
-
-**Suggested fix:** Retire a standard with a flagged hide and a free name; it stays `hidden`/`hidden_for_name` and isn't returned.
-
-### 1276. [MEDIUM] Untested edge case: the seed's "showed … again" output
-`platform/scripts/seed_standard_materials.py:68` — No script test has a non-empty `shown_for_name`. (review 2026-10-17 round 5 #12, deferred)
-
-**Suggested fix:** Seed with hides, apply a seed renaming the standard to a free name, assert the "showed … again" line.
 
 ### 1277. [MEDIUM] Dead fallback `or norm_name(str(doc.get("name") or ""))`
 `platform/services/material_catalog_writes.py:558` — Every caller passes docs with `name_norm`, a required field. (review 2026-10-17 round 5 #13, deferred)
@@ -3788,11 +3506,6 @@ row count first — this may be years away.
 `platform/services/maple_attachments.py:118` — `pdf_page_count` counts `/Type /Page` objects in the file's bytes, because no PDF library is installed. A PDF that keeps its page objects in compressed object streams (common from modern exporters) shows none, so its count is unknown and it is read whole — bounded only by OpenAI's own 100-page cap on file inputs, so one such upload can still cost far more than a 20-page read. (review 2026-10-18 #7, fixed in part by /fix-issues: Simon's pick was `pypdf`, which needs a new dependency.)
 
 **Suggested fix:** Add `pypdf` to requirements.txt and count pages with `len(PdfReader(BytesIO(content)).pages)` in `asyncio.to_thread`, falling back to the byte count when the PDF won't parse; keep `MAX_PDF_PAGES_TO_READ` = 20.
-
-### 1305. [MEDIUM] Untested edge cases in `waiting_slot`
-`platform/services/maple_attachments.py:240` — Edge cases: L257–258 — `left > 0` (two admitted, one finishes); L256 — the `.get(key, 1)` default with the key already gone. (Maple attachments review round 3, 2026-10-19, #14, deferred)
-
-**Suggested fix:** Cap at waiting + 2, enter two slots, exit one → `_uploads_in_flight[(company, user)] == 1`; exit the second → the key is gone.
 
 ### 1327. [LOW] The attachment sweep's shield doesn't survive shutdown
 `platform/services/maple_attachments.py:465` — On cancel, `await asyncio.shield(...)` raises at once; the lifespan ends and `asyncio.run` cancels the shielded inner task too, possibly between the row delete and the blob delete. (Maple attachments review round 3, 2026-10-19, #36, deferred)
@@ -3814,56 +3527,7 @@ row count first — this may be years away.
 
 **Suggested fix:** Match the fixed tail after the placeholder.
 
-### 1605. [LOW] Untested edge cases in _load_glibc
-`platform/services/memory_trace.py:84` — Untested edge cases: no libc found (line 88 → None, None); CDLL raising OSError (line 92); a glibc without mallinfo2 (< 2.33, line 93 — stats off, trim kept); no malloc_trim (line 97). (review 2026-11-09 #15, deferred)
-
-**Suggested fix:** Monkeypatch ctypes.util.find_library → None and assert (None, None); ctypes.CDLL raising OSError → (None, None); CDLL returning an object with only malloc_trim → mallinfo2 None, malloc_trim set; and the reverse.
-
-### 1606. [LOW] Untested edge cases in read_anon_and_file
-`platform/services/memory_trace.py:139` — Untested edge cases: a malformed number (ValueError / IndexError, line 153); a rollup missing its Rss or Anonymous line (line 155). (review 2026-11-09 #16, deferred)
-
-**Suggested fix:** Write "Rss: abc kB" → assert (None, None); write only an Rss line → assert (None, None).
-
-### 1607. [LOW] Untested edge case in trim_malloc
-`platform/services/memory_trace.py:125` — Untested edge case: read_rss() returns None before or after the trim (line 134 → None). (review 2026-11-09 #17, deferred)
-
-**Suggested fix:** Patch _malloc_trim with a stub and services.memory_watch.read_rss → None; assert trim_malloc() is None and the stub was called.
-
-### 1608. [LOW] Untested edge cases in memory_trace.start
-`platform/services/memory_trace.py:215` — Untested edge cases: called with tracing off (line 219, returns without tracing); tracemalloc already tracing (line 221, keeps its frame depth). (review 2026-11-09 #18, deferred)
-
-**Suggested fix:** Setting off, tracemalloc stopped: call start(), assert not is_tracing(). With tracemalloc.start(1) running: call start(), assert get_traceback_limit() == 1 and _baseline is set.
-
-### 1609. [LOW] Untested edge case in memory_trace.begin
-`platform/services/memory_trace.py:238` — Untested edge case: the setting on but tracemalloc not tracing (start() never ran or failed) returns None. (review 2026-11-09 #19, deferred)
-
-**Suggested fix:** Setting on, tracemalloc stopped: assert begin(reset_peak=True) is None.
-
-### 1610. [LOW] Untested edge case in memory_trace._short
-`platform/services/memory_trace.py:281` — Untested edge case: a path outside both site-packages and the app root (a stdlib frame like /usr/lib/python3.11/json/decoder.py) is returned unchanged. (review 2026-11-09 #20, deferred)
-
-**Suggested fix:** Assert _short("/usr/lib/python3.11/json/decoder.py") returns it unchanged.
-
-### 1611. [LOW] Untested edge case in memory_watch._begin_trace
-`platform/services/memory_watch.py:324` — Untested edge case (pragma no cover): memory_trace.begin raising is logged as "MEM trace failed to start" and the request goes on. (review 2026-11-09 #22, deferred)
-
-**Suggested fix:** Monkeypatch memory_trace.begin to raise; run a request through the middleware; assert it completes and the failure line is logged.
-
-### 1612. [LOW] Untested edge case in memory_watch._log_request
-`platform/services/memory_watch.py:344` — Untested edge case (pragma no cover): take_reading() raising after the request returns None, which skips the trace as well as the MEM line. (review 2026-11-09 #23, deferred)
-
-**Suggested fix:** Make the second take_reading raise with tracing on; assert "MEM request measurement failed" is logged, no "MEM trace" line, and the request completes.
-
-### 1613. [LOW] Untested edge case in memory_watch.log_startup
-`platform/services/memory_watch.py:379` — Untested edge case: memory_trace.start() raising at startup is logged (line 392) and startup goes on. (review 2026-11-09 #24, deferred)
-
-**Suggested fix:** Setting on, monkeypatch memory_trace.start to raise; call log_startup(); assert "MEM trace failed to start" is logged and nothing escapes.
-
 ## Portal — estimate builder
-
-**Update 2026-09-27** (platform `a612723`, `3526a08`): the server half is fixed — the conversation remembers its language (`conversation_lang`), a short reply in a non-English conversation is detected and translated, a code/email/number reply is answered in the conversation's language, and "No."/"No, thanks." read as a no. Still open (portal, design §8): the restored transcript shows the English history.
-
-**Resolved 2026-09-27** (platform `9f657b4`, portal `97c87f4`): a non-English turn's chat lines carry `display_text` — the user's own words and the reply as sent — written by a second, conditional save after the reply is translated; the restored transcript shows `display_text` over the English `text` the pipeline keeps. Pinned by `tests/test_conversation_display_text.py` and `useMapleAgent.test.tsx`.
 
 ### 131. [MEDIUM] `saveError` displayed far from origin
 **File**: [portal/src/pages/NewEstimateWithActivityPage.tsx](../../portal/src/pages/NewEstimateWithActivityPage.tsx)
@@ -4201,28 +3865,6 @@ test that breaks on every MDXEditor upgrade.
 
 **Suggested fix:** On close reset `options`/`answeredQuery`; compute the query from `searchText` directly when it's "".
 
-### 1130. [MEDIUM] Untested edge cases in useMaterialCatalog
-**Checked 2026-10-22:** One arm now covered (search when page returns null, tests/useMaterialCatalog.test.tsx 'an empty search'); remember-after-switch, _id-only remember and sync-throw resolve remain.
-
-`portal/src/hooks/useMaterialCatalog.ts:116` — Untested arms: `remember` right after a company switch (empty base); `remember` with only `_id`; `search` when `page` returns null; a resolve that throws synchronously. (review 2026-10-16 round 2 #65, deferred)
-
-**Suggested fix:** One renderHook test per arm.
-
-### 1131. [MEDIUM] Untested edge cases in MaterialSearchDropdown
-`portal/src/components/common/MaterialSearchDropdown.tsx:107` — Untested arms: a non-Escape key leaves it open; mousedown inside doesn't close; read-only with no label shows "—"; drop-up placement. (review 2026-10-16 round 2 #66, deferred)
-
-**Suggested fix:** One test per arm.
-
-### 1132. [MEDIUM] Untested edge cases in handleMaterialGapResolved
-`portal/src/pages/NewEstimateWithActivityPage.tsx:921` — Untested arms: the `else if (gap.workItemIndex < workItems.length)` arm (dialog editing another item); the no-op when neither applies; the `!estimate` guard. (review 2026-10-16 round 2 #67, deferred)
-
-**Suggested fix:** Call the handler with `workItemEditIndex` on another item; one case each for the no-op and the guard.
-
-### 1133. [MEDIUM] Untested edge cases in gapMaterialLine
-`portal/src/lib/estimateInventoryGaps.ts:87` — Untested arms: a record with only `_id`; an empty name. (review 2026-10-16 round 2 #68, deferred)
-
-**Suggested fix:** `gapMaterialLine({...effective([]), id: "", _id: "m2", name: ""}, {})` → `material: "m2", name: ""`.
-
 ### 1174. [LOW] Two builders of a line from an effective material
 **Checked 2026-10-22:** Hand-built lines now live in hooks/useWorkItemLines.ts; gapMaterialLine still separate in lib/estimateInventoryGaps.ts.
 
@@ -4245,7 +3887,8 @@ test that breaks on every MDXEditor upgrade.
 
 **Suggested fix:** Un-export it.
 
-### 1229. [MEDIUM] Untested edge case: the company answers without a numeric `material_markup`
+### 1229. [HIGH] Line pricing when the company has no numeric `material_markup` is untested
+**Kept 2026-11-14 (coverage policy):** critical: the price computed when the company has no numeric markup (money).
 **Checked 2026-10-22:** Code moved: company fetch is now useCompanyDefaults/linePricingFromCompany; test.each in tests/NewEstimateWithActivityPage.materialGaps.test.tsx still lacks the {} reply row.
 
 `portal/src/pages/NewEstimateWithActivityPage.tsx:302` — The pending and rejected fetches and markup 25 are tested; a reply lacking the field isn't. (review 2026-10-17 round 3 #14, deferred)
@@ -4411,17 +4054,8 @@ oversight.
 
 **Suggested fix:** Set a ref when any local turn completes, and skip the restored `open_question` once it is set.
 
-### 1312. [MEDIUM] Untested edge cases in `thumbUrlFor` / `useThumbUrl`
-`portal/src/components/Layout/MapleAttachmentChips.tsx:16` — Edge cases: (a) L20 — a failed fetch is evicted so a later mount fetches again; no test rejects for a real id; (b) L36 — the `.catch` keeping the name tile; the existing test uses `id: ""`, so `attachmentBlob` never runs; (c) L34/40 — unmounting before the fetch resolves sets no state. (Maple attachments review round 3, 2026-10-19, #21, deferred)
-
-**Suggested fix:** Id "gone-1": reject once → name tile; remount with a resolving mock → a second fetch and an img. Rename the existing test "files without ids still list". Use unique ids per test (the cache outlives tests).
-
-### 1313. [MEDIUM] Untested edge case in `StagedChipTile`: the uploading spinner
-`portal/src/components/common/StagedFileChips.tsx:75` — Edge case: L90 — the uploading spinner (`staged-file-uploading`) is never queried. (Maple attachments review round 3, 2026-10-19, #22, deferred)
-
-**Suggested fix:** In "an upload in flight…", assert it on the PDF tile and its absence on the ready photo.
-
-### 1314. [MEDIUM] Untested edge case in SupportPanel's `handleSend`: a failed send
+### 1314. [HIGH] SupportPanel's `handleSend`: a failed send keeping the draft and file is untested
+**Kept 2026-11-14 (coverage policy):** critical: a failed send must keep the draft and the staged file (data loss).
 `portal/src/components/common/SupportPanel.tsx:259` — Edge case: L281–283 — a failed send keeps the draft and the staged file and shows the error; untested, so moving `clearStagedFiles()` above the await would pass. (Maple attachments review round 3, 2026-10-19, #23, deferred)
 
 **Suggested fix:** `sendMessageWithFile` rejects once with an ApiError; stage, type, send → error shown, chip and draft kept.
@@ -4526,13 +4160,6 @@ and will be resolved as part of the planned onboarding-flow overhaul.
 `portal/src/components/settings/FinancialTab.tsx:82` — "Applies to every standard material you haven't priced yourself" — a cost you set still gets the markup. (review 2026-10-16 round 2 #119, deferred)
 
 **Suggested fix:** "Applies to every standard material size you haven't set a price for (a cost you set gets the markup too)."
-
-### 1233. [MEDIUM] Untested edge cases in applyStandardToggle
-**Checked 2026-10-22:** Component now at components/materials/MaterialCategoriesTab.tsx:153; neither arm tested.
-
-`portal/src/components/settings/MaterialCategoriesTab.tsx:176` — (a) The `togglingStandardRef` early return (the busy test is stopped by the switch's own `if (!busy)`); (b) `result?.hidden_for_name ?? []` when the toggle answers null. (review 2026-10-17 round 3 #18, deferred)
-
-**Suggested fix:** (a) Pending PATCH, then "Turn on all" in the same tick → one write; (b) PATCH resolves null → switch applied, no toast, list refreshed.
 
 ### 1522. [MEDIUM] Customer API keys can't be revoked from the portal while the keys section is hidden — accepted (review 2026-11-06, Settings AI Apps #1)
 `portal/src/components/settings/AiAppsTab.tsx:17` — With ApiKeysSection hidden, no page lists or revokes a customer key (3m_app_). A key made since 1.17.1 (2026-11-04) keeps working until it expires (up to a year) or its user leaves; if one leaks, neither its user nor an Owner/Admin can stop it from the portal.
@@ -4657,35 +4284,6 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 
 **Suggested fix:** Mount it with `key={standardMaterial.id}` and initialise state from props; drop the effect.
 
-### 1134. [MEDIUM] Untested edge cases in write/changes
-**Checked 2026-10-22:** negative price arm now covered (MaterialsPageStandardEdit 'a negative price is refused'); other arms still untested
-
-`portal/src/components/materials/StandardMaterialDialog.tsx:60` — Untested arms: a negative price; `if (!row) return []`; `onClose` ignored while busy; the "Standard $x" hint hidden when equal or null; no description/category_name. (review 2026-10-16 round 2 #69, deferred)
-
-**Suggested fix:** One test per arm.
-
-### 1137. [MEDIUM] Untested edge cases in the deep-link effect
-`portal/src/pages/MaterialsPage.tsx:262` — Untested arms: unmount while `get` is pending (`cancelled`); `found.name ?? ""`. (review 2026-10-16 round 2 #72, deferred)
-
-**Suggested fix:** One test each.
-
-### 1138. [MEDIUM] Untested edge case in duplicateMaterial: a null copy
-**Checked 2026-10-22:** row Duplicate answered with null is exercised in MaterialsPageMenus 'a row action in flight' but with no no-highlight/no-error assertion; dialog 'no copy' arm covered
-
-`portal/src/pages/MaterialsPage.tsx:640` — Untested. (review 2026-10-16 round 2 #73, deferred)
-
-**Suggested fix:** `duplicateMock` → null; no highlight, no error.
-
-### 1139. [MEDIUM] Untested edge case in runRowAction: clearing an earlier refusal banner
-`portal/src/pages/MaterialsPage.tsx:625` — Untested. (review 2026-10-16 round 2 #74, deferred)
-
-**Suggested fix:** Refuse one action, run another; the old banner is gone.
-
-### 1140. [MEDIUM] Untested edge case in loadMaterials: a filter change clears an earlier error
-`portal/src/pages/MaterialsPage.tsx:175` — Untested. (review 2026-10-16 round 2 #75, deferred)
-
-**Suggested fix:** Fail a load, change a filter, succeed; no ErrorState.
-
 ### 1177. [LOW] Exports nothing imports: `TOAST_DURATION_MS`, `ToastTone`, `ToastPosition`
 `portal/src/components/common/Toast.tsx:4` — Speculative surface. (review 2026-10-16 round 2 #112, deferred)
 
@@ -4716,17 +4314,8 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 
 **Suggested fix:** `await Promise.resolve(reload()).catch((e) => console.error("Quiet refresh failed:", e))`; test with a rejecting reload (dialog closed, toast shown, error "").
 
-### 1231. [MEDIUM] Untested edge cases in loadMaterials
-`portal/src/pages/MaterialsPage.tsx:199` — (a) `!movedPage` in `finally` (214): a first load past the end should keep the spinner until the redirected load lands; (b) `lastPage >= 1` false with page > 1 (total 0 on page 3): no redirect, empty message. (review 2026-10-17 round 3 #16, deferred)
-
-**Suggested fix:** (a) Hold the redirected load pending and assert "Loading materials..."; (b) `?page=3` with `envelope([], 0, 3)` → one request, no redirect, empty message.
-
-### 1232. [MEDIUM] Untested edge case in runRowAction: the same-tick `rowBusyRef` guard
-`portal/src/pages/MaterialsPage.tsx:650` — The test clicks a disabled item, which proves `disabled` works, not the ref. (review 2026-10-17 round 3 #17, deferred)
-
-**Suggested fix:** Two `fireEvent.click`s on Duplicate in one synchronous block; `duplicateMock` called once.
-
-### 1234. [MEDIUM] Untested edge cases in setField/changes/write
+### 1234. [HIGH] StandardMaterialDialog: price validation before the write is untested
+**Kept 2026-11-14 (coverage policy):** critical: price validation before a write (money).
 `portal/src/components/materials/StandardMaterialDialog.tsx:74` — `priceBad` (83); Infinity without badInput (90); `input.validity` missing (`?.`). (review 2026-10-17 round 3 #19, deferred)
 
 **Suggested fix:** One test each.
@@ -4746,11 +4335,6 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 
 **Suggested fix:** Narrow the signature to `(material: EffectiveMaterial)` and test the fields directly.
 
-### 1279. [MEDIUM] Untested edge case in the render-time search sync: a pending push the URL didn't take
-`portal/src/pages/MaterialsPage.tsx:299` — `fromBox` false while a push is recorded (the push is cleared and the box overwritten) — the arm that stops a stale push sticking — isn't driven. (review 2026-10-17 round 5 #15, deferred)
-
-**Suggested fix:** Type "abc" and navigate to `?q=other` in the same act as the debounce firing → box "other"; Back to q=abc → box "abc".
-
 ### 1287. [LOW] A recorded search push can stick when another navigation in the same tick wins
 `portal/src/pages/MaterialsPage.tsx:288` — If a pager/filter click or a past-the-end move commits over the box's push in the same tick, the push stays recorded; a later Back to an entry with that search is then treated as the box's own and doesn't overwrite the box. A millisecond window. (review 2026-10-17 round 5 #23, deferred)
 
@@ -4761,35 +4345,11 @@ if one is already scheduled, clear it in the callback, and cancel it in the exis
 
 **Suggested fix:** A short placeholder ("At cost") with `title="Not set — sells at its cost"`; check it in the app at 820px.
 
-### 1300. [MEDIUM] Untested edge case in `sizeRowsPayload`: a typed price that isn't finite
+### 1300. [HIGH] `sizeRowsPayload`: a non-finite typed price sent as null is untested
+**Kept 2026-11-14 (coverage policy):** critical: a non-finite typed price is sent as null and repriced from the markup (money).
 `portal/src/lib/materialSizes.ts:45` — A price typed as "1e999" reads as Infinity, fails `Number.isFinite`, and is sent as null — so the server prices the size from the markup instead of refusing or keeping what was typed. No test drives that arm; it was untested in handleSubmit too (moved code). (review 2026-10-18, #1251 round 2 #1, deferred)
 
 **Suggested fix:** Add to tests/materialSizes.test.ts: `sizeRowsPayload([row({ price: "1e999" })], true)` → `[{ size: "1 bag", unit: "u1", cost: 10, price: null }]` (pins today's behaviour: a non-finite price is treated as blank).
-
-### 1315. [MEDIUM] Untested edge case in `PhotoTileFace`: the spinner while a thumb loads
-`portal/src/components/tasks/TaskPhotoGrid.tsx:49` — Edge case: L62–66 — the spinner while a thumb loads. (Maple attachments review round 3, 2026-10-19, #24, deferred)
-
-**Suggested fix:** `photoBlob` never resolves → `.animate-spin` inside the tile.
-
-### 1316. [MEDIUM] Untested edge case in `PhotoTile`: a video's delete label
-`portal/src/components/tasks/TaskPhotoGrid.tsx:69` — Edge case: L103 — a video's delete badge now reads "Delete video clip.mp4"; unasserted. (Maple attachments review round 3, 2026-10-19, #25, deferred)
-
-**Suggested fix:** Assert that name in "video tiles render a placeholder…".
-
-### 1317. [MEDIUM] Untested edge case in `ViewerMedia`: the spinner while the full file loads
-`portal/src/components/tasks/TaskPhotoGrid.tsx:229` — Edge case: L230 — the spinner while the full file loads. (Maple attachments review round 3, 2026-10-19, #26, deferred)
-
-**Suggested fix:** `photoBlob` pending, open a tile → `.animate-spin` in the dialog, no img/video/iframe.
-
-### 1318. [MEDIUM] Untested edge case in `TaskDialog`: the staged PDF tile
-`portal/src/components/tasks/TaskDialog.tsx:98` — Edge case: L770 — the staged PDF tile (`PdfTile`) isn't asserted; deleting the arm renders a broken `<img>` with tests green. (Maple attachments review round 3, 2026-10-19, #27, deferred)
-
-**Suggested fix:** In "a staged PDF uploads the original file", assert the name "quote.pdf" shows and no img has that alt.
-
-### 1645. [LOW] Untested edge case in `TaskAgePill`: the tooltip's two arms
-`portal/src/components/tasks/TaskAgePill.tsx:22` — Edge case: L28 — the `title` ternary has two arms, "Created <day>, due <day>" for a task with a due date and "Created <day>" for one without, and no test asserts either. This logic predates the change; the audit listed it because the archived-task change (no pill for an archived task) edited TaskAgePill. A regression would only change hover text, never what the card shows or counts. (Archived-task pill review, 2026-11-12, #1, deferred)
-
-**Suggested fix:** Add two cases to `tests/TaskAgePill.test.tsx`: `makeTask({ due_date: new Date(2026, 6, 15).toISOString() })` → `expect(pill.getAttribute("title")).toMatch(/^Created .+, due .+$/)`; `makeTask()` with no due date → `expect(pill.getAttribute("title")).not.toMatch(/due/)`.
 
 ## Website
 
@@ -5028,21 +4588,6 @@ the source of truth, or adopt `bandit -b baseline.json` so the tool tracks the
 delta itself instead of a human-maintained integer in prose. The second is
 better if the B110 sweep is going to be gradual.
 
-### 440. [LOW] platform — untested branches and one simulated test premise
-**Checked 2026-10-22:** estimate-deleted branch of _write_link now covered (test_agent_helpers_pending_property_link.py:602); other parts open
-
-Three small gaps, none behavioral: (a) the `resolution["error"]` path and the
-estimate-deleted branch of `_write_link` have no covering test — both are simple
-early returns with no state mutation; (b) there is no router-level end-to-end
-test for arm-near-tie → reply `"2"` — both halves are unit-tested with a fake on
-the other side, and the record shape was verified by inspection; (c) the Critical
-ordinal test simulates the substring trap with a fake resolver rather than
-exercising real tier-1 matching, so nothing in the suite pins
-`"2" in "12 oak rd"` as the mechanism. (c) is now largely moot — the short-query
-floor in `_resolve_property_address` closes that trap at its source.
-**Suggested fix:** add the covering tests opportunistically when these files are
-next touched.
-
 ### 444. [LOW] portal/tests/opsUsage.test.ts — assertions depend on the runtime locale
 `formatUsage` / `formatCreditsBalance` use `toLocaleString()`, and the tests
 assert `"1,200 / 100,000"` and `"49,876"`. Under a non-en ICU locale those become
@@ -5088,7 +4633,9 @@ by any test and could be removed without failing anything.
 exempt only the first occurrence of that src in document order (the header logo) and require
 lazy on the rest.
 
-### 489. [LOW] platform/scripts/prime_brevo_events.py — no test coverage
+### 489. [HIGH] platform/scripts/prime_brevo_events.py — no test coverage
+**Kept 2026-11-14 (coverage policy):** a script's main run needs a test under the new rule, and this one posts to a live Brevo account.
+**Superseded 2026-11-14:** the scripts rule (`/code-review` Step 2b.6) makes this test required, not optional: a dry run makes zero HTTP calls, and the live run posts each event once. The Suggested fix below is kept as history.
 The one file in the change with no tests. It is an operational script in the same mould as
 `scripts/create_brevo_attributes.py`, which is also untested, so this is consistent rather
 than novel — but it posts to a live Brevo account.
@@ -5148,16 +4695,6 @@ cleanup is unblocked.
 queries match every row, not only blank ones — so the assertions need rewriting in terms of
 total row count rather than blank-row count.
 
-### 578. [LOW] No test that `discard_doc_image_paths` swallows errors
-`platform/routers/estimate_helpers/doc_versions.py:376` — Every API test swaps in a `delete_doc_images` that never raises, so the "never fails the request" branch the delete route relies on is untested.
-
-**Suggested fix:** A unit test with a raising `delete_doc_images`: assert no exception and one warning.
-
-### 579. [LOW] No test for the doc-image GET when the blob is missing from storage
-`platform/routers/estimate_documents.py:264` — Only an unknown image id is tested, not a known id whose blob is gone (for example after a race).
-
-**Suggested fix:** Pop the blob from `fake_store.blobs`, then assert 404.
-
 ### 582. [LOW] Stale docstring says notes inherit the estimate edit lock
 `platform/tests/test_estimate_agent.py:3818` — `test_locked_estimate_refuses_title_rename` still lists "notes" among the sub-ops that inherit the lock; notes bypass it since 2026-09-23.
 
@@ -5168,22 +4705,13 @@ total row count rather than blank-row count.
 
 **Suggested fix:** `@pytest.mark.parametrize("status", ["Draft", "Review"])`.
 
-### 603. [LOW] No test re-renders the Documents dialog with the post-success versions
-`portal/tests/DocumentsDialog.test.tsx:97` — The kept-image reconciliation never runs against a freshly kept image — the path the adjust-during-render design was accepted for. It is believed correct; nothing pins it.
-
-**Suggested fix:** After the `waitFor`, `rerender(<DocumentsDialog {...props} versions={[v3, v2, v1]} />)` and assert "Remove c.jpg" is present and the counter reads "1 / 10".
-
 ### 604. [LOW] Documents dialog test name says "oversize files" but uploads none
 `portal/tests/DocumentsDialog.test.tsx:86` — The size branch is covered only by the `docImagePickError` unit test.
 
 **Suggested fix:** Upload `jpeg("big.jpg", 10 * 1024 * 1024 + 1)` and assert `/big\.jpg.*10MB/`, or rename the test.
 
-### 605. [LOW] `useBlobObjectUrl`'s leak guards aren't tested
-`portal/tests/useBlobObjectUrl.test.tsx:27` — No test for a late resolution after unmount (URL revoked, never returned) or a key change (old URL revoked) — the branches `NoteAttachmentStrip` now relies on.
-
-**Suggested fix:** Add a deferred-load-resolves-after-unmount test and a key-change rerender test asserting the first URL is revoked and `load` is called twice.
-
-### 606. [LOW] The estimate page's own generate-doc rejection paths aren't tested
+### 606. [HIGH] The estimate page's own generate-doc rejection paths aren't tested
+**Kept 2026-11-14 (coverage policy):** critical: a failed save must not generate a document from unsaved data.
 `portal/tests/NewEstimateWithActivityPage.documents.test.tsx:194` — The dirty-save failure (must reject without calling `generateGoogleDoc`) and the `!estimate` guard have no test.
 
 **Suggested fix:** Make the page dirty and make `estimatesApi.update` reject, call onGenerate, and assert it rejects with /couldn't be saved/ and `generateMock` was not called.
@@ -5318,6 +4846,7 @@ total row count rather than blank-row count.
 **Suggested fix:** Rename to `…_is_answered` and update the docstring.
 
 ### 972. [LOW] Acceptance `planner_has=()` against None isn't tested
+**Kept 2026-11-14 (coverage policy):** test infrastructure, not an edge case: the acceptance checks can be silently turned off.
 `platform/tests/planner_parity/acceptance.py:32` — `planner_has=()` silently turns the fragment checks off, while None falls back to `has`; nothing pins the difference, and the corpus now uses `()` (task-field-value-never-lands-on-the-newest-task).
 
 **Suggested fix:** Report tests for both values, and say on `Turn` what `()` means.
@@ -5343,25 +4872,10 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Drop the message from the parametrize, or move it to a strict xfail tagged #1000.
 
-### 1023. [MEDIUM] `follow_up_for_created`: edge arms untested
-`platform/routers/agent_helpers/estimate_gathering.py:309` — Edge case. These mutants survive: dropping `.lower()` (M3) or `.strip()` (M4) on `field`, and the non-dict `follow_up` guard (M5; a string would raise AttributeError). (review round 13 #5, deferred)
-
-**Suggested fix:** `follow_up_for_created({"optional_follow_up": {"field": " Property ", …}}, {"property": "p"}) is None`; a non-dict follow-up → None.
-
-### 1024. [MEDIUM] `name_linked_property`: edge arms untested
-`platform/routers/agent_helpers/estimate_gathering.py:324` — Edge case. The final `.strip()` (M12) and the failed-lookup warning are never asserted (the `is_valid` guard, M7, is equivalent). (review round 13 #6, deferred)
-
-**Suggested fix:** A padded name → stripped label; a raising `find_one` → "" with the warning logged.
-
 ### 1025. [MEDIUM] `_gathering_property`: precedence and stripping untested
 `platform/routers/agent_helpers/estimate_gathering.py:347` — Edge case. A request's `property_id` beating the stash (M13) survives: "named in the message beats the request's property" is never tested with both set. An unstripped label or id (M14, M15) also survives. (review round 13 #7, deferred)
 
 **Suggested fix:** A finalize with both a stash and `property_id`, asserting the stash wins; a padded label/id.
-
-### 1026. [MEDIUM] `_generation_failed`: the non-dict detail fallback untested
-`platform/routers/agent_helpers/estimate_gathering.py:399` — Edge case, M21: `{"error": exc.detail}` → `{}` survives. (review round 13 #8, deferred)
-
-**Suggested fix:** An `EstimateGenerationError` with a string detail different from its message → the result carries `{"error": detail}`.
 
 ### 1027. [MEDIUM] `_created_reply`: the kept follow-up untested
 `platform/routers/agent_helpers/estimate_gathering.py:430` — Edge case. Dropping `estimate_id` from the legacy follow-up stash (M23, read by `pending_estimate_follow_up.py:179`) and forcing `optional_follow_up` to None (M24) survive. (review round 13 #9, deferred)
@@ -5490,11 +5004,6 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Add a `clarify`-plan case to that test.
 
-### 1082. [MEDIUM] `expand_beside`: edge arms untested
-`platform/agents/planner/followups.py:495` — Edge cases: (a) `social` as the only other action — the parametrize covers `[]` and acknowledge only; mutant M8 (social removed) survives. (b) Two follow-up Replies beside a request, joined with "\n\n" (:534); mutant M10 (only the first said) survives. (review round 28 #2, deferred)
-
-**Suggested fix:** (a) Add `[{"op": "social"}]` to `test_a_follow_ups_reply_alone_or_beside_thanks_is_the_turn`. (b) `_plan(_WON, {"op": "redo_last", "before_tax": True}, {"op": "show_more"})` with a stored count list → `said == NO_FIGURE + "\n\n" + NOTHING_MORE`.
-
 ### 1083. [MEDIUM] `_said_above`: the arm where `clarifying_question` differs from `response` is untested
 **Checked 2026-10-22:** _said_above was rewritten (agents/planner/turn.py:506); the differing-clarifying_question arm is still untested
 
@@ -5541,29 +5050,28 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Post to /auth/send-verification-email with `headers={"X-Test-Email": ""}`; assert 401 and the detail.
 
-### 1291. [MEDIUM] delegate_generic: untested edge-case arms
-`platform/routers/agent_helpers/delegate_generic.py:31` — Edge cases: L61-62 — an optional_follow_up with no question text (nothing appended); L66 — an empty delegated response, where the follow-up question becomes the whole reply; L69 — an allowlisted spec when the agent returned no context (falls back to context_payload); L79 — `completion_ready` already set on the result (setdefault keeps the agent's value). (Sentry fixes review 2026-10-17 #37, deferred)
-
-**Suggested fix:** One test per arm in tests/test_agent_helpers_delegate_generic.py: (a) optional_follow_up={} leaves the response unchanged; (b) response "" + a question → response == the question; (c) no "context" key + a stubbed spec → result["context"][PENDING_OPTIONAL_FOLLOW_UP_KEY] == spec and the context_payload keys kept; (d) result {"completion_ready": True} with needs_clarification=True → stays True.
-
-### 1292. [MEDIUM] upload_contacts_csv: untested edge-case arms
+### 1292. [HIGH] upload_contacts_csv: a contact saved but its note failing is untested
+**Kept 2026-11-14 (coverage policy):** critical: a contact saved but its note failed must be reported, not done.
 `platform/routers/contacts.py:104` — Edge cases: L148 — a header-only CSV (the loop runs zero times); L246 — the note insert raising after the contact is saved ("Contact saved, but its note could not be saved"). (Sentry fixes review 2026-10-17 #43, deferred)
 
 **Suggested fix:** (a) Post "first_name,last_name\n"; assert 200, all lists empty, "Processed 0 contacts". (b) Monkeypatch routers.contacts.create_note_as to raise RuntimeError, post "first_name,last_name,notes\nNo,Note,hi\n", assert len(created) == 1 and errors[0]["error"].startswith("Contact saved, but its note could not be saved"); delete the contact.
 
-### 1293. [MEDIUM] upload_properties_csv: untested edge-case arms
+### 1293. [HIGH] upload_properties_csv: re-uploading a contact against an existing address is untested
+**Kept 2026-11-14 (coverage policy):** critical: a re-upload must not duplicate a property contact.
 `platform/routers/properties.py:140` — Edge cases: L187/L311 — a header-only CSV (no rows, so no geocode backfill is scheduled); L229 — re-uploading the same contact against an existing address merges without duplicating; L279 — the note insert raising after save. (Sentry fixes review 2026-10-17 #44, deferred)
 
 **Suggested fix:** (a) Header-only CSV with backfill_property_coordinates spied: 200, empty lists, spy not called. (b) Upload contact1 twice for one address; assert len(contacts) == 1. (c) Monkeypatch create_note_as to raise; assert the "Property saved, but its note could not be saved" prefix.
 
-### 1294. [MEDIUM] upload_labours_csv: untested edge-case arms
+### 1294. [HIGH] upload_labours_csv: a failed row write reported as a row error is untested
+**Kept 2026-11-14 (coverage policy):** critical: a failed row write must be reported as an error.
 **Checked 2026-10-22:** labour upload is now keyed by name only (routers/labours.py ~316-351), so the name+unit and raw-string-unit arms are reworded; no header-only/phase-3 failure test exists
 
 `platform/routers/labours.py:142` — Edge cases: L197 — a header-only CSV; L239 — a raw-string unit on a stored Labour (defensive); L264 — the same name+unit twice in one CSV (the second row updates the first); L265 — a write failing in phase 3 → row error. The review's fifth arm (a missing Company → 404) is gone: the same day's fix #2 runs `assert_user_company_access` first, which refuses a missing company with 403. (Sentry fixes review 2026-10-17 #45, deferred)
 
 **Suggested fix:** (a) "name,unit,cost\n" → 200, "Uploaded 0 labour entries". (b) L239: no test; mark it defensive with a comment. (c) Rows "Dup,Hourly,10" and "Dup,Hourly,20" → the same id twice, stored cost 20.0. (d) Monkeypatch Labour.insert to raise → errors[0]["row"] == 2.
 
-### 1295. [MEDIUM] upload_equipments_csv: untested edge-case arms
+### 1295. [HIGH] upload_equipments_csv: a duplicate row and a failed row write are untested
+**Kept 2026-11-14 (coverage policy):** critical: a duplicate row upserts, and a failed row write is reported.
 `platform/routers/equipments.py:63` — Edge cases: L112 — a header-only CSV; L168 — a duplicate name+unit in one CSV upserts; L169 — a phase-3 write failure → row error. (The missing-Company 404 the review named was removed by fix #3: `assert_user_company_access` refuses it first.) (Sentry fixes review 2026-10-17 #46, deferred)
 
 **Suggested fix:** The same tests as #1294 (a), (c), (d), against /equipments/upload and Equipment.insert.
@@ -5673,1027 +5181,97 @@ total row count rather than blank-row count.
 
 **Suggested fix:** Bisect the batch to the file that leaves the shared user or company changed. Have that test restore it, or give the vocabulary tests their own user.
 
-### 1440. [LOW] `create_audit_log`: two actor arms untested (review 2026-10-28, MCP enhancements release one)
+### 1440. [HIGH] `create_audit_log`: two actor arms untested (review 2026-10-28, MCP enhancements release one)
+**Kept 2026-11-14 (coverage policy):** critical: the audit row must name the right actor when a key or connection acts for a user.
 `platform/services/audit_service.py:175` — Edge cases. Line 231: an acting user is set but the token names a different email, which should fall through to the email lookup. Line 237: an email-only call with no token (fixed for staff key rows by passing `user_id`, but no direct test).
 
 **Suggested fix:** Test 1: set an acting user, pass `decoded_token={"email": other}`, and assert the row names the other user. Test 2: call with `user_email` only and assert the id is resolved.
-
-### 1441. [LOW] `_actor_from_token`: the no-email arm is untested (review 2026-10-28, MCP enhancements release one)
-`platform/services/audit_service.py:66` — Edge case. A token with no email returns `(None, token.get("role"))` at line 77, and no test drives it.
-
-**Suggested fix:** Call `create_audit_log(decoded_token={"uid": "x"})` and assert `user_id is None`.
-
-### 1442. [LOW] `_audit_email_request`: an email with no platform user is untested (review 2026-10-28, MCP enhancements release one)
-`platform/routers/auth.py:670` — Edge case. When the email has no platform user, the row carries only the email, and no test covers it.
-
-**Suggested fix:** Stub the send, post a password reset for an email with no `User`, and assert one row with `resource_id` None and that email.
-
-### 1443. [LOW] Invitation re-accept into the user's own company: no join row, untested (review 2026-10-28, MCP enhancements release one)
-`platform/routers/auth.py:1102` — Edge case. When `should_update_company` is False (the invitation is into the company the user already belongs to), no USER_JOIN_COMPANY row should be written. No test drives that arm.
-
-**Suggested fix:** Accept an invitation into the user's current company and assert no new join row.
-
-### 1444. [LOW] Stripe webhook: a company found only after the handler writes no row, untested (review 2026-10-28, MCP enhancements release one)
-`platform/routers/stripe_webhooks.py:134` — Edge case. Since the plan-move-only rule (Simon, 2026-10-28) the row needs the company before the handler, to know the old plan. A company the handler links first (`company_before` None) writes no row, and no test drives that arm.
-
-**Suggested fix:** Stub `find_company` to return None on the first call and the company after, post a plan change, and assert no SUBSCRIPTION_SYNC row. If that case should be audited, decide what `from` says first.
-
-### 1445. [LOW] `_audit_status_change`: a target with no `version` is untested (review 2026-10-28, MCP enhancements release one)
-`platform/agents/estimate/crud_handlers.py:3562` — Edge case. A target without `version` skips `audit_metadata`, and no test drives it.
-
-**Suggested fix:** Call `_audit_status_change` with a stub target lacking `version` and assert the row has from/to but no `version` key.
-
-### 1446. [LOW] Logo upload: the replace case is untested (review 2026-10-28, MCP enhancements release one)
-`platform/routers/companies.py:337` — Edge case. `metadata.replaced` is True only when a logo already existed, and the test uploads once.
-
-**Suggested fix:** Upload twice and assert the second COMPANY_LOGO_UPLOAD row has `replaced: true`.
-
-### 1447. [LOW] `actor_of`: a plain-string role is untested (review 2026-10-28, MCP enhancements release one)
-**RESOLVED 2026-11-04:** `tests/test_audit_service.py::test_actor_of_takes_a_plain_string_role` (customer MCP review fixes).
-`platform/services/audit_service.py:47` — Edge case. Line 56 handles a `role` without `.value`, and no test passes one.
-
-**Suggested fix:** Call `actor_of` on a `SimpleNamespace(email=..., id=..., role="Admin")` and assert `_user_role == "Admin"`.
 
 ### 1448. [MEDIUM] No test that a cancelled subscription writes a downgrade row (review 2026-10-29, MCP enhancements release one)
 `platform/routers/stripe_webhooks.py:134` — Secondary flow. `customer.subscription.deleted` sets `plan_lookup_key = "plan_free"` (`handle_subscription_deleted`), which would write a SUBSCRIPTION_SYNC row from the paid plan to `plan_free`. The only webhook test posts `customer.subscription.updated`. **Deferred (Simon, 2026-10-29):** the product has no subscription cancellation and no upgrade or downgrade today, so this waits until one of them ships.
 
 **Suggested fix:** When cancellation or a plan change ships, let `_post_subscription_event` in `tests/test_audit_coverage.py` take the event type. Start the company on `plan_pro`, post `customer.subscription.deleted`, and assert one row with metadata `{"from": "plan_pro", "to": "plan_free", "event_type": "customer.subscription.deleted", "source": "stripe"}`.
 
-### 1449. [LOW] `resolve_user_api_key`: the missing-company arm is untested (review 2026-10-29, MCP enhancements release two)
-**RESOLVED 2026-11-04:** `tests/test_user_api_keys.py::test_a_key_whose_company_is_gone_resolves_to_nothing` (customer MCP review fixes).
-`platform/services/user_api_keys.py:109` — Edge case. Line 125: the user still points at the key's company, but that company document is gone, so the function returns None. No test deletes the company.
-
-**Suggested fix:** Issue a key, delete the Company document (leaving the user's `company` set), and assert `resolve_user_api_key` returns None.
-
-### 1450. [LOW] `issue_user_api_key`: the service's own input checks are untested (review 2026-10-29, MCP enhancements release two)
-`platform/services/user_api_keys.py:71` — Edge case. (a) Line 81: `checked_name` raises ValueError on a blank or 81-character name. (b) The next line: `check_expiry` raises on 0 or 366 days. The router's validation stops both before they get here, so no test reaches them.
-
-**Suggested fix:** Call `issue_user_api_key` directly. (a) With `name=" "`, assert ValueError. (b) With `expires_in_days=366`, assert ValueError.
-
-### 1451. [LOW] `aware`: the naive-datetime arm is untested (review 2026-10-29, MCP enhancements release two)
-`platform/services/api_keys_common.py:30` — Edge case. A naive datetime gets UTC attached. Motor is tz-aware, so only a key written by older code reaches this, and no test passes a naive `expires_at` to `key_status`. This is moved code, untested before the move too.
-
-**Suggested fix:** Unit-test `key_status(SimpleNamespace(revoked_at=None, expires_at=datetime(2000, 1, 1)))` and assert "expired". Also assert `aware(datetime(2000, 1, 1)).tzinfo is timezone.utc`.
-
-### 1452. ~~[LOW] `useKeyList`: the empty-reply arm is untested (review 2026-10-29, MCP enhancements release two)~~ — RESOLVED 2026-10-29
-
-**Resolved 2026-10-29** (review round 3): the guard at `portal/src/components/settings/useApiKeys.ts:28` is tested by `portal/tests/ApiKeysSection.test.tsx:196`, "an empty reply is a failed load", which answers the list with `null` and asserts "Failed to load API keys.". Move to the archive in the next cleanup.
-
-### 1453. [LOW] `useIssueUserKey`: three arms untested (review 2026-10-29, MCP enhancements release two)
-`portal/src/components/settings/useApiKeys.ts:59` — Edge cases. (a) Line 72: an empty create reply sets "Failed to create the key.". (b) Copy succeeds and the button reads "Copied". (c) The clipboard throws and the button stays "Copy".
-
-**Suggested fix:** (a) Mock `create` to resolve null and assert the message. (b) Stub `navigator.clipboard.writeText` to resolve, click Copy and assert "Copied". (c) Stub it to reject and assert "Copy" stays.
-
-### 1454. [LOW] `KeysTable`: two arms untested (review 2026-10-29, MCP enhancements release two)
-`portal/src/components/settings/ApiKeysSection.tsx` — Edge cases. (a) `KeysTable`: "Loading keys..." while the request is pending. (b) `KeyRow` (split out of `KeysTable` on 2026-10-29): an unknown scope falls back to the raw value.
-
-**Suggested fix:** (a) Mock `listMine` with a never-resolving promise and assert "Loading keys...". (b) Return a key with `scope: "admin"` (cast) and assert "admin" is shown.
-
-### 1455. [LOW] `ownerLabel`: two fallbacks untested (review 2026-10-29, MCP enhancements release two)
-`portal/src/components/settings/ApiKeysSection.tsx:222` — Edge cases. (a) No name but an email shows the email. (b) Neither shows "Former member", which is what a key whose user left shows (leaving a company revokes the key, and the row stays on the company list).
-
-**Suggested fix:** In the company-list test, add a key with `user_name: null, user_email: "x@example.com"` and assert the email. Add another with both null and assert "Former member".
-
 ### 1456. [LOW] Text-block audit rows: the actor is unchecked (review 2026-10-30, MCP enhancements release two)
 `platform/tests/test_text_blocks_api.py:145` — Edge case. `test_each_change_writes_an_audit_row` checks each row's action, resource and before/after state, but not `user_id`, `user_email` or `user_role`. Those are the fields the 2026-10-30 switch to `actor_of(user)` set. If a later edit passed the wrong user or dropped `decoded_token`, the rows would name nobody or the wrong person and the test would still pass. `actor_of` has its own test (`test_audit_actor.py::test_actor_of_user`); only this router's wiring goes unchecked.
 
 **Suggested fix:** Look up the signed-in user's Mongo id (as `test_audit_coverage.py::_user_id` does). Then assert on the create, update and delete rows that `user_id` is that id, `user_email` is the signed-in email and `user_role` is "Owner".
 
-### 1458. [LOW] `assert_estimate_quota_open`: edge arm untested (review 2026-11-04, customer MCP server)
+### 1458. [HIGH] `assert_estimate_quota_open`: the 429 when a card is on file is untested (review 2026-11-04, customer MCP server)
+**Kept 2026-11-14 (coverage policy):** critical: the quota gate's 429 refusal when a card is on file (billing).
 `platform/routers/estimates.py:332` — Edge case: L335 the "blocked" arm (quota met with a card on file → 429) is never driven; only the no-card 402 is.
 
 **Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/routers/estimates.py:335`; the blocked arm is L341.
 
 **Suggested fix:** generate_estimate with confirm, quota met, default_payment_method_last4="4242" → ToolError "reset at the start of your next billing period"; no model call, daily count 0.
 
-### 1459. [LOW] `removed_work_items`: edge arms untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/estimate_edits.py:168` — Edge cases: L175-176 a non-removal command in the same batch is skipped; L181 a removal naming no loaded item adds nothing (job_item_ids == []).
-
-**Suggested fix:** Unconfirmed [set_title, remove_work_item position 2] → job_item_ids == [that item]; [add_work_item "Temp", remove_work_item "Temp"] → job_item_ids == [].
-
-### 1460. [LOW] `edit_estimate`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_estimates.py:609` — Edge case: L623 `or "work items"` — the confirm wording when no loaded work item is named.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_estimates.py:610`; the fallback is L624.
-
-**Suggested fix:** With #54's second test, assert "remove work items from estimate" in `would`.
-
-### 1461. [LOW] `_assign`: edge arms untested (review 2026-11-04, customer MCP server)
-`platform/scripts/backfill_line_ids.py:52` — Edge cases: L56-57 the estimate deleted between a missed write and the re-read (skipped count); L59-60 a concurrent save gave every line an id meanwhile ((0, 0)).
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/scripts/backfill_line_ids.py:58`; the arms are L62-63 and L66-67.
-
-**Suggested fix:** With _MissingWrites(misses=1), delete the estimate in the first update_one → lines_skipped == its missing lines; with misses=1, $set every line id in the first update_one → assigned 0, skipped 0.
-
-### 1462. [LOW] `_main`: edge arms untested (review 2026-11-04, customer MCP server)
-`platform/scripts/backfill_line_ids.py:89` — Edge cases: L91-92 the APPLIED output; L93-94 the skipped-lines line. Only the dry run's output is tested.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/scripts/backfill_line_ids.py:96`; the arms are L99-101 and L102-103.
-
-**Suggested fix:** _main(True) with init_db patched → "[APPLIED] line ids assigned:" and no --apply hint; with _MissingWrites(10_000) → "lines skipped".
-
-### 1463. [LOW] `_main`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/scripts/pull_dangling_property_contacts.py:85` — Edge case: L85-95 the --apply output ("[APPLIED]", "changed", "pulled", no "Nothing written"); only the dry run's is tested.
-
-**Suggested fix:** _main(True) with init_db stubbed → "[APPLIED]" in output, "Nothing written" absent, the dangling id pulled.
-
-### 1464. [LOW] `sdk_logging_left_alone`: edge arms untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/shared.py:181` — Edge case (moved code, untested before too): no test checks building a server leaves root logging handlers alone or that `sdk_server.configure_logging` is restored, including when the build raises.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/shared.py:189`.
-
-**Suggested fix:** (a) record root handlers and configure_logging, call new_server("t", "x"), assert both unchanged; (b) raise inside the block and assert configure_logging is the original.
-
-### 1465. [LOW] `_masked`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/shared.py:122` — Edge case: L124 a nested masked key with an empty value (`{"op": "add_work_item", "description": ""}`) is kept as "" rather than "<text>"; only top-level empties are tested.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/shared.py:124`; the arm is L126.
-
-**Suggested fix:** Add that command to the nested-masking test's commands and assert it is recorded with description "".
-
-### 1466. [LOW] `_empty`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/shared.py:116` — Edge case: L119 `{}` counts as empty (new: the old staff filter kept it); no test passes `{}`.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/shared.py:118`; the arm is L121.
-
-**Suggested fix:** Add `"filters": {}` to test_staff_call_arguments_are_kept_as_sent_with_zeros' input; expected output unchanged.
-
-### 1467. [LOW] `record`: edge arms untested and unreached (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/toolkit.py:164` — Edge case (defensive): L166 the `dict(doc)` arm; L167-168 the `_id` → `id` rename. Every caller passes a Beanie document.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/toolkit.py:171`; the arms are L173 and L174-175.
-
-**Suggested fix:** Test `record({"_id": "abc", "name": "x"}) == {"id": "abc", "name": "x"}`, or narrow record to documents and delete both arms.
-
-### 1468. [LOW] `_with_tie_breaker`: the sort=None arm is untested and unreached (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/toolkit.py:197` — Edge case (defensive): L201 `if sort is None` (sort by `_id` alone) — no caller or test passes sort=None to `paged`. (Moved here from `paged`'s own `if sort is not None` by review round 2's tie-breaker fix, #34; the toolkit tests now use `paged`'s default serializer, so that half of the original entry is covered.)
-
-**Suggested fix:** Make `sort` a required keyword on `paged` and drop the arm, or test `paged(..., sort=None)` orders by `_id`.
-
-### 1469. [LOW] `_line_ids`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_setup.py:90` — Edge case: L93 an activity with no role is skipped; every test activity has a role.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_setup.py:97`; the arm is L100.
-
-**Suggested fix:** create_template(activities=[{"name": "Haul", "rate": 10, "effort": 1}]) → saved, role None.
-
-### 1470. [LOW] `reset_people_role`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_people_roles.py:236` — Edge case: L243-245 a role whose standard_key has left the standard list gets NOT_STANDARD_DETAIL; only an untagged role is tested.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_people_roles.py:237`; the arm is L245-246.
-
-**Suggested fix:** Insert a Labour with standard_key="test-retired-key"; reset_people_role(confirm=True) → "Only a standard role", wage unchanged.
-
-### 1471. [LOW] `company_view`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_company.py:47` — Edge case: L52 `plan_lookup_key or "plan_free"`; the fixture always sets plan_pro.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_company.py:51`; the fallback is L56.
-
-**Suggested fix:** plan_lookup_key None → get_company plan == "plan_free".
-
-### 1472. [LOW] `whoami`: edge arms untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_company.py:81` — Edge cases: L88 the "plan_free" fallback; L93 tasks_enabled is never asserted.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_company.py:85`; the arms are L92 and L97.
-
-**Suggested fix:** plan_lookup_key None → company.plan "plan_free"; monkeypatch settings.tasks_enabled True/False → whoami's tasks_enabled matches.
-
-### 1473. [LOW] `own_record`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/dependencies.py:190` — Edge case: L195 a malformed id with a real company (formerly a Beanie error, now 404); test_own_record.py sends "not-an-id" only with company None.
-
-**Suggested fix:** own_record(MaterialCategory, "not-an-id", PydanticObjectId(), what="X") → 404 "X not found".
-
-### 1474. [LOW] `_contact_search`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_contacts.py:110` — Edge case: L113 a whitespace-only search gives no filter.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:111`; the arm is L114.
-
-**Suggested fix:** list_contacts(search="   ") → the unfiltered total.
-
-### 1475. [LOW] `get_contact`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_contacts.py:137` — Edge case: L142-143 more than 50 linked properties — `properties` capped, `properties_total` the full count.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:139`; the arm is L143-145.
-
-**Suggested fix:** Monkeypatch _CONTACT_PROPERTIES_SHOWN to 1, link two properties → one listed, properties_total 2.
-
-### 1476. [LOW] `list_properties`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_contacts.py:250` — Edge case: L260 a whitespace-only search is ignored.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:252`; the arm is L262.
-
-**Suggested fix:** list_properties(search="  ") → the unfiltered total.
-
-### 1477. [LOW] `create_property`: edge arms untested (review 2026-11-04, customer MCP server)
+### 1477. [HIGH] `create_property`: the blank-address refusal and duplicate contact ids are untested (review 2026-11-04, customer MCP server)
+**Kept 2026-11-14 (coverage policy):** critical: the refusal of a property with a blank address.
 `platform/mcp_server/company/tools_contacts.py:295` — Edge cases: L312 the blank street/city/prov_state refusal; L286 duplicate contact_ids stored once.
 
 **Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:297`; the blank refusal is L314, the dedupe `_contact_ids` at L286.
 
 **Suggested fix:** (a) street="  " → "street: must not be blank", nothing made; (b) contact_ids=[ana, ana] → contacts == [ana].
 
-### 1478. [LOW] `update_property`: edge arms untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_contacts.py:354` — Edge cases: L376 a malformed id in contact_ids → "Contact not found" before any lookup; duplicates collapse to one.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_contacts.py:356`; the arm is L378.
-
-**Suggested fix:** (a) contact_ids=["nope"] → "Contact not found", unchanged; (b) [ana, ana] → [ana].
-
-### 1479. [LOW] `delete_note`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_notes.py:141` — Edge case: L153 a body over 60 characters is cut to 57 + "..." in the confirm question.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_notes.py:147`; the cut is L159.
-
-**Suggested fix:** An 80-character note → `would` holds the first 57 characters and "...".
-
-### 1480. [LOW] `task_view`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_tasks.py:70` — Edge case: L75 a status id not among the company's statuses → `status` the raw id, `status_name` None.
-
-**Suggested fix:** Raw-set a task's status to a fresh ObjectId → get_task returns that id and status_name None.
-
-### 1481. [LOW] `_task`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_tasks.py:93` — Edge case: L97-98 a blank code → "Task not found" with no query.
-
-**Suggested fix:** get_task(task_id="  ") → "Task not found".
-
-### 1482. [LOW] `_task_conditions`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_tasks.py:136` — Edge case: L146-147 a search that yields no condition (whitespace only) lists everything. (Moved out of `list_tasks` by review round 2's #21.)
-
-**Suggested fix:** list_tasks(search="  ") → the unfiltered total.
-
-### 1483. [LOW] `convert_task_to_estimate`: edge arm untested (review 2026-11-04, customer MCP server)
-`platform/mcp_server/company/tools_tasks.py:332` — Edge case: L346-351 billing overage and delete_task together → both clauses in one question; tests drive each alone.
-
-**Checked 2026-11-04 (after review round 2's fixes moved the code):** now `platform/mcp_server/company/tools_tasks.py:340`; the arm is L354-359.
-
-**Suggested fix:** estimate_bills_overage True, delete_task=True, no confirm → `would` has "extra estimate" and "delete the task"; no estimate made.
-
-### 1486. [LOW] `_property_named`: edge arm untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:69` — Edge case: a company id that isn't an ObjectId (L73) returns None.
-
-**Suggested fix:** Test that `await _property_named("not-an-id", "Oak House")` is None.
-
-### 1487. [LOW] `_remembered`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:80` — Edge cases: a remembered place that isn't a dict (L82), and one with a missing field or a non-number latitude (L86), both return None.
-
-**Suggested fix:** Test `_remembered({WEATHER_PLACE_KEY: "x"})` is None, and `_remembered({WEATHER_PLACE_KEY: {"latitude": "x"}})` is None.
-
-### 1488. [LOW] `_at_phone`: edge arm untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:90` — Edge case: a property here with no name, only a street (L95), is named by its street ("at 12 Oak St").
-
-**Suggested fix:** Test a turn with HERE_KEY `{"id": ..., "name": "", "street": "12 Oak St", "stale": False}` and the reply starts "Today at 12 Oak St:".
-
-### 1489. [LOW] `_weekend`: edge arm untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:164` — Edge case: when today is Sunday (L168), "this weekend" is Sunday alone.
-
-**Suggested fix:** Test `_weekend` on days starting on a Sunday and assert it returns one day.
-
-### 1490. [LOW] `_driest`: edge arm untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:180` — Edge case: exactly one dry day says "Driest day:", singular (L186).
-
-**Suggested fix:** Test `_driest` on a week with one day under 30% and assert the text starts "Driest day:".
-
-### 1491. [LOW] `plain_reply`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:189` — Edge cases: (a) "now" with no days (L197, no tip after it); (b) "tomorrow" with only today's forecast (L204, falls back to today); (c) no days, with current conditions, when "now" wasn't asked (L211); (d) no days and no current conditions (L209, returns UNAVAILABLE).
-
-**Suggested fix:** One test per arm: (a) starts "Right now" with no tip text; (b) starts "Today"; (c) starts "Right now"; (d) equals UNAVAILABLE.
-
-### 1492. [LOW] `get_wording_llm`: edge arm untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:247` — Edge case: the flag is on but there's no OpenAI key (L250), so it returns None.
-
-**Suggested fix:** Test with the flag on and `openai_api_key=""` that it returns None.
-
-### 1493. [LOW] `facts`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:259` — Edge cases: no current conditions (L266) leaves out the "Right now" line, and no days (L277) leaves out the "Days:" line.
-
-**Suggested fix:** Two tests on `facts()`: `now=None` has no "Right now:" line; `days=[]` has no "Days:" line.
-
-### 1494. [LOW] `_company_country`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:317` — Edge cases: an id that isn't an ObjectId (L320) and a missing company (L322) both return None.
-
-**Suggested fix:** Two tests: "not-an-id" returns None, and a fresh unused ObjectId returns None.
-
-### 1495. [LOW] `_one_day`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/agents/planner/execute_weather.py:154` — Edge cases: a day with no rain chance (L156) has no rain clause, and an amount under the threshold (L158) has no "about".
-
-**Suggested fix:** Two tests on `plain_reply(..., "today")`: `rain_chance=None` has no "chance of rain"; `rain_amount=0.3` mm has no "about".
-
-### 1496. [LOW] `_get_json`: error arms untested (review 2026-11-05, Maple weather)
-`platform/services/weather.py:105` — Edge cases: an HTTP error such as the 403 seen live on 2026-11-04, and a body that isn't JSON (L113), both return None and log without the URL.
-
-**Suggested fix:** With `_google_over_http` in `tests/test_weather_service.py` (added by the 2026-11-05 fixes), a 403 handler and a non-JSON 200 should both return None. Assert the logged warning contains no "key".
-
-### 1497. [LOW] `get_forecast`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/services/weather.py:125` — Edge cases: (a) the days call fails but current conditions parse (L149), giving a Forecast with no days; (b) the cache at `_CACHE_MAX` is cleared (L152). (The time-zone arm in the review is gone: #7 of the review deleted `Forecast.time_zone`.)
-
-**Suggested fix:** Two tests: (a) days returns None and now parses, so `forecast.days == []` and `forecast.now` is set; (b) `_CACHE_MAX + 1` positions leave the cache with one entry.
-
-### 1498. [LOW] `_first_place`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/services/weather.py:162` — Edge cases: a result that isn't a dict (L166) is skipped, and a result without `formatted_address` (L173) is labelled with the text said.
-
-**Suggested fix:** Two tests: results `["x", {valid}]` gives the valid place; a result with no `formatted_address` gives `label` == the text said.
-
-### 1499. [LOW] `geocode_place`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/services/weather.py:179` — Edge cases: no key, or blank text (L187), return None without a call.
-
-**Suggested fix:** Two tests asserting None and no `_get_json` call: key "" with text "Guelph", and key set with text "   ".
-
-### 1500. [LOW] `_day`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/services/weather.py:245` — Edge cases: a day with only a night condition (L259) takes the night's text, and a day with no precipitation data (L262) gives `rain_chance` and `rain_amount` None.
-
-**Suggested fix:** Two parse tests on a single `forecastDays` entry.
-
-### 1501. [LOW] `here_position`: edge arms untested (review 2026-11-05, Maple weather)
-`platform/agents/conversation/here.py:80` — Edge cases: a stored position that isn't a dict, or has a non-number field (L87), returns None.
-
-**Suggested fix:** Test `here_position({POSITION_KEY: "x"})` is None, and `here_position({POSITION_KEY: {"latitude": "x", "longitude": 1}})` is None.
-
-### 1502. [LOW] `redirect_problem` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #21)
+### 1502. [HIGH] `redirect_problem`: two unsafe redirect URIs are untested (review 2026-11-06, MCP OAuth sign-in #21)
+**Kept 2026-11-14 (coverage policy):** critical: OAuth redirect URI validation (security).
 `platform/services/oauth.py:140` — Edge cases: line 145, something that isn't a URL (no scheme, e.g. "callback"); line 151, an https URI with no host ("https:///cb").
 
 **Suggested fix:** Add both to the `test_unsafe_redirects_are_refused` parametrize list (`"callback"`, `"https:///cb"`), each expecting 400 `invalid_redirect_uri`.
 
-### 1503. [LOW] `register_client` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #22)
-`platform/services/oauth.py:188` — Edge cases: line 192, more than MAX_REDIRECT_URIS (10) redirect URIs; line 201, a blank or over-long client_name (trimmed to 80, blank → None, which shows "An AI app").
-
-**Suggested fix:** (a) Register with 11 loopback URIs and assert 400 `invalid_redirect_uri`. (b) Register with `client_name=" "` and assert the consent page's `client_name` == "An AI app". (c) Register with a 200-character name and assert the response's `client_name` has 80 characters.
-
-### 1504. [LOW] `audience_of_resource` trailing-slash arm untested (review 2026-11-06, MCP OAuth sign-in #23)
-`platform/services/oauth.py:128` — Edge case: line 133, `resource=".../mcp/"` with a trailing slash must still name the customer server.
-
-**Suggested fix:** Authorize with `resource=COMPANY_RESOURCE + "/"`, then approve and assert the token opens /mcp.
-
-### 1505. [LOW] `account_for` mixed-case email arm untested (review 2026-11-06, MCP OAuth sign-in #24)
-`platform/services/oauth.py:292` — Edge case: lines 295/299, a Firebase email in different case from the stored User email ("Member@X.com") must still find the user.
-
-**Suggested fix:** Call `consent` with `as_email(email.upper())` and assert `account.email` is the lowercased address and `problem` is None.
-
-### 1506. [LOW] `approve` edge-case arm untested (review 2026-11-06, MCP OAuth sign-in #25)
-`platform/services/oauth.py:344` — Edge case: line 356, the client record is gone (TTL or a manual delete) when the person approves, so the grant is named "An AI app".
-
-**Suggested fix:** Start a request, delete its OAuthClient, approve, and assert the grant's `client_name` == "An AI app".
-
-### 1507. [LOW] `exchange_authorization_code` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #26)
+### 1507. [HIGH] `exchange_authorization_code`: a connection revoked before the code exchange is untested (review 2026-11-06, MCP OAuth sign-in #26)
+**Kept 2026-11-14 (coverage policy):** critical: a revoked connection must not exchange its code.
 `platform/services/oauth_provider.py:83` — Edge cases: line 86, the code row vanished between load and exchange; lines 89-90, the connection was revoked between approval and the code exchange ("the connection was revoked").
 
 **Suggested fix:** (a) Approve, revoke the grant through DELETE /oauth/connections/{id}, then exchange the code; assert 400 `invalid_grant`. (b) Delete the code row with a monkeypatched `find_token` returning None on the second call; assert 400.
 
-### 1508. [LOW] `load_refresh_token` edge-case arm untested (review 2026-11-06, MCP OAuth sign-in #27)
+### 1508. [HIGH] `load_refresh_token`: refreshing after a disconnect is untested (review 2026-11-06, MCP OAuth sign-in #27)
+**Kept 2026-11-14 (coverage policy):** critical: a disconnected app must not refresh its token.
 `platform/services/oauth_provider.py:93` — Edge case: line 101, refreshing after the connection was disconnected in Settings.
 
 **Suggested fix:** Connect, DELETE the connection, then POST /token `grant_type=refresh_token`; assert 400 `invalid_grant`. The tokens are deleted, so this also covers the `row is None` arm.
 
-### 1509. [LOW] `exchange_refresh_token` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #28)
+### 1509. [HIGH] `exchange_refresh_token`: a spent refresh token and a revoked grant are untested (review 2026-11-06, MCP OAuth sign-in #28)
+**Kept 2026-11-14 (coverage policy):** critical: refresh-token reuse and revocation.
 `platform/services/oauth_provider.py:107` — Edge cases: line 110, the row is gone after load; lines 112-115, losing the spend race (two refreshes at once), which revokes the connection; lines 117-118, the grant revoked after load.
 
 **Suggested fix:** Unit-test the provider directly. Load a StoredRefreshToken, call `oauth.spend(row)` yourself, then call `exchange_refresh_token`; assert TokenError("invalid_grant") and the grant revoked. Repeat with the grant revoked first and with the row deleted.
 
-### 1510. [LOW] `resolve_company_token` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #29)
+### 1510. [HIGH] `resolve_company_token`: a deleted user's token is untested (review 2026-11-06, MCP OAuth sign-in #29)
+**Kept 2026-11-14 (coverage policy):** critical: a deleted user's token must resolve to nothing.
 `platform/services/oauth.py:517` — Edge cases: line 522, a company-audience grant with no `user`; line 525, the user deleted outright (`User.get` None).
 
 **Suggested fix:** (a) Connect a member, delete their User document, and assert /mcp is 401. (b) Set the grant's `user` to None and assert 401.
 
-### 1511. [LOW] `resolve_staff_token` edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #30)
+### 1511. [HIGH] `resolve_staff_token`: a deleted staff user's token is untested (review 2026-11-06, MCP OAuth sign-in #30)
+**Kept 2026-11-14 (coverage policy):** critical: a deleted staff user's token must resolve to nothing.
 `platform/services/oauth.py:534` — Edge cases: line 538, a staff grant with no `staff`; line 541, the StaffUser deleted (the disabled case is tested).
 
 **Suggested fix:** Connect a staff member, delete the StaffUser, and assert /mcp/internal is 401. Separately set the grant's `staff` to None and assert 401.
 
-### 1512. [LOW] `_live_access` audience-mismatch arm untested (review 2026-11-06, MCP OAuth sign-in #31)
-`platform/services/oauth.py:505` — Edge case (a defensive guard no caller can reach today): line 512, a token carrying the company prefix whose grant is a staff grant.
-
-**Suggested fix:** Insert an OAuthToken with the `3m_oat_` prefix pointing at a staff grant, and assert `resolve_company_token` returns None.
-
-### 1513. [LOW] `/revoke` bad-request arm untested (review 2026-11-06, MCP OAuth sign-in #32)
-`platform/mcp_server/oauth_app.py:76` — Edge case: lines 81-83, a POST with no `token` or no `client_id` must be 400 `invalid_request`.
-
-**Suggested fix:** POST /revoke with `data={"client_id": cid}` and then with `data={"token": t}`; assert 400 and `error == "invalid_request"`.
-
-### 1514. [LOW] `OAuthApp._router` rebuild arm untested (review 2026-11-06, MCP OAuth sign-in #33)
-`platform/mcp_server/oauth_app.py:112` — Edge case: line 114, the router is rebuilt when API_PUBLIC_URL changes, so metadata names the new issuer.
-
-**Suggested fix:** GET the metadata, monkeypatch `settings.api_public_url` to "http://localhost:9999", GET it again, and assert `issuer` changed.
-
-### 1515. [LOW] `list_my_connections` no-company arm untested (review 2026-11-06, MCP OAuth sign-in #34)
-`platform/routers/oauth.py:191` — Edge case: lines 200-201, a signed-in customer with no company gets an empty list rather than an error.
-
-**Suggested fix:** Call GET /oauth/connections as a user with `company=None`; assert 200 `{"items": [], "total": 0}`.
-
-### 1516. [LOW] `disconnect` no-company arm untested (review 2026-11-06, MCP OAuth sign-in #35)
-`platform/routers/oauth.py:230` — Edge case: lines 243-244, a customer with no company (or no account) gets 404.
-
-**Suggested fix:** DELETE /oauth/connections/{id} as a user with `company=None`; assert 404 "Connection not found".
-
-### 1517. [LOW] `list_staff_connections` unknown-staff arm untested (review 2026-11-06, MCP OAuth sign-in #36)
-`platform/routers/ops.py:236` — Edge case: `_staff_or_404` for a staff id that doesn't exist.
-
-**Suggested fix:** GET /ops/staff/{random ObjectId}/oauth-connections as root; assert 404 "Staff user not found".
-
-### 1518. [LOW] `redirect_hosts` no-redirect arm untested (review 2026-11-06, MCP OAuth sign-in #37)
-`platform/services/oauth.py:563` — Edge case: line 570, a stored client whose `info` has no redirect_uris, so the listing shows no host.
-
-**Suggested fix:** Unset `info.redirect_uris` on a connected client and assert the connection's `redirect_host` is None in GET /oauth/connections.
-
-### 1519. [LOW] ConnectPage edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #38)
-`portal/src/pages/auth/ConnectPage.tsx:55` — Edge cases: line 45, `getRequest` resolves to null ("Couldn't load this sign-in request…"); line 62, approve or deny replies with no `redirect_url` ("No answer from 3Maples. Try again.").
-
-**Suggested fix:** In ConnectPage.test.tsx: (a) mock `getRequest` → null and expect the load message; (b) mock `approve` → `{}`, click Approve, expect "No answer from 3Maples" and `goTo` not called.
-
-### 1520. [LOW] ConnectionsList edge-case arms untested (review 2026-11-06, MCP OAuth sign-in #39)
-`portal/src/components/apiKeys/ConnectionsList.tsx:37` (renamed from ConnectionsTable.tsx 2026-11-06, a card per app) — Edge cases: line 40, the load-error alert ("Failed to load connected apps."); line 47, the loading text; line 86, "Showing the newest N of M apps." when total > shown; line 102, the owner falling back to email, then "Former member".
-
-**Suggested fix:** In ConnectedAppsSection.test.tsx: (a) `listMine` rejects → expect the failure text; (b) a pending promise → expect "Loading connected apps..."; (c) `{items: [one], total: 3}` → expect "Showing the newest 1 of 3 apps."; (d) a company row with `user_name: null, user_email: "a@x.com"` → "a@x.com", and both null → "Former member".
-
-### 1521. [LOW] `ConnectRoute` auth-not-ready arm untested (review 2026-11-06, MCP OAuth sign-in #40)
-`portal/src/App.tsx:96` — Edge case: line 97, /connect while auth is still loading shows the loader instead of bouncing to /login.
-
-**Suggested fix:** In AppAuthRoutes.test.tsx, render /connect with `authReady=false` and assert the loader shows and there's no navigation to /login.
-
-### 1523. [LOW] ConnectPage staff disconnect note untested — won't fix (review 2026-11-06, Settings AI Apps #4)
-`portal/src/pages/auth/ConnectPage.tsx:27` — Edge case: line 162, the staff-audience arm of the disconnect note ("A root admin can disconnect it on the ops Staff page.") has no test; the company arm has one.
-
-**Decision (Simon, 2026-11-06):** ignore. The suggested test (assert that text in ConnectPage.test.tsx's staff-audience test) is not wanted; close this in the next cleanup pass.
-
-### 1524. [LOW] build_doc_context / company_lines / _fields edge cases untested (review 2026-11-08, document templates #175)
-**Update 2026-11-12 (review 2026-11-11):** with no property, `property_name` and `property_city` are None and `property_address_lines` is `[]` too (context.py `build_doc_context`); test those with the no-property arm.
-`platform/services/document_templates/context.py:180` — Edge cases: a contact with no name dropped (194); first contact's blank phone/email uses the second's (108–111); no phone → None (199); no property → address None (201); blank company phone → None (132); empty logo_url → None (127); CUSTOMER_NAME/CATEGORY/COMPANY_CONTACT None (146/147/154); blank division skipped (119–120).
-
-**Suggested fix:** Unit tests with in-memory models: nameless + named contacts; no contacts and no property; company phone "  " and logo ""; divisions "" and "X"; no divisions → CATEGORY None.
-
-### 1525. [LOW] _execute / _status error arms untested (review 2026-11-08, document templates #176)
-**Update 2026-11-12:** `_execute` and `_status` moved to `docs_writer.py` (:115, :47).
-`platform/services/document_templates/docs_composer.py:146` — Edge cases: non-429 re-raised (150–151); a second 429 raises (154); `_status` reading `resp.status` (113); non-int status → None (116–117).
-
-**Suggested fix:** batchUpdate raising 500 → raises; 429 twice → raises after one retry; `_status(resp.status=429) == 429`; `_status(status_code="x") is None`.
-
-### 1526. [LOW] compose_into / _clear_body / _logo_request / writers edge cases untested (review 2026-11-08, document templates #177)
-**Update 2026-11-12 (review 2026-11-11):** the "customer with nothing printable prints no heading" arm is gone (the Customer block has no heading since 2026-11-11); the second-logo arm is now per segment (`_write_company`). The composer's writer moved to `docs_writer.py`.
-`platform/services/document_templates/docs_composer.py:565` — Edge cases: unknown block type → ComposeError (578–579); single empty paragraph skips the delete (535); logo with no size → 72pt (553); small logo scale 1 (550); second Company block keeps no second logo (320); customer with nothing printable prints no heading (343–344); signature with no party prints nothing (458–459).
-
-**Suggested fix:** One test per arm as listed (model_construct type "x"; FakeDocument(("",)); `_logo_request` without size; 100×50 logo; two company blocks → one "[img]"; empty CustomerLines; signature with both off).
-
-### 1527. [LOW] compose failure cleanup untested (review 2026-11-08, document templates #178)
-`platform/services/document_templates/generate.py:13` — Edge cases: compose_into raises → doc trashed, error re-raised (24–29); trash also raises → warning, original error propagates (27–28).
-
-**Suggested fix:** Stub drive whose compose fails; assert `trash_document(doc_id)` and the error; again with trash raising.
-
-### 1528. [LOW] resolve_started_from edge cases untested (review 2026-11-08, document templates #179)
-`platform/routers/estimate_helpers/doc_layout.py:106` — Edge cases: no `started_from` keeps the draft's (114); invalid JSON → 422 (117–118); non-ObjectId id → 404 (134).
-
-**Suggested fix:** Save twice without started_from and assert it's kept; `"{bad"` → 422; `{"kind":"template","id":"nope"}` → 404.
-
-### 1529. [LOW] parse_blocks / _check_new_ids / _photos_in_print_order / _library_copies / version_blocks edge cases untested (review 2026-11-08, document templates #180)
-**Update 2026-11-12 (review 2026-11-11):** the library read failure → 502 is now also reached from `_plan_images` through `doc_layout.load_library` (a "library" photo spec).
-**Update 2026-11-08 (round 2 #8):** the over-`MAX_DOC_IMAGES` arm in `_photos_in_print_order` was deleted (unreachable after `validate_layout`'s cap); drop it from this entry.
-`platform/routers/estimate_helpers/doc_layout.py:84` — Edge cases: bad blocks JSON/shape → 422 (87–88); upload with no id → 400 (190–191); duplicate new ids → 400 (192); new id clashing with the current draft (97–98); over MAX_DOC_IMAGES → 400 (214–216); library read failure → 502 (169–171); saved_text with missing content dropped (79).
-
-**Suggested fix:** One test per arm as listed (bad JSON; spec without id; two specs same id; reuse a draft photo id; `MAX_DOC_IMAGES=1` with 2; fake_store read raising; `version_blocks()` with empty `saved_texts`).
-
-### 1530. [LOW] create_doc_from_layout / build_layout_doc / compose_input failure arms untested (review 2026-11-08, document templates #181)
-`platform/routers/estimate_helpers/doc_layout.py:274` — Edge cases: create raises → 500 "Failed to create document." (289–291); build failure discards new blobs and re-raises (313–315); compose_input drops a photo id not in `images` (261).
-
-**Suggested fix:** Patch `create_estimate_from_style_base` to raise with one upload → 500 and the blob in `fake_store.deleted`; compose_input with an absent id → empty images list.
-
-### 1531. [LOW] the old dialog's draft stores no layout (untested) (review 2026-11-08, document templates #182)
-`platform/routers/estimate_documents.py:567` — Edge cases: no test asserts `blocks is None` and `started_from is None` for a draft saved from today's dialog (607).
-
-**Suggested fix:** Flag on, `_save_draft(info="x")`; assert both None.
-
-### 1532. [LOW] get_doc_start edge cases untested (review 2026-11-08, document templates #183)
+### 1532. [MEDIUM] get_doc_start: opening a legacy draft and a missing template are untested (review 2026-11-08, document templates #183)
+**Kept 2026-11-14 (coverage policy):** secondary: every existing draft opens through the legacy arm.
 `platform/routers/estimate_document_layouts.py:72` — Edge cases: `source=template` with no id or a missing ObjectId → 404 (87/94); a legacy draft opens as Standard Estimate with its photos (101–102); `_named_photos` drops an unnamed image (52).
 
 **Suggested fix:** `?source=template` → 404; `&id=<FAKE_ID>` → 404; legacy draft with info and a photo → Notes text and the image id; `_named_photos([], [img]) == []`.
 
-### 1533. [LOW] _free_copy_name edge cases untested (review 2026-11-08, document templates #184)
-`platform/routers/document_templates.py:263` — Edge cases: long names truncated to fit (269); every candidate taken → 409 (272).
-
-**Suggested fix:** Duplicate a max-length name, assert length and prefix; cap at 1 with "Copy of X" taken → 409.
-
-### 1534. [LOW] update_document_template edge cases untested (review 2026-11-08, document templates #185)
+### 1534. [HIGH] update_document_template: the concurrent-save 409 and built-in refusal are untested (review 2026-11-08, document templates #185)
+**Kept 2026-11-14 (coverage policy):** critical: the concurrent-save 409 that stops a lost update, and built-in templates refused.
 `platform/routers/document_templates.py:377` — Edge cases: concurrent save between read and replace (`matched_count == 0`) → 409 (425–430); "someone else" fallback (392); PUT/DELETE on `builtin:nope` → 404 (189–190).
 
 **Suggested fix:** Patch `replace_one` to match 0 → 409 VERSION_CONFLICT; `updated_by_email=None` with a stale version → "someone else"; `builtin:nope` → 404.
-
-### 1535. [LOW] Save as template, duplicate and set-default edge cases untested (review 2026-11-08, document templates #186)
-`platform/routers/document_templates.py:342` — Edge cases: the cap on from-estimate (355) and duplicate (463) → 409; audit metadata `from_estimate_id` (365), `duplicated_from` (475), `previous_default_id` (490) never asserted; set-default `builtin:nope` → 404.
-
-**Suggested fix:** Cap 1 with one template → both 409; read the audit rows and assert each key; set-default `builtin:nope` → 404.
-
-### 1536. [LOW] _clean_name non-string arm untested (review 2026-11-08, document templates #187)
-`platform/routers/document_templates.py:54` — Edge cases: a non-string name passes through to the str check (55–56).
-
-**Suggested fix:** POST `{"name": 5, "blocks": []}` → 422.
-
-### 1537. [LOW] upload / file / delete / list edge cases untested (review 2026-11-08, document templates #188)
-`platform/routers/document_images.py:119` — Edge cases: DuplicateKeyError race deletes blobs → 409 (165–167); missing stored file → 404 (182–183); blob delete failure still 200 (227–229); case-insensitive sort (116).
-
-**Suggested fix:** Patch insert to raise DuplicateKeyError; pop the blob and GET file; make `delete_doc_images` raise; upload "b" and "A" and assert order.
-
-### 1538. [LOW] _first_error / _clean_text / library_image_ids edge cases untested (review 2026-11-08, document templates #189)
-`platform/services/document_templates/blocks.py:146` — Edge cases: empty loc → message only (149); non-string text (31–32); a non-dict or id-less library ref skipped (183–184).
-
-**Suggested fix:** model_construct props as a list → "Block 1 (text):"; text=5 → LayoutError; `library_image_ids` with `["x", {"image_id": ""}]` → [].
-
-### 1539. [LOW] draft_layout started_from fallback untested (review 2026-11-08, document templates #190)
-`platform/services/document_templates/legacy.py:46` — Edge cases: blocks with no `started_from` → STANDARD_START (48).
-
-**Suggested fix:** `DocDraft(blocks=[divider], started_from=None)` → `STANDARD_START`.
-
-### 1540. [LOW] linked_texts edge cases untested (review 2026-11-08, document templates #191)
-`platform/services/document_templates/refs.py:32` — Edge cases: a gone Text Block left out (39–40); a non-ObjectId filtered (36); no links → {} with no query (37–38).
-
-**Suggested fix:** `linked_texts(company, [saved_text FAKE_ID, saved_text "nope"]) == {}` and `linked_texts(company, []) == {}`.
-
-### 1541. [LOW] caller_with_templates with no company untested (review 2026-11-08, document templates #192)
-`platform/services/document_templates/access.py:31` — Edge cases: `user.company is None` → 404 before the lookup (34).
-
-**Suggested fix:** Call it with `User(company=None, …)` and the flag on; assert 404.
-
-### 1542. [LOW] EstimateDocument edge cases untested (review 2026-11-08, document templates #193)
-`portal/src/pages/EstimateDocumentEditorPage.tsx:68` — Edge cases: save response without `doc_draft` → "saved" (121); `draft.blocks` missing (116); blank template name (145); response without a name (149); Owner arm of `isManager` (84); manager on a phone (196); title without `estimate_id` (184); busy labels and disabled buttons (164/168); "1 block" (233).
-
-**Suggested fix:** One test per arm: `{doc_draft:null}` → "Draft saved."; draft without blocks keeps order; empty name → not called; `{}` → typed name; Owner shows the button; phone hides it; heading "Document · Backyard patio"; held save → "Saving..." and both disabled; one block → "· 1 block".
-
-### 1543. [LOW] useDocumentLoad edge cases untested (review 2026-11-08, document templates #194)
-`portal/src/pages/EstimateDocumentEditorPage.tsx:36` — Edge cases: unknown `source=` falls back (47); null start/context (50, see #163); load failure message (56).
-
-**Suggested fix:** `?source=bogus` with a draft → `docStart("est1","draft")`; `docStart` → null; `estimates.get` rejecting → "Estimate not found".
-
-### 1544. [LOW] the page's flag edge cases untested (review 2026-11-08, document templates #195)
-`portal/src/pages/EstimateDocumentEditorPage.tsx:250` — Edge cases: `getCompany` rejecting → off notice (256); loading state (258).
-
-**Suggested fix:** Reject → "Document templates aren't turned on"; hold → "Opening the document...".
-
-### 1545. [LOW] TemplateEditor edge cases untested (review 2026-11-08, document templates #196)
-**Checked 2026-11-08:** the divisions arm went with the division settings; the others moved into `useTemplateActions` and `TemplateTopBar`.
-`portal/src/pages/DocumentTemplateEditorPage.tsx:46` — Edge cases: `duplicate` → null (`components/documentEditor/useTemplateActions.ts:26`); setDefault guard and catch (`useTemplateActions.ts:63`/`68`); Save disabled when clean (`TemplateTopBar.tsx:60`); "Saving..." (`TemplateTopBar.tsx:62`); "1 block" (`DocumentTemplateEditorPage.tsx:87`).
-
-**Suggested fix:** duplicate null → no navigation; reject setDefault → alert; clean → Save disabled; held update → "Saving..."; one block → "1 block · sample data".
-
-### 1546. [LOW] TemplateDetails and DivisionChecks edge cases untested (review 2026-11-08, document templates #197)
-**Stale 2026-11-12:** `TemplateDetails` and `DivisionChecks` were removed (review 2026-11-11); archive in the next cleanup pass.
-`portal/src/pages/DocumentTemplateEditorPage.tsx:56` — Edge cases: no divisions hint (80); unticking removes (46).
-
-**Suggested fix:** `divisionsApi.list` → `[]` → hint; untick d1 and Save → `suggested_division_ids: []`.
-
-**RESOLVED 2026-11-08:** The division settings were removed (templates aren't tied to divisions), so `DivisionChecks` and the hint are gone.
-
-### 1547. [LOW] the page's gate edge cases untested (review 2026-11-08, document templates #198)
-`portal/src/pages/DocumentTemplateEditorPage.tsx:220` — Edge cases: Admin arm (224); `getCompany` rejecting (231); loading (236).
-
-**Suggested fix:** Admin opens the editor; reject → "aren't turned on"; hold → "Opening the template...".
-
-### 1548. [LOW] useTemplateEditor edge cases untested (review 2026-11-08, document templates #199)
-`portal/src/components/documentEditor/useTemplateEditor.ts:33` — Edge cases: no reload after a create moves the URL (46); new from an existing copies its description (60); `get` → null (58); `update` → null keeps the version (100); `create` → null error (103).
-
-**Suggested fix:** Assert `get` not called with the new id; `new?from=t1` description; null get → empty; null update then save → same version; null create → "Couldn't save the template.".
-
-### 1549. [LOW] useDocumentTemplatesOn edge cases untested (review 2026-11-08, document templates #200)
-`portal/src/components/documentEditor/useDocumentTemplatesOn.ts:11` — Edge cases: `getCompany` rejecting → false (19); empty COMPANY_ID → false with no lookup (24).
-
-**Suggested fix:** renderHook with a rejecting `getCompany` → false; `COMPANY_ID = ""` → false and not called.
-
-**RESOLVED 2026-11-08** (per-company flag dropped): the hook is deleted; `documentTemplatesOn()` reads the env flag alone, with no company read.
-
-### 1550. [LOW] SettingsPage flag edge cases untested (review 2026-11-08, document templates #201)
-`portal/src/pages/SettingsPage.tsx:328` — Edge cases: Admin arm of `canManageTabs` (328); company read failing keeps Text Blocks (341).
-
-**Checked 2026-11-08:** the company-read arm is gone with the per-company flag; only the Admin arm of `canManageTabs` is left.
-
-**Suggested fix:** Admin → "Documents" tab; reject `/companies/co_test` → "Text Blocks" and no "Documents".
-
-### 1551. [LOW] TextBlocksTab description edge cases untested (review 2026-11-08, document templates #202)
-`portal/src/components/settings/TextBlocksTab.tsx:55` — Edge cases: neither the default nor DocumentTemplatesTab's custom description is asserted.
-
-**Suggested fix:** Assert the default text in TextBlocksTab.test and "every template using it follows" in DocumentTemplatesTab.test.
-
-### 1552. [LOW] useStartOptions edge cases untested (review 2026-11-08, document templates #203)
-`portal/src/components/estimates/DocumentsHub.tsx:54` — Edge cases: templates list failing (62); `docContext` failing (65); "Loading templates…" (194); "Built-in" badge (75).
-
-**Suggested fix:** Reject list → the message with Blank and Version 2 still offered; reject docContext → Alpha before Patio; hold → loading text; Standard label has "Built-in".
-
-### 1553. [LOW] DocumentsHub edge cases untested (review 2026-11-08, document templates #204)
-`portal/src/components/estimates/DocumentsHub.tsx:131` — Edge cases: a picked key that vanished falls back (140); `!chosen` guard (148); draft without `started_from` → "Draft" (176); Close → `onClose` (158).
-
-**Suggested fix:** Draft without started_from → exactly "Draft"; Close → `onClose` called; remove versions after picking → Blank checked.
-
-### 1554. [LOW] savedLine and createdOn edge cases untested (review 2026-11-08, document templates #205)
-**Update 2026-11-12:** `createdOn` was removed (review 2026-11-11); only the `savedLine` arms remain.
-`portal/src/components/estimates/DocumentsHub.tsx:38` — Edge cases: no `saved_by` (42); invalid `saved_at` (40); version without/invalid `created_at` (47).
-
-**Suggested fix:** `saved_by: null` → "saved ·"; `saved_at: "x"` → "saved by Ana"; no created_at → note is just "from Alpha".
-
-### 1555. [LOW] edited() edge cases untested (review 2026-11-08, document templates #206)
-`portal/src/components/settings/DocumentTemplatesTab.tsx:19` — Edge cases: built-in or no `updated_at` → "—" (20); invalid date (22); no email (23).
-
-**Suggested fix:** Standard row → "—"; `updated_at: "x"` → "dana"; no email → date only.
-
-### 1556. [LOW] DocumentTemplatesTab edge cases untested (review 2026-11-08, document templates #207)
-**Checked 2026-11-08:** the "no divisions" arm went with the Divisions column.
-`portal/src/components/settings/DocumentTemplatesTab.tsx:140` — Edge cases: description line (73); loading (163); delete Cancel (179); buttons disabled while busy (45/50).
-
-**Suggested fix:** Assert the description; hold list → loading; Delete → Cancel → not removed; hold duplicate → buttons disabled.
-
-### 1557. [LOW] useDocumentTemplatesAdmin edge cases untested (review 2026-11-08, document templates #208)
-**Checked 2026-11-08:** the divisions arm went with the hook's division load.
-`portal/src/components/settings/useDocumentTemplatesAdmin.ts:33` — Edge cases: failed delete keeps the confirm (64); `!toDelete` guard (62); setDefault with list null (59); `active` false loads nothing (25).
-
-**Suggested fix:** Reject remove → dialog open with "x"; `active={false}` → list not called.
-
-### 1558. [LOW] DocumentEditor edge cases untested (review 2026-11-08, document templates #209)
-`portal/src/components/documentEditor/DocumentEditor.tsx:63` — Edge cases: Escape with a dialog open (86); drop line (97); drop with no target (104); non-block target (106); DragOverlay label (178); phone with nothing selected (140).
-
-**Suggested fix:** Escape in Save-as-template keeps the selection; drag helper with `over: null` and an unknown id adds nothing; phone → no "Edit block" before selecting.
-
-### 1559. [LOW] ReadinessBar edge cases untested (review 2026-11-08, document templates #210)
-`portal/src/components/documentEditor/ReadinessBar.tsx:11` — Edge cases: "1 thing to check" (18); a document-level warning has no name button (41).
-
-**Suggested fix:** One warning → singular; no Estimate block → that warning has no button.
-
-### 1560. [LOW] ImageSection edge cases untested (review 2026-11-08, document templates #211)
-`portal/src/components/documentEditor/BlockPalette.tsx:108` — Edge cases: blank name does nothing (124); chooser closed with no file (162); "No images yet." (166).
-
-**Suggested fix:** Clear name and save → not called; empty FileList → no dialog; list `[]` → text.
-
-### 1561. [LOW] BlockPalette edge cases untested (review 2026-11-08, document templates #212)
-`portal/src/components/documentEditor/BlockPalette.tsx:213` — Edge cases: library load error alert (226); in-sheet instruction (218); disabled item's title (46).
-
-**Suggested fix:** Reject textBlocks list → alert; phone sheet → "Tap a block to add it"; "Add Estimate block" title text.
-
-### 1562. [LOW] BlockCard edge cases untested (review 2026-11-08, document templates #213)
-`portal/src/components/documentEditor/LayoutCanvas.tsx:46` — Edge cases: click in a read-only built-in (50); focus selects (61); Move up and end-disabled (92/96); no drag handle on a phone (87); drop line (73).
-
-**Suggested fix:** Built-in click → no selection; focus → selected; first up disabled, last down disabled, Customer up reorders; phone → no "Drag".
-
-### 1563. [LOW] LayoutCanvas and EndDropZone edge cases untested (review 2026-11-08, document templates #214)
-`portal/src/components/documentEditor/LayoutCanvas.tsx:149` — Edge cases: page click read-only (155); empty-page hint (136); no end zone read-only (168); no footer (171).
-
-**Suggested fix:** Blank template → hint; built-in → no hint or zone.
-
-### 1564. [LOW] CompanyView edge cases untested (review 2026-11-08, document templates #215)
-`portal/src/components/documentEditor/BlockView.tsx:73` — Edge cases: label "none" (76); logo without size → 72pt (84); missing address/phone/email/website skipped (93–96).
-
-**Suggested fix:** "none" → no h1; logo without size → 72pt; website shown / absent.
-
-### 1565. [LOW] CustomerView edge cases untested (review 2026-11-08, document templates #216)
-`portal/src/components/documentEditor/BlockView.tsx:102` — Edge cases: all options off → "nothing to print" (111); no names (106).
-
-**Suggested fix:** Untick all four → that text; `names: []` → no names line.
-
-### 1566. [LOW] EstimateView edge cases untested (review 2026-11-08, document templates #217)
-**Update 2026-11-12:** the divisions and tax-note arms are gone (the Estimate block prints neither since 2026-11-11); the other EstimateView edge cases are #1629.
-`portal/src/components/documentEditor/BlockView.tsx:120` — Edge cases: divisions shown/skipped (135); description as markdown (136); no work items → no table (139); tax note off (165).
-
-**Suggested fix:** Template context → "Division: Design/Build" and the description; `work_items: []` → no table; `show_tax_note: false` → no note.
-
-### 1567. [LOW] TextView edge cases untested (review 2026-11-08, document templates #218)
-`portal/src/components/documentEditor/BlockView.tsx:172` — Edge cases: empty unselected → "Empty Text block: it won't print." (197); "Prints as (sample data)" vs "Prints as" (189).
-
-**Suggested fix:** Deselect an empty Text block → text; template mode with a field → "(sample data)"; document mode → "Prints as".
-
-### 1568. [LOW] SavedTextView edge case untested (review 2026-11-08, document templates #219)
-`portal/src/components/documentEditor/BlockView.tsx:212` — Edge cases: a linked Text Block with empty content (215).
-
-**Suggested fix:** `content: " "` → "“Warranty” is empty: it won't print."
-
-### 1569. [LOW] ImageView edge cases untested (review 2026-11-08, document templates #220)
-`portal/src/components/documentEditor/BlockView.tsx:265` — Edge cases: empty text per mode (281); template "+ photos added on each document" (279); deleted library ref skipped (269); photo id not in pool skipped (276).
-
-**Suggested fix:** Empty block in each mode → its text; library ref to a missing id → the empty text.
-
-### 1570. [LOW] imageRows edge cases untested (review 2026-11-08, document templates #221)
-`portal/src/components/documentEditor/BlockView.tsx:245` — Edge cases: same-size photos share a row up to the column count (249); a size change starts a row (250).
-
-**Suggested fix:** Export and unit-test: medium ×4 + large → rows of 3, 1, 1.
-
-### 1571. [LOW] SignatureView edge cases untested (review 2026-11-08, document templates #222)
-`portal/src/components/documentEditor/BlockView.tsx:304` — Edge cases: no parties → "Signature: choose who signs." (308); printed name or date off (317/318).
-
-**Suggested fix:** Untick both → that text; `date: false` → no "Date:".
-
-### 1572. [LOW] LibraryThumb and PhotoThumb edge case untested (review 2026-11-08, document templates #223)
-`portal/src/components/documentEditor/BlockView.tsx:224` — Edge cases: the grey placeholder while loading (232/260).
-
-**Suggested fix:** Hold `documentImagesApi.file` → a `role="img"` placeholder named after the image.
-
-### 1573. [LOW] DividerView and BlockView switch edge cases untested (review 2026-11-08, document templates #224)
-`portal/src/components/documentEditor/BlockView.tsx:325` — Edge cases: green divider (326); Page break "New page" (352); Spacer heights (364).
-
-**Suggested fix:** green → rgb(46,107,61); Page break → "New page"; Spacer large → 48pt.
-
-### 1574. [LOW] DocMarkdown renderers untested (review 2026-11-08, document templates #225)
-`portal/src/components/documentEditor/DocMarkdown.tsx:14` — Edge cases: h1/h2/h3, ul/ol and link renderers aren't exercised.
-
-**Suggested fix:** Render "# A\n\n- b\n\n[c](http://x)" → 20pt h1, disc list, "c" as a styled span.
-
-### 1575. [LOW] BlockOptions edge cases untested (review 2026-11-08, document templates #226)
-`portal/src/components/documentEditor/Inspector.tsx:188` — Edge cases: counter red past 5000 (227); "Deleted Text Block" (236); Page break note (264).
-
-**Suggested fix:** 5001 chars → `text-red-600`; missing link → "Deleted Text Block"; Page break → its note.
-
-### 1576. [LOW] ImageOptions edge cases untested (review 2026-11-08, document templates #227)
-`portal/src/components/documentEditor/Inspector.tsx:129` — Edge cases: "Deleted image" (149); no library → no select (167); template photos hint (178).
-
-**Suggested fix:** Ref to "gone" → "Deleted image"; list `[]` → no select; template mode → the hint.
-
-### 1577. [LOW] BlockPanel edge cases untested (review 2026-11-08, document templates #228)
-`portal/src/components/documentEditor/Inspector.tsx:273` — Edge cases: no Heading for Page break/Spacer (282); cleared heading → null (286); no spacing for Page break (290).
-
-**Suggested fix:** Spacer → no heading field; Page break → no "Space above"; clear Customer heading, Save → `heading: null`.
-
-### 1578. [LOW] Inspector edge cases untested (review 2026-11-08, document templates #229)
-**Stale 2026-11-12:** the Inspector tabs became SidePanel's Blocks / Detail tabs (Content / Block until renamed 2026-11-12; tested in documentEditorInspector.test.tsx); archive in the next cleanup pass.
-`portal/src/components/documentEditor/Inspector.tsx:306` — Edge cases: selecting a block switches to the Block tab (315); Block tab disabled with none selected (323); "Select a block…" hint (333).
-
-**Suggested fix:** Document tab then click a block → Block tab selected; no selection → disabled and the hint.
-
-### 1579. [LOW] PhotoOptions edge cases untested (review 2026-11-08, document templates #230)
-`portal/src/components/documentEditor/PhotoOptions.tsx:34` — Edge cases: "No photos yet." (49); move up/down disabled at the ends (59/61); kit error alert (94).
-
-**Suggested fix:** Empty block → text; two uploads → end buttons disabled; move first down, Save → order swapped.
-
-### 1580. [LOW] asDraft edge cases untested (review 2026-11-08, document templates #231)
-`portal/src/components/documentEditor/PhotoOptions.tsx:21` — Edge cases: kept and note arms feeding the note picker's already-included count.
-
-**Suggested fix:** With a kept and a note photo placed, open From Notes → that photo marked included and the right room shown.
-
-### 1581. [LOW] useDocumentPhotos edge cases untested (review 2026-11-08, document templates #232)
-`portal/src/components/documentEditor/useDocumentPhotos.ts:28` — Edge cases: `move` out of bounds (81–85); `addNotes` skips placed photos (62–68); past the cap (70); null FileList (54); placing nothing (47); object URLs revoked (16/40/92).
-
-**Suggested fix:** renderHook: same note twice → one photo; 29 placed + 2 picks → one placed and the error; spy `URL.revokeObjectURL` on unmount.
-
-### 1582. [LOW] usePhotoThumb edge cases untested (review 2026-11-08, document templates #233)
-`portal/src/components/documentEditor/usePhotoThumb.ts:7` — Edge cases: kept photo's thumb fetch (9); note photo's (10); no photo (8).
-
-**Suggested fix:** Open a draft with a kept image → `docImageBlob("est1", id, "thumb")`; a note photo → `attachmentBlob(…, "thumb")`.
-
-### 1583. [LOW] useEditorLibraries edge cases untested (review 2026-11-08, document templates #234)
-`portal/src/components/documentEditor/useEditorLibraries.ts:14` — Edge cases: load failure sets `error` (43); null response leaves the list empty (40); `reloadImages` catch (31). (`reloadSavedText` is #54.)
-
-**Suggested fix:** Reject textBlocks list → palette alert; reject images list on reload after an upload → the library message.
-
-### 1584. [LOW] readiness edge cases untested (review 2026-11-08, document templates #235)
-`portal/src/components/documentEditor/readiness.ts:30` — Edge cases: an Image block with library images and no photos is fine (51); the same missing field twice warns once (23).
-
-**Suggested fix:** Library-only Image block → no warning; "{{CUSTOMER_PHONE}} {{CUSTOMER_PHONE}}" → one warning.
-
-### 1585. [LOW] documentPhotos edge cases untested (review 2026-11-08, document templates #236)
-`portal/src/components/documentEditor/documentPhotos.ts:25` — Edge cases: missing size/caption fallback (26); no `URL.createObjectURL` (30); an id not in the pool skipped (54); `photoName` kept/note arms (73/75).
-
-**Suggested fix:** Image without size/caption → `{size:"large", caption:""}`; stub createObjectURL undefined → `""`; block naming "nope" → no images; `photoName` for kept and note.
-
-### 1586. [LOW] layoutReducer edge cases untested (review 2026-11-08, document templates #237)
-`portal/src/components/documentEditor/layoutReducer.ts:50` — Edge cases: `move` unknown/same id (63); `duplicate` unknown (74); `remove` unknown (84); `update`/`updateProps` unknown (46); `add` with a stale `selectedId` appends (54).
-
-**Suggested fix:** Each unknown-id action returns the same state (`toBe`); stale selection + add → appended.
-
-### 1587. [LOW] newBlockId fallback untested (review 2026-11-08, document templates #238)
-`portal/src/components/documentEditor/blockDefaults.ts:70` — Edge cases: no `crypto.randomUUID` (73).
-
-**Suggested fix:** `vi.stubGlobal("crypto", {})` → matches /^[0-9a-f]{32}$/.
-
-### 1588. [LOW] startName edge case untested (review 2026-11-08, document templates #239)
-`portal/src/lib/documentPaths.ts:20` — Edge cases: a version start with no `id` keeps its stored name (21).
-
-**Suggested fix:** `startName({kind:"version", name:"Copy of v1"}) === "Copy of v1"`.
-
-### 1589. [LOW] splitMergeFields edge case untested (review 2026-11-08, document templates #240)
-`portal/src/components/documentEditor/mergeFields.ts:19` — Edge cases: a known field with no MergeFieldDef labels itself by its key (44).
-
-**Suggested fix:** `splitMergeFields("{{X}}", {X: null}, [])` → `[{kind:"missing", key:"X", label:"X"}]`.
-
-### 1591. [LOW] useStartEditor, DraftCard and ReplaceDraftDialog edge cases untested (review 2026-11-08 round 2, document templates #72)
-`portal/src/components/estimates/DocumentsHub.tsx:210` — Edge cases: `onBeforeStart` rejecting is caught as not saved (220–221); the `if (starting) return` guard (214); Continue draft disabled while starting (273); ReplaceDraftDialog's "This estimate has a saved draft (saved by Ana · …)" line (198).
-
-**Suggested fix:** Reject `onBeforeStart` → START_SAVE_FAILED alert, no navigation; hold it with a draft → Continue draft disabled; Start over a draft → dialog text contains "saved by Ana".
-
-### 1592. [LOW] useTemplateEditor and useTemplateLoad edge cases untested (review 2026-11-08 round 2, document templates #73)
-`portal/src/components/documentEditor/useTemplateEditor.ts:118` — Edge cases: a failed save's message clears when another template opens (152); `/new` with no `?from` starts empty without a read (59).
-
-**Suggested fix:** Reject update on t1 → alert, navigate to t2 → no alert; render `/settings/document-templates/new` → no blocks, `templates.get` not called.
-
-### 1593. [LOW] useTemplateActions edge cases untested (review 2026-11-08 round 2, document templates #74)
-`portal/src/components/documentEditor/useTemplateActions.ts:10` — Edge cases: no saved id doesn't read the list (17); a failed list read leaves "Set as default" showing (23).
-
-**Suggested fix:** `/new?from=blank` → `templates.list` not called; reject `templates.list` on t1 → "Set as default" shows, no alert.
-
-### 1594. [LOW] TemplateEditor edge cases untested (review 2026-11-08 round 2, document templates #75)
-`portal/src/pages/DocumentTemplateEditorPage.tsx:106` — Edge cases: `sampleContext` resolving null → "Couldn't open the template." (119); an unsaved new template shows no Set as default (127).
-
-**Suggested fix:** `templates.sampleContext.mockResolvedValue(null)` → that text, no Page region; `/new?from=blank` → no "Set as default".
-
-### 1595. [LOW] useDocumentPhotos edge cases untested (review 2026-11-08 round 2, document templates #76)
-`portal/src/components/documentEditor/useDocumentPhotos.ts:60` — Edge cases: `remove` keeps a photo another block still names (91–92); `room` clamps to 0 past the cap (64); `photoIdsOf` on a non-Image id (68).
-
-**Suggested fix:** renderHook: two Image blocks naming "p1", remove from one → "p1" kept and `revokeObjectURL` not called; 31 library refs → `room === 0`.
-
-### 1596. [LOW] notesNotYetPlaced edge cases untested (review 2026-11-08 round 2, document templates #77)
-`portal/src/components/documentEditor/documentPhotos.ts:52` — Edge cases: a placed upload, and a placed kept photo with no `source_attachment_id`, add nothing to `included` (57–58).
-
-**Suggested fix:** Place an upload and a sourceless kept photo, pick "a1" → `["a1"]`.
-
-### 1597. [LOW] Inspector option components' edge cases untested (review 2026-11-08 round 2, document templates #78)
-`portal/src/components/documentEditor/Inspector.tsx:150` — Edge cases: LibraryRefRow stores a cleared caption as null (173); AddLibraryImage's placeholder adds nothing (188); InsertField's placeholder inserts nothing (117); a field group with no fields gets no optgroup (111).
-
-**Suggested fix:** Type then clear a ref's Caption → `caption: null`; select "" in each select → nothing changes; merge fields with no property group → no "Property" optgroup.
-
-### 1598. [LOW] useEditorDrag edge cases untested (review 2026-11-08 round 2, document templates #79)
-`portal/src/components/documentEditor/useEditorDrag.ts:22` — Edge cases: `onDragEnd` passing ids and `paletteData(...)` into `dropAction` and dispatching (47–48); `onDragCancel` clearing the overlay and drop line (50).
-
-**Suggested fix:** renderHook with a spy dispatch: palette onto "b-customer" → `{type:"add", index:1}`; block onto block → `{type:"move"}`; `onDragOver` then `onDragCancel` → `dropTargetId` and `dragging` null.
-
-### 1599. [LOW] countWarnings, WarningBadge and placedPhotosOf edge cases untested (review 2026-11-08 round 2, document templates #80)
-`portal/src/components/documentEditor/DocumentEditor.tsx:54` — Edge cases: a document-level warning gets no badge (57); two warnings → "2 to check" (LayoutCanvas.tsx:48); placedPhotosOf leaves out pool photos no block names (65).
-
-**Suggested fix:** No Estimate block plus an empty Text block → only the Text block badged; a Text block with two missing fields → "2 to check"; upload into an Image block, remove it, add another → its photo options list nothing.
-
-### 1600. [LOW] the Add sheet closing after adding a block is untested (review 2026-11-08 round 2, document templates #81)
-`portal/src/components/documentEditor/PhoneEditor.tsx:15` — Edge cases: line 45; the phone test never asserts the dialog is gone.
-
-**Suggested fix:** After "Add Divider block" in the sheet, assert `queryByRole("dialog")` is null.
-
-### 1601. [LOW] useLibraryImageActions, UploadImageAction and ImageThumb edge cases untested (review 2026-11-08 round 2, document templates #82)
-**Update 2026-11-12:** the delete Cancel arm is now `useImageDelete` (useLibraryImageActions.ts).
-`portal/src/components/documentEditor/useLibraryImageActions.ts:15` — Edge cases: Cancel on the name dialog (61); Cancel on the delete confirm (62); confirm busy while deleting (BlockPalette.tsx:166); Upload opening the chooser (138); the input reset so the same file can be picked again (144); ImageThumb's placeholder while loading (102).
-
-**Suggested fix:** Upload → Cancel → no dialog, `upload` not called; Delete → Cancel → `remove` not called; hold `remove` → Delete disabled; click Upload → input click spy called; after an upload the input value is "".
-
-### 1602. [LOW] useSaveAsTemplate, applySavedDraft and request edge cases untested (review 2026-11-08 round 2, document templates #83)
-`portal/src/components/estimateDocument/useDocumentActions.ts:28` — Edge cases: Cancel closes Save as template (45); typing ignored while saving (46); a saved draft's own `started_from` replaces the shown start (64); the `request()` null/busy guards (82/89/105).
-
-**Suggested fix:** Open Save as template → Cancel → no dialog, not called; hold `saveFromEstimate`, type → name unchanged; `saveDocLayout` returning `started_from: {kind:"version", id:"1"}` → "Started from Version 1".
-
-### 1603. [LOW] top bar and DocumentTab edge cases untested (review 2026-11-08 round 2, document templates #84)
-**Update 2026-11-12:** the DocumentTab part is gone (no Document tab since 2026-11-11); only the top bar arm remains.
-`portal/src/components/estimateDocument/EstimateDocumentTopBar.tsx:46` — Edge cases: `md:pr-20` room for the closed Maple button on the document page (51); the Document tab's "Started from …" text (EstimateDocumentEditorPage.tsx:38).
-
-**Suggested fix:** Header has `md:pr-20` with Maple closed, not open or on a phone; click the Document tab → "Started from Standard Estimate.".
-
-### 1614. [LOW] _work_items_and_tax edge cases untested (review 2026-11-11, document templates #28)
-`platform/services/document_templates/context.py:254` — (a) no work items → subtotal "$0.00", tax_total None (loop runs zero times, 260); (b) the + 0.0 negative-zero guard (264).
-
-**Suggested fix:** (a) _estimate(job_items=[]) → SUBTOTAL "$0.00", tax_total None. (b) job_items [0.1, 0.2, 0 @5%], grand_total 0.3 → tax_total "$0.00", not "$-0.00".
-
-### 1615. [LOW] work_item_amounts' tax ≤ −100% arm untested (review 2026-11-11, document templates #29)
-`platform/services/estimate_doc_generator.py:145` — The rate > 0 else arm (153) where the amount stands has no test; nobody enters such a tax.
-
-**Suggested fix:** MagicMock item sub_total=50, tax=-100, recurring=False → [(desc, 50.0, 50.0)], no ZeroDivisionError.
-
-### 1616. [LOW] _doc_description with only the label untested (review 2026-11-11, document templates #30)
-`platform/services/document_templates/context.py:146` — "Work requested:   " → blank → None (153).
-
-**Suggested fix:** Add ("Work requested:   ", None) to test_the_document_drops_the_work_requested_label; assert description and DESCRIPTION None.
-
-### 1617. [LOW] _prepared_by blank and capitalised arms untested (review 2026-11-11, document templates #31)
-`platform/services/document_templates/context.py:273` — Blank created_by → None (276); "System" → None. Only "Sam Lee" and "system" are tested.
-
-**Suggested fix:** Unit test: _prepared_by("  ") is None and _prepared_by("System") is None.
-
-### 1618. [LOW] load_library's invalid-id arm unreachable and untested (review 2026-11-11, document templates #32)
-`platform/routers/estimate_helpers/doc_layout.py:164` — The except (173) for a non-ObjectId id: both callers already validate.
-
-**Suggested fix:** Delete the try/except (my pick), or pytest.raises(HTTPException) on load_library(oid, ["nope"]) → 404.
 
 ### 1619. [LOW] library_copy's size or "large" fallback unreachable (review 2026-11-11, document templates #33)
 `platform/routers/estimate_helpers/doc_layout.py:182` — DocImageSpec.size and LibraryImageRef.size both default to "large" (191).
 
 **Suggested fix:** Drop the or "large", or test library_copy(loaded, size=None, caption=None, image_id="a"*32).size == "large".
 
-### 1620. [LOW] version_blocks with a saved_text block missing style keys untested (review 2026-11-11, document templates #34)
-`platform/routers/estimate_helpers/doc_layout.py:86` — Defensive filter (98) for an unvalidated block.
-
-**Suggested fix:** LayoutPlan with a saved_text block {"text_block_id": "t"} and saved_texts {"t": "x"} → version_blocks()[0].props == {"text": "x"}.
-
-### 1621. [LOW] _write_estimate with the description last untested (review 2026-11-11, document templates #35)
-**Update 2026-11-12:** `_write_estimate` is now docs_composer.py:223 (the writer split out to docs_writer.py).
-`platform/services/document_templates/docs_composer.py:536` — Table, tax and total hidden → no gap under the description (553); only the title-last case is tested.
-
-**Suggested fix:** make_block("estimate","e", show_work_items=False, show_tax=False, show_grand_total=False) → description's spaceBelow is 0.
-
-### 1622. [LOW] _work_items_fill before-tax fallback untested (review 2026-11-11, document templates #36)
+### 1622. [HIGH] _work_items_fill before-tax fallback untested (review 2026-11-11, document templates #36)
+**Kept 2026-11-14 (coverage policy):** critical: amounts printed on the customer document when before-tax is missing (money).
 **Update 2026-11-12:** `_work_items_fill` is now docs_composer.py:161; a blank cell is now tested (round 2 #1).
 `platform/services/document_templates/docs_composer.py:478` — before_tax with a row whose amount_before_tax is None prints amount (482).
 
 **Suggested fix:** _estimate_context with tax_total "$1.00" and a row without amount_before_tax → that row prints amount.
-
-### 1623. [LOW] _header_target empty-header arm untested (review 2026-11-11, document templates #37)
-**Update 2026-11-12:** `_header_target` is now docs_composer.py:431; its tests moved to test_docs_composer_page_regions.py.
-`platform/services/document_templates/docs_composer.py:744` — An existing empty default header → end = 1 (759).
-
-**Suggested fix:** headers={"default": []}, defaultHeaderId "default" → header lines are the company lines, no segment delete.
-
-### 1624. [LOW] _footer_deletes edge cases untested (review 2026-11-11, document templates #38)
-**Update 2026-11-12:** `_footer_deletes` is now docs_composer.py:487; its tests moved to test_docs_composer_page_regions.py.
-`platform/services/document_templates/docs_composer.py:800` — (a) two page-number paragraphs, the earlier keeps its newline (811); (b) a page-number paragraph after other text deletes the text (822).
-
-**Suggested fix:** (a) footer "PAGE [n]\nof [n]\n" → both kept under the company lines. (b) "Old\nPAGE [n]\n" → "Old" gone, "PAGE [n]" last.
-
-### 1625. [LOW] _footer_requests with every detail hidden untested (review 2026-11-11, document templates #39)
-**Update 2026-11-12:** `_footer_requests` is now docs_composer.py:517; its tests moved to test_docs_composer_page_regions.py.
-`platform/services/document_templates/docs_composer.py:830` — All shows off → no insertText (844); on a footer without a page number, total > 1 (848) false.
-
-**Suggested fix:** All show_* False on the page-number footer → footer_lines == ["PAGE [n] of [n]"]; on {"only": "Old\n"} → empty footer, no updateTextStyle.
-
-### 1626. [LOW] compose_into extra header/footer block arm untested (review 2026-11-11, document templates #40)
-**Update 2026-11-12:** `compose_into` is now docs_composer.py:604.
-`platform/services/document_templates/docs_composer.py:917` — A second header/footer Company block (unvalidated layouts only) isn't skipped by [:1] (936) and prints in the body.
-
-**Suggested fix:** Raise ComposeError there (my pick, can't happen after validate_layout), or test two model_construct header blocks → second's lines in the body.
-
-### 1627. [LOW] _send_last_batch with two logos untested (review 2026-11-11, document templates #41)
-**Update 2026-11-12:** `_send_last_batch` is now docs_composer.py:642.
-`platform/services/document_templates/docs_composer.py:955` — A header and a body Company block both with a logo put two insertInlineImage requests in the last batch (_write_company:452); one failing drops both.
-
-**Suggested fix:** Compose [company placement=header, company] with a logo → two inserts (one segmentId "default"), logo_placed; with fail_on="insertInlineImage" → no [img] in either, both blocks' text present.
-
-### 1628. [LOW] CompanyFooterView edge cases untested (review 2026-11-11, document templates #42)
-`portal/src/components/documentEditor/BlockView.tsx:114` — All details off → "Company footer: nothing to print" (120); phone without email (118); no address_lines (117).
-
-**Suggested fix:** All show_* false → WontPrint text; phone only → "+1 …" without "·"; context without address_lines → no address line.
-
-### 1629. [LOW] EstimateView edge cases untested (review 2026-11-11, document templates #43)
-`portal/src/components/documentEditor/BlockView.tsx:216` — Taxed row without amount_before_tax falls back to amount (223); a description with nothing after it gets no room under it.
-
-**Suggested fix:** Taxed context, one row lacking amount_before_tax → prints amount; description only → wrapper marginBottom "".
-
-### 1630. [LOW] CompanyOptions edge cases untested (review 2026-11-11, document templates #44)
-`portal/src/components/documentEditor/Inspector.tsx:227` — The Body placement note (242); both refusals joined when other blocks hold header and footer (242); the footer note without the logo sentence (245).
-
-**Suggested fix:** Fresh Company block → Body note; header+footer+body blocks → both refusal sentences; footer placement → no "current logo".
-
-### 1631. [LOW] libraryRefsAsPhotos edge case untested (review 2026-11-11, document templates #45)
-`portal/src/components/documentEditor/documentPhotos.ts:51` — An Image block with no refs beside one with refs comes back unchanged (55).
-
-**Suggested fix:** [imageBlock with refs, imageBlock("i2", ["p2"])] → blocks[1] is the same object.
-
-### 1632. [LOW] unsavedLibraryPhotosAsRefs edge cases untested (review 2026-11-11, document templates #46)
-**Update 2026-11-12:** now `libraryPhotosAsRefs`; the blank caption is covered; only "a block's existing refs stay ahead" is still open.
-`portal/src/components/documentEditor/documentPhotos.ts:69` — A blank caption becomes null (73); a block's existing refs stay ahead (75).
-
-**Suggested fix:** Caption "  " → caption null; library [img0] plus unsaved img1 → [img0, img1].
-
-### 1633. [LOW] pickerDraft library arm untested (review 2026-11-11, document templates #47)
-`portal/src/components/documentEditor/PhotoOptions.tsx:26` — A placed library photo is left out of the note picker's draft (31).
-
-**Suggested fix:** Place a library photo, open From Notes → the included count ignores it.
-
-### 1634. [LOW] PhotoOptions with an empty library untested (review 2026-11-11, document templates #48)
-**Update 2026-11-12:** the "Add a library image" dropdown is now the From Library button (`LibraryImagePicker.tsx`); the check is no From Library button with an empty library.
-`portal/src/components/documentEditor/PhotoOptions.tsx:102` — No "Add a library image" picker with an empty library (136).
-
-**Suggested fix:** Document mode, libraryImages=[] → no "Add a library image" combobox.
-
-### 1635. [LOW] addLibrary at the cap untested (review 2026-11-11, document templates #49)
-**Update 2026-11-12:** `addLibrary` is now in `photoAdders` (useDocumentPhotos.ts).
-`portal/src/components/documentEditor/useDocumentPhotos.ts:108` — Room 0 sets TOO_MANY_DOC_IMAGES and places nothing (109–110); defensive, the picker is disabled at the cap.
-
-**Suggested fix:** renderHook with 30 placed, addLibrary → error set, photo_ids unchanged.
-
-### 1636. [LOW] imageNameOf edge cases untested (review 2026-11-11, document templates #50)
-`portal/src/components/documentEditor/useLibraryImageActions.ts:12` — ".png" falls back to the whole name; a name over 100 characters is cut (14).
-
-**Suggested fix:** imageNameOf(new File([], ".png")) → ".png"; 150-character name → 100 characters.
-
-### 1637. [LOW] startUploads with no files untested (review 2026-11-11, document templates #51)
-`portal/src/components/documentEditor/useLibraryImageActions.ts:62` — An empty pick does nothing (64).
-
-**Suggested fix:** Fire change with no files → no dialog, upload not called.
-
-### 1638. [LOW] HoverTip edge cases untested (review 2026-11-11, document templates #52)
-**Update 2026-11-12:** HoverTip's logic moved to `useAnchoredTip` (components/ui/anchoredBubble.ts); scroll, focus, the clamp and Escape are now tested; the open-menu trigger and click-hides arms are still open.
-`portal/src/components/common/HoverTip.tsx:15` — No tip over an open menu trigger (25); viewport clamp (37); scroll hides (42); click hides and focus shows (48).
-
-**Suggested fix:** Open Share menu + hover → no tooltip; right-edge rect → left ≤ innerWidth − width − 8; fireEvent.scroll(window) → hidden; click → hidden; focus() → shown.
-
-### 1639. [LOW] unzoomed at zoom 1 untested (review 2026-11-11, document templates #53)
-`portal/src/components/documentEditor/fitWidth.ts:27` — At zoom 1 it returns the same transform (28).
-
-**Suggested fix:** unzoomed(t, 1) is t.
-
-### 1640. [LOW] usePageZoom without ResizeObserver untested (review 2026-11-11, document templates #54)
-`portal/src/components/documentEditor/fitWidth.ts:37` — Without ResizeObserver it measures once (44).
-
-**Suggested fix:** Stub ResizeObserver undefined → zoom measured once, no throw.
-
-### 1641. [LOW] useMergeFields edge cases untested (review 2026-11-11, document templates #55)
-`portal/src/components/settings/useMergeFields.ts:10` — A second wanted=true doesn't fetch again (14) in isolation; a null context gives [] (17).
-
-**Suggested fix:** renderHook toggling wanted → sampleContext once; resolve null → [].
-
-### 1642. [LOW] DocumentsHub edge cases untested (review 2026-11-11, document templates #56)
-**Update 2026-11-12:** the onStartOver-with-no-path arm is now `useReplaceDraft` (DocumentsHub.tsx).
-`portal/src/components/estimates/DocumentsHub.tsx:244` — New draft clears an earlier Open error (267–269); onStartOver with no path (307–310), defensive.
-
-**Suggested fix:** Fail Open (error shown), click New draft → no alert in the pop-up.
-
-### 1643. [LOW] New draft from while starting untested (review 2026-11-11, document templates #57)
-**Stale 2026-11-12:** New draft from left the version rows (a version is picked in the New draft pop-up, whose Start is tested disabled while starting); archive in the next cleanup pass.
-`portal/src/components/estimates/DocVersionList.tsx:44` — New draft from is disabled while a start is saving (73).
-
-**Suggested fix:** Hold onBeforeStart, start once → "New draft from Estimate v2" disabled.
-
-### 1648. [LOW] Seat-count cron `_main()` with Sentry off untested (review 2026-11-14, Sentry environment name round 2 #1)
-`platform/scripts/snapshot_seat_counts.py:42` — Edge case. The new `tests/test_snapshot_seat_counts.py` only drives `_main()`'s `if settings.sentry_dsn:` true arm (43). The false arm, where no DSN is set and Sentry isn't started, never runs. That only happens without a DSN (locally, or a cron service missing SENTRY_DSN).
-
-**Suggested fix:** Add `test_without_a_dsn_sentry_isnt_started` to `tests/test_snapshot_seat_counts.py`. Use the same stubs, set `sentry_dsn=None`, run `asyncio.run(cron_script._main())`, and assert the `sentry_sdk.init` recorder is empty.
 
 ## Codebase hygiene (batchable)
 
@@ -7010,6 +5588,7 @@ indentation as the new provider tag. Functionally fine, just
 inconsistent. Fix: Prettier pass over the file.
 
 ### 273. [LOW] NBSP literal in `markdownBlankParagraphs.ts` is invisible in source, no test imports the constant
+**Kept 2026-11-14 (coverage policy):** not an edge case: an invisible character the test does not import.
 `portal/src/components/common/markdownBlankParagraphs.ts:7` —
 `NBSP_PARAGRAPH = " "` contains a literal U+00A0 byte-different
 from regular space but visually identical. The test file
