@@ -11719,3 +11719,113 @@ next touched.
 `platform/scripts/snapshot_seat_counts.py:42` — Edge case. The new `tests/test_snapshot_seat_counts.py` only drives `_main()`'s `if settings.sentry_dsn:` true arm (43). The false arm, where no DSN is set and Sentry isn't started, never runs. That only happens without a DSN (locally, or a cron service missing SENTRY_DSN).
 
 **Suggested fix:** Add `test_without_a_dsn_sentry_isnt_started` to `tests/test_snapshot_seat_counts.py`. Use the same stubs, set `sentry_dsn=None`, run `asyncio.run(cron_script._main())`, and assert the `sentry_sdk.init` recorder is empty.
+
+**Added later the same day: the MCP pricing review's edge cases (#1648–1678; 3 closed, 17 dropped)**
+
+### 1653. ~~[LOW] `_apply`: "none" with no word match untested~~ — RESOLVED 2026-11-14
+`platform/agents/estimate/catalog_pick.py:196` — Edge case: choice None and matched_id None (:203-205) leaves no decision. (Deferred from /code-review 2026-11-14, finding #40.)
+
+**Suggested fix:** A name sharing a word but below the review bar, model answers None → no catalog_pick key, line unmatched.
+
+**RESOLVED 2026-11-14** (review round 2 #37): obsolete — `_apply` now stamps `{"id": None}` for every none, so there is no undecided arm; a none on an unsure line is pinned by `tests/test_estimate_catalog_pick.py::test_none_leaves_an_unsure_line_unmatched`.
+
+### 1667. ~~[LOW] `display_name_for_email`: edge arms untested~~ — RESOLVED 2026-11-14
+`platform/services/user_display.py:24` — Edge cases: blank or None email → "system" (:31); no user → lowercased email (:35). (Deferred from /code-review 2026-11-14, finding #54.)
+
+**Suggested fix:** " " → "system"; User.find_one patched to None, "Pat@X.com" → "pat@x.com".
+
+**RESOLVED 2026-11-14** (review round 2 #37): both arms are pinned in `tests/test_estimate_created_by.py` — no user → the lowercased email by `test_maples_creator_falls_back_to_the_email_never_the_uid`, a blank email → "system" by `test_a_failed_user_lookup_falls_back_to_the_email`.
+
+### 1678. ~~[LOW] `_main`: output arms untested~~ — RESOLVED 2026-11-14
+`platform/scripts/unassign_orphan_divisions.py:156` — Edge cases: --company builds the one-id list (L158); APPLIED vs DRY RUN line (L160-165); "no orphan division names found" (L166-167); the skipped line (L175-176); the dry-run footer (L177-178). (Deferred from /code-review 2026-11-14, finding #65.)
+
+**Suggested fix:** init_db patched to a no-op; `_main(False, a)` under capsys asserts the DRY RUN line and "Nothing written"; `_main(True, b)` asserts the "no orphan" and "skipped" lines.
+
+**RESOLVED 2026-11-14** (review round 2 #34): `tests/test_unassign_orphan_divisions_script.py::test_main_prints_each_line_of_the_report` runs `_main` with `init_db` patched out — `--company a` (b left out), every DRY RUN line with both variant lines and the footer, then APPLIED for b (the "no orphan" and skipped lines, no footer) and for a ("moved").
+
+### 1679. ~~[LOW] `get_pick_llm`: edge branches untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+
+**Renumbered 2026-11-14:** filed as #1648, which main had already given the seat-count cron entry.
+`platform/agents/estimate/catalog_pick.py:92` — Edge cases: no API key → None (:95-96); first build through create_chat_model (:97-100). (Deferred from /code-review 2026-11-14, finding #35.)
+
+**Suggested fix:** openai_api_key "" → None; with a key and create_chat_model patched → one call with role "worker", temperature 0, cached on the second.
+
+### 1649. ~~[LOW] `pick_catalog_materials`: edge branches untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/catalog_pick.py:215` — Edge cases: no model → return (:221-222); a non-CatalogPicks result ignored (:235). (Deferred from /code-review 2026-11-14, finding #36.)
+
+**Suggested fix:** get_pick_llm → None leaves no catalog_pick; a fake returning a dict leaves the lines unchanged.
+
+### 1650. ~~[LOW] `_asks`: edge branches untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/catalog_pick.py:138` — Edge cases: a blank name skipped (:148-149); the MAX_LINES cap (:153-154). (Deferred from /code-review 2026-11-14, finding #37.)
+
+**Suggested fix:** {"material": " "} isn't asked; 31 distinct near names → the prompt stops at "Line 30:".
+
+### 1651. ~~[LOW] `_candidates`: edge branches untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/catalog_pick.py:108` — Edge cases: matched row outside `near` (:122); a name clean_label rejects (:129); the MAX_CANDIDATES cap (:133-134). (Deferred from /code-review 2026-11-14, finding #38.)
+
+**Suggested fix:** A "bad\nname" row isn't offered; 12 rows sharing a word → exactly 8 candidates; a matched row sharing no key is listed first.
+
+### 1652. ~~[LOW] `_prompt`: edge branches untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/catalog_pick.py:174` — Edge cases: no size (:180); no quantity or unit (:182); no description → "not said" (:184). (Deferred from /code-review 2026-11-14, finding #39.)
+
+**Suggested fix:** {"material": "Concrete mix"} in a job item with no description → `needs "Concrete mix" — for: not said`, no size or amount.
+
+### 1654. ~~[LOW] `_picked_or_matched`: edge branches untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/catalog_matching.py:319` — Edge cases: picked id found only in material_catalog (:333-335); an id found nowhere falls back to the words (:336-338). (Deferred from /code-review 2026-11-14, finding #41.)
+
+**Suggested fix:** No material_details but row "x" → (row, 50); an absent id → equals `_resolve_material_inventory_match_scored`.
+
+### 1656. ~~[LOW] `_size_rows`: edge branches untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/prompts/material_catalog.py:126` — Edge cases: no sizes_of on a plain list (:133-134); a KeyError → () (:136-138). (Deferred from /code-review 2026-11-14, finding #43.)
+
+**Suggested fix:** with_sizes from a plain list without sizes → no "sizes:"; a CatalogRows whose sizes_of raises KeyError for one id → that row name-only.
+
+### 1657. ~~[LOW] `_render_sizes`: edge branches untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/prompts/material_catalog.py:141` — Edge cases: a non-mapping size skipped (:146); a size with no unit name (:155). (Deferred from /code-review 2026-11-14, finding #44.)
+
+**Suggested fix:** sizes [None, {"size": "84 ft"}] → "sizes: `84 ft`" with no "per".
+
+### 1658. ~~[LOW] `head_said`: request with no head noun untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/catalog_text.py:360` — Edge case: no full-weight token → True (:367-368). (Deferred from /code-review 2026-11-14, finding #45.)
+
+**Suggested fix:** `head_said("3 4", ("crushed stone",)) is True`.
+
+### 1661. ~~[LOW] `stated_scope_size`: edge arms untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/assumption_defaults.py:347` — Edge cases: "0 sq ft" → None (:356); "Length" label for linear yards/feet (:361); empty scope_name → "estimate" (:365). (Deferred from /code-review 2026-11-14, finding #48.)
+
+**Suggested fix:** One assertion per arm.
+
+### 1664. ~~[LOW] `scale_job_item`: rounding arms untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/template_scaling.py:239` — Edge cases: rounding of labours (:253), equipments (:255), unmatched_labours (:261), unmatched_activities (:263). (Deferred from /code-review 2026-11-14, finding #51.)
+
+**Suggested fix:** Set each to 1.54 in test_scaled_figures_carry_no_float_noise and assert 1.232.
+
+### 1665. ~~[LOW] `_handle_assumption_size_adjustment`: legacy estimate-wide size untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/agents/estimate/assumption_handlers.py:694` — Edge case: scope "estimate" (only_index None, :727/730) restates every matching description and pins nothing. (Deferred from /code-review 2026-11-14, finding #52.)
+
+**Suggested fix:** Two items "… 300 sq ft …", scope "estimate", adjust to 400 → both say 400 sq ft and job_item_id None.
+
+### 1666. ~~[LOW] `duplicate_estimate`: assumption on a gone item untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/routers/estimates.py:832` — Edge case: line 873 drops an assumption whose job_item_id names an item no longer on the source. (Deferred from /code-review 2026-11-14, finding #53.)
+
+**Suggested fix:** Source with EstimateAssumption(job_item_id="gone") → not in the copy.
+
+### 1668. ~~[LOW] `create_estimate`: edge arms untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/routers/estimates.py:351` — Edge cases: no user for the token's email → created_by is the email (:390); a non-dict agent_result saves no assumptions (:457). (Deferred from /code-review 2026-11-14, finding #55.)
+
+**Suggested fix:** Patch `_find_token_user` to None → created_by == email; stub prepare_generated_estimate to (generated, None) → assumptions == [].
+
+### 1675. ~~[LOW] `_due`: naive time with no zone untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/mcp_server/company/tools_tasks.py:145` — Edge case: L162, a date-time with no offset and no user zone, read as UTC. (Deferred from /code-review 2026-11-14, finding #62.)
+
+**Suggested fix:** No zone, due_date "2026-11-21T09:00" → stored 09:00 UTC and the reply's date "2026-11-21".
+
+### 1676. ~~[LOW] `unassign_deleted`: Unassigned-named division untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/services/division_names.py:79` — Edge case: L82, deleting a division named "Unassigned" or "Others" returns zeros without a retag. (Deferred from /code-review 2026-11-14, finding #63.)
+
+**Suggested fix:** Delete a division "Others" with an item under it → the item still reads "Others".
+
+### 1677. ~~[LOW] `retag_division`: all-blank names untested~~ — DROPPED 2026-11-14 (untested edge case: /code-review no longer reports these)
+`platform/services/division_names.py:50` — Edge case: L55-56, whitespace-only names return zeros before an empty $or (Division allows " "). (Deferred from /code-review 2026-11-14, finding #64.)
+
+**Suggested fix:** `retag_division(company, [" "], "X")` → zeros; rename a " " division through PUT → 200.

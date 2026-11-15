@@ -41,9 +41,12 @@ asking for an edge-case or LOW-graded test were read against that rule. 275 move
 2026-11-14** line naming why: the untested arm guards sign-in or revocation, tenant scope, a
 refusal, money, or a write that could lose data. The 37 critical ones and #489 (an untested script
 that writes) were re-graded HIGH and #1532 MEDIUM, and every kept entry is titled by what it guards. 773 remain. **Don't file untested edge cases
-here.** The archive's 2026-11-14 section lists the moves.
+here.** The archive's 2026-11-14 section lists the moves. Later the same day the MCP pricing
+review's 25 edge-case entries (#1648–1678) were read the same way: 17 dropped, 3 already
+resolved, 5 kept and re-graded HIGH (#1655, #1659, #1662, #1663, #1674). Its #1648 is now #1679,
+since main had already used 1648. 784 remain.
 
-- **Entries are numbered and permanent.** Next free number: **1649**. Never
+- **Entries are numbered and permanent.** Next free number: **1680**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -3006,6 +3009,36 @@ geocode and note it in the comment.
 
 **Suggested fix:** A `RequestValidationError` handler in `main.py` that returns FastAPI's usual 422 shape with the echoed `input` values made JSON-safe (non-finite floats as strings); test a raw body with `"tax_rate": Infinity` → 422.
 
+### 1660. [LOW] missing_items still shows float noise
+`platform/mcp_server/company/tools_estimates.py:158` — Lines are rounded by _figure/_money, but missing_items dumps unmatched lines raw (1.2320000000000002). (Deferred from /code-review 2026-11-14, finding #47.)
+
+**Suggested fix:** Round quantity/effort/price in those dumps with _figure; extend test_get_estimate_figures_carry_no_float_noise with an unmatched material of 1.54*0.8.
+
+### 1669. [LOW] `AuthenticateRequest.timezone` is typed Any
+`platform/routers/auth.py:447` — The model accepts arbitrary JSON for it; LOW because only a value `zone_from_name` accepts is stored. (Deferred from /code-review 2026-11-14, finding #56.)
+
+**Suggested fix:** `Optional[str]` with a mode="before" validator returning the value only if `zone_from_name` accepts it, else None (never a failed sign-in).
+
+### 1670. [LOW] A time zone change on User has no audit row
+`platform/routers/auth.py:450` — `_record_timezone` $sets without an audit entry; it is sign-in telemetry like last_login_at, but it now shifts MCP due dates, so "why did my due dates move a day" can't be traced. (Deferred from /code-review 2026-11-14, finding #57.)
+
+**Suggested fix (needs Simon's call):** (a) Recommended: add the new and old zone to the day's USER_LOGIN row's metadata when it changes. (b) Accept it as telemetry and say so on the field.
+
+### 1671. [LOW] A failed rename cascade isn't redone on retry
+`platform/routers/divisions.py:88` — The name is saved (L88) before `carry_rename` (L91); if the cascade raises, the division is renamed, work items keep the old name, no audit row is written, and a retry does nothing (names now equal). (Deferred from /code-review 2026-11-14, finding #58.)
+
+**Suggested fix:** Run the cascade before the set (it is idempotent), or catch, log and record the failure on the audit row.
+
+### 1672. [LOW] A failed delete cascade leaves orphans with no audit row
+`platform/routers/divisions.py:120` — `division.delete()` (L120) runs before `unassign_deleted` (L121); if that raises, the items keep the deleted name and a retry 404s. (Deferred from /code-review 2026-11-14, finding #59.)
+
+**Suggested fix:** Run `unassign_deleted` first (excluding the division's own id in `_still_named`), or catch, log and flag it on the audit row.
+
+### 1673. [LOW] `user_zone` shares a name with `agents.local_time.user_zone` but behaves differently
+`platform/mcp_server/company/tools_tasks.py:87` — The agents one never returns None; this one's None selects the noon-UTC path. An import mix-up silently moves date-only due dates. (Deferred from /code-review 2026-11-14, finding #60.)
+
+**Suggested fix:** Rename to `caller_zone` and update its four call sites (L119, L234, L280, L324).
+
 ## Platform — services, scripts and integrations
 
 ### 350. [MEDIUM] Credential fields are plain `str`, not `SecretStr` — both known leak paths closed 2026-07-27
@@ -5272,6 +5305,36 @@ total row count rather than blank-row count.
 `platform/services/document_templates/docs_composer.py:478` — before_tax with a row whose amount_before_tax is None prints amount (482).
 
 **Suggested fix:** _estimate_context with tax_total "$1.00" and a row without amount_before_tax → that row prints amount.
+
+### 1655. [HIGH] A package-labelled size with no unit name drops the line to a missing item, untested
+**Kept 2026-11-14 (coverage policy):** critical: decides whether a priced material line is bought or left out of the total (money).
+`platform/agents/estimate/catalog_matching.py:622` — Edge case: in `_purchase_by_package`, `not sold_by and _PACKAGE_WORD_RE.search(selected_size)` (:636); since round 2 that arm makes the line a missing item. (Deferred from /code-review 2026-11-14, finding #42.)
+
+**Suggested fix:** size "contractor roll", unit_name None, 450 sq ft → the line is a missing item with the can't-be-bought reason, not a priced line.
+
+### 1659. [HIGH] `positive_number`: rejecting a zero, negative, infinite or junk quantity is untested
+**Kept 2026-11-14 (coverage policy):** critical: it stops a model's 0, negative or infinite purchase count from being priced (money).
+`platform/agents/estimate/calc_helpers.py:31` — Edge cases: non-numeric (:35-36); zero, negative, inf (:37). (Deferred from /code-review 2026-11-14, finding #46.)
+
+**Suggested fix:** Parametrize None, "x", 0, -2, inf → None and "7" → 7.0.
+
+### 1662. [HIGH] `restate_size`: overlapping sizes restate the wrong one ("20x20 sq ft" → "20x16 sq ft"); two guard arms untested
+**Kept 2026-11-14 (coverage policy):** critical: a write that changes the work item's description wrongly. The overlap is a defect, not only a test gap.
+`platform/agents/estimate/template_scaling.py:218` — Edge cases: empty text or zero old size (:226); a length stated against an area size skipped (:229-230); overlapping matches ("20x20 sq ft" with old 20 → "20x16 sq ft"). (Deferred from /code-review 2026-11-14, finding #49.)
+
+**Suggested fix:** Tests for the first two; for the third, drop matches inside an earlier span in `_stated_sizes` and assert "20x20 sq ft" is left alone.
+
+### 1663. [HIGH] `_stated_sizes`: a time ("5 by 6 pm") is read as a size and restated
+**Kept 2026-11-14 (coverage policy):** critical: a write that changes the work item's description wrongly. A defect, not only a test gap.
+`platform/agents/estimate/template_scaling.py:200` — Edge cases: canonical_size_unit None (:205); `_dimensions` None (:211); and unlike parse_job_size it never applies _TIME_AFTER_RE ("5 by 6 pm" read as 30 sq ft). (Deferred from /code-review 2026-11-14, finding #50.)
+
+**Suggested fix:** Add the time check; test "Arrive 5 by 6 pm, 30 sq ft patio" replaces only "30 sq ft"; an inch dimension yields no entry.
+
+### 1674. [HIGH] `_record_timezone`: a failed time-zone write must not fail sign-in, untested
+**Kept 2026-11-14 (coverage policy):** critical: the except arm is what keeps sign-in working when the write fails (sign-in).
+`platform/routers/auth.py:450` — Edge case: the except arm (L460-462) should log, keep the old zone and not fail the sign-in. (Deferred from /code-review 2026-11-14, finding #61.)
+
+**Suggested fix:** update_one raising, sign in with "Asia/Tokyo" → 200 and the stored zone unchanged.
 
 ## Codebase hygiene (batchable)
 
