@@ -9580,6 +9580,8 @@ pattern.
 
 **Suggested fix:** Rebuild existing sizes with their stored price as-is (keep `None`), so an edit that doesn't touch sizes carries no `sizes`. Test: a Member describes a company material whose size has no price.
 
+**Note added 2026-11-15 (#1303):** Review round 1 moved the stored-sizes rebuild into `_stored_size_entries` and added two tests: a price said again at its own value still records the unpriced size at its cost, and a stored size with neither a price nor a cost is left out of a sizes write.
+
 ### 817. ~~[MEDIUM] Sentry ships frame locals — token claims and chat messages — with every `logger.exception`~~ — RESOLVED 2026-10-18
 
 **Resolved 2026-10-18:** your decision — drop all locals. `_init_sentry` in `platform/main.py` passes `include_local_variables=False`, so every event keeps its stack and loses every frame's variables, and `max_request_body_size="never"`, because the FastAPI integration also attached the JSON body (the `/agents/orchestrate` chat message) as `request.data` — `send_default_pii=False` gates only cookies and headers (review round 1). `tests/test_sentry_init.py`: production init turns locals and request bodies off (and keeps `send_default_pii=False`); Sentry isn't started outside production or without a DSN; an exception captured through a client built from those options keeps its frames and carries no `vars`. The template instantiation's type-only log (`routers/agent_helpers/template_estimate.py:183`, #318) stays, its comment now giving the reason that holds — the exception's message can hold the estimate's values, as in the edit executor's type-only logs (`agents/estimate/edit_executor.py:420/426`, #619). The brevo rule keeps its "never `logger.exception`", its reason restated: a Brevo error's message can echo the contact email (`.claude/rules/brevo.md`).
@@ -9622,6 +9624,8 @@ Migrate both call sites in the same PR so the pattern is consistent.
 `portal/src/pages/MaterialsPage.tsx` — `cost = costProvided ? parsedCost : (price ?? NaN)`: unlike the gap dialog, the page's Cost field isn't `required`, so a size row with a label and a price but no cost stores the price as the catalog cost — the coercion `.claude/rules/pricing.md` forbids. Removing the fallback alone would silently drop the row (and on edit delete the size). Found while fixing review 2026-10-17 round 3 #7/#8.
 
 **Suggested fix:** Refuse the save with a per-row "Cost is required" error (and mark the Cost input `required`), then use `cost: parsedCost`. Test: a row with a price and no cost is refused and nothing is sent.
+
+**Note added 2026-11-15 (#1302):** Review round 1 moved the size checks and the payload into `src/lib/materialSizes.ts` (`sizeRowsPayload`, `sellsAtCost`, `SizeFormRow`), unit-tested in `tests/materialSizes.test.ts`, and added a test that a non-finite cost is refused.
 
 ### 1363. [LOW] .claude/launch.json: machine-specific dev configs from the Work Item cost-column check — RESOLVED 2026-10-21
 **RESOLVED 2026-10-21** — dropped while syncing the branch with main: main had added an equivalent `platform-8002` + `portal-5176` pair, so the branch's `launch.json` now matches main. Move to the archive in the next cleanup.
@@ -11829,3 +11833,1203 @@ next touched.
 `platform/services/division_names.py:50` — Edge case: L55-56, whitespace-only names return zeros before an empty $or (Division allows " "). (Deferred from /code-review 2026-11-14, finding #64.)
 
 **Suggested fix:** `retag_division(company, [" "], "X")` → zeros; rename a " " division through PUT → 200.
+
+## Consolidation pass — 2026-11-15 (duplicates and missed edge cases)
+
+Every open entry was read for duplicates, and every MEDIUM test entry the 2026-11-14 coverage pass missed (it read only those graded LOW or titled as edge cases) was read against the same rule. 210 entries moved here; 574 remain.
+
+**The 2026-10-22 priority queue, replaced on 2026-11-15**
+
+**Re-derived 2026-10-22**, after the consolidation above. Ranked by user impact first (wrong writes,
+data integrity, privacy, cost), then risk, then how much each fix unblocks. Planner gaps rank high
+because the planner is the default for every company.
+
+| # | Item | Why it's here |
+|---|------|---------------|
+| 1 | [#947](code-review-followups.md#947-medium-planner-add-bob-as-the-contact-on-e0042-can-create-a-new-bob) + [#948](code-review-followups.md#948-medium-planner-a-property-create-beside-a-link-doesnt-check-the-address-exists) | Maple can plan `create_contact` or `create_property` beside a link, so "add Bob as the contact on E0042" can create a second Bob and link it. The only guard is a prompt line (`maple_planner.py:211`); `policy.py` checks nothing. A duplicate record written into the customer's data, from the default pipeline. |
+| 2 | [#846](code-review-followups.md#846-high-planner-owed-verification-after-phase-8) | G1–G35 closed and the full live run are done. Still owed: task statuses in the parity state, the acceptance corpus on the planner pipeline, and acceptance conversations for the ~250 reference rows never put to the planner. This is how the next #947 gets found before a customer does. |
+| 3 | [#1304](code-review-followups.md#1304-medium-a-pdf-whose-pages-sit-in-compressed-object-streams-is-read-whatever-its-length) | A PDF with its pages in compressed object streams shows no page count, so Maple reads it whole, up to OpenAI's 100-page cap rather than our 20. One upload can cost several normal reads. The fix (`pypdf`) is chosen. |
+| 4 | [#490](code-review-followups.md#490-medium-same-field-conflicts-are-still-silent--the-conflict-detection-phase) | Same-field concurrent edits still resolve last-write-wins with no signal. Work-item saves now send `base_version`; the field auto-save, whole-save and `ConflictNotice` in the estimate builder are not wired, and `persist_fields` writes no audit entry. |
+| 5 | [#1436](code-review-followups.md#1436-medium-test_vocabulary_unique_namespy-fails-after-the-planner-and-maple-suites-in-one-run) | The full pytest run fails 11–13 vocabulary tests (and a rotating neighbour) though each passes alone, so the `/release` gate is red on every run and a real failure can hide in it. Some test leaves the shared test user changed. |
+| 6 | [#1329](code-review-followups.md#1329-low-maple-uploads-hold-their-bytes-in-memory-while-queued-for-a-read-slot) | Maple uploads sit in memory while they wait for a read slot, up to 300MB per user. Production runs on a 512 MB instance that idles around 260 MB and restarted out of memory on 2026-10-29 and 2026-10-31, so one user's burst of uploads can crash it. Moved up 2026-11-01. |
+| 7 | [#546](code-review-followups.md#546-medium-platformscriptsmigrate_landscaping_industrypy73--no-way-to-target-prod-and-no-confirmation-before---apply) | A migration script runs `--apply` with no environment guard or confirmation, so one wrong shell writes to a live database. Mirror `backfill_companies_to_free.py` (`--prod`, `--mongo-url`, a confirmation prompt). |
+| 8 | [#196](code-review-followups.md#196-medium-implement-payment_failed-user-notification) | A card decline leaves the customer in `past_due` with no notice from the platform (the handler is still a TODO). Send a Brevo email from `invoice.payment_failed`. |
+| 9 | [#1434](code-review-followups.md#1434-medium-a-line-named-without-its-work-item-is-looked-for-on-the-models-guess) | "make the excavation activity 8 hours" with no work item named is looked for on the model's guess, and failed two of four live runs on 2026-10-22. Nothing is written, but the edit doesn't happen. |
+| 10 | [#865](code-review-followups.md#865-medium-when-a-create-makes-nothing-the-later-steps-are-dropped-without-a-word) | When a create makes nothing, the plan's later steps are dropped without a word. |
+
+**Next in line:** [#1001](code-review-followups.md#1001-medium-a-command-followed-by-a-separate-question-is-read-as-a-question) (a command followed by a separate question is asked about as a question; moved down 2026-11-01 for #1329), [#1100](code-review-followups.md#1100-medium-dead-legacy-material-paths-post-materialsload-standard-and-the-unpaged-get-materials-now-unblocked) (the dead `load-standard` route is now unblocked: the stage-2 portal is on `release`), [#4](code-review-followups.md#4-high-file-and-function-size) (the first move is still extracting the invitation lifecycle from `routers/auth.py`), [#408](code-review-followups.md#408-medium-portalsrccomponentsdashboardupcomingtaskscardtsx38--completed-tasks-surface-in-upcoming-tasks) (needs a product call), and the [Query efficiency](code-review-followups.md#query-efficiency--scans-n1-and-missing-indexes) section.
+
+
+**Already marked resolved (7)**
+
+### 103. ~~[MEDIUM] `delete_template` returns 200 on non-existent id~~ — RESOLVED 2026-11-04
+
+**RESOLVED 2026-11-04:** DELETE of a missing template, role, task, contact or property now answers 404 (and so does another company's, through `dependencies.own_record`). In the portal, deleting a contact or property someone already deleted now shows "… not found" in the dialog instead of closing it.
+File: `platform/routers/templates.py:158-160`
+**Severity**: MEDIUM
+
+```python
+if not template:
+    return {"message": "Template not found"}
+```
+
+200 with a body that says "not found" is misleading. Mirrors
+`routers/labours.py:336-338`, so it's a project convention rather than a
+regression. If we ever standardize, fix all four (labours, templates, etc.)
+together.
+
+Fix: change to `raise HTTPException(404, "Template not found")` and update
+the parallel routers in the same PR.
+
+### 252. ~~[LOW] In-function imports in `services/billing/webhook_handlers.py`~~ — RESOLVED 2026-11-14
+
+`handle_invoice_paid` does `from models import User` inside the function
+for the per-user token-counter reset path. The rest of the module imports
+models at the top. Mixed style.
+
+Fix: move to module-top imports for consistency. Trivial cleanup; bundle
+with the next functional change to this file.
+
+**RESOLVED 2026-11-14:** the per-user reset moved to `services/billing/usage_reset.py`, which imports `User` at the top; `webhook_handlers.py` has no in-function import left.
+
+### 443. ~~[MEDIUM] platform/routers/ops.py:200 — task counts aggregate the whole collection~~ — RESOLVED 2026-10-22
+
+**RESOLVED 2026-10-22** (analytics MCP server, phase 1): `services/ops_queries.py::_counts_by_company` now `$match`es the page's company ids before grouping.
+
+`_counts_by_company` runs `$group` with no `$match`, and is now called on `tasks`
+as well as `users` for the ops Companies list. The page needs counts for at most
+100 company ids, but the pipeline scans every task in the database on every load.
+Tasks are the highest-volume company-scoped collection (50 per company on Free
+alone), so the cost grows without bound while the page's needs stay fixed.
+Harmless at present data size; the shape is the problem.
+**Suggested fix:** pass the page's company ids and prepend
+`{"$match": {"company": {"$in": ids}}}` — the existing
+`IndexModel([("company", 1), ...])` prefixes on Task serve it. Applies equally to
+the pre-existing users call.
+
+### 453. ~~[LOW] platform/routers/ops.py:417 — company-detail payload carries stale membership fields~~ — RESOLVED 2026-10-22
+
+**RESOLVED 2026-10-22** (review 2026-10-22 #14): the analytics MCP server's `get_company` gives these fields to agents, so the accept-as-is reasoning below no longer held. `services/ops_queries.py::list_company_users` now passes `email_verified`, `membership_status` and `company_archived` as the Users page does.
+
+Reviewed and **accepted as-is** rather than deferred by omission. `list_company_users`
+calls `_serialize_user_summary(u, company.name)` with defaults, so the payload reports
+`membership_status="active"` and `company_archived=False` even for an archived company.
+
+This was originally raised as HIGH ("the two ops pages contradict each other") and that
+was wrong about impact: `OpsCompanyDetailPage` renders Name / Email / Role / Joined and
+never reads either field, so no operator-visible inconsistency exists. The page is also a
+*roster* view — "who is attached to this company" — and its header already shows the
+company as archived, so per-row orphan labelling would be redundant. The product decision
+is that the roster should keep listing attached users exactly as it does now.
+
+What remains is dead data that could mislead later: whoever next adds a Status column to
+that table would get wrong values with no hint why.
+
+**Suggested fix:** if that table ever grows a Status column, pass the real values at the
+same time — `company` is already loaded on line 410, so it costs no extra query:
+`membership_status(u.company, ..., company_archived=_is_archived(company))` and
+`company_archived=_is_archived(company)`. Until then, no change.
+
+### 746. ~~[LOW] Linking rewrites the whole `contacts` array~~ — RESOLVED 2026-11-04
+
+**RESOLVED 2026-11-04:** Linking and unlinking go through `services/property_contacts.link_contact` / `unlink_contact` (`$addToSet` / `$pull`); the module docstring now says so.
+**Checked 2026-10-22:** Still read-modify-write at record_links.py:153 (link_contact_reply); docstring still says the write is the property agent's
+
+`platform/agents/conversation/record_links.py:141` — `fresh.set({"contacts": [*fresh.contacts, id]})` reads, modifies and writes, so a concurrent link (another turn or a portal edit) is overwritten. The docstring (13-14) says the write goes through the property agent; it doesn't. (review 2026-09-27 #76)
+
+**Suggested fix:** Use `{"$addToSet": {"contacts": contact.id}}` with an `updated_at` `$set`, and correct the docstring.
+
+### 1111. ~~[LOW] NaN and Infinity accepted as a material cost or price~~ — RESOLVED 2026-11-04
+
+**RESOLVED 2026-11-04:** `routers/material_helpers/common.to_float` refuses NaN and Infinity, so create and PUT on a company material answer 422 (the material agent shares the helper); CSV and pricing already refused them. Tested in `tests/test_material_api.py` with raw JSON bodies.
+**Checked 2026-10-22:** CSV upload (upload.py:_checked_amount) and PATCH /pricing / PUT on a standard (material_catalog_writes._price_value) now refuse NaN/Inf; create, PUT on a company material and common.to_float still accept them.
+
+`platform/routers/materials.py:105` — JSON/pydantic floats and `_to_float("nan")` accept them in PATCH /pricing, PUT, create and CSV cells; NaN passes the `< 0` check and is stored (Owner/Admin, own company only).
+
+**Suggested fix:** `Field(allow_inf_nan=False)` on SizePricing / MaterialSizeCost / the PUT model, and `math.isfinite` in `_to_float`.
+
+### 1424. ~~[LOW] list_by_source reads 50 rows to show 10~~ — RESOLVED 2026-11-12
+
+`platform/agents/planner/execute_catalog.py:247` — page_size=50 while `_LIST_MAX` is 10. (review 2026-10-21 #154, deferred)
+
+**Suggested fix:** page_size=_LIST_MAX.
+
+**RESOLVED 2026-11-12** (ten to a page, Simon): `list_by_source` reads one page, `page_size=paging.PAGE_SIZE`, from where "show more" left off; `_LIST_MAX` is gone.
+
+**Entries about this file, now fixed or obsolete (10)**
+
+### 977. ~~[LOW] Several new entries point at the wrong line~~ — RESOLVED 2026-11-15
+
+**RESOLVED 2026-11-15** (this pass): Citations updated: #962 → confirm.py:465, #966 → followups.py:567, #967 → metric_ratio_shapes.py:147, #969 → planner.py:183, #970 → `.claude/rules/maple.md`.
+
+**Checked 2026-10-22:** #955/#958/#959 are archived; #962/#966/#967/#969/#970 remain with stale citations.
+
+`documentation/development/code-review-followups.md:2236` — #955 → 1932 (not 2969), #958 → 2331, #959 → 2437, #962 → confirm.py:336, #966 → followups.py:446, #967 → metric_ratio_shapes.py:123, #969 → planner.py:171, #970 → CLAUDE.md:662. (review 2026-10-13 round 2 #77, deferred)
+
+**Suggested fix:** Update those references.
+
+### 1044. ~~[LOW] #952 and #960 cite the old reference lines again~~ — RESOLVED 2026-11-15
+
+**RESOLVED 2026-11-15** (this pass): #952 and #960 were merged into #952, which names each row by its phrasing; the rows' current lines are on their **Checked 2026-10-22** lines.
+
+**Checked 2026-10-22:** #952 row is now at maple-phrasing-reference.md:796 and #960 at :3154; entries still cite :769 and :2994.
+
+`documentation/development/code-review-followups.md` — Lines shifted with round 13's how-to edit: #952's row is now :772 (cited :769), #960's :2997 (cited :2994) — and round 14 moved nothing above them. (review round 14 #22, deferred)
+
+**Suggested fix:** Cite the rows by phrasing as well as line, so the next shift doesn't stale them; :772 and :2997 today.
+
+### 1055. ~~[LOW] #1023–#1027 cite stale lines~~ — RESOLVED 2026-11-15
+
+**RESOLVED 2026-11-15** (this pass): Of #1023–#1027 only #1025 is still open; it now cites estimate_gathering.py:353. #1027 was dropped as an edge case.
+
+**Checked 2026-10-22:** estimate_gathering.py defs are now at :315, :330, :353, :405, :436; entries still cite the older lines.
+
+`documentation/development/code-review-followups.md` — The estimate_gathering.py citations (:309, :324, :347, :399, :430) moved with round 14's `property_gone`: the defs are now at :315, :330, :353, :405 and :436. (review round 15 #18, deferred)
+
+**Suggested fix:** Cite the def lines.
+
+### 1056. ~~[LOW] #1038 is off by one~~ — RESOLVED 2026-11-15
+
+**RESOLVED 2026-11-15** (this pass): #1038 now cites the table at maple-phrasing-reference.md:1222 and `_TURN_HEADER` at phrasing_reference_rows.py:64.
+
+**Checked 2026-10-22:** Table is now at maple-phrasing-reference.md:1177; _TURN_HEADER at scripts/phrasing_reference_rows.py:64.
+
+`documentation/development/code-review-followups.md` — The table is at reference :1151 (cited :1150), and `_TURN_HEADER` at script :64 (cited :62). (review round 15 #19, deferred)
+
+**Suggested fix:** Correct both.
+
+### 1061. ~~[LOW] #1041 overclaims which fields the same-write checks read~~ — RESOLVED 2026-11-15
+
+**RESOLVED 2026-11-15** (this pass): #1041 now names the fields the same-write checks read.
+
+`documentation/development/code-review-followups.md` — It says "`commands=add_work_item_note` / `fields.*`, which the same-write checks read"; they read `commands=add_work_item_note`, `fields.property`, `fields.notes_append` and, since review round 16, the row's `parent.domain` / `a.domain` / `b.domain`. (review round 16 #11, deferred)
+
+**Suggested fix:** Name them.
+
+### 1200. ~~[LOW] Follow-ups #1100, #1101, #1111–#1116 cite pre-split line numbers~~ — RESOLVED 2026-11-15
+
+**RESOLVED 2026-11-15** (this pass): #1100 now cites material_overrides.py:79 and materials.py:167 (#1101 merged into it), #1112 materials.py:360, #1113 material_overrides.py:156, #1114 material_overrides.py:70 and materials.py:469. #1111 is resolved; #1116 already carries its own **Checked** line.
+
+`documentation/development/code-review-followups.md:2964` — E.g. #1100 cites materials.py:362 (now material_overrides.py:78). (review 2026-10-16 round 2 #135, deferred)
+
+**Suggested fix:** Re-point each to its new file and line.
+
+### 1302. ~~[LOW] #1251's resolution note names the old home of the check~~ — RESOLVED 2026-11-15
+
+**RESOLVED 2026-11-15** (this pass): The note was appended to #1251 in the archive.
+
+`documentation/development/code-review-followups.md (#1251)` — The note says "`handleSubmit` refuses a save…" and lists only the MaterialsPageForm tests. Review round 1 moved the checks into `src/lib/materialSizes.ts::sizeRowsPayload` and added `tests/materialSizes.test.ts` (including the "1e999" cost). A reader following the note looks in the wrong place. (review 2026-10-18, round 2 #3, deferred)
+
+**Suggested fix:** Append to the note: "Review round 1 moved the size checks and the payload into `src/lib/materialSizes.ts` (`sizeRowsPayload`, `sellsAtCost`, `SizeFormRow`), unit-tested in `tests/materialSizes.test.ts`, and added a test that a non-finite cost is refused." Do it when #1251 moves to the archive.
+
+### 1303. ~~[LOW] #1252's resolution note predates the helper and the two added tests~~ — RESOLVED 2026-11-15
+
+**RESOLVED 2026-11-15** (this pass): The note was appended to #1252 in the archive.
+
+`documentation/development/code-review-followups.md (#1252)` — The note credits `_material_payload_from_fields` with the rebuild; review round 1 moved it into `_stored_size_entries` and added two tests (a price said again still records the unpriced size at its cost; a size with neither number is left out) that the note's test list doesn't name. (review 2026-10-18, round 2 #4, deferred)
+
+**Suggested fix:** Append to the note: "Review round 1 moved the stored-sizes rebuild into `_stored_size_entries` and added two tests: a price said again at its own value still records the unpriced size at its cost, and a stored size with neither a price nor a cost is left out of a sizes write." Do it when #1252 moves to the archive.
+
+### 978. ~~[LOW] The new #4 table row is out of order~~ — OBSOLETE 2026-11-15
+
+**Obsolete 2026-11-15:** The `test_planner_said.py` row is no longer in #4's tables.
+
+`documentation/development/code-review-followups.md:186` — "| 965 | test_planner_said.py" sits above the 1,091 row; the table is sorted largest first. (review 2026-10-13 round 2 #78, deferred)
+
+**Suggested fix:** Move it between the 1,091 and 957 rows.
+
+### 1039. ~~[LOW] #1030, #1031 and #1034 are partly stale~~ — OBSOLETE 2026-11-15
+
+**Obsolete 2026-11-15:** #1030, #1031 and #1034 were dropped as untested edge cases, so there is nothing left to reword.
+
+`documentation/development/code-review-followups.md` — #1034 says "53 live cases" of legacy rows; after the turn-table change only 3 remain (:604, :954, :2624). #1030's `expect or "gap"` and unreadable-row arms are now killed by `test_an_unreadable_plan_row_without_a_status_is_not_called_supported` — only the de-dup arm is left. #1031's reset on a heading is now done in `read()` too (now tested, round 14 #15). (review round 14 #24, deferred)
+
+**Suggested fix:** Reword the three entries to what is still untested.
+
+**Merged into another entry (96)** — each keeper's body carries the merged entry under a **From #N** heading.
+
+### 61. ~~[LOW] Trello httpx client rebuilt per request~~ — MERGED 2026-11-15 into #392
+
+Its body moved into #392, under **From #61**.
+
+### 83. ~~[LOW] Inconsistent ID extraction across settings tab components~~ — MERGED 2026-11-15 into #337
+
+Its body moved into #337, under **From #83**.
+
+### 148. ~~[LOW] Three near-identical settings tabs~~ — MERGED 2026-11-15 into #337
+
+Its body moved into #337, under **From #148**.
+
+### 315. ~~[LOW] Duplicate `normalizeEstimateStatus` definition (pre-existing)~~ — MERGED 2026-11-15 into #317
+
+Its body moved into #317, under **From #315**.
+
+### 571. ~~[LOW] "5,000" hard-coded in the additional-info 422 message~~ — MERGED 2026-11-15 into #599
+
+Its body moved into #599, under **From #571**.
+
+### 572. ~~[LOW] "10 MB" hard-coded in the doc-image size message~~ — MERGED 2026-11-15 into #599
+
+Its body moved into #599, under **From #572**.
+
+### 573. ~~[LOW] Doc-image file-name limit `200` is an unnamed literal~~ — MERGED 2026-11-15 into #599
+
+Its body moved into #599, under **From #573**.
+
+### 574. ~~[LOW] `max-age=3600` literal on the doc-image response~~ — MERGED 2026-11-15 into #599
+
+Its body moved into #599, under **From #574**.
+
+### 580. ~~[LOW] `prepare_doc_template` docstring doesn't mention `additional_info`~~ — MERGED 2026-11-15 into #587
+
+Its body moved into #587, under **From #580**.
+
+### 586. ~~[LOW] `get_doc_image` has no return annotation~~ — MERGED 2026-11-15 into #587
+
+Its body moved into #587, under **From #586**.
+
+### 588. ~~[LOW] `doc_image_storage_path` has no docstring~~ — MERGED 2026-11-15 into #587
+
+Its body moved into #587, under **From #588**.
+
+### 589. ~~[LOW] `store_doc_image` has no docstring~~ — MERGED 2026-11-15 into #587
+
+Its body moved into #587, under **From #589**.
+
+### 590. ~~[LOW] `read_doc_image` has no docstring~~ — MERGED 2026-11-15 into #587
+
+Its body moved into #587, under **From #590**.
+
+### 591. ~~[LOW] `ProcessedDocImage` has no docstring~~ — MERGED 2026-11-15 into #587
+
+Its body moved into #587, under **From #591**.
+
+### 593. ~~[LOW] The save-failure reason is hidden behind the Documents dialog~~ — MERGED 2026-11-15 into #592
+
+Its body moved into #592, under **From #593**.
+
+### 595. ~~[LOW] The portal still sends a `created_by` the server now ignores~~ — MERGED 2026-11-15 into #594
+
+Its body moved into #594, under **From #595**.
+
+### 596. ~~[LOW] `getEntityId(estimate) ?? ""` is dead code on the Documents button~~ — MERGED 2026-11-15 into #594
+
+Its body moved into #594, under **From #596**.
+
+### 600. ~~[LOW] "10MB" hard-coded in the image rejection message~~ — MERGED 2026-11-15 into #599
+
+Its body moved into #599, under **From #600**.
+
+### 754. ~~[LOW] A reload can return the numbers from before the write~~ — MERGED 2026-11-15 into #753
+
+Its body moved into #753, under **From #754**.
+
+### 755. ~~[LOW] The list reload has no `cancelled` guard~~ — MERGED 2026-11-15 into #753
+
+Its body moved into #753, under **From #755**.
+
+### 770. ~~[LOW] The `?propertyId=` announce test never checks the link is consumed~~ — MERGED 2026-11-15 into #769
+
+Its body moved into #769, under **From #770**.
+
+### 772. ~~[LOW] A `?propertyId=` link on a phone-sized screen lands on the list with no sheet~~ — MERGED 2026-11-15 into #771
+
+Its body moved into #771, under **From #772**.
+
+### 853. ~~[HIGH] `_from_step` when the earlier step found no single record is untested~~ — MERGED 2026-11-15 into #851
+
+Its body moved into #851, under **From #853**.
+
+### 960. ~~[MEDIUM] Reference row fails 2 runs in 3: "don't forget to call Bob Lee tomorrow" [none]~~ — MERGED 2026-11-15 into #952
+
+Its body moved into #952, under **From #960**.
+
+### 979. ~~[LOW] The by-division card rule is said twice~~ — MERGED 2026-11-15 into #898
+
+Its body moved into #898, under **From #979**.
+
+### 1004. ~~[MEDIUM] The gap before "pay" catches what customers pay~~ — MERGED 2026-11-15 into #1003
+
+Its body moved into #1003, under **From #1004**.
+
+### 1017. ~~[LOW] The new-or-open question puts "the" before the scope whatever its wording~~ — MERGED 2026-11-15 into #1015
+
+Its body moved into #1015, under **From #1017**.
+
+### 1064. ~~[MEDIUM] Reference row asks or reads another way: "add mulch to the front patio work item" [wi]~~ — MERGED 2026-11-15 into #952
+
+Its body moved into #952, under **From #1064**.
+
+### 1065. ~~[MEDIUM] Reference row asks or reads another way: "this month vs last month" [est]~~ — MERGED 2026-11-15 into #952
+
+Its body moved into #952, under **From #1065**.
+
+### 1066. ~~[MEDIUM] Reference row asks or reads another way: "tasks by person" [none]~~ — MERGED 2026-11-15 into #952
+
+Its body moved into #952, under **From #1066**.
+
+### 1067. ~~[MEDIUM] Reference row asks or reads another way: "rename the fence task to edging by property" [none]~~ — MERGED 2026-11-15 into #952
+
+Its body moved into #952, under **From #1067**.
+
+### 1068. ~~[MEDIUM] Reference row asks or reads another way: "and mulch materials?" [none]~~ — MERGED 2026-11-15 into #952
+
+Its body moved into #952, under **From #1068**.
+
+### 1101. ~~[MEDIUM] Dead branch: GET /materials bare-array response, unbounded (keep until the new portal ships)~~ — MERGED 2026-11-15 into #1100
+
+Its body moved into #1100, under **From #1101**.
+
+### 1105. ~~[LOW] The shared Toast's live region is mounted already holding its text~~ — MERGED 2026-11-15 into #757
+
+Its body moved into #757, under **From #1105**.
+
+### 1121. ~~[LOW] Missing annotations and docstrings in the material vocabulary and migration script~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1121**.
+
+### 1126. ~~[LOW] Missing docstrings and a bare set in catalog matching~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1126**.
+
+### 1178. ~~[LOW] Export nothing imports: `GapMaterialLine`~~ — MERGED 2026-11-15 into #1177
+
+Its body moved into #1177, under **From #1178**.
+
+### 1179. ~~[LOW] `csvUploadSummary` is exported only for its tests~~ — MERGED 2026-11-15 into #1177
+
+Its body moved into #1177, under **From #1179**.
+
+### 1180. ~~[LOW] A disabled item's reason exists only as a title~~ — MERGED 2026-11-15 into #431
+
+Its body moved into #431, under **From #1180**.
+
+### 1183. ~~[LOW] `min_price` / `max_price` in MaterialPageParams have no caller~~ — MERGED 2026-11-15 into #1177
+
+Its body moved into #1177, under **From #1183**.
+
+### 1187. ~~[LOW] PUT `price: null` on a cost-only override writes and audits a no-op~~ — MERGED 2026-11-15 into #1113
+
+Its body moved into #1113, under **From #1187**.
+
+### 1188. ~~[LOW] DELETE /overrides with no override still audits~~ — MERGED 2026-11-15 into #1113
+
+Its body moved into #1113, under **From #1188**.
+
+### 1189. ~~[LOW] PATCH /visibility to the current state still audits~~ — MERGED 2026-11-15 into #1113
+
+Its body moved into #1113, under **From #1189**.
+
+### 1194. ~~[LOW] load-standard writes the toggle audit inline~~ — MERGED 2026-11-15 into #1100
+
+Its body moved into #1100, under **From #1194**.
+
+### 1197. ~~[LOW] Missing docstrings in upload.py~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1197**.
+
+### 1198. ~~[LOW] `to_float` has no docstring~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1198**.
+
+### 1199. ~~[LOW] `LineItemSnapshots.material` lacks a docstring; `_fetch_material_snapshots` takes a bare set~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1199**.
+
+### 1201. ~~[LOW] `hide_name_clashes_for` scans every tenant's materials with regexes~~ — MERGED 2026-11-15 into #1285
+
+Its body moved into #1285, under **From #1201**.
+
+### 1212. ~~[LOW] Missing docstrings in material_catalog_writes.py~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1212**.
+
+### 1213. ~~[LOW] Missing docstrings in standard_material_seed.py~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1213**.
+
+### 1214. ~~[LOW] Missing docstrings in material_migration.py~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1214**.
+
+### 1215. ~~[LOW] `_opt_into_standard_materials` has no docstring~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1215**.
+
+### 1216. ~~[LOW] `Vocabulary` has no docstring~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1216**.
+
+### 1218. ~~[LOW] Magic strings "standard"/"custom"/"detached" in the writer~~ — MERGED 2026-11-15 into #1217
+
+Its body moved into #1217, under **From #1218**.
+
+### 1220. ~~[LOW] A Member who renames a standard via Maple is told about prices~~ — MERGED 2026-11-15 into #1115
+
+Its body moved into #1115, under **From #1220**.
+
+### 1225. ~~[LOW] The 200 name-match cap is defined three times~~ — MERGED 2026-11-15 into #1125
+
+Its body moved into #1125, under **From #1225**.
+
+### 1243. ~~[LOW] `_NOT_EDITABLE` copies the route's refusal text~~ — MERGED 2026-11-15 into #863
+
+Its body moved into #863, under **From #1243**.
+
+### 1244. ~~[LOW] The new reply models have no docstrings~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1244**.
+
+### 1265. ~~[LOW] `unhide_for_removed_names`' docstring miscounts the round trips~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1265**.
+
+### 1266. ~~[LOW] `_material_payload_from_fields` has no docstring~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1266**.
+
+### 1267. ~~[LOW] `_build_sizes_from_fields` has no docstring~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1267**.
+
+### 1268. ~~[LOW] `_normalize_size_text` has no docstring~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1268**.
+
+### 1286. ~~[LOW] The seed module docstring omits the release step~~ — MERGED 2026-11-15 into #1211
+
+Its body moved into #1211, under **From #1286**.
+
+### 1293. ~~[HIGH] upload_properties_csv: re-uploading a contact against an existing address is untested~~ — MERGED 2026-11-15 into #1292
+
+Its body moved into #1292, under **From #1293**.
+
+### 1294. ~~[HIGH] upload_labours_csv: a failed row write reported as a row error is untested~~ — MERGED 2026-11-15 into #1292
+
+Its body moved into #1292, under **From #1294**.
+
+### 1295. ~~[HIGH] upload_equipments_csv: a duplicate row and a failed row write are untested~~ — MERGED 2026-11-15 into #1292
+
+Its body moved into #1292, under **From #1295**.
+
+### 1320. ~~[MEDIUM] `VIDEO_ACCEPT` is exported but imported nowhere (dead export)~~ — MERGED 2026-11-15 into #1319
+
+Its body moved into #1319, under **From #1320**.
+
+### 1321. ~~[MEDIUM] `read_error` on `MapleAttachmentUpload` is never populated (dead field)~~ — MERGED 2026-11-15 into #1319
+
+Its body moved into #1319, under **From #1321**.
+
+### 1343. ~~[LOW] The Maple attachments design doc documents the upload reply with `read_error`~~ — MERGED 2026-11-15 into #1342
+
+Its body moved into #1342, under **From #1343**.
+
+### 1378. ~~[HIGH] _update_property: the early return before a clear is untested~~ — MERGED 2026-11-15 into #1377
+
+Its body moved into #1377, under **From #1378**.
+
+### 1379. ~~[HIGH] "A contact keeps its name" isn't pinned by a test~~ — MERGED 2026-11-15 into #1377
+
+Its body moved into #1377, under **From #1379**.
+
+### 1382. ~~[HIGH] undo._before_write: a ref that isn't one record is untested~~ — MERGED 2026-11-15 into #1388
+
+Its body moved into #1388, under **From #1382**.
+
+### 1383. ~~[HIGH] undo._wrote: the not-written arms are untested~~ — MERGED 2026-11-15 into #1388
+
+Its body moved into #1388, under **From #1383**.
+
+### 1385. ~~[HIGH] undo._after_write: the status-date guard and the other not-undoable arms are untested~~ — MERGED 2026-11-15 into #1388
+
+Its body moved into #1388, under **From #1385**.
+
+### 1390. ~~[HIGH] _check_action: a stray yes planned as an undo is untested~~ — MERGED 2026-11-15 into #851
+
+Its body moved into #851, under **From #1390**.
+
+### 1393. ~~[HIGH] show_material: the name-taken refusal and a catalog error are untested~~ — MERGED 2026-11-15 into #1391
+
+Its body moved into #1391, under **From #1393**.
+
+### 1394. ~~[HIGH] reset_material: the name-taken refusal and a catalog error are untested~~ — MERGED 2026-11-15 into #1391
+
+Its body moved into #1391, under **From #1394**.
+
+### 1395. ~~[HIGH] copy_material: the copy refusals and a copy missing after insert are untested~~ — MERGED 2026-11-15 into #1391
+
+Its body moved into #1391, under **From #1395**.
+
+### 1399. ~~[HIGH] _check_catalog_ops / _effective_target: an unresolved target is untested~~ — MERGED 2026-11-15 into #851
+
+Its body moved into #851, under **From #1399**.
+
+### 1400. ~~[HIGH] _check_catalog_notes: a note on a role is untested~~ — MERGED 2026-11-15 into #851
+
+Its body moved into #851, under **From #1400**.
+
+### 1405. ~~[LOW] The file-removal rule lives in the planner prompt and in code~~ — MERGED 2026-11-15 into #898
+
+Its body moved into #898, under **From #1405**.
+
+### 1406. ~~[LOW] The average-rate rule lives in the planner prompt and in code~~ — MERGED 2026-11-15 into #898
+
+Its body moved into #898, under **From #1406**.
+
+### 1410. ~~[LOW] The five catalog actions are listed twice in the Action union~~ — MERGED 2026-11-15 into #1427
+
+Its body moved into #1427, under **From #1410**.
+
+### 1416. ~~[LOW] undo._SKIP names fields that don't exist~~ — MERGED 2026-11-15 into #1433
+
+Its body moved into #1433, under **From #1416**.
+
+### 1417. ~~[LOW] undo._WHAT["delete_note"] is dead~~ — MERGED 2026-11-15 into #1433
+
+Its body moved into #1433, under **From #1417**.
+
+### 1418. ~~[LOW] The "write_failed" check in undo._wrote is dead~~ — MERGED 2026-11-15 into #1433
+
+Its body moved into #1433, under **From #1418**.
+
+### 1419. ~~[LOW] undo stores a turn on every entry and never reads it~~ — MERGED 2026-11-15 into #1433
+
+Its body moved into #1433, under **From #1419**.
+
+### 1430. ~~[HIGH] `_size_change_applies`: the no-size arm untested~~ — MERGED 2026-11-15 into #851
+
+Its body moved into #851, under **From #1430**.
+
+### 1439. ~~[LOW] The email-only verification resend answers differently under a throttle or outage~~ — MERGED 2026-11-15 into #1298
+
+Its body moved into #1298, under **From #1439**.
+
+### 1484. ~~[LOW] Onboarding accepts a NaN percentage, or an infinite markup (review 2026-11-04, customer MCP server round 3)~~ — MERGED 2026-11-15 into #1205
+
+Its body moved into #1205, under **From #1484**.
+
+### 1508. ~~[HIGH] `load_refresh_token`: refreshing after a disconnect is untested (review 2026-11-06, MCP OAuth sign-in #27)~~ — MERGED 2026-11-15 into #1507
+
+Its body moved into #1507, under **From #1508**.
+
+### 1509. ~~[HIGH] `exchange_refresh_token`: a spent refresh token and a revoked grant are untested (review 2026-11-06, MCP OAuth sign-in #28)~~ — MERGED 2026-11-15 into #1507
+
+Its body moved into #1507, under **From #1509**.
+
+### 1510. ~~[HIGH] `resolve_company_token`: a deleted user's token is untested (review 2026-11-06, MCP OAuth sign-in #29)~~ — MERGED 2026-11-15 into #1507
+
+Its body moved into #1507, under **From #1510**.
+
+### 1511. ~~[HIGH] `resolve_staff_token`: a deleted staff user's token is untested (review 2026-11-06, MCP OAuth sign-in #30)~~ — MERGED 2026-11-15 into #1507
+
+Its body moved into #1507, under **From #1511**.
+
+### 1647. ~~[MEDIUM] Today's city/role list still shows up to 25~~ — MERGED 2026-11-15 into #1646
+
+Its body moved into #1646, under **From #1647**.
+
+### 1672. ~~[LOW] A failed delete cascade leaves orphans with no audit row~~ — MERGED 2026-11-15 into #1671
+
+Its body moved into #1671, under **From #1672**.
+
+**Dropped: untested edge cases (97)**
+
+### 823. ~~[MEDIUM] The catalog figure's database-down reply is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/conversation/catalog_figures.py:298` — (Edge case — an infrastructure failure.) `catalog_figure_reply` catches a failed query and replies `_DB_DOWN` under a list intent with an empty result, so no 500 reaches the user. No test makes the query fail, so a regression that re-raises or uses the wrong intent would pass. (review 2026-10-08 (2c) branch audit #2, deferred)
+
+**Suggested fix:** Monkeypatch `catalog_figures.material_price_extreme` to raise, run `{op: "catalog_figure", kind: "priciest_material"}` through the executor, and assert `response == _DB_DOWN`, `intent == "list_materials"`, `result == {"operation": "list_materials", "read_only": True, "figure": "highest", "field": "price"}`.
+
+### 824. ~~[MEDIUM] The metric's database-down reply is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/estimate/metric_answers.py:334` — (Edge case — an infrastructure failure.) `answer_metric_ask` catches a failed resolve or fetch and replies `_DB_DOWN` as a question ("Would you like to try again?"). Only the string's outcome classification is tested (test_maple_outcomes.py:84), not the path. (review 2026-10-08 (2c) branch audit #3, deferred)
+
+**Suggested fix:** Monkeypatch `metric_answers.run_metric` to raise, run `{op: "metric", status: "sold"}` through the executor, and assert `response == _DB_DOWN`, `needs_clarification is True`, `clarifying_question == "Would you like to try again?"`.
+
+### 825. ~~[MEDIUM] A status breakdown with no data is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/estimate/crud_handlers.py:2188` — (Edge case — analytics with no entries at all, a data shape #4/#5 don't reach.) When `compute_analytics` returns no status entries, the reply is "No status data available for this period." No test reaches it. (review 2026-10-08 (2c) branch audit #6, deferred)
+
+**Suggested fix:** Monkeypatch `routers.estimates.compute_analytics` to return an object with empty `by_status` and `by_division`, run `{card: "by_status"}`, and assert the reply. Pair with #5, so each arm has its own case.
+
+### 826. ~~[MEDIUM] A `count: false` inside a filter beside `count: true` is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/schema.py:67` — (Edge case — an unusual combination of inputs.) `_count_in_filter` keeps the action's own `count` when the filter's is false (`bool(data.get("count")) or bool(counted)`). Only `filter.count: true` is tested, so a change that lets the filter's false override the action's true would pass. (review 2026-10-08 (2c) branch audit #10, deferred)
+
+**Suggested fix:** Add a schema test: `{"op": "list_properties", "count": True, "filter": {"owner": "x", "count": False}}` validates to `count is True` and a filter without `count`.
+
+### 827. ~~[MEDIUM] `_metric`'s no-ask guard is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** _metric now lives in platform/agents/planner/execute_figures.py, not execute.py
+
+`platform/agents/planner/execute.py:681` — (Edge case — a defensive guard no caller reaches.) `_metric` raises `ValueError` when `metric_ask` returns None — unreachable through `execute` because the gate stops such a plan, but it is the executor's guard if `_metric` is ever reached another way. No test. (review 2026-10-08 (2c) branch audit #12, deferred)
+
+**Suggested fix:** Call `execute._metric(schema.Metric(shape="ranking"), context={}, message_en="m", get_processor=lambda _l: None)` under `pytest.raises(ValueError)`.
+
+### 828. ~~[MEDIUM] A notes parent property with no name is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/conversation/record_notes.py:115` — (Edge case — optional data missing.) `note_parent("property", doc)` names a property by its street when it has no name (`Property.name` is optional, default ""). The reply's label and the focus name both use it. Every test property has a name. (review 2026-10-08 (2c) branch audit #13, deferred)
+
+**Suggested fix:** In the notes test, add a property with `name=""` and a note, run `list_notes` on it, and assert the reply names its street ("Here are the notes on [3 Oak Ave]…").
+
+### 829. ~~[MEDIUM] A notes parent estimate with no code is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/conversation/record_notes.py:119` — (Edge case — optional data missing.) `note_parent("estimate", doc)` labels the estimate by its title when `estimate_id` is blank. No test has an estimate without a code. (review 2026-10-08 (2c) branch audit #14, deferred)
+
+**Suggested fix:** Call `note_parent("estimate", SimpleNamespace(id=PydanticObjectId(), estimate_id="", title="Birch Patio"))` and assert `"Birch Patio" in parent.label` and `parent.name == ""`.
+
+### 830. ~~[MEDIUM] A property's contacts named by its street, or "That property", is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/contact/service.py:2039` — (Edge case — optional data missing.) `contacts_of_property_reply` labels the property by name, else street, else "That property". Only the name arm is tested. (review 2026-10-08 (2c) branch audit #15, deferred)
+
+**Suggested fix:** Add stored properties with `name=""` (assert "3 Oak Ave has 1 contact:") and with `name=""` and `street=""` — `street` is required but an empty string passes — (assert "That property has no contacts linked to it yet.").
+
+### 831. ~~[MEDIUM] A contact's property row named by its street, or "Unnamed Property", is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/property/service.py:2553` — (Edge case — optional data missing.) `properties_of_contact_reply` labels each row by name, else street, else "Unnamed Property". Only named properties are tested, so a nameless property's row label is unpinned. (review 2026-10-08 (2c) branch audit #16, deferred)
+
+**Suggested fix:** Link Ana to a property with `name=""` (assert its row shows the street) and to one with `name=""` and `street=""` — `street` is required but an empty string passes validation — (assert its row shows "Unnamed Property").
+
+### 832. ~~[MEDIUM] Adding notes to a task that has none, among several changes, is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/task/planned.py:95` — (Edge case: optional data missing.) `_planned_note`'s `else added` arm, notes added to an empty note among several changes, has no test. A wrong join would leave a stray blank first line, which becomes an empty title. (review 2026-10-08 (4b) #16, deferred)
+
+**Suggested fix:** With the blank task, test `{"notes_append": "Call Bob", "status": "Done"}`: `description == "Call Bob"` and `title == "Call Bob"`.
+
+### 833. ~~[MEDIUM] A task status that doesn't resolve among several changes is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/task/planned.py:107` — (Edge case: a guard the policy screens out.) The policy asks first about a status the company doesn't have (`_check_details`), so `_planned_change` returning None for one is reachable only if the policy and `_resolve_status_by_name` disagree. It is untested. (review 2026-10-08 (4b) #17, deferred)
+
+**Suggested fix:** Test `TaskAgent.update_task_reply(task, {"status": "Blocked", "assignee": "Jordan"}, …)` directly: it asks today's "I don't recognize 'Blocked' …" question, and nothing is written.
+
+### 834. ~~[MEDIUM] A teammate that doesn't resolve among several task changes is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/task/planned.py:110` — (Edge case: a guard the policy screens out.) The policy asks first about a teammate who isn't exactly one (`_check_details`), so `_planned_assignee` returning None for a name is unreachable through a real turn. It is untested. (review 2026-10-08 (4b) #18, deferred)
+
+**Suggested fix:** Call `update_task_reply` directly with `{"assignee": "Nobody", "status": "Done"}`: today's "Who should I assign the task to?" is asked, and nothing is written.
+
+### 835. ~~[MEDIUM] "Me" with no known email among several task changes is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/task/planned.py:129` — (Edge case: missing data.) With no `current_user_email`, `_planned_assignee` returns None and the change goes to `_handle_task_assign`, which says "I couldn't confirm your email…". There is no test. (review 2026-10-08 (4b) #19, deferred)
+
+**Suggested fix:** Use a context without `current_user_email` and `{"assignee": "me", "status": "Done"}`: that reply, with `success=False`, and nothing written (`_run(..., me=None)` in test_planner_execute_tasks.py already supports it).
+
+### 836. ~~[MEDIUM] Archiving among several task changes is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/task/planned.py:115` — (Edge case: an unusual combination.) `_planned_change`'s `archived` arm ("mark it done and archive it") has no test. (review 2026-10-08 (4b) #20, deferred)
+
+**Suggested fix:** Test `{"status": "Done", "archived": True}`: both are written in one update.
+
+### 837. ~~[MEDIUM] The planner's unknown-task-field raise can't be reached~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/task/planned.py:122` — (Edge case: a defensive guard no caller reaches.) Every key comes from `TaskFields`, so `raise ValueError(f"no task field {name}")` can't run. It is untested. (review 2026-10-08 (4b) #21, deferred)
+
+**Suggested fix:** Keep it as the explicit guard and add a direct test: `_planned_change("colour", "red", …)` raises ValueError. Or fold `due_date` into the `cleared` table's style and drop the raise.
+
+### 850. ~~[MEDIUM] The archive/unarchive role refusal wording is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/policy.py:304` — Edge case. The `who == "archive"` text is never asserted. (review 2026-10-11 #24, deferred)
+
+**Suggested fix:** A non-creator Member archiving → `response == status_role_refusal_text("archive", code, DRAFT, ARCHIVED)`.
+
+### 852. ~~[MEDIUM] A status jump from a status with nowhere to go (`asks=False`) is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/policy.py:295` — Edge case. The "there's nowhere I can move it from chat" arm, and that no question is kept, are untested. (It's unreachable with today's transition table; see #31.) (review 2026-10-11 #26, deferred)
+
+**Suggested fix:** Monkeypatch `ESTIMATE_STATUS_TRANSITIONS` so the current status has no targets → assert the text and `_asks_again(done)` false.
+
+### 856. ~~[MEDIUM] An empty list total is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/estimate/list_core.py:118` — Edge case. The "You don't have any matching {plural} to total up." arm isn't reached. (review 2026-10-11 #30, deferred)
+
+**Suggested fix:** `{list_estimates, filter:{statuses:[Lost]}, total}` with no Lost estimates → that text and count 0.
+
+### 857. ~~[MEDIUM] Public `or_join`'s empty and two-item arms are untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/services/estimate_status.py:98` — Edge case, unreachable today (every status allows 1 or 3 targets), but the helper is now public. (review 2026-10-11 #31, deferred)
+
+**Suggested fix:** Unit test: `or_join([])==""`, `["A"]`→"A", `["A","B"]`→"A or B", `["A","B","C"]`→"A, B, or C".
+
+### 861. ~~[MEDIUM] The comparison said-back for average/largest/smallest, and "smallest", are untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** said_back wording changed ('I can't rank by ... yet'); by_month/ranking for average/largest tested (test_planner_metric_shapes.py:45-53), the comparison fall-through and 'smallest' still untested
+
+`platform/agents/estimate/metric_ratios.py:58` — Edge case. The fall-through arm, and every "smallest" entry, are never used by a test. (review 2026-10-11 #35, deferred)
+
+**Suggested fix:** `said_back(_metric(metric="average", compare="quarter", status="sold", period="quarter"))` == the "I can't compare average estimates yet…" text, and smallest ranking → "I can't rank by smallest estimate yet.".
+
+### 869. ~~[MEDIUM] A policy refusal with no words falling back (`decision:refuse`) is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute.py:334` — Edge case. The `all(c.refusal …)` False arm isn't reached by a test. (review 2026-10-11 #44, deferred)
+
+**Suggested fix:** `PlanCheck("refuse", [ActionCheck(1, "edit_estimate", verdict="would_refuse", refusal="")])` → `uncovered == "decision:refuse"`.
+
+### 870. ~~[MEDIUM] Several refusals joined and de-duplicated is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute.py:415` — Edge case. The two-action join is never driven. (review 2026-10-11 #45, deferred)
+
+**Suggested fix:** Two refused actions, the same text twice plus one different → the response holds two paragraphs.
+
+### 873. ~~[MEDIUM] `_metric`'s said-back reply is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_figures.py:102` — Edge case. Only `said_back()` and the gate are tested, not the handler arm. (review 2026-10-11 #48, deferred)
+
+**Suggested fix:** `asyncio.run(_metric(metric{average, by_month}, …))` → the response equals the `said_back` text and the operation is "refusal".
+
+### 874. ~~[MEDIUM] Notes on a work item or a catalog record are only reached through the gate~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** Material parent covered (tests/test_planner_material_catalog_ops.py:722-735, test_planner_execute_files.py:1562); the work_item list_notes arm of no_notes_feed is not driven (only via delete)
+
+`platform/agents/planner/execute_links.py:199` — Edge case. The `said_reply(no_notes_feed(domain))` arm isn't driven. (review 2026-10-11 #49, deferred)
+
+**Suggested fix:** `list_notes` with a material parent → NOTES_NOT_ON_CATALOG_MESSAGE; with a work_item parent → WORK_ITEM_NOTES_IN_APP.
+
+### 878. ~~[MEDIUM] `catalog_within`'s role wording is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_figures.py:23` — Edge case. Only the material arm is tested. (review 2026-10-11 #53, deferred)
+
+**Suggested fix:** `catalog_within("foremen", "labour")` contains "all your roles".
+
+### 884. ~~[MEDIUM] The validator arm rejecting a name side with no kind is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/schema.py:386` — Edge case. (review 2026-10-11 #59, deferred)
+
+**Suggested fix:** `pytest.raises(ValidationError)` for a link `{"a":{"by":"name","text":"Ana"}, …}`.
+
+### 889. ~~[MEDIUM] A create's missing field in a multi-action plan is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/asks.py:338` — Edge case. The "What's the name of the new contact?" arm isn't reached. (review 2026-10-11 #64, deferred)
+
+**Suggested fix:** `[create_contact {}, link step 1 → property]` with `create_need("create_contact","name")` → that text, `label == "name"`, domain PLANNER_TEXT; plus a labour case ("wage").
+
+### 890. ~~[MEDIUM] LOST_TRACK through asks is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/asks.py:329` — Edge case. (review 2026-10-11 #65, deferred)
+
+**Suggested fix:** Reasons `["the question expired (asked over an hour ago)"]` → `found.text == confirm.LOST_TRACK and found.ask is False`.
+
+### 892. ~~[MEDIUM] The singular "I only listed 1 …" is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/asks.py:271` — Edge case. (review 2026-10-11 #67, deferred)
+
+**Suggested fix:** Reason "row 2 of a list of 1" for a task → "I only listed 1 task — which one did you mean?".
+
+### 895. ~~[MEDIUM] The `by == "added"` branch is unreachable and untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/resolve.py:412` — Edge case. A defensive guard: the policy handles "added" before calling the resolver. (review 2026-10-11 #70, deferred)
+
+**Suggested fix:** `_pick(world, {"by":"added"}).status == "unresolved"`, or remove the branch with a comment.
+
+### 901. ~~[MEDIUM] A question asked on a confirmed yes being kept is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/turn.py:123` — Edge case. The overage-yes test asserts only the response prefix. (review 2026-10-11 #81, deferred)
+
+**Suggested fix:** After "yes" to an overage create with no property, assert the open question is REWRITE_OP with `original_message == "link estimate E00xx to a property"` and OFFER_LABEL_KEY set.
+
+### 903. ~~[MEDIUM] Several handler questions in one turn is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/kept_questions.py:122` — Edge case. All are dropped and only the newest is kept; nothing asserts this. (review 2026-10-11 #83, deferred)
+
+**Suggested fix:** Two non-yes/no handler questions in `ran["context"]` → exactly one open question, with the newest text.
+
+### 931. ~~[MEDIUM] An estimate in the combined delete question is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/confirm.py:138` — Edge case. The `what`/`name` an estimate delete gives ("estimate 'Birch Patio (E0001)'") is never shown in a combined question or its no. (review 2026-10-11 #14, deferred)
+
+**Suggested fix:** Test two deletes (an estimate and a contact) → the question lists "- estimate 'Birch Patio (E0001)'", and the no names both.
+
+### 932. ~~[MEDIUM] A note in the combined delete question is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/conversation/record_notes.py:516` — Edge case. `note_delete_label` ("your note on Ana Reyes: “Gate code 4411”") and the note's name, "the note", are never asserted. (review 2026-10-11 #15, deferred)
+
+**Suggested fix:** Test a note row delete plus a contact delete → the question lists "- your note on Ana Reyes: “Gate code 4411”".
+
+### 933. ~~[MEDIUM] A role's "labor role" wording in the combined question is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/confirm.py:218` — Edge case. The `_KIND_WORD` arm (labour → "labor role 'Foreman'") is never driven. (review 2026-10-11 #16, deferred)
+
+**Suggested fix:** Add a two-delete test with a role → "- labor role 'Foreman'".
+
+### 934. ~~[MEDIUM] A handler's own rewrite beside a write is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/kept_questions.py:137` — Edge case. The REWRITE_OP arm that sets `DONE_KEY` is not reached by a test (the existing one uses a name question). (review 2026-10-11 #17, deferred)
+
+**Suggested fix:** Test `ask_to_rewrite(...)` beside an earlier write → the record carries `DONE_KEY` (only when its original_message is the turn's message, the condition review 2026-10-11 #7 added).
+
+### 935. ~~[MEDIUM] A row not found beside a record found is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/note_pick.py:40` — Edge case. When the listed row isn't `one` (out of range) and the record is, `on_it` is False, so the row is dropped and the record's own note is asked about. No test. (review 2026-10-11 #18, deferred)
+
+**Suggested fix:** Ana's notes listed, a plan with row 9 and parent Bob Lee (one note) → asks about Bob's note.
+
+### 936. ~~[MEDIUM] A work item's note matched by its work item is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/note_pick.py:57` — Edge case. `_is_on` also matches `work_item_id`; no test points a work-item parent at its listed note. (review 2026-10-11 #19, deferred)
+
+**Suggested fix:** Unit test `_is_on` with the `on_item` note and a work_item `Resolved` whose record_id is the JobItem id → True.
+
+### 937. ~~[MEDIUM] `_is_on`'s invalid-id guard is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/note_pick.py:53` — Edge case (defensive). A non-ObjectId note or company id returns False; nothing drives it. (review 2026-10-11 #20, deferred)
+
+**Suggested fix:** Assert `_is_on("x", parent, "y")` is False.
+
+### 938. ~~[MEDIUM] The task finder's question back is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/resolve.py:428` — Edge case. When `find_task_from_context_or_message` returns a clarification (e.g. "the second to last task"), `_task_by_words` returns `unresolved` with that reason. No test. (review 2026-10-11 #21, deferred)
+
+**Suggested fix:** `_resolve(... "the second to last task")` → status `unresolved` and the reason "Which task did you mean? Tell me its name or ID.".
+
+### 939. ~~[MEDIUM] Words and an owner together are untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_records.py:85` — Edge case (an unusual combination). Two sets are intersected and both phrases said; no test. (review 2026-10-11 #22, deferred)
+
+**Suggested fix:** `list_properties {text: "Birch", owner: "Ana Lee", city: "Toronto"}` → 'matching "Birch" owned by Ana Lee in Toronto'.
+
+### 940. ~~[MEDIUM] A property beside a name to try is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_records.py:559` — Edge case. In `_task_ask`, `property` wins over `for_name` (the elif); no test has both. (review 2026-10-11 #23, deferred)
+
+**Suggested fix:** `list_tasks {property: "Birch House", for_name: "Jordan"}` → the Birch House list, and no teammate lookup.
+
+### 941. ~~[MEDIUM] Words beside a price on an estimate's materials are untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_records.py:319` — Edge case. The `said` filter and its ` matching "…"` qualifier are never driven. (review 2026-10-11 #24, deferred)
+
+**Suggested fix:** `{text: "sand", price_above: 10}` on the lines fixture → `Estimate E0001's materials priced over $10.00 matching "sand": Polymeric sand ($20.00).`
+
+### 942. ~~[MEDIUM] A category with no catalog lines on the estimate is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_records.py:357` — Edge case. When no line carries a valid material id, `ids` is empty and nothing is in the category; no test. (review 2026-10-11 #25, deferred)
+
+**Suggested fix:** The lines fixture as seeded (ids "m1", "m2") with a real "Stone" category → "Estimate E0001 doesn't use any materials in Stone."
+
+### 943. ~~[MEDIUM] A work item with no description in the bounds reply is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_estimates.py:332` — Edge case (optional data missing). `name` falls back to "Untitled". (review 2026-10-11 #26, deferred)
+
+**Suggested fix:** A work item with description "" lowered past bounds → 'That would make the tax on "Untitled" …'.
+
+### 944. ~~[MEDIUM] A breakdown whose metric the engine can't read is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_figures.py:52` — Edge case (likely unreachable). `_dashboard_uncovered` returns "filter:dashboard.period" when `_metric_uncovered(metric)` isn't None. (review 2026-10-11 #27, deferred)
+
+**Suggested fix:** Monkeypatch `metric_ask.metric_ask` to return None for a `by_status week` card → `uncovered == "filter:dashboard.period"`. If it proves unreachable, drop the arm.
+
+### 945. ~~[MEDIUM] A counted list by a template's name is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/other_kinds.py:56` — Edge case. `list_estimates {title_contains, count: true}` stays as planned (the `not action.count` guard); no test. (review 2026-10-11 #28, deferred)
+
+**Suggested fix:** Add `{"op": "list_estimates", "filter": {"title_contains": "Driveway Maintenance"}, "count": True}` to `test_anything_else_is_as_planned`.
+
+### 946. ~~[MEDIUM] `as_template`'s company guard is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/other_kinds.py:67` — Edge case (defensive). An invalid company id returns the plan unchanged; nothing drives it. (review 2026-10-11 #29, deferred)
+
+**Suggested fix:** `as_template(plan, "not-an-id")` returns the same plan.
+
+### 1027. ~~[MEDIUM] `_created_reply`: the kept follow-up untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/routers/agent_helpers/estimate_gathering.py:430` — Edge case. Dropping `estimate_id` from the legacy follow-up stash (M23, read by `pending_estimate_follow_up.py:179`) and forcing `optional_follow_up` to None (M24) survive. (review round 13 #9, deferred)
+
+**Suggested fix:** A create with an unlinked description follow-up asserting the stash's `estimate_id` and the kept `optional_follow_up`.
+
+### 1028. ~~[MEDIUM] `_finalize_template_estimate`: "the label skips the lookup" untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/routers/agent_helpers/template_estimate.py:213` — Edge case, M33: passing "" instead of the caller's `property_label` survives, because the lookup returns the same name. (review round 13 #10, deferred)
+
+**Suggested fix:** A template finalize with `property_label="X"` and a `find_one` that must not be awaited.
+
+### 1030. ~~[MEDIUM] `plan_row`: three arms untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** per #1039 only the de-dup-alternates arm is left untested
+
+`platform/scripts/phrasing_reference_rows.py:359` — Edge case: de-duplicating alternates in one cell, appending unreadable rows to `rows`, and the `expect or "gap"` fallback (was "supported" until review round 13 #34) all survive. (review round 13 #14, deferred)
+
+**Suggested fix:** One parser test per arm on a sample table.
+
+### 1031. ~~[MEDIUM] `heading`: two arms untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** per #1039 the heading-reset arm is now tested; the level-3 inherits-parent-default arm is not
+
+`platform/scripts/phrasing_reference_rows.py:290` — Edge case: the table reset on a heading, and a level-3 heading inheriting its parent's default (legacy), survive. (review round 13 #15, deferred)
+
+**Suggested fix:** Two sample-table tests.
+
+### 1032. ~~[MEDIUM] `problems`: two arms untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/phrasing_reference_rows.py:474` — Edge case: skipping unchecked rows (without it, unreadable rows share the key ("", state) and report false "two plans"), and the message de-duplication. (review round 13 #16, deferred)
+
+**Suggested fix:** Two unreadable rows → no "two plans" problem; a repeated problem → reported once.
+
+### 1034. ~~[MEDIUM] `reference_cases` / `_scored_on_its_plan`: legacy rows and two fields untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** legacy rows are now ~3, not 53 (see #1039)
+
+`platform/tests/planner_parity/cases.py:116` — Edge case: dropping every legacy row (plan None, 53 live cases) survives, and `expect_agent` / `note` are never asserted. (review round 13 #18, deferred)
+
+**Suggested fix:** A sample with a legacy checked row → one Case with its agent and note.
+
+### 1035. ~~[MEDIUM] legacy reader arms untested (`_state`, `_mark`, `_phrases`, `add`, `table_row`)~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/phrasing_reference_rows.py:164` — Edge case, pre-existing: the §1 → est and §1.5/§1.11 → wi rules (:164), first-marker order (:148), the "..." arm and separator stripping (:179), de-duplication (:304), and the 🛑-cancel rule (:374). `test_a_cancel_marked_with_the_refusal_sign_is_not_a_refusal_row` can never fail, because its row is unchecked anyway. (review round 13 #19, deferred)
+
+**Suggested fix:** One sample-table test per arm; rewrite the cancel test with a checked row.
+
+### 1048. ~~[MEDIUM] `_note_commands`: `len(ops) == 1` untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/tests/planner_parity/score.py:63` — Edge case, S10: an edit holding both note kinds. (review round 15 #12, deferred)
+
+**Suggested fix:** `[add_estimate_note, add_work_item_note]` against an add_note row → differ.
+
+### 1049. ~~[MEDIUM] `_op_said`: the differ path's `intent_match` never asserted~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/tests/planner_parity/score.py:110` — Edge case, S27. (review round 15 #13, deferred)
+
+**Suggested fix:** Assert `intent_match is True` for the cancel/start_over case (same intent, different op).
+
+### 1050. ~~[MEDIUM] `reference_cases`: first row wins untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/tests/planner_parity/cases.py:124` — Edge case, C3: last-wins would cite the later line in the case id. (review round 15 #14, deferred)
+
+**Suggested fix:** In `test_a_phrasing_listed_twice_with_one_plan_is_one_case`, assert the case id starts with the first row's line.
+
+### 1051. ~~[MEDIUM] `table_line`: a separator inside the table untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/phrasing_reference_rows.py:351` — Edge case, P7. (review round 15 #15, deferred)
+
+**Suggested fix:** A Plan table with a second `|---|` mid-table → no error and no row.
+
+### 1052. ~~[MEDIUM] `read()`: the `" | "` condition untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/phrasing_reference_rows.py:420` — Edge case, P12. (review round 15 #16, deferred)
+
+**Suggested fix:** Prose with a backtick but no " | ", right after a table → no error.
+
+### 1083. ~~[MEDIUM] `_said_above`: the arm where `clarifying_question` differs from `response` is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** _said_above was rewritten (agents/planner/turn.py:506); the differing-clarifying_question arm is still untested
+
+`platform/agents/planner/turn.py:487` — Edge case. At :496, a multi-action reply (`execute._combined`) sets `clarifying_question` to one sub-reply's question, not the whole response, and it must be left as is. Mutant M14 (always replaced) survives. (review round 28 #3, deferred)
+
+**Suggested fix:** `_said_above(PlannerTurn({"response": "Done.\n\nWhich property?", "needs_clarification": True, "clarifying_question": "Which property?"}), None, "x")` keeps `clarifying_question == "Which property?"`, and the response starts "x\n\n".
+
+### 1084. ~~[MEDIUM] `_expanded_amounts`: the Reply path's `after` join looks unreachable~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** _expanded_amounts now at agents/planner/turn.py:477; the `after` join at :492
+
+`platform/agents/planner/turn.py:458` — Edge case (a defensive guard). At :473, `_joined(note, left.text, after)`: `after` is set only beside an action that isn't a follow-up or a thanks, and the first `_figure_left_out` already removed every planned figure carrying an amount, so `rest` can't be None while `after` is set. Mutant M16 survives. (review round 28 #4, deferred)
+
+**Suggested fix:** Drop `after` from that join, with a comment that it can't be set there (simpler), or add a test if a path reaches it. (Since review round 28 #1, a follow-up that made a read also counts as something that runs — re-check reachability with that.)
+
+### 1085. ~~[MEDIUM] `_changes_besides_amount`: the `won_alone` exclusion is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/followups.py:364` — Edge case. `won_alone` is excluded; it matters only if the model sets it without statuses. Mutant M5 survives. (review round 28 #5, deferred)
+
+**Suggested fix:** Test `_prepared("only the ones over $1000", {"op": "refine_last", "won_alone": True, "amount": {"over": 1000}}, last=_CARD)` → `Reply(AMOUNT_UNREAD)`, or drop `won_alone` from the exclusion if it can't occur alone.
+
+### 1086. ~~[MEDIUM] `_material_matches_price_filters`: guard arms untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/material/text_helpers.py:132` — Edge cases: (a) `sizes` not a list → False (:136); (b) a size that isn't a dict is skipped (:143); (c) empty `price_filters` → `all([])` True, so any material matches — only `list_materials_reply`'s `if price_filters:` prevents that. M24 and M25 survive but are equivalent (the single-bound helper rejects these too). (review round 28 #6, deferred)
+
+**Suggested fix:** One unit test in tests/test_material_agent.py: `({"sizes": "x"}, [("gt", 1)])` → False; `({"sizes": ["x", {"price": 5}]}, [("gt", 1), ("lt", 10)])` → True; and return False for empty filters, with an assert.
+
+### 1296. ~~[MEDIUM] dropThirdPartyNoise: an exception value without a stacktrace is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`portal/src/lib/sentryConfig.ts:42` — Edge case: an exception value with no `stacktrace` (the `?? []` fallback), common for unhandledrejection events with non-Error values, is untested; a regression there would throw inside beforeSend and Sentry drops the event silently. (Sentry fixes review 2026-10-17 #47, deferred)
+
+**Suggested fix:** In tests/sentryConfig.test.ts, an event whose `exception.values` = [{ type: "Error", value: "x" }] (no stacktrace); assert dropThirdPartyNoise(event) returns the event.
+
+### 1344. ~~[MEDIUM] build_standard_materials `clean_rows`: a bad cost's exit code is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/build_standard_materials.py:130` — Edge case: a blank or non-numeric cost raises `ValueError`. Round-2 fix #16 now drives that arm (`test_a_bad_cost_names_its_file_and_row` asserts the file/name/size message from `build`); what stays untested is that `main` reports it — returns 1, prints "Nothing written", writes no file. (review 2026-10-20 round 2 #5, deferred)
+
+**Suggested fix:** Test: a row with cost "TBD" → `builder.main([folder, "--out", out]) == 1`, `not out.exists()`.
+
+### 1345. ~~[MEDIUM] build_standard_materials `_brand_from_url`: a mismatched domain is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/build_standard_materials.py:161` — Edge case: a provider URL whose domain doesn't spell the name's first words (`pthorticulture.com` for "Premier Tech …") returns `None` after the loop; no test pins that a mismatched domain names no brand. (review 2026-10-20 round 2 #6, deferred)
+
+**Suggested fix:** Test: "Acme Widget" with description "Provider reference: https://example.com/" builds as "Acme Widget".
+
+### 1346. ~~[MEDIUM] build_standard_materials `brand_names`: a cue naming another brand is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/build_standard_materials.py:178` — Edge case: a description cue naming a brand the name doesn't start with (line 194) falls through to the URL lookup; no test covers it. (review 2026-10-20 round 2 #7, deferred)
+
+**Suggested fix:** Test: name "Erosion Blanket", description "Acme branded system." → name unchanged.
+
+### 1347. ~~[MEDIUM] build_standard_materials `write_outputs`: no `--report` is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/build_standard_materials.py:300` — Edge case: without `--report` (`report_path is None`) only the seed is written; no test runs `main` that way. (review 2026-10-20 round 2 #8, deferred)
+
+**Suggested fix:** Test: `main([folder, "--out", out])` returns 0, writes the seed, and creates no other file in `tmp_path`.
+
+### 1348. ~~[MEDIUM] build_standard_materials `load_rows`: a folder with no blank rows is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/build_standard_materials.py:106` — Edge case: no blank rows (`if blank:` false) adds no "blank rows dropped" section; no test asserts its absence. (review 2026-10-20 round 2 #9, deferred)
+
+**Suggested fix:** Test: one clean row → `"blank rows dropped" not in report`.
+
+### 1349. ~~[MEDIUM] catalog_text `_stem`: the -ies, -ches/-xes and -ing rules are untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/estimate/catalog_text.py:94` — Edge cases in code moved here unchanged (2026-10-20): the "-ies" rule ("supplies" → "supply"), the "-ches/-shes/-sses/-xes/-zes" rule ("benches" → "bench") and the "-ing" rule ("edging" → "edg"); the scorer tests drive only the plural "-s" and "-ed" rules. (review 2026-10-20 round 2 #10, deferred)
+
+**Suggested fix:** Tests in `tests/test_catalog_text.py`: `_stem("supplies") == "supply"`, `_stem("benches") == "bench"`, `_stem("boxes") == "box"`, `_stem("string") == "string"` (guard), `_stem("edging") == "edg"`; and "landscape supplies" matches "Landscape Supply" at or above AUTO.
+
+### 1350. ~~[MEDIUM] catalog_text `build_profile`: the duplicate-stem dedupe is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/estimate/catalog_text.py:123` — Edge case in code moved here unchanged: a stem seen twice with a lower weight the second time keeps the first (`seen.get(stem, 0.0) < weight` false); no test asserts the dedupe. (review 2026-10-20 round 2 #11, deferred)
+
+**Suggested fix:** Test: `build_profile("stone stones") == (("stone", 1.0),)`.
+
+### 1352. ~~[MEDIUM] change_logs `get_unseen`: the no-entries branch is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/routers/change_logs.py:63` — Edge case: an empty change-log collection (line 66, `if newest is None` → `has_unseen` false) is never driven by a test; production always has releases and the test DB keeps whatever entries are there. (review 2026-10-20 What's New badge #3, deferred)
+
+**Suggested fix:** `test_unseen_false_when_no_entries`: monkeypatch `routers.change_logs._newest_entry_id` to an async function returning None, sign up a user, assert GET /change-logs/unseen returns `{"has_unseen": false}`.
+
+### 1353. ~~[MEDIUM] change_logs `mark_seen`: the no-entries branch is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/routers/change_logs.py:77` — Edge case: with no entries (line 85, `if newest is not None` false) nothing is written; no test asserts the user's marker is left untouched and the reply is still `{"has_unseen": false}`. (review 2026-10-20 What's New badge #4, deferred)
+
+**Suggested fix:** `test_mark_seen_without_entries_writes_nothing`: monkeypatch `_newest_entry_id` to return None, POST /change-logs/seen, assert 200 `{"has_unseen": false}` and the user's `changelog_seen_id` is still None.
+
+### 1354. ~~[MEDIUM] useWhatsNewUnseen: the null-response and hidden-tab arms are untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`portal/src/lib/useWhatsNewUnseen.ts:22` — Edge cases: (a) a null response (`apiRequest` returns null on a 204/empty body) leaves the dot unchanged — no test resolves `unseen()` with null; (b) a visibilitychange to a hidden tab must not re-check — the only visibility test fires while jsdom reports "visible". (review 2026-10-20 What's New badge #5, deferred)
+
+**Suggested fix:** (a) `mockedApi.unseen.mockResolvedValue(null as never)`, render, assert hasUnseen stays false after the call settles; (b) `Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true })`, dispatch `visibilitychange`, assert `unseen()` was called only once (the mount); restore the property afterwards.
+
+### 1355. ~~[MEDIUM] copy_storage_files `select_objects`: the folderless-file branch is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/copy_storage_files.py:109` — Edge case: line 113, the `len(parts) < 3` arm — a file directly in a company prefix with no company folder (e.g. `companies/readme.txt`) is counted as an unknown prefix, neither copied nor counted as another company's. No test drives it. (review 2026-10-20 Firebase split #9, deferred)
+
+**Suggested fix:** assert `select_objects(["companies/readme.txt"], {"dev1"}).unknown_prefixes == {"companies": 1}` and that `selected` is empty.
+
+### 1356. ~~[MEDIUM] copy_storage_files `copy_objects`: the no-metadata and no-size branches are untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/copy_storage_files.py:131` — Edge cases: (a) line 151, a source file with no custom metadata (no download token) is uploaded without the follow-up `patch()` — every test file carries metadata; (b) line 145, `source_blob.size or 0` when the SDK reports no size. (review 2026-10-20 Firebase split #10, deferred)
+
+**Suggested fix:** (a) a source file stored with `metadata=None`: assert it is copied, its target metadata is None, and the stand-in recorded no patch; (b) a stand-in blob with `size=None`: assert `copied_bytes` counts it as 0.
+
+### 1357. ~~[MEDIUM] copy_storage_files `rewrite_attachment_urls`: the missing-key and mixed-attachment branches are untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/copy_storage_files.py:168` — Edge cases: (a) line 179, a message doc with no `attachments` key at all (the test's m2 has an empty list, not a missing key); (b) line 184, a message whose attachments mix a copied source-bucket link with another link — only the first should change. (review 2026-10-20 Firebase split #11, deferred)
+
+**Suggested fix:** (a) a message `{"text": "hi"}` is left untouched and not counted; (b) a message with one copied source-bucket attachment and one `https://example.com/x.png` attachment — assert only the first `downloadUrl` changes and the count is 1.
+
+### 1358. ~~[MEDIUM] copy_storage_files `_run`: the no-companies abort is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/copy_storage_files.py:228` — Edge case: line 245, aborting when MongoDB returns no companies (wrong or empty database). (The review's other arm, the same-project refusal, moved into `firebase_split.load_source_and_target` with #7 and is tested there.) (review 2026-10-20 Firebase split #12, deferred)
+
+**Suggested fix:** make the harness's `load_companies` return `[]`; assert exit code 1 and `h.target.uploads == 0`.
+
+### 1359. ~~[MEDIUM] copy_support_chat `_run`: the missing-in-source warning is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/copy_support_chat.py:145` — Edge case: line 163, the warning listing MongoDB conversations with no Firestore doc to copy (`report.missing_in_source`) never runs in a `_run` test — the harness's ids are all in the source. (review 2026-10-20 Firebase split #13, deferred)
+
+**Suggested fix:** have the harness's `load_conversation_ids` return `{"dev1", "gone"}`, run `_run`, and assert (capsys) the output names `gone` under the warning line.
+
+### 1360. ~~[MEDIUM] prune_firebase_users `delete_auth_users`: the error-printing branch is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/prune_firebase_users.py:107` — Edge case: line 115, printing each error when Firebase reports failed deletions — the batching test's stub returns `errors=[]`, so the loop body never runs. (review 2026-10-20 Firebase split #14, deferred)
+
+**Suggested fix:** stub `failure_count=1, errors=[SimpleNamespace(reason="USER_NOT_FOUND")]`; assert `delete_auth_users` returns 1 and capsys output contains `USER_NOT_FOUND`.
+
+### 1361. ~~[MEDIUM] prune_firebase_users `_print_sample`: the truncation branch is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/scripts/prune_firebase_users.py:120` — Edge case: line 124, the "… and N more" line printed when more than `_SAMPLE` (50) users are listed. No test lists more than two; the live dev run took this arm (98 users). (review 2026-10-20 Firebase split #15, deferred)
+
+**Suggested fix:** `_print_sample("t", [AuthUser(f"u{i}", f"u{i}@x.com") for i in range(52)])` — assert capsys output contains "… and 2 more" and exactly 50 user lines.
+
+### 1371. ~~[MEDIUM] edit_estimate: the work-item file sentence beside a question is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_estimates.py:362` — Edge case: the needs_clarification arm with files on the message; the sentence must not be added to a question. (review 2026-10-21 #101, deferred)
+
+**Suggested fix:** Stub edit_reply to ask, files "this" → WORK_ITEM_NOTE_FILES_REFUSAL not in the reply.
+
+### 1373. ~~[MEDIUM] _list_notes: a filed-file ask on a task is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_links.py:213` — Edge case: a filed-file ask on a task (the task details path) gets the D3 sentence; no test drives it. (The no-notes-feed refusal is now tested.) (review 2026-10-21 #103, deferred)
+
+**Suggested fix:** A task parent with "what's in the photo on the fence task?" → the reply ends with FILED_FILES_NOT_READ.
+
+### 1376. ~~[MEDIUM] added_in: the all_time arm is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_added.py:15` — Edge case: added "all_time" falls through to the plain list. (review 2026-10-21 #106, deferred)
+
+**Suggested fix:** list_contacts {added: all_time} → today's plain list.
+
+### 1380. ~~[MEDIUM] undo._what: the delete arm is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/undo.py:85` — Edge case: the delete_ arm ("a delete"). (review 2026-10-21 #110, deferred)
+
+**Suggested fix:** delete_contact then undo → CANT_UNDO "a delete".
+
+### 1381. ~~[MEDIUM] undo._raw: the invalid-id arm is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/undo.py:91` — Edge case: a non-ObjectId record id or company → None. (review 2026-10-21 #111, deferred)
+
+**Suggested fix:** `_raw("contact", "nope", company)` is None.
+
+### 1384. ~~[MEDIUM] undo.after_write: its except arm is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/undo.py:172` — Edge case: `_after_write` raising (keep undoable False, log); only before_write is broken in tests. (review 2026-10-21 #114, deferred)
+
+**Suggested fix:** Monkeypatch `_after_write` to raise → the entry is {"op": …, "undoable": False}.
+
+### 1387. ~~[MEDIUM] undo.question: the nothing-kept arm is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/undo.py:303` — Edge case: no entry → None (which makes _ask_undo return "confirm:undo_nothing"). (review 2026-10-21 #117, deferred)
+
+**Suggested fix:** `question({})` is None.
+
+### 1392. ~~[MEDIUM] hide_material: the write-failed arm is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_catalog.py:92` — Edge case: CatalogError (removed between check and write) → CATALOG_WRITE_FAILED. (review 2026-10-21 #122, deferred)
+
+**Suggested fix:** Make set_hidden raise MaterialNotFound → that reply and no audit entry.
+
+### 1398. ~~[MEDIUM] source_sentence: the hidden suffix is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/execute_catalog.py:224` — Edge case: the " It's hidden from your lists." suffix. (review 2026-10-21 #128, deferred)
+
+**Suggested fix:** A stub hidden standard → ends with that sentence.
+
+### 1402. ~~[MEDIUM] hidden_material_named: the bare-name retry is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/resolve.py:174` — Edge case: the bare-name retry ("the Black Mulch material" → "Black Mulch"). (review 2026-10-21 #132, deferred)
+
+**Suggested fix:** Hide mulch, `hidden_material_named("the <mulch> material", company)` → one, mulch's id.
+
+### 1403. ~~[MEDIUM] find_by_name: the visibility argument is untested at the service~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/services/material_catalog.py:535` — Edge cases: the new invalid-visibility ValueError; no service-level test of visibility="hidden". (review 2026-10-21 #133, deferred)
+
+**Suggested fix:** visibility "nope" raises; with mulch hidden, visibility "hidden" returns only mulch and the default returns nothing.
+
+### 1428. ~~[MEDIUM] `_is_where` (now `_delete_said`): the no-name arm untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+**Checked 2026-10-22:** _is_where is now as_asked_files._delete_said
+
+`platform/agents/planner/as_asked_files.py:108` — Edge case: a delete with no name (by focus, listed) beside an attach is taken as the removal's and dropped. (review 2026-10-21 round 5 #4, deferred. Its arm (b), a removal with an empty place, went with the place check: round 7 #1 replaced it with `_delete_said`, which keeps a delete only when the message says its record is deleted.)
+
+**Suggested fix:** [update_task attach, delete_task {by: focus}] with "attach this to T0042 and remove the photo from that task" → ["update_task"].
+
+### 1431. ~~[MEDIUM] `_ask_copy_offer`: the no-material arm untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/confirm.py:343` — Edge case. With no record id, or `get_effective` finding nothing, the question is worded from the fields as planned (lines 351–352); moved here by round 4 #15 and still untested. (review 2026-10-21 round 5 #7, deferred)
+
+**Suggested fix:** Call it with a target whose record_id is "" and a size rename → the question says "rename the size there".
+
+### 1432. ~~[MEDIUM] `_answer_kept`: a no that asks again with a sentence kept is untested~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/agents/planner/turn.py:161` — Edge case. With `decline_asks` true, the sentence the planner added is not said (line 200): the request is planned again from the answer and says it then. No test pins that the question goes out without it. (review 2026-10-21 round 5 #8, deferred)
+
+**Suggested fix:** The round 4 #19 confirm test with `decline_asks=True` → the reply is "Okay — which contact did you mean?" and doesn't contain MEDIA_REMOVE_REFUSAL.
+
+### 1456. ~~[LOW] Text-block audit rows: the actor is unchecked (review 2026-10-30, MCP enhancements release two)~~ — DROPPED 2026-11-15 (untested edge case: /code-review no longer reports these)
+
+`platform/tests/test_text_blocks_api.py:145` — Edge case. `test_each_change_writes_an_audit_row` checks each row's action, resource and before/after state, but not `user_id`, `user_email` or `user_role`. Those are the fields the 2026-10-30 switch to `actor_of(user)` set. If a later edit passed the wrong user or dropped `decoded_token`, the rows would name nobody or the wrong person and the test would still pass. `actor_of` has its own test (`test_audit_actor.py::test_actor_of_user`); only this router's wiring goes unchecked.
+
+**Suggested fix:** Look up the signed-in user's Mongo id (as `test_audit_coverage.py::_user_id` does). Then assert on the create, update and delete rows that `user_id` is that id, `user_email` is the signed-in email and `user_role` is "Owner".
