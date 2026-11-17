@@ -2,7 +2,7 @@
 
 Canonical catalog of user phrasings Maple supports, organized by resource. Add new use cases you want Maple to handle; Claude will update the ✅/⚠️ status after wiring the classifier rule or confirming existing behavior.
 
-**Last updated:** 2026-11-13
+**Last updated:** 2026-11-15
 
 ### Recent changes
 
@@ -1835,6 +1835,11 @@ One handler (`agents/conversation/record_notes.py`) keeps the notes feed for con
 | `show me his contact info` [contact_focus] | `get_contact` | ✅ the contact in focus — a pronoun is never looked up as a name *(2026-10-01, #703 — "his" matched "Chris", which then took the focus)* |
 | `delete that one` [contact_focus] | `delete_contact` | ✅ the contact in focus — a pronoun is never looked up as a name *(2026-10-01, #703)* |
 | `link John Doe to 123 Main St` / `link 123 Main St to John Doe` / `connect Carla Diaz with the Elm House property` / `add Carla Diaz to 12 Oak St` / `Carla Diaz lives at 12 Oak St` | `link` | ✅ links them (either order); "already linked" when they are *(the guide's own phrasing was unknown on the rules tier)* |
+| `add Bob Lee as the contact on {EST}` / `Bob Lee is the contact for this quote` [est] | `link` | ✅ Bob Lee is already a contact: he is linked, never made twice. A `create_contact` planned beside the link is looked up in the company's contacts first (#947, `existing_records.py`): one contact with that whole name is linked; a name that is only part of one, or the start of one ("add Bob as the contact on E0042"; "Kim Shaw" for Kimberly Shaw) asks *"Just to check — do you mean Bob Lee?"*; several, counting the names it starts (Bob Lee and Bobby Tran for "Bob"), ask which; none is created. A phone, email or role the create gives that he hasn't is his `update_contact`, asked first and run with the link on the yes ("add Bob Lee, 416-555-0100, as the contact on E0042"); the question names it and the value it replaces — *"Just to check — do you mean Bob Lee? A yes also changes the phone from 416-111-1111 to 416-555-0100. (yes/no)"* ("sets the phone to …" when he has none) |
+| `add a contact Bob Lee to Elm House` / `add another contact to Elm House, Bob Lee` | `link` | ✅ a contact added to the property: Bob Lee is linked, never made twice (#947, code review 2026-11-16) |
+| `add a new contact Bob Lee to Elm House` / `create a contact called Bob Lee and link him to Elm House` / `Bob Lee is a different person — add him as a new contact` | `create_contact` | ✅ a new one asked for: created and linked, even beside a Bob Lee (#947) |
+| `the property for this quote is 123 Main St` / `this quote is for 123 Main Street` [est] | `link` | ✅ a property the company has at that address, however it's spelled, is linked, never made twice. A `create_property` planned beside the link is looked up first (#948): the same address (`address_match`) or the same name → linked; only close (a misspelling, another unit) → *"Just to check — do you mean …?"*; several → which; none → created. A name or postal code the property hasn't ("Lake Cottage at 9 Birch Rd") is its `update_property`, asked first and named in the question — *"Just to check — do you mean Birch House? A yes also changes the name from Birch House to Lake Cottage. (yes/no)"* |
+| `add a property at 123 Main St to this estimate` / `create a new property at 123 Main St for Ana Reyes` [est] | `create_property` | ✅ a new one asked for: created and linked (#948) |
 | `link Zed Quill to 12 Oak St` | `link` | ✅ no such contact: "I couldn't find a contact or a property called Zed Quill." |
 | `remove Ana Reyes from 12 Oak St` / `unlink Ana Reyes from 12 Oak St` | refuse `out_of_chat` `unlink` | 🛑 done in the app — §9.8 |
 | `add this to Elm House's notes` / `add a note to Bob Lee with this PDF` / `put this photo on 12 Oak St` [none+photo] | `add_note` attach | ✅ with a photo or PDF on the message (or the previous one): a note with the file(s), signed by you; the body is whatever else was said, and may be nothing (Maple attachments, 2026-10-18) |
