@@ -59,7 +59,7 @@ heading, and its severity is the highest among them. 17 edge-case entries stay, 
 #886, #897, #902, #930), so they stay unchanged. 574 remain. The archive's 2026-11-15 section lists the
 moves.
 
-- **Entries are numbered and permanent.** Next free number: **1680**. Never
+- **Entries are numbered and permanent.** Next free number: **1681**. Never
   reuse or reassign one — the archive keeps them resolvable. `/fix-issues`
   selects by number.
 - **File and function length goes in #4.** Update its table; do not file a new
@@ -372,6 +372,7 @@ seams that already exist as separate classes.
 | 174 | `ActivityRow` — portal/src/components/estimates/ActivitiesTable.tsx:49 (first measured 2026-10-21, same change, +~20 for the Cost cell and read-only `disabled` — review 2026-10-21 #6, deferred. Same `LineCell` extraction as `MaterialRow`, and move the calculator button into an `EffortCalculatorCell`) |
 | 158 | `useWorkItemLines` — portal/src/hooks/useWorkItemLines.ts:35 (new 2026-10-22: the Work Item editor's line state and handlers, lifted out of `WorkItemInlineContent` in the cost → price change — review 2026-10-22 round 2 #3. Next seam: `useMaterialLines({ companyId, catalog, pricing })` and `useActivityLines({ people, pricing })`, the catalog resolution staying in the material half; the component composes the two) |
 | 495 | `WorkItemInlineContent` — portal/src/components/estimates/WorkItemInlineContent.tsx:52 (first recorded 2026-10-22 after the lines hook took 103 lines out (650 → 547 file lines) — review 2026-10-22 round 2 #4. Next seam: the markup / gross-margin / adjust handlers (`handleProfitMarginChange`, `handleGrossMarginChange`, `handleAdjustSet` and the breakdown memos) into a `useWorkItemPricing` hook) |
+| 213 | `WorkItemTotalsTicket` — portal/src/components/estimates/WorkItemTotalsTicket.tsx:271 (first measured 2026-11-19, Recurring Schedule V2 review round 2 #6: pre-existing at 227; the recurring visits block came out as `RecurringTotals`, 227 → 213. Next seams: the Work Item Total row (with Adjust and Original) as `WorkItemTotalRow`, and the markup / overhead / tax rows as `PercentRow`s) |
 | 492 | `TemplatesTab` — portal/src/components/settings/TemplatesTab.tsx:30 (first recorded 2026-10-22 after the company fetch moved into `useCompanyDefaults` (532 → 516 file lines) — review 2026-10-22 round 2 #5. Next seam: the template form dialog state (`editingTemplate`, `isFormOpen`, `handleSave`, `initialWorkItem`) into a `useTemplateForm` hook) |
 | 62 | `signup` — routers/auth.py:493 (first measured 2026-10-28: 53 → 62 for the USER_SIGNUP row — review 2026-10-28, MCP enhancements release one (audit gaps) #13. Move the audit call into `_audit_signup(request, user)` beside `_dispatch_signup_events`) |
 | 118 | `accept_company_invitation` — routers/auth.py:1040 (first measured 2026-10-28: 111 → 118 for the USER_JOIN_COMPANY row — review 2026-10-28, MCP enhancements release one (audit gaps) #14. Extract the company-assignment block, the join row included, into `_join_invited_company(user, invitation, request)`) |
@@ -5942,3 +5943,8 @@ clean either way.
 `platform/agents/planner/undo.py:167` — `_keep` stamps turn on every entry; nothing reads it. (review 2026-10-21 #149, deferred)
 
 **Suggested fix:** Use it for an expiry (an undo of a create days later) or drop it.
+
+### 1680. [LOW] `formatSeason` is exported only for its tests
+`portal/src/lib/recurrenceFormat.ts:331` — Nothing in the app imports `formatSeason`; the export exists for `tests/recurrenceFormat.test.ts`. Deferred from the 2026-11-18 Recurring Schedule V2 review (#35): dropping the export would mean rewriting an existing assertion (`formatSeason(old) === ""`), which has no direct equivalent through `formatScheduleDetail`. A comment on the export now says it is for the tests.
+
+**Suggested fix:** Drop the export and cover an old schedule's empty season through `formatScheduleDetail` (assert the detail has no season part), or leave the test-only export as is.
