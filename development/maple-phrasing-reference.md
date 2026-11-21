@@ -9,15 +9,18 @@ Canonical catalog of user phrasings Maple supports, organized by resource. Add n
 **2026-11-13 (AI apps and what's coming, Simon):** "how do I connect ChatGPT?",
 "set up MCP" and the like are help: Maple gives the app's steps from the guide's
 §9.7 and points to https://3maples.com/ai-apps. Asked what's coming next she
-lists the features on the way — multi-language support (translations
-included), scheduling, resourcing, time tracking, task reminders, job
+lists the features on the way — scheduling, resourcing, time tracking, task reminders, job
 management, invoicing & payments, QuickBooks and reporting & analytics (the
 guide's §10 "Coming soon");
 asked about one, or to use one ("schedule the crew for Monday"), she says it's
 being worked on and coming soon, and what works today. "Remind me to …" is still
 a task, and the Scheduled status still a status. A refusal of any of these
 as `other`, or as the `billing` or `settings_financial` redirect, is help (`as_asked_reads.coming_or_ai_apps_is_help`)
-(new §11.7).
+(new §11.7). **2026-11-18:** multi-language support shipped, so translating
+3Maples' text ("translate E0042 into Spanish", "do you support other languages?")
+is no longer a coming feature: it is help, answered from the guide's §9.9 (the
+Translate button and auto-translate, on screen only). Maple doesn't translate
+the record.
 
 **2026-11-12 (ten to a page, Simon):** every list of records stops at 10 and
 says how far it got — *"That's 1–10 of 25 — say "show more" for the next 10."*
@@ -3561,12 +3564,13 @@ redirect stands, since its words name a record ("add a Scheduling division", "in
 |---|---|---|
 | `how do I connect ChatGPT to 3Maples?` / `can I use 3Maples from Claude?` / `does it work with Cursor?` | `help` | ✅ the app's steps and the website's setup page |
 | `set up the MCP server` / `connect my AI app` / `how do I add 3Maples to Grok?` | `help` | ✅ |
-| `what features are coming next?` / `what's on the roadmap?` / `what's coming soon?` | `help` | ✅ lists the guide's §10 "Coming soon": multi-language support, scheduling, resourcing, time tracking, task reminders, job management, invoicing & payments, QuickBooks, reporting & analytics |
+| `what features are coming next?` / `what's on the roadmap?` / `what's coming soon?` | `help` | ✅ lists the guide's §10 "Coming soon": scheduling, resourcing, time tracking, task reminders, job management, invoicing & payments, QuickBooks, reporting & analytics |
 | `can I schedule my crews?` / `schedule the crew for Monday at Elm House` | `help` | ✅ scheduling is on the way — said as a command too |
 | `do you do resource planning?` / `can I see which crew is free next week?` | `help` | ✅ resourcing is on the way |
 | `can my guys track their time?` / `can we clock in and out?` | `help` | ✅ time tracking is on the way |
 | `will I get a reminder when a task is due?` / `can 3Maples send me task reminders?` | `help` | ✅ task reminders are on the way; "remind me to …" makes a task today |
-| `is the app available in Spanish?` / `do you support other languages?` / `can you translate my estimate into Spanish?` | `help` | ✅ multi-language support, translations included, is on the way; Maple already chats in any |
+| `is the app available in Spanish?` / `do you support other languages?` / `can you translate my estimate into Spanish?` | `help` | ✅ the translate button and auto-translate (guide §9.9); the app's menus stay English; Maple already chats in any |
+| `translate {EST} into Spanish` [est] | `help` | ✅ said as a command too: the Translate button and auto-translate translate on screen (guide §9.9); Maple doesn't translate the record (2026-11-18) |
 | `can I invoice my customers from 3Maples?` / `can I take payments from customers?` / `do you integrate with QuickBooks?` | `help` | ✅ on the way |
 | `show me my invoices` | refuse `out_of_chat` `billing` | 🛑 3Maples' own invoices are on the Billing tab — not invoicing customers |
 | `add a Scheduling division` | refuse `out_of_chat` `divisions` | 🛑 a division named Scheduling, not the scheduling feature — the Divisions redirect stands |
